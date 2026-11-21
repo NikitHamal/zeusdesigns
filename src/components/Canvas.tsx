@@ -420,39 +420,38 @@ export function InfiniteCanvas() {
     }
     // frame | shape | pen drags
     const kind = tool === "frame" ? "frame" : tool === "shape" ? "shape" : "pen";
-    setDraft({ kind, x0: w.x, y0: w.y, x1: w.x, y1: w.y, pts: [[w.x, w.y]] });
+    const pts: [number, number][] = [[w.x, w.y]];
+    setDraft({ kind, x0: w.x, y0: w.y, x1: w.x, y1: w.y, pts });
     const mv = (ev: PointerEvent) => {
       const p = toWorld(ev.clientX, ev.clientY);
-      setDraft((d) => (d ? { ...d, x1: p.x, y1: p.y, pts: kind === "pen" ? [...d.pts, [p.x, p.y]] : d.pts } : d));
+      if (kind === "pen") pts.push([p.x, p.y]);
+      setDraft({ kind, x0: w.x, y0: w.y, x1: p.x, y1: p.y, pts: kind === "pen" ? [...pts] : pts });
     };
     const upH = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH);
       const p = toWorld(ev.clientX, ev.clientY);
-      setDraft((d) => {
-        if (!d) return null;
-        const S = useStore.getState();
-        const x = Math.min(d.x0, p.x), y = Math.min(d.y0, p.y), ww = Math.abs(p.x - d.x0), hh = Math.abs(p.y - d.y0);
-        if (kind === "frame") {
-          const big = ww > 40 && hh > 40;
-          const ab = S.addBlankFrame(big ? x : d.x0, big ? y : d.y0, big ? ww : 390, big ? hh : 844);
-          S.setSel([ab.id]); S.setTool("select");
-        } else if (kind === "shape") {
-          const sh = S.shape;
-          const line = sh === "line" || sh === "arrow";
-          if (ww > 6 || hh > 6) {
-            const el = S.addElement({
-              kind: "shape", shape: sh, x, y, w: Math.max(ww, line ? 1 : 12), h: Math.max(hh, line ? 1 : 12), color: "var(--m-primary)",
-              points: line ? [[d.x0 - x, d.y0 - y], [p.x - x, p.y - y]] : undefined,
-            });
-            S.setSel([el.id]); S.setTool("select");
-          }
-        } else if (d.pts.length > 2) {
-          const xs = d.pts.map((q) => q[0]), ys = d.pts.map((q) => q[1]);
-          const bx = Math.min(...xs), by = Math.min(...ys);
-          S.addElement({ kind: "pen", x: bx, y: by, w: Math.max(...xs) - bx, h: Math.max(...ys) - by, color: "var(--m-primary)", points: d.pts.map(([a, b]) => [a - bx, b - by] as [number, number]) });
+      const S = useStore.getState();
+      const x = Math.min(w.x, p.x), y = Math.min(w.y, p.y), ww = Math.abs(p.x - w.x), hh = Math.abs(p.y - w.y);
+      if (kind === "frame") {
+        const big = ww > 40 && hh > 40;
+        const ab = S.addBlankFrame(big ? x : w.x, big ? y : w.y, big ? ww : 390, big ? hh : 844);
+        S.setSel([ab.id]); S.setTool("select");
+      } else if (kind === "shape") {
+        const sh = S.shape;
+        const line = sh === "line" || sh === "arrow";
+        if (ww > 6 || hh > 6) {
+          const el = S.addElement({
+            kind: "shape", shape: sh, x, y, w: Math.max(ww, line ? 1 : 12), h: Math.max(hh, line ? 1 : 12), color: "var(--m-primary)",
+            points: line ? [[w.x - x, w.y - y], [p.x - x, p.y - y]] : undefined,
+          });
+          S.setSel([el.id]); S.setTool("select");
         }
-        return null;
-      });
+      } else if (pts.length > 2) {
+        const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+        const bx = Math.min(...xs), by = Math.min(...ys);
+        S.addElement({ kind: "pen", x: bx, y: by, w: Math.max(...xs) - bx, h: Math.max(...ys) - by, color: "var(--m-primary)", points: pts.map(([a, b2]) => [a - bx, b2 - by] as [number, number]) });
+      }
+      setDraft(null);
     };
     window.addEventListener("pointermove", mv);
     window.addEventListener("pointerup", upH);
