@@ -17,7 +17,7 @@ split-screen studio with an infinite multi-artboard canvas, free keyless AI prov
 
 - **Chat and canvas**: sidebar with date-grouped chats, a split chat and infinite canvas, one model and effort picker, per-screen export, pages.
 - **Memory**: four buckets (preferences, profile, topics, areas) that you can edit by hand or by telling Zeus what to change. Stored natively in `.zeusdesigns/memory.json` and added to every prompt.
-- **Connectors**: built-in design token and workspace tools, plus a store of real keyless MCP servers (shadcn/ui, Magic UI, Playwright, Chrome DevTools, Context7, Fetch, Filesystem, Knowledge graph, Sequential thinking, Time) and custom stdio servers. Node.js (npx) or uv (uvx) must be installed for the server you pick.
+- **Connectors**: Zeus Studio (built-in, offline: brief, palette, contrast, fonts, icons, components, tokens, screen lint), design token and workspace tools, plus a store of real keyless MCP servers (shadcn/ui, Magic UI, Playwright, Chrome DevTools, Context7, Fetch, DuckDuckGo, Open WebSearch, Wikipedia, MarkItDown, Filesystem, Knowledge graph, Sequential thinking, Time) and custom stdio servers. Node.js (npx) or uv (uvx) must be installed for the server you pick.
 - **Harness**: per-design-system component kit, archetype blueprints, a tool loop that feeds results back to the model, and an automatic layout audit that renders each screen off-screen, measures overflow, overlap, contrast, clipping and dead space, then repairs severe defects.
 
 ## Download
