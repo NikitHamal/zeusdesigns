@@ -1,4 +1,6 @@
-use crate::crypto::{fake_ipv4, generate_deepai_tryit_key, pseudo_random_u64, random_hex, uuid_v4};
+use crate::crypto::{
+    fake_ipv4, generate_deepai_tryit_key, pseudo_random_u64, random_hex, sha256_hex, uuid_v4,
+};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -73,11 +75,23 @@ pub struct ChatRequest {
     pub custom: Option<CustomEndpoint>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QwenAppAccount {
+    pub email: String,
+    pub password: String,
+    pub device: String,
+    pub token: String,
+    pub created: u64,
+    #[serde(default)]
+    pub cool_until: u64,
+}
+
 #[derive(Default)]
 pub struct ProviderSessionState {
     pub inception_token: Option<(String, u64)>,
     pub motif_conversation_id: Option<String>,
     pub gemini_session: Option<GeminiWarmSession>,
+    pub qwen_accounts: Vec<QwenAppAccount>,
     pub active_cancels: HashMap<String, Arc<AtomicBool>>,
 }
 
@@ -785,6 +799,365 @@ where
     }
 }
 
+const QWEN_APP_BASE: &str = "https://chat.qwen.ai/api/v2";
+const QWEN_MAIL_BASE: &str = "https://api.0mail.tech/v1";
+const QWEN_APP_UA: &str = "Dalvik/2.1.0 (Linux; U; Android 15; 25028RN03A Build/AP3A.240905.015.A2) AliApp(QWENCHAT/2.5.1) AppType/Release AplusBridgeLite,Dalvik/2.1.0 (Linux; U; Android 15; 25028RN03A Build/AP3A.240905.015.A2)";
+const QWEN_APP_WAF: &str = "Z9Tr56YmQpXcO2K_d_3nAbJvRqMLFW8HTNjvRguWHEowM1xY";
+
+fn qwen_pool_file() -> std::path::PathBuf {
+    let base = std::env::var("APPDATA")
+        .or_else(|_| std::env::var("HOME"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir());
+    let dir = base.join(".zeusdesigns");
+    let _ = std::fs::create_dir_all(&dir);
+    dir.join("qwen_pool.json")
+}
+
+fn extract_activate_link(body: &str) -> Option<String> {
+    let idx = body.find("auths/activate")?;
+    let before = &body[..idx];
+    let http_start = before.rfind("http")?;
+    let rest = &body[http_start..];
+    let end = rest
+        .find(|c: char| matches!(c, '"' | '\'' | '<' | '>' | ' ' | '\r' | '\n'))
+        .unwrap_or(rest.len());
+    Some(rest[..end].replace("&amp;", "&"))
+}
+
+fn provision_qwen_account() -> Result<QwenAppAccount, String> {
+    let client = build_client(25)?;
+    let sess = uuid_v4();
+    let device = format!("ai{}", random_hex(32));
+
+    let dom_resp = client
+        .get(format!("{}/domains", QWEN_MAIL_BASE))
+        .header("X-Session-Id", &sess)
+        .send()
+        .map_err(|e| format!("0mail domains failed: {}", e))?;
+    let doms: Value = dom_resp.json().map_err(|e| e.to_string())?;
+    let domain = doms
+        .as_array()
+        .and_then(|arr| {
+            arr.iter().find_map(|d| {
+                let avail = d.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
+                let prem = d.get("premium").and_then(|v| v.as_bool()).unwrap_or(false);
+                let name = d.get("domain").and_then(|v| v.as_str()).unwrap_or("");
+                if avail && !prem && !name.is_empty() && name != "cfdevelopment.online" {
+                    Some(name.to_string())
+                } else {
+                    None
+                }
+            })
+        })
+        .ok_or_else(|| "No available 0mail domain".to_string())?;
+
+    let inbox_resp = client
+        .post(format!("{}/inboxes", QWEN_MAIL_BASE))
+        .header("X-Session-Id", &sess)
+        .json(&json!({ "domain": domain }))
+        .send()
+        .map_err(|e| format!("0mail inbox failed: {}", e))?;
+    let inbox: Value = inbox_resp.json().map_err(|e| e.to_string())?;
+    let email = inbox
+        .get("address")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "0mail missing address".to_string())?
+        .to_string();
+    let inbox_id = inbox
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "0mail missing id".to_string())?
+        .to_string();
+
+    let password = format!("Aa1!{}", random_hex(14));
+    let pw_hash = sha256_hex(password.as_bytes());
+    let short_name = format!("Neb {}", &email[..email.len().min(5)]);
+
+    let signup_resp = client
+        .post(format!("{}/auths/signup", QWEN_APP_BASE))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("Accept", "application/json")
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("Accept-Language", "en-US")
+        .header("Cache-Control", "no-store")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-request-id", uuid_v4())
+        .header("x-device-id", &device)
+        .json(&json!({
+            "email": email,
+            "password": pw_hash,
+            "name": short_name
+        }))
+        .send()
+        .map_err(|e| format!("Qwen signup failed: {}", e))?;
+    let signup_json: Value = signup_resp.json().unwrap_or_default();
+    if signup_json.get("success").and_then(|v| v.as_bool()) != Some(true) {
+        return Err("Qwen signup rejected".to_string());
+    }
+
+    let mut activate_link = None;
+    for _ in 0..18 {
+        std::thread::sleep(Duration::from_millis(1200));
+        if let Ok(r) = client
+            .get(format!("{}/inboxes/{}/messages", QWEN_MAIL_BASE, inbox_id))
+            .header("X-Session-Id", &sess)
+            .send()
+        {
+            if let Ok(msgs) = r.json::<Value>() {
+                if let Some(arr) = msgs.as_array() {
+                    for m in arr {
+                        let body = m.get("body").and_then(|v| v.as_str()).unwrap_or("");
+                        if let Some(l) = extract_activate_link(body) {
+                            activate_link = Some(l);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if activate_link.is_some() {
+            break;
+        }
+    }
+
+    let link = activate_link.ok_or_else(|| "Qwen activation email timeout".to_string())?;
+    if let Ok(no_redir) = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(20))
+        .build()
+    {
+        let _ = no_redir
+            .get(&link)
+            .header("User-Agent", QWEN_APP_UA)
+            .header("X-Platform", "android")
+            .header("source", "app")
+            .header("app_waf", QWEN_APP_WAF)
+            .header("x-device-id", &device)
+            .send();
+    }
+
+    let signin_resp = client
+        .post(format!("{}/auths/signin", QWEN_APP_BASE))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("Accept", "application/json")
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-request-id", uuid_v4())
+        .header("x-device-id", &device)
+        .json(&json!({
+            "email": email,
+            "password": pw_hash
+        }))
+        .send()
+        .map_err(|e| format!("Qwen signin failed: {}", e))?;
+    let signin_json: Value = signin_resp.json().map_err(|e| e.to_string())?;
+    let token = signin_json
+        .get("data")
+        .and_then(|d| d.get("token"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("")
+        .to_string();
+    if token.is_empty() {
+        return Err("Qwen signin missing token".to_string());
+    }
+
+    Ok(QwenAppAccount {
+        email,
+        password,
+        device,
+        token,
+        created: now_secs(),
+        cool_until: 0,
+    })
+}
+
+fn acquire_qwen_account(engine: &ProviderEngine) -> Result<QwenAppAccount, String> {
+    let now = now_secs();
+    if let Ok(mut guard) = engine.state.lock() {
+        if guard.qwen_accounts.is_empty() {
+            let path = qwen_pool_file();
+            if let Ok(raw) = std::fs::read_to_string(&path) {
+                if let Ok(loaded) = serde_json::from_str::<Vec<QwenAppAccount>>(&raw) {
+                    guard.qwen_accounts = loaded;
+                }
+            }
+        }
+        if let Some(acct) = guard
+            .qwen_accounts
+            .iter()
+            .find(|a| !a.token.is_empty() && a.cool_until <= now)
+            .cloned()
+        {
+            return Ok(acct);
+        }
+    }
+
+    let fresh = provision_qwen_account()?;
+    if let Ok(mut guard) = engine.state.lock() {
+        guard.qwen_accounts.push(fresh.clone());
+        if let Ok(raw) = serde_json::to_string_pretty(&guard.qwen_accounts) {
+            let _ = std::fs::write(qwen_pool_file(), raw);
+        }
+    }
+    Ok(fresh)
+}
+
+/// Stream from Qwen via the native Android App Gateway (`https://chat.qwen.ai/api/v2`, ported from `qwen_app.py`).
+pub fn stream_qwen_app<F>(
+    engine: &ProviderEngine,
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    effort: &str,
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let acct = acquire_qwen_account(engine)?;
+    let qwen_model = if model.is_empty() || model == "qwen4-max" {
+        "qwen3.8-max"
+    } else {
+        model
+    };
+    let thinking = effort == "high" || effort == "max";
+
+    let mut prompt = String::new();
+    if !system.trim().is_empty() {
+        prompt.push_str(&format!("[System]\n{}\n\n", system));
+    }
+    if messages.len() > 1 {
+        prompt.push_str("[Conversation so far]\n");
+        for m in &messages[..messages.len() - 1] {
+            let r = if m.role == "assistant" { "Assistant" } else { "User" };
+            prompt.push_str(&format!("{}: {}\n", r, m.content));
+        }
+        prompt.push('\n');
+    }
+    if let Some(last) = messages.last() {
+        prompt.push_str(&format!("[User]\n{}", last.content));
+    }
+
+    let client = build_client(120)?;
+    let new_resp = client
+        .post(format!("{}/chats/new", QWEN_APP_BASE))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("Accept", "application/json")
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-request-id", uuid_v4())
+        .header("x-device-id", &acct.device)
+        .header("Authorization", format!("Bearer {}", acct.token))
+        .json(&json!({ "chat_mode": "normal", "project_id": "" }))
+        .send()
+        .map_err(|e| format!("Qwen chats/new failed: {}", e))?;
+
+    let new_json: Value = new_resp.json().map_err(|e| e.to_string())?;
+    let chat_id = new_json
+        .get("data")
+        .and_then(|d| d.get("id"))
+        .and_then(|i| i.as_str())
+        .ok_or_else(|| "Qwen chats/new missing id".to_string())?
+        .to_string();
+
+    let ts = now_secs();
+    let payload = json!({
+        "stream": true,
+        "incremental_output": true,
+        "chat_id": chat_id,
+        "chat_mode": "normal",
+        "model": qwen_model,
+        "version": "2.1",
+        "timestamp": ts,
+        "share_id": "",
+        "origin_branch_message_id": "",
+        "messages": [{
+            "chat_type": "t2t",
+            "content": prompt,
+            "role": "user",
+            "timestamp": ts,
+            "sub_chat_type": "t2t",
+            "models": [qwen_model],
+            "user_action": "chat",
+            "extra": { "meta": { "subChatType": "t2t" } },
+            "feature_config": {
+                "output_schema": "phase",
+                "thinking_enabled": thinking,
+                "thinking_format": "summary",
+                "auto_thinking": false,
+                "auto_search": false
+            }
+        }]
+    });
+
+    let comp_resp = client
+        .post(format!("{}/chat/completions?chat_id={}", QWEN_APP_BASE, chat_id))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("Accept", "*/*,text/event-stream")
+        .header("Content-Type", "application/json; charset=UTF-8")
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-request-id", uuid_v4())
+        .header("x-device-id", &acct.device)
+        .header("Authorization", format!("Bearer {}", acct.token))
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Qwen completions failed: {}", e))?;
+
+    if !comp_resp.status().is_success() {
+        return Err(format!("Qwen HTTP {}", comp_resp.status()));
+    }
+
+    let mut reader = BufReader::new(comp_resp);
+    let mut line = String::new();
+    let mut saw_text = false;
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(delta) = ev
+                    .get("choices")
+                    .and_then(|c| c.get(0))
+                    .and_then(|c0| c0.get("delta"))
+                {
+                    let phase = delta.get("phase").and_then(|p| p.as_str()).unwrap_or("answer");
+                    let content = delta.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                    if phase == "answer" && !content.is_empty() {
+                        saw_text = true;
+                        on_delta(content);
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+
+    let _ = client
+        .delete(format!("{}/chats/{}", QWEN_APP_BASE, chat_id))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-device-id", &acct.device)
+        .header("Authorization", format!("Bearer {}", acct.token))
+        .send();
+
+    if saw_text {
+        Ok(())
+    } else {
+        Err("Qwen app stream ended without answer".to_string())
+    }
+}
+
 /// Stream from LongCat (`https://longcat.chat/api/v1/chat-completion-oversea-V2`, LongCat 2.5 1.6T MoE).
 pub fn stream_longcat<F>(
     system: &str,
@@ -1202,7 +1575,8 @@ where
             &mut on_delta,
         ),
         "deepai" => stream_deepai(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "qwen" => stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta)
+        "qwen" => stream_qwen_app(engine, &req.model, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
+            .or_else(|_| stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta))
             .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, cancel, &mut on_delta)),
         "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
         "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),

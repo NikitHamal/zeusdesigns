@@ -87,17 +87,30 @@ impl McpRegistry {
     }
 
     pub fn add(&self, name: String, command: String, args: Option<Vec<String>>, transport: Option<String>) -> Vec<McpServer> {
+        self.add_with_id(None, name, command, args, transport)
+    }
+
+    pub fn add_with_id(
+        &self,
+        custom_id: Option<String>,
+        name: String,
+        command: String,
+        args: Option<Vec<String>>,
+        transport: Option<String>,
+    ) -> Vec<McpServer> {
         let mut guard = match self.servers.lock() {
             Ok(g) => g,
             Err(_) => return Vec::new(),
         };
-        let id = format!(
-            "mcp-{}",
-            name.to_lowercase()
-                .chars()
-                .map(|c| if c.is_alphanumeric() { c } else { '-' })
-                .collect::<String>()
-        );
+        let id = custom_id.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| {
+            format!(
+                "mcp-{}",
+                name.to_lowercase()
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                    .collect::<String>()
+            )
+        });
         let t = transport.unwrap_or_else(|| {
             if command.starts_with("http://") || command.starts_with("https://") {
                 "http".to_string()
@@ -251,15 +264,37 @@ pub fn mcp_list(registry: tauri::State<'_, McpRegistry>) -> Vec<McpServer> {
     registry.list()
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct McpServerInput {
+    pub id: Option<String>,
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Option<Vec<String>>,
+    #[serde(default)]
+    pub transport: Option<String>,
+}
+
 #[tauri::command]
 pub fn mcp_add(
-    name: String,
-    command: String,
+    server: Option<McpServerInput>,
+    name: Option<String>,
+    command: Option<String>,
     args: Option<Vec<String>>,
     transport: Option<String>,
     registry: tauri::State<'_, McpRegistry>,
 ) -> Vec<McpServer> {
-    registry.add(name, command, args, transport)
+    if let Some(s) = server {
+        registry.add_with_id(s.id, s.name, s.command, s.args, s.transport)
+    } else {
+        registry.add_with_id(
+            None,
+            name.unwrap_or_else(|| "Custom MCP".to_string()),
+            command.unwrap_or_default(),
+            args,
+            transport,
+        )
+    }
 }
 
 #[tauri::command]
