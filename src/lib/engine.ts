@@ -106,6 +106,12 @@ async function demoRun(opts: {
       await sleep(delay);
     }
   };
+  if (opts.target && !opts.asVariant && opts.target.html.includes("Empty frame")) {
+    const arche = detectArchetype(opts.prompt, opts.target.device);
+    await emit(`Filling **${opts.target.name}** with a ${arche} design in **${ds.name}**.\n\n`, 40, 12);
+    await emit(`<artboard name="${arche[0].toUpperCase() + arche.slice(1)}" device="${opts.target.device}" mode="revise" id="${opts.target.id}">\n${renderScreen(ds, arche, 0, opts.target.device, "Zeus")}\n</artboard>`);
+    return;
+  }
   if (opts.target && !opts.asVariant) {
     const r = demoRevise(opts.target.html, opts.prompt);
     await emit(`Updated **${opts.target.name}** — ${r.note}.\n\n_Demo engine: connect a real model (Mercury 3, Qwen…) in the native app for full redesigns._\n\n`, 40, 12);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle, Brain, Check, ChevronDown, Copy, FileText, Folder, FolderOpen, FolderTree, History, MessageSquare, MessageSquarePlus, PanelLeftClose, Paperclip,
-  Pin, Plus, Square, ArrowUp, Sparkles, Trash2, Wrench, X, Zap, Image as ImageIcon, BookmarkPlus, Palette, ChevronRight, KeyRound,
+  Pin, Plus, Square, ArrowUp, Sparkles, Trash2, Wrench, X, Zap, Image as ImageIcon, BookmarkPlus, Palette, ChevronRight, KeyRound, RotateCcw,
 } from "lucide-react";
 import { activeConv, useStore } from "../store";
 import type { Attachment, FileNode, Message, Quote } from "../types";
@@ -69,6 +69,17 @@ function ArtboardCards({ ids }: { ids: string[] }) {
   );
 }
 
+function retry(m: Message) {
+  const st = useStore.getState();
+  if (st.busy) return;
+  const c = activeConv(st);
+  const idx = c.messages.findIndex((x) => x.id === m.id);
+  const u = c.messages[idx - 1];
+  if (!u || u.role !== "user") return;
+  useStore.setState((s) => ({ conversations: s.conversations.map((cc) => (cc.id === c.id ? { ...cc, messages: cc.messages.slice(0, idx - 1) } : cc)) }));
+  sendMessage({ text: u.text, attachments: u.attachments, quote: u.quote });
+}
+
 function MessageView({ m }: { m: Message }) {
   const addMemory = useStore((s) => s.addMemory);
   const notify = useStore((s) => s.notify);
@@ -102,6 +113,7 @@ function MessageView({ m }: { m: Message }) {
         {!m.streaming && (
           <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
             <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Copy size={13} /></IconBtn>
+            <IconBtn label="Retry" size={28} onClick={() => retry(m)}><RotateCcw size={13} /></IconBtn>
             <IconBtn label="Remember this" size={28} onClick={() => { addMemory(m.text.slice(0, 240)); notify("Saved to Memory"); }}><BookmarkPlus size={13} /></IconBtn>
             {m.model && <span className="ml-1">{m.model}</span>}
             {m.stats?.tps ? <span className="rounded-full bg-tertiary-container px-2 py-0.5 font-semibold text-on-tertiary-container">⚡ {m.stats.tps.toLocaleString()} tok/s</span> : null}

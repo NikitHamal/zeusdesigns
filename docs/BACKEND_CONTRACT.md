@@ -53,3 +53,19 @@ The assistant emits live screens as tagged HTML blocks that the canvas renders i
 </artboard>
 ```
 `mode="revise"` + `id` replaces the HTML of an existing artboard (as a new version).
+
+## Linking the C++20 engine (`/include/zeus`, `/engine`) into the Tauri shell
+
+The shell is Rust (Tauri 2 / WebView2). The native C++ engine plugs in through a **C ABI**:
+
+1. Expose a flat C surface in the engine (e.g. `zeus_chat_stream(const char* req_json, void (*cb)(const char* event_json, void* ud), void* ud)`,
+   `zeus_cancel`, `zeus_title`, `zeus_workspace_tree`, `zeus_memory_*`, `zeus_mcp_*`). JSON strings in/out keep ABI trivial.
+2. In `src-tauri/Cargo.toml` add `cc = "1"` under `[build-dependencies]` and compile the engine in `src-tauri/build.rs`
+   (`cc::Build::new().cpp(true).std("c++20").files(...).compile("zeus_engine")`) before `tauri_build::build()`.
+3. In a new `src-tauri/src/engine.rs` declare the `extern "C"` functions and wrap them as `#[tauri::command]`s from the table above;
+   forward callback JSON to the window with `app.emit(&format!("zeus://chat/{request_id}"), payload)`.
+4. Register the commands in `lib.rs` (`invoke_handler`). The UI flips to the native path automatically as soon as
+   `providers_list` resolves (`ui.nativeReady`), no UI change needed.
+
+Provider slugs sent by the UI: `mercury3`, `geminiweb`, `qwen`, `k2horizon`, `motif`, `longcat`, `deepai`, `chatjimmy`, `custom`.
+Unknown model ids must fall back to the provider's default model.
