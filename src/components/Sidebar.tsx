@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { activeConv, useStore } from "../store";
 import { openWorkspace } from "../lib/bridge";
 import { cn } from "../utils/cn";
-import { Dialog, IconBtn } from "./ui";
+import { Dialog, Dropdown, IconBtn, MenuItem } from "./ui";
 import { Icon } from "./Icon";
 
 function NavItem({ icon, label, onClick, active, right }: { icon: string; label: string; onClick: () => void; active?: boolean; right?: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={cn("state flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium text-on-surface", active && "bg-surface-high")}>
+    <button onClick={onClick} className={cn("state flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[14px] font-medium text-on-surface", active && "bg-surface-high")}>
       <Icon name={icon} size={20} />
       <span className="flex-1 truncate">{label}</span>
       {right}
@@ -49,19 +49,99 @@ function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
+function group(at: number): string {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const day = 86400000;
+  if (at >= d0.getTime()) return "Today";
+  if (at >= d0.getTime() - day) return "Yesterday";
+  if (at >= d0.getTime() - 7 * day) return "Previous 7 days";
+  return "Older";
+}
+
+function ChatRow({ id, title, active }: { id: string; title: string; active: boolean }) {
+  const [rename, setRename] = useState(false);
+  const { setActiveConv, deleteConv, setTitle } = useStore.getState();
+  const patchUI = useStore((s) => s.patchUI);
+  if (rename) {
+    return (
+      <input
+        autoFocus defaultValue={title} spellCheck={false}
+        onBlur={(e) => { if (e.target.value.trim()) setTitle(id, e.target.value.trim()); setRename(false); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRename(false); }}
+        className="h-9 w-full rounded-lg border border-primary bg-transparent px-3 text-[14px] outline-none"
+      />
+    );
+  }
+  return (
+    <div className={cn("group relative rounded-lg", active && "bg-surface-high")}>
+      <button onClick={() => { setActiveConv(id); patchUI({ showCanvas: false }); }} onDoubleClick={() => setRename(true)} className="state flex h-9 w-full items-center rounded-lg px-3 pr-9 text-left text-[14px] text-on-surface">
+        <span className="truncate">{title}</span>
+      </button>
+      <Dropdown align="right" width={180} className="!absolute right-1 top-1/2 -translate-y-1/2" trigger={({ toggle, open }) => (
+        <button onClick={toggle} title="More" aria-label="More" className={cn("state grid size-7 place-items-center rounded-md text-on-surface-variant group-hover:opacity-100", open ? "opacity-100" : "opacity-0")}><Icon name="more_horiz" size={18} /></button>
+      )}>
+        {(close) => (
+          <>
+            <MenuItem icon={<Icon name="edit" size={16} />} label="Rename" onClick={() => { close(); setRename(true); }} />
+            <MenuItem danger icon={<Icon name="delete" size={16} />} label="Delete" onClick={() => { close(); deleteConv(id); }} />
+          </>
+        )}
+      </Dropdown>
+    </div>
+  );
+}
+
+function AccountMenu() {
+  const theme = useStore((s) => s.settings.theme);
+  const patch = useStore((s) => s.patchSettings);
+  const patchUI = useStore((s) => s.patchUI);
+  const version = useStore((s) => s.ui.version);
+  const update = useStore((s) => s.ui.update);
+  const link = "state flex w-full items-center gap-3 rounded-[16px] px-3 py-2 text-left text-sm text-on-surface";
+  return (
+    <Dropdown up width={248} className="w-full" trigger={({ toggle, open }) => (
+      <button onClick={toggle} className={cn("state flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left", open && "bg-surface-high")}>
+        <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-primary-container text-[13px] font-semibold text-on-primary-container">Z{update?.available && <i className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface-dim bg-primary" />}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-on-surface">Zeus</span><span className="block truncate text-xs text-on-surface-variant">{version ? `v${version.replace(/^v/, "")}` : "Local"}</span></span>
+        <Icon name="expand_more" size={16} className="text-on-surface-variant" />
+      </button>
+    )}>
+      {(close) => (
+        <>
+          <MenuItem icon={<Icon name="settings" size={18} />} label="Settings" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "appearance" }); }} />
+          <MenuItem icon={<Icon name="psychology" size={18} />} label="Memory" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "memory" }); }} />
+          <MenuItem icon={<Icon name="extension" size={18} />} label="Connectors" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "mcp" }); }} />
+          <div className="my-1.5 border-t border-outline-variant/70" />
+          {([["light", "Light", "light_mode"], ["dark", "Dark", "dark_mode"], ["system", "System", "computer"]] as const).map(([id, label, icon]) => (
+            <MenuItem key={id} icon={<Icon name={icon} size={18} />} label={label} active={theme === id} onClick={() => patch({ theme: id })} />
+          ))}
+          <div className="my-1.5 border-t border-outline-variant/70" />
+          <MenuItem icon={<Icon name={update?.available ? "system_update" : "refresh"} size={18} />} label={update?.available ? `Update to ${update.latest}` : "Check for updates"} onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "updates" }); }} />
+          <a href="https://github.com/NikitHamal/zeusdesigns/issues" target="_blank" rel="noreferrer" className={link}><Icon name="help" size={18} />Get help</a>
+          <a href="https://github.com/NikitHamal/zeusdesigns" target="_blank" rel="noreferrer" className={link}><Icon name="open_in_new" size={18} />Source code</a>
+        </>
+      )}
+    </Dropdown>
+  );
+}
+
 export function Sidebar() {
   const convs = useStore((s) => s.conversations);
   const current = useStore(activeConv);
   const ui = useStore((s) => s.ui);
   const patchUI = useStore((s) => s.patchUI);
   const notify = useStore((s) => s.notify);
-  const theme = useStore((s) => s.settings.theme);
-  const patch = useStore((s) => s.patchSettings);
-  const { newConversation, setActiveConv, deleteConv } = useStore.getState();
+  const { newConversation } = useStore.getState();
   const [search, setSearch] = useState(false);
-  const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [open, setOpen] = useState(true);
   const list = convs.filter((c) => c.messages.length > 0);
   const split = current.messages.length > 0 || ui.showCanvas;
+  const groups = useMemo(() => {
+    const order = ["Today", "Yesterday", "Previous 7 days", "Older"];
+    const m = new Map<string, typeof list>();
+    for (const c of [...list].sort((a, b) => b.at - a.at)) { const g = group(c.at); m.set(g, [...(m.get(g) ?? []), c]); }
+    return order.filter((g) => m.has(g)).map((g) => [g, m.get(g)!] as const);
+  }, [list]);
 
   const startNew = () => {
     if (current.messages.length > 0) newConversation();
@@ -74,43 +154,31 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex h-full w-[288px] shrink-0 flex-col border-r border-outline-variant bg-surface-dim">
-      <div className="flex h-14 shrink-0 items-center gap-2 px-3">
-        <IconBtn label="Hide sidebar" size={36} onClick={() => patchUI({ sidebarOpen: false })}><Icon name="left_panel_close" size={20} /></IconBtn>
-        <span className="font-display text-[19px] font-semibold tracking-tight text-on-surface">Zeus</span>
-        <span className="flex-1" />
-        <IconBtn label={dark ? "Light theme" : "Dark theme"} size={36} onClick={() => patch({ theme: dark ? "light" : "dark" })}><Icon name={dark ? "light_mode" : "dark_mode"} size={20} /></IconBtn>
+    <aside className="flex h-full w-[272px] shrink-0 flex-col border-r border-outline-variant bg-surface-dim">
+      <div className="flex h-14 shrink-0 items-center gap-1 px-3">
+        <IconBtn label="Hide sidebar" size={34} onClick={() => patchUI({ sidebarOpen: false })}><Icon name="left_panel_close" size={20} /></IconBtn>
+        <span className="px-1 font-display text-[20px] font-semibold tracking-tight text-on-surface">Zeus</span>
       </div>
       <nav className="flex flex-col gap-0.5 px-2">
         <NavItem icon="add" label="New design" onClick={startNew} active={!split} />
         <NavItem icon="search" label="Search" onClick={() => setSearch(true)} />
         <NavItem icon="folder_open" label={ui.workspace ? ui.workspace.name : "Project folder"} onClick={project} />
         <NavItem icon="local_library" label="Library" onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })} />
-        <NavItem icon="extension" label="Tools" onClick={() => patchUI({ settingsOpen: true, settingsTab: "mcp" })} />
+        <NavItem icon="extension" label="Connectors" onClick={() => patchUI({ settingsOpen: true, settingsTab: "mcp" })} />
       </nav>
-      <div className="mt-5 px-5 pb-1 text-[13px] font-medium text-on-surface-variant">Chats</div>
+      <button onClick={() => setOpen(!open)} className="state mx-2 mt-5 flex h-8 items-center gap-1 rounded-lg px-3 text-[13px] font-medium text-on-surface-variant">
+        Chats<Icon name={open ? "expand_more" : "chevron_right"} size={16} />
+      </button>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {list.map((c) => (
-          <div key={c.id} className={cn("group relative", c.id === current.id && split && "rounded-xl bg-surface-high")}>
-            <button onClick={() => { setActiveConv(c.id); patchUI({ showCanvas: false }); }} className="state flex h-9 w-full items-center rounded-xl px-3 pr-9 text-left text-[14px] text-on-surface">
-              <span className="truncate">{c.title}</span>
-            </button>
-            <button onClick={() => deleteConv(c.id)} title="Delete chat" aria-label="Delete chat" className="state absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-on-surface-variant opacity-0 group-hover:opacity-100">
-              <Icon name="delete" size={16} />
-            </button>
+        {open && groups.map(([g, items]) => (
+          <div key={g} className="mb-1">
+            {groups.length > 1 && <div className="px-3 pb-1 pt-2 text-xs text-on-surface-variant/80">{g}</div>}
+            {items.map((c) => <ChatRow key={c.id} id={c.id} title={c.title} active={c.id === current.id && split} />)}
           </div>
         ))}
+        {open && list.length === 0 && <div className="px-3 py-2 text-[13px] text-on-surface-variant">No chats yet</div>}
       </div>
-      <div className="flex shrink-0 items-center gap-1 border-t border-outline-variant p-2">
-        <button onClick={() => patchUI({ settingsOpen: true, settingsTab: "providers" })} className="state flex h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium text-on-surface">
-          <Icon name="settings" size={20} /><span className="truncate">Settings</span>
-        </button>
-        {ui.update?.available && (
-          <button onClick={() => patchUI({ settingsOpen: true, settingsTab: "updates" })} className="state flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary">
-            <Icon name="system_update" size={16} />Update
-          </button>
-        )}
-      </div>
+      <div className="shrink-0 border-t border-outline-variant p-2"><AccountMenu /></div>
       <SearchDialog open={search} onClose={() => setSearch(false)} />
     </aside>
   );

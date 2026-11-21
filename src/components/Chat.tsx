@@ -32,17 +32,29 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
   );
 }
 
+const TOOL_LABEL: Record<string, string> = {
+  design_lint: "Cleaned up", design_audit: "Checked layout", design_repair: "Repairing layout", read_file: "Read file", write_file: "Wrote file",
+  list_dir: "Listed folder", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
+};
+function toolTitle(name: string): { label: string; sub?: string } {
+  if (name.startsWith("mcp:")) { const [, server, ...tool] = name.split(":"); return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, "") }; }
+  return { label: TOOL_LABEL[name] ?? name.replace(/_/g, " ") };
+}
+
 function ToolChip({ t }: { t: NonNullable<Message["tools"]>[number] }) {
   const [open, setOpen] = useState(false);
+  const { label, sub } = toolTitle(t.name);
+  const arg = (() => { try { const j = JSON.parse(t.args ?? ""); return j.path || j.body || ""; } catch { return t.args ?? ""; } })();
   return (
-    <div className="rounded-2xl bg-surface-low">
-      <button onClick={() => setOpen(!open)} className="state flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-[13px]">
-        <Icon name="build" size={14} className="text-primary" />
-        <span className="font-mono font-medium">{t.name}</span>
-        <span className="min-w-0 flex-1 truncate text-on-surface-variant">{t.args}</span>
-        {t.status === "running" ? <span className="size-3 animate-spin rounded-full border-2 border-primary border-t-transparent" /> : t.status === "ok" ? <Icon name="check" size={14} className="text-primary" /> : <Icon name="error" size={14} className="text-error" />}
+    <div className="rounded-xl border border-outline-variant/70">
+      <button onClick={() => setOpen(!open)} className="state flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px]">
+        {t.status === "running" ? <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" /> : t.status === "ok" ? <Icon name="check" size={15} className="shrink-0 text-on-surface-variant" /> : <Icon name="error" size={15} className="shrink-0 text-error" />}
+        <span className="font-medium text-on-surface">{label}</span>
+        {sub && <span className="text-on-surface-variant">{sub}</span>}
+        <span className="min-w-0 flex-1 truncate text-on-surface-variant">{String(arg).replace(/\s+/g, " ")}</span>
+        {t.output && <Icon name={open ? "expand_less" : "expand_more"} size={15} className="shrink-0 text-on-surface-variant" />}
       </button>
-      {open && t.output && <pre className="max-h-48 overflow-auto px-3 pb-3 font-mono text-xs text-on-surface-variant select-text">{t.output}</pre>}
+      {open && t.output && <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words px-3 pb-3 font-mono text-xs text-on-surface-variant select-text">{t.output}</pre>}
     </div>
   );
 }
@@ -52,7 +64,7 @@ function ArtboardCards({ ids }: { ids: string[] }) {
   const list = ids.map((id) => boards.find((b) => b.id === id)).filter(Boolean) as typeof boards;
   if (!list.length) return null;
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="no-bar flex gap-2 overflow-x-auto pb-1">
       {list.map((a) => (
         <button key={a.id} onClick={() => focusArtboard(a.id)} className="state group w-[130px] shrink-0 overflow-hidden rounded-[22px] bg-surface-low p-1.5 text-left transition-transform ease-spring hover:-translate-y-0.5">
           <div className="overflow-hidden rounded-[16px]">
@@ -124,62 +136,40 @@ function MessageView({ m }: { m: Message }) {
 /* ------------------------------------------------------------------ */
 /* Composer                                                            */
 /* ------------------------------------------------------------------ */
-function ModelSelector() {
+function ModelPicker() {
   const settings = useStore((s) => s.settings);
   const patch = useStore((s) => s.patchSettings);
   const patchUI = useStore((s) => s.patchUI);
   const custom = settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId);
   const prov = findProvider(settings.providerId);
   const label = custom ? custom.model : prov.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
+  const effort = EFFORTS.find((e) => e.id === settings.effort);
   return (
-    <Dropdown up width={320} trigger={({ toggle, open }) => (
-      <button onClick={toggle} className={cn("state flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-on-surface-variant", open && "bg-surface-high")}>
-        <Icon name={custom ? "key" : prov.icon} size={17} />
-        <span className="max-w-[130px] truncate">{label}</span>
-        <Icon name="expand_more" size={14} />
+    <Dropdown up align="right" width={330} className="min-w-0" trigger={({ toggle, open }) => (
+      <button onClick={toggle} title="Model and effort" className={cn("state flex h-9 max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-on-surface", open && "bg-surface-high")}>
+        <span className="truncate">{label}</span>
+        <span className="hidden shrink-0 text-on-surface-variant @[400px]:inline">{effort?.label}</span>
+        <Icon name="expand_more" size={14} className="shrink-0 text-on-surface-variant" />
       </button>
     )}>
       {(close) => (
         <>
-          <MenuLabel>Free models</MenuLabel>
-          {PROVIDERS.filter((p) => p.role !== "title").map((p) => (
-            <div key={p.id}>
-              {p.models.map((m) => (
-                <MenuItem
-                  key={m.id} active={settings.providerId === p.id && settings.modelId === m.id}
-                  icon={<Icon name={p.icon} size={18} />} label={`${m.label}`} desc={`${p.name} · ${p.speed}${m.note ? " · " + m.note : ""}`}
-                  right={m.reasoning ? <Icon name="psychology" size={13} className="text-on-surface-variant" /> : undefined}
-                  onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
-                />
-              ))}
-            </div>
-          ))}
-          <MenuLabel>Instant</MenuLabel>
-          <MenuItem icon={<Icon name="rocket_launch" size={18} />} label="ChatJimmy · Llama 3.1 8B" desc="20,000+ tok/s" onClick={() => { patch({ providerId: "chatjimmy", modelId: "llama3.1-8b" }); close(); }} active={settings.providerId === "chatjimmy"} />
-          <MenuLabel>Your API keys</MenuLabel>
+          <MenuLabel>Model</MenuLabel>
+          {PROVIDERS.map((p) => p.models.map((m) => (
+            <MenuItem
+              key={p.id + m.id} active={settings.providerId === p.id && settings.modelId === m.id}
+              label={m.label} desc={`${p.name} · ${p.speed}`}
+              onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
+            />
+          )))}
+          {settings.customProviders.length > 0 && <MenuLabel>Your API keys</MenuLabel>}
           {settings.customProviders.map((c) => (
-            <MenuItem key={c.id} icon={<Icon name="key" size={15} />} label={c.model} desc={`${c.name} · ${c.format}`} active={settings.providerId === `custom:${c.id}`} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} />
+            <MenuItem key={c.id} label={c.model} desc={`${c.name} · ${c.format}`} active={settings.providerId === `custom:${c.id}`} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} />
           ))}
-          <MenuItem icon={<Icon name="add" size={15} />} label="Add OpenAI / Anthropic endpoint…" onClick={() => { patchUI({ settingsOpen: true, settingsTab: "providers" }); close(); }} />
-        </>
-      )}
-    </Dropdown>
-  );
-}
-
-function EffortSelector() {
-  const effort = useStore((s) => s.settings.effort);
-  const patch = useStore((s) => s.patchSettings);
-  return (
-    <Dropdown up width={240} trigger={({ toggle, open }) => (
-      <button onClick={toggle} className={cn("state flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-on-surface-variant", open && "bg-surface-high")}>
-        <Icon name="psychology" size={14} /> {EFFORTS.find((e) => e.id === effort)?.label}
-      </button>
-    )}>
-      {(close) => (
-        <>
-          <MenuLabel>Thinking effort</MenuLabel>
-          {EFFORTS.map((e) => <MenuItem key={e.id} label={e.label} desc={e.desc} active={effort === e.id} onClick={() => { patch({ effort: e.id }); close(); }} />)}
+          <MenuItem icon={<Icon name="add" size={16} />} label="Add your own endpoint" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} />
+          <div className="my-1.5 border-t border-outline-variant/70" />
+          <MenuLabel>Effort</MenuLabel>
+          {EFFORTS.map((e) => <MenuItem key={e.id} label={e.label} desc={e.desc} active={settings.effort === e.id} onClick={() => { patch({ effort: e.id }); close(); }} />)}
         </>
       )}
     </Dropdown>
@@ -245,7 +235,7 @@ export function Composer({ hero }: { hero?: boolean }) {
 
   return (
     <div
-      className="relative px-3 pb-3 pt-1"
+      className="@container relative px-3 pb-3 pt-1"
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
     >
@@ -278,7 +268,7 @@ export function Composer({ hero }: { hero?: boolean }) {
           placeholder={hero ? "How can I help you design today?" : selected ? `Reply about “${selected.name}”` : "Reply"}
           className={hero ? "block max-h-[260px] min-h-[84px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-[16px] text-on-surface outline-none placeholder:text-on-surface-variant/60" : "block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60"}
         />
-        <div className="flex items-center gap-0.5 px-2 pb-2">
+        <div className="flex min-w-0 items-center gap-0.5 px-2 pb-2">
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
           <Dropdown up width={270} trigger={({ toggle }) => <IconBtn label="Add" size={36} onClick={toggle}><Icon name="add" size={19} /></IconBtn>}>
             {(close) => (
@@ -291,8 +281,8 @@ export function Composer({ hero }: { hero?: boolean }) {
             )}
           </Dropdown>
           <Dropdown up width={290} trigger={({ toggle }) => (
-            <button onClick={toggle} title="Design system" className="state flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-on-surface-variant">
-              <Icon name="palette" size={15} /><span className="hidden max-w-[90px] truncate min-[470px]:inline">{ds.name}</span>
+            <button onClick={toggle} title="Design system" className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-on-surface-variant">
+              <Icon name="palette" size={15} /><span className="hidden max-w-[110px] truncate @[440px]:inline">{ds.name}</span>
             </button>
           )}>
             {(close) => (
@@ -305,9 +295,8 @@ export function Composer({ hero }: { hero?: boolean }) {
               </>
             )}
           </Dropdown>
-          <span className="flex-1" />
-          <EffortSelector />
-          <ModelSelector />
+          <span className="min-w-2 flex-1" />
+          <ModelPicker />
           {busy ? (
             <button onClick={stopGeneration} title="Stop" className="state morph ml-1 grid size-10 place-items-center rounded-full bg-primary text-on-primary"><Icon name="stop" size={14} fill /></button>
           ) : (

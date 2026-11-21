@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
-import { nativeAvailable, nativeMemory } from "./lib/bridge";
+import { nativeAvailable, nativeMcp, nativeMemory } from "./lib/bridge";
+import { enabledMcpTools } from "./lib/tools";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { CanvasPane } from "./components/CanvasPane";
@@ -37,6 +38,15 @@ export default function App() {
     nativeAvailable().then((ok) => patchUI({ nativeReady: ok }));
     nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: l.reverse() }));
     appVersion().then((version) => patchUI({ version }));
+    nativeMcp.list().then((native) => {
+      if (!native) return;
+      const st = useStore.getState();
+      const mine = st.settings.mcp;
+      const add = native.filter((n) => n.transport === "stdio" && !mine.some((m) => m.id === n.id)).map((n) => ({ id: n.id, name: n.name, transport: "stdio" as const, command: n.command, args: n.args ?? [], enabled: true }));
+      if (add.length) st.patchSettings({ mcp: [...mine, ...add] });
+      for (const m of mine) if (!native.some((n) => n.id === m.id)) nativeMcp.add({ id: m.id, name: m.name, command: m.command, args: m.args, transport: "stdio" });
+      void enabledMcpTools(true, 0);
+    });
     const check = () => checkForUpdate().then((update) => {
       patchUI({ update });
       if (update.available) useStore.getState().notify(`Update ${update.latest} is available`);
@@ -50,7 +60,7 @@ export default function App() {
   const startDrag = (e: React.PointerEvent) => {
     e.preventDefault();
     dragging.current = true;
-    const left = sidebarOpen ? 288 : 0;
+    const left = sidebarOpen ? 272 : 0;
     const mv = (ev: PointerEvent) => setW(Math.min(760, Math.max(340, ev.clientX - left)));
     const up = () => { dragging.current = false; window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", mv);

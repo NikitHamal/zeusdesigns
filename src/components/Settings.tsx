@@ -7,20 +7,21 @@ import { SKILLS } from "../lib/skills";
 import { ACCENTS } from "../lib/theme";
 import { renderScreen } from "../lib/templates";
 import { DEVICE_SIZE } from "../types";
-import { nativeMemory, tryInvoke } from "../lib/bridge";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
 import { Icon } from "./Icon";
+import { MemoryTab } from "./MemoryPanel";
+import { ConnectorsTab } from "./Connectors";
 
 const TABS = [
-  { id: "providers", label: "AI Models", icon: "memory" },
-  { id: "library", label: "Design Library", icon: "local_library" },
-  { id: "memory", label: "Memory", icon: "psychology" },
-  { id: "mcp", label: "MCP & Tools", icon: "extension" },
-  { id: "appearance", label: "Appearance", icon: "palette" },
-  { id: "updates", label: "Updates", icon: "system_update" },
-  { id: "about", label: "About", icon: "info" },
+  { id: "appearance", label: "Appearance", icon: "palette", group: "General" },
+  { id: "providers", label: "Models", icon: "memory", group: "General" },
+  { id: "memory", label: "Memory", icon: "psychology", group: "Your Zeus" },
+  { id: "library", label: "Design library", icon: "local_library", group: "Capabilities" },
+  { id: "mcp", label: "Connectors", icon: "extension", group: "Capabilities" },
+  { id: "updates", label: "Updates", icon: "system_update", group: "App" },
+  { id: "about", label: "About", icon: "info", group: "App" },
 ];
 
 const PRESETS = [
@@ -168,69 +169,6 @@ function LibraryTab() {
   );
 }
 
-/* ---------------- Memory ---------------- */
-function MemoryTab() {
-  const mem = useStore((s) => s.settings.memory);
-  const { addMemory, removeMemory } = useStore.getState();
-  const [t, setT] = useState("");
-  const add = async () => {
-    const v = t.trim();
-    if (!v) return;
-    setT("");
-    const list = await nativeMemory.add(v);
-    if (list) useStore.getState().patchSettings({ memory: list.reverse() }); else addMemory(v);
-  };
-  const forget = async (id: string) => {
-    const list = await nativeMemory.remove(id);
-    if (list) useStore.getState().patchSettings({ memory: list.reverse() }); else removeMemory(id);
-  };
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2"><input className={field} placeholder="e.g. “Our brand is teal, audience is Gen-Z, Android-first (Compose)”" value={t} onChange={(e) => setT(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} /><button onClick={add} className="state morph h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-semibold text-on-primary">Remember</button></div>
-      {mem.length === 0 && <div className="grid place-items-center rounded-[28px] bg-surface-container py-12 text-center text-sm text-on-surface-variant"><Icon name="psychology" size={32} className="mb-2 text-primary" />Nothing remembered yet</div>}
-      {mem.map((m) => (
-        <div key={m.id} className="anim-pop flex items-start gap-3 rounded-[22px] bg-surface-container px-4 py-3"><Icon name="auto_awesome" size={16} className="mt-0.5 shrink-0 text-primary" /><p className="flex-1 select-text text-sm">{m.text}</p><IconBtn label="Forget" size={30} onClick={() => forget(m.id)}><Icon name="delete" size={14} /></IconBtn></div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------- MCP ---------------- */
-function McpTab() {
-  const mcp = useStore((s) => s.settings.mcp);
-  const patch = useStore((s) => s.patchSettings);
-  const [f, setF] = useState({ name: "", transport: "stdio" as "stdio" | "http", command: "" });
-  const add = () => {
-    if (!f.name || !f.command) return;
-    const srv = { id: Math.random().toString(36).slice(2, 8), enabled: true, ...f };
-    patch({ mcp: [...mcp, srv] });
-    tryInvoke("mcp_add", { server: srv });
-    setF({ name: "", transport: "stdio", command: "" });
-  };
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-2 rounded-[26px] bg-surface-container p-4">
-        <div className="text-sm font-semibold">Built-in agent tools</div>
-        <div className="flex flex-wrap gap-1.5">{["read_file", "write_file", "list_dir", "search_code", "shell", "memory", "web_fetch"].map((t) => <span key={t} className="rounded-full bg-surface-high px-2.5 py-1 font-mono text-xs">{t}</span>)}</div>
-      </div>
-      {mcp.map((m) => (
-        <div key={m.id} className="flex items-center gap-3 rounded-[22px] bg-surface-container px-4 py-3">
-          <Icon name="extension" size={18} className="text-primary" />
-          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">{m.name}</div><div className="truncate font-mono text-xs text-on-surface-variant">{m.transport} · {m.command}</div></div>
-          <Toggle on={m.enabled} onChange={(v) => patch({ mcp: mcp.map((x) => (x.id === m.id ? { ...x, enabled: v } : x)) })} />
-          <IconBtn label="Remove" size={32} onClick={() => { patch({ mcp: mcp.filter((x) => x.id !== m.id) }); tryInvoke("mcp_remove", { id: m.id }); }}><Icon name="delete" size={15} /></IconBtn>
-        </div>
-      ))}
-      <div className="grid gap-2.5 rounded-[26px] bg-surface-container p-4 sm:grid-cols-2">
-        <input className={field} placeholder="Server name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <Segmented value={f.transport} onChange={(v) => setF({ ...f, transport: v })} options={[{ id: "stdio", label: "stdio (command)" }, { id: "http", label: "HTTP / SSE" }]} />
-        <input className={cn(field, "sm:col-span-2 font-mono")} placeholder={f.transport === "stdio" ? "npx -y @modelcontextprotocol/server-filesystem C:\\projects" : "https://mcp.example.com/sse"} value={f.command} onChange={(e) => setF({ ...f, command: e.target.value })} />
-        <button onClick={add} className="state morph flex h-11 items-center justify-center gap-2 rounded-full bg-primary font-semibold text-on-primary sm:col-span-2"><Icon name="add" size={17} /> Add MCP server</button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- Appearance & About ---------------- */
 function AppearanceTab() {
   const s = useStore((st) => st.settings);
@@ -246,7 +184,10 @@ function AppearanceTab() {
           ))}
         </div>
       </div>
-      <div className="flex items-center justify-between rounded-[22px] bg-surface-container px-4 py-3"><div className="text-sm font-semibold">Auto-title chats</div><Toggle on={s.autoTitle} onChange={(v) => patch({ autoTitle: v })} /></div>
+      <div className="divide-y divide-outline-variant/60 rounded-xl border border-outline-variant">
+        <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Auto-title chats</div><Toggle on={s.autoTitle} onChange={(v) => patch({ autoTitle: v })} /></div>
+        <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Check and repair every design</div><Toggle on={s.selfCheck} onChange={(v) => patch({ selfCheck: v })} /></div>
+      </div>
     </div>
   );
 }
@@ -317,30 +258,35 @@ export function SettingsDialog() {
   const [q, setQ] = useState("");
   const tabs = TABS.filter((t) => t.label.toLowerCase().includes(q.toLowerCase()));
   const cur = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const groups = Array.from(new Set(tabs.map((t) => t.group)));
   return (
-    <Dialog open={open} onClose={() => patchUI({ settingsOpen: false })} className="h-[86vh] w-[min(1060px,94vw)]">
-      <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
-        <h2 className="font-display text-xl font-semibold">Settings</h2>
-        <IconBtn label="Close" onClick={() => patchUI({ settingsOpen: false })}><Icon name="close" size={22} /></IconBtn>
+    <Dialog open={open} onClose={() => patchUI({ settingsOpen: false })} className="h-[min(760px,88vh)] w-[min(1040px,94vw)] !rounded-2xl">
+      <div className="flex shrink-0 items-center justify-between border-b border-outline-variant px-6 py-3.5">
+        <h2 className="text-[17px] font-semibold">Settings</h2>
+        <IconBtn label="Close" size={36} onClick={() => patchUI({ settingsOpen: false })}><Icon name="close" size={20} /></IconBtn>
       </div>
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-60 shrink-0 flex-col gap-1 border-r border-outline-variant p-3 max-md:w-16">
+        <nav className="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-outline-variant p-3 max-md:w-14">
           <div className="relative mb-2 max-md:hidden">
-            <Icon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="h-10 w-full rounded-xl bg-surface-container pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="h-9 w-full rounded-lg border border-outline-variant bg-transparent pl-9 pr-3 text-sm outline-none focus:border-primary" />
           </div>
-          {tabs.map((t) => (
-            <button key={t.id} onClick={() => patchUI({ settingsTab: t.id })} className={cn("state flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium", cur.id === t.id ? "bg-surface-high text-on-surface" : "text-on-surface-variant")}>
-              <Icon name={t.icon} size={20} fill={cur.id === t.id} /><span className="max-md:hidden">{t.label}</span>
-            </button>
+          {groups.map((g, gi) => (
+            <div key={g} className={cn("flex flex-col gap-0.5", gi > 0 && "mt-3 border-t border-outline-variant/60 pt-3")}>
+              {tabs.filter((t) => t.group === g).map((t) => (
+                <button key={t.id} onClick={() => patchUI({ settingsTab: t.id })} className={cn("state flex h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium", cur.id === t.id ? "bg-surface-high text-on-surface" : "text-on-surface-variant")}>
+                  <Icon name={t.icon} size={18} fill={cur.id === t.id} /><span className="max-md:hidden">{t.label}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
-          <h3 className="mb-5 font-display text-2xl font-semibold">{cur.label}</h3>
+          {cur.id !== "memory" && <h3 className="mb-5 text-xl font-semibold">{cur.label}</h3>}
           {cur.id === "providers" && <ProvidersTab />}
           {cur.id === "library" && <LibraryTab />}
           {cur.id === "memory" && <MemoryTab />}
-          {cur.id === "mcp" && <McpTab />}
+          {cur.id === "mcp" && <ConnectorsTab />}
           {cur.id === "appearance" && <AppearanceTab />}
           {cur.id === "updates" && <UpdatesTab />}
           {cur.id === "about" && <AboutTab />}
