@@ -25,7 +25,24 @@ export const UI_ICON_NAMES = Object.keys(MATERIAL_ICONS).sort();
 /* ------------------------------------------------------------------ */
 /* Component kit                                                       */
 /* ------------------------------------------------------------------ */
-export function kitCss(): string {
+/** Per-system component overrides. Same class names, different physical language. */
+export const DS_KIT: Record<string, string> = {
+  m3e: ".z-btn{height:48px;padding:0 26px}.z-btn:active{border-radius:14px}.z-card{border-color:transparent}.z-fab{width:64px;height:64px;border-radius:20px}.z-chip{height:36px}",
+  m3: ".z-btn{font-weight:500}.z-card{border-radius:12px;border-color:transparent}.z-card.tonal{background:var(--surface-2)}",
+  hig: ".z-appbar{align-items:flex-end;min-height:96px}.z-appbar h1{font-size:34px;font-weight:700}.z-list{background:var(--surface);border-radius:var(--r-lg);padding:0 16px}.z-item{border-bottom-width:.5px}.z-btn{height:50px}.z-card{border-color:transparent}.z-nav{background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding-bottom:26px}.z-nav-item.on{color:var(--primary)}.z-nav-item.on .z-nav-pill,.z-nav-pill{background:transparent!important;width:auto;color:inherit}.z-chip{border-color:transparent;background:var(--surface-2)}.z-chip.on{background:var(--primary);color:var(--on-primary)}",
+  fluent: ".z-btn{height:32px;padding:0 16px;font-size:14px}.z-btn.lg{height:40px}.z-input{height:32px;border-width:1px}.z-card{padding:16px}.z-side-item{position:relative;height:36px}.z-side-item.on{background:var(--surface-2);color:var(--text)}.z-side-item.on::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--primary)}",
+  shadcn: ".z-btn{height:36px;padding:0 16px;font-size:14px;font-weight:500}.z-btn.lg{height:40px}.z-input{height:36px;border-radius:6px}.z-card{padding:24px;gap:8px}.z-badge{background:var(--surface-2);color:var(--text);border:1px solid var(--outline);font-weight:500}.z-chip{border-radius:6px}.z-side-item.on{background:var(--surface-2);color:var(--text)}.z-tab.on{color:var(--text);border-bottom-color:var(--text)}",
+  carbon: ".z-btn{height:48px;justify-content:space-between;padding:0 16px;min-width:160px}.z-btn.outline{border-color:var(--primary);color:var(--primary)}.z-input{border:0;border-bottom:1px solid var(--outline);background:var(--surface-2);height:40px}.z-card{border-color:transparent;padding:16px}.z-top{background:var(--text);color:var(--bg);min-height:48px}.z-table th{background:var(--surface-2);color:var(--text)}.z-chip,.z-badge{border-radius:24px}.z-tab.on{color:var(--text);border-bottom-width:3px}",
+  antd: ".z-btn{height:32px;padding:0 15px;font-size:14px;font-weight:400}.z-btn.lg{height:40px}.z-input{height:32px}.z-card{padding:24px;gap:16px}.z-table th{background:var(--surface-2);color:var(--text);font-weight:500;font-size:14px}.z-badge{border-radius:4px;font-weight:400}",
+  polaris: ".z-btn{height:32px;font-size:13px}.z-btn.lg{height:40px}.z-card{padding:16px;gap:8px}.z-badge{border-radius:8px}.z-side{background:var(--bg);border-right:0}.z-side-item{height:32px;font-size:13px}",
+  atlassian: ".z-btn{height:32px;font-weight:500;font-size:14px}.z-btn.lg{height:40px}.z-badge{border-radius:3px;text-transform:uppercase;font-size:11px;letter-spacing:.04em;font-weight:700}.z-card{padding:16px}.z-input{height:40px;border-width:2px}",
+  neo: ".z-btn{border:3px solid var(--text);text-transform:uppercase;letter-spacing:.02em;font-weight:800;height:48px}.z-btn:hover{filter:none;transform:translate(-2px,-2px)}.z-card,.z-hero,.z-input,.z-chip,.z-badge{border:3px solid var(--text)}.z-item{border-bottom:3px solid var(--text)}.z-nav,.z-side,.z-top,.z-appbar{border-color:var(--text);border-width:3px}.z-chip.on{background:var(--primary);color:var(--on-primary)}.z-display,.z-h1{text-transform:uppercase}",
+  glass: ".z-card,.z-hero,.z-nav,.z-side,.z-input{backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border:1px solid var(--outline)}.z-btn{height:46px}",
+  minimal: ".z-display,.z-h1,.z-h2{font-weight:500;letter-spacing:-.02em}.z-display{line-height:1}.z-btn{height:40px;padding:0 24px;font-size:14px;letter-spacing:.02em}.z-card{padding:28px}.z-badge{background:transparent;border:1px solid var(--outline);color:var(--text);font-weight:500}.z-page{gap:28px}.z-section{padding:96px 0}",
+  claude: ".z-btn{height:40px;font-weight:500}.z-input{height:52px;border-radius:16px}.z-h1,.z-h2,.z-display{font-weight:500}.z-chip{border-radius:10px}.z-side-item.on{background:var(--surface-2);color:var(--text)}",
+};
+
+export function kitCss(dsId = ""): string {
   return `
 *{box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;text-shadow:none!important}
 html{-webkit-text-size-adjust:100%}
@@ -104,7 +121,7 @@ svg,img{display:block;max-width:100%}
 .z-section{display:flex;flex-direction:column;gap:16px;padding:72px 0}
 @media(max-width:700px){.z-grid-3,.z-grid-4{grid-template-columns:1fr 1fr}.z-shell{grid-template-columns:1fr}.z-side{display:none}.z-main{padding:20px}.z-wide{padding:0 20px}.z-top{padding:0 20px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-`.replace(/\n/g, "");
+`.replace(/\n/g, "") + (DS_KIT[dsId] ?? "");
 }
 
 /** Tiny interaction runtime so kit components feel alive without model-written JS. */
@@ -281,7 +298,7 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
 
   // --- kit injection (first in <head>, so the model's own CSS always wins) ---
   if (!html.includes("data-zeus-kit")) {
-    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${tokensCss(ds)}${kitCss()}</style>`);
+    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${tokensCss(ds)}${kitCss(ds.id)}</style>`);
     if (!opts.partial) html = html.replace(/<\/body>/i, `<script data-zeus-kit-js>${KIT_JS}</script></body>`);
   }
   // metas go first so the charset declaration stays within the first 1024 bytes

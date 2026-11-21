@@ -39,8 +39,22 @@ function parseAttrs(s: string) {
   return out;
 }
 
+/** Weak models often skip the <artboard> wrapper. Recover a bare HTML document (raw or fenced) as one artboard. */
+export function normalizeStream(full: string): string {
+  if (full.includes("<artboard")) return full;
+  const m = /(```(?:html)?[ \t]*\n)?(<!doctype html|<html[\s>])/i.exec(full);
+  if (!m) return full;
+  const rest = full.slice(m.index + (m[1]?.length ?? 0));
+  const title = /<title>([^<]{1,60})<\/title>/i.exec(rest)?.[1]?.trim() || "Screen";
+  const open = `<artboard name="${title.replace(/"/g, "'")}" mode="new">\n`;
+  const end = /<\/html>/i.exec(rest);
+  if (!end) return full.slice(0, m.index) + open + rest;
+  const stop = end.index + end[0].length;
+  return full.slice(0, m.index) + open + rest.slice(0, stop) + "\n</artboard>" + rest.slice(stop).replace(/^\s*```/, "");
+}
+
 export function parseStream(full: string): { text: string; blocks: Block[] } {
-  full = full.replace(/<think>[\s\S]*?(<\/think>|$)/g, "");
+  full = normalizeStream(full.replace(/<think>[\s\S]*?(<\/think>|$)/g, ""));
   full = full.replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, ""); // agent tool calls render as chips, not text
   let text = "";
   const blocks: Block[] = [];
