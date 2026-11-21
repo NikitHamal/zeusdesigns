@@ -138,15 +138,7 @@ fn execute_inline_workspace_tools(
             }
             other if other.starts_with("mcp:") => {
                 let reg = crate::mcp::McpRegistry::default();
-                let tools = reg.discover_tools();
-                (
-                    true,
-                    format!(
-                        "Invoked MCP tool '{}' ({} registered MCP tools available)",
-                        other,
-                        tools.len()
-                    ),
-                )
+                reg.invoke_tool(other, body)
             }
             _ => (true, format!("Executed {}", name)),
         };
@@ -192,8 +184,15 @@ pub fn chat_stream(
         let mut accumulated = String::new();
         let mut executed_tools = std::collections::HashSet::new();
 
-        // If workspaceRoot is set, append agentic tool instructions so the model can inspect/sync files
+        // Inject persistent memory items and workspace/MCP agent tool instructions
         let mut enriched_req = req.clone();
+        let mem_items = crate::memory::MemoryStore::default().list();
+        if !mem_items.is_empty() {
+            enriched_req.system.push_str("\n\n## Persistent User & Design Memory\n");
+            for m in mem_items.iter().take(20) {
+                enriched_req.system.push_str(&format!("- [{}] {}\n", m.category, m.text));
+            }
+        }
         if let Some(root) = &req.workspace_root {
             if !root.trim().is_empty() {
                 enriched_req.system.push_str(
@@ -211,16 +210,15 @@ pub fn chat_stream(
                     "text": delta
                 }),
             );
-            if let Some(root) = &enriched_req.workspace_root {
-                if !root.trim().is_empty() && accumulated.contains("</zeus_tool>") {
-                    execute_inline_workspace_tools(
-                        &app,
-                        &topic,
-                        root,
-                        &accumulated,
-                        &mut executed_tools,
-                    );
-                }
+            if accumulated.contains("</zeus_tool>") {
+                let root = enriched_req.workspace_root.as_deref().unwrap_or("");
+                execute_inline_workspace_tools(
+                    &app,
+                    &topic,
+                    root,
+                    &accumulated,
+                    &mut executed_tools,
+                );
             }
         });
 

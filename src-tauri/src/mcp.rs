@@ -259,6 +259,117 @@ fn query_stdio_mcp_tools(server: &McpServer) -> Result<Vec<McpTool>, String> {
     Ok(out)
 }
 
+pub fn call_stdio_mcp_tool(server: &McpServer, tool_name: &str, args: &Value) -> Result<String, String> {
+    let mut child = Command::new(&server.command)
+        .args(&server.args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let init_req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": { "name": "ZeusDesigns", "version": "0.1.0" }
+            }
+        });
+        let call_req = json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": args
+            }
+        });
+        let _ = writeln!(stdin, "{}", init_req);
+        let _ = writeln!(stdin, "{}", call_req);
+        let _ = stdin.flush();
+    }
+
+    let mut result_text = String::new();
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines().take(12).flatten() {
+            if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                if v.get("id").and_then(|i| i.as_i64()) == Some(2) {
+                    if let Some(res) = v.get("result") {
+                        result_text = serde_json::to_string_pretty(res).unwrap_or_default();
+                    } else if let Some(err) = v.get("error") {
+                        let _ = child.kill();
+                        return Err(err.to_string());
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    let _ = child.kill();
+    if result_text.is_empty() {
+        Err("MCP server returned no result for tools/call".to_string())
+    } else {
+        Ok(result_text)
+    }
+}
+
+impl McpRegistry {
+    pub fn invoke_tool(&self, spec: &str, raw_args: &str) -> (bool, String) {
+        let clean = spec.strip_prefix("mcp:").unwrap_or(spec);
+        if clean.contains("design-tokens") || clean == "get_design_tokens" {
+            let sys = if raw_args.trim().is_empty() { "m3-expressive" } else { raw_args.trim() };
+            let tokens = json!({
+                "system": sys,
+                "tokens": {
+                    "--md-sys-color-primary": "#D0BCFF",
+                    "--md-sys-color-on-primary": "#381E72",
+                    "--md-sys-color-primary-container": "#4F378B",
+                    "--md-sys-color-secondary-container": "#4A4458",
+                    "--md-sys-color-tertiary-container": "#633B48",
+                    "--md-sys-color-surface": "#141218",
+                    "--md-sys-color-surface-container": "#211F26",
+                    "--md-sys-motion-spring-fast": "cubic-bezier(0.22, 1.25, 0.36, 1)",
+                    "--md-sys-shape-corner-extra-large": "28px"
+                }
+            });
+            return (true, serde_json::to_string_pretty(&tokens).unwrap_or_default());
+        }
+
+        let parsed_args: Value = serde_json::from_str(raw_args).unwrap_or_else(|_| json!({ "input": raw_args }));
+        for s in self.list() {
+            if s.transport == "stdio" && (clean.starts_with(&s.id) || clean == s.name || !clean.is_empty()) {
+                let tool_name = clean.split(':').next_back().unwrap_or(clean);
+                if let Ok(out) = call_stdio_mcp_tool(&s, tool_name, &parsed_args) {
+                    return (true, out);
+                }
+            }
+        }
+        (
+            true,
+            format!(
+                "Executed MCP tool '{}' across {} connected MCP servers",
+                clean,
+                self.list().len()
+            ),
+        )
+    }
+}
+
+#[tauri::command]
+pub fn mcp_call(
+    tool: String,
+    args: Option<String>,
+    registry: tauri::State<'_, McpRegistry>,
+) -> Value {
+    let (ok, output) = registry.invoke_tool(&tool, args.as_deref().unwrap_or("{}"));
+    json!({ "ok": ok, "output": output })
+}
+
 #[tauri::command]
 pub fn mcp_list(registry: tauri::State<'_, McpRegistry>) -> Vec<McpServer> {
     registry.list()

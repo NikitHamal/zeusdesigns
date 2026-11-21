@@ -63,6 +63,7 @@ pub fn run() {
             mcp::mcp_add,
             mcp::mcp_remove,
             mcp::mcp_tools,
+            mcp::mcp_call,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ZeusDesigns");
