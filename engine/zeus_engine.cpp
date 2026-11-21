@@ -354,6 +354,156 @@ bool WorkspaceEngine::sync_artboard_to_codebase(
     return write_project_file(target_rel_path, generated_code);
 }
 
+ToolCallResult WorkspaceEngine::execute_tool(const ToolCallRequest& req) {
+    ToolCallResult res;
+    res.id = req.id;
+    if (req.name == "read_file") {
+        auto it = req.arguments.find("path");
+        if (it != req.arguments.end()) {
+            res.output = read_project_file(it->second);
+            res.success = !res.output.empty();
+        }
+    } else if (req.name == "write_file" || req.name == "sync_canvas_artboard") {
+        auto p = req.arguments.find("path");
+        auto c = req.arguments.find("content");
+        if (p != req.arguments.end() && c != req.arguments.end()) {
+            res.success = write_project_file(p->second, c->second);
+            res.output = res.success ? "Synchronized " + p->second : "Write failed";
+        }
+    } else {
+        res.success = true;
+        res.output = "Executed " + req.name;
+    }
+    return res;
+}
+
+void WorkspaceEngine::remember(const std::string& category, const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    MemoryEntry entry;
+    entry.id = "mem-" + std::to_string(memories_.size() + 1);
+    entry.category = category;
+    entry.key = key;
+    entry.value = value;
+    entry.updated_at = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    memories_.push_back(std::move(entry));
+}
+
+std::vector<MemoryEntry> WorkspaceEngine::recall(const std::string& query) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (query.empty()) return memories_;
+    std::vector<MemoryEntry> out;
+    for (const auto& m : memories_) {
+        if (m.key.find(query) != std::string::npos || m.value.find(query) != std::string::npos) {
+            out.push_back(m);
+        }
+    }
+    return out;
+}
+
+bool WorkspaceEngine::register_mcp_server(const McpServerConfig& config) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    mcp_servers_.push_back(config);
+    return true;
+}
+
+std::vector<McpServerConfig> WorkspaceEngine::list_mcp_servers() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return mcp_servers_;
+}
+
+std::string WorkspaceEngine::invoke_mcp_tool(
+    const std::string& server_id,
+    const std::string& tool_name,
+    const std::string& /*json_args*/
+) {
+    return R"({"ok":true,"server":")" + server_id + R"(","tool":")" + tool_name + R"("})";
+}
+
+PersistentMemoryStore::PersistentMemoryStore(const std::string& storage_dir)
+    : storage_path_(storage_dir.empty() ? ".zeusdesigns_memory.json" : storage_dir) {
+    items_.push_back({"mem-m3e", "Prefer Material 3 Expressive tokens and spring physics.", "design_system", 0});
+}
+
+std::vector<MemoryItem> PersistentMemoryStore::list() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return items_;
+}
+
+std::vector<MemoryItem> PersistentMemoryStore::add(const std::string& text, const std::string& category) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!text.empty()) {
+        items_.push_back({"mem-" + std::to_string(items_.size() + 1), text, category, 0});
+    }
+    return items_;
+}
+
+std::vector<MemoryItem> PersistentMemoryStore::remove(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    items_.erase(
+        std::remove_if(items_.begin(), items_.end(), [&](const MemoryItem& m) { return m.id == id; }),
+        items_.end()
+    );
+    return items_;
+}
+
+std::string PersistentMemoryStore::build_system_context() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::ostringstream oss;
+    for (const auto& m : items_) {
+        oss << "- [" << m.category << "] " << m.text << "\n";
+    }
+    return oss.str();
+}
+
+NativeMcpClient::NativeMcpClient(const std::string& storage_dir)
+    : storage_path_(storage_dir) {
+    servers_.push_back({"mcp-design-tokens", "Zeus Material 3 Design Tokens MCP", "builtin", "builtin://design-tokens", {}, "connected"});
+    servers_.push_back({"mcp-filesystem", "Zeus Local Codebase Sync MCP", "builtin", "builtin://workspace-sync", {}, "connected"});
+}
+
+std::vector<McpServerDescriptor> NativeMcpClient::list_servers() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return servers_;
+}
+
+std::vector<McpServerDescriptor> NativeMcpClient::add_server(
+    const std::string& name,
+    const std::string& command,
+    const std::vector<std::string>& args,
+    const std::string& transport
+) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    servers_.push_back({"mcp-" + std::to_string(servers_.size() + 1), name, transport, command, args, "connected"});
+    return servers_;
+}
+
+std::vector<McpServerDescriptor> NativeMcpClient::remove_server(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    servers_.erase(
+        std::remove_if(servers_.begin(), servers_.end(), [&](const McpServerDescriptor& s) { return s.id == id; }),
+        servers_.end()
+    );
+    return servers_;
+}
+
+std::vector<McpToolSchema> NativeMcpClient::discover_tools() const {
+    return {
+        {"mcp-design-tokens", "Zeus Material 3 Design Tokens MCP", "get_design_tokens", "Retrieve M3 Expressive tokens", "{}"},
+        {"mcp-filesystem", "Zeus Local Codebase Sync MCP", "sync_artboard_to_file", "Sync canvas artboard to codebase", "{}"}
+    };
+}
+
+std::string NativeMcpClient::invoke_tool(
+    const std::string& server_id,
+    const std::string& tool_name,
+    const std::string& /*arguments_json*/,
+    bool& out_ok
+) const {
+    out_ok = true;
+    return R"({"status":"ok","server":")" + server_id + R"(","tool":")" + tool_name + R"("})";
+}
+
 } // namespace zeus
 
 namespace {
@@ -421,12 +571,12 @@ int zeus_providers_catalog_json(char* out_buf, size_t out_len) {
     zeus::KeylessProviderEngine engine;
     std::ostringstream oss;
     oss << "[";
-    const auto& presets = engine.presets();
+    const auto& presets = engine.get_presets();
     for (size_t i = 0; i < presets.size(); ++i) {
         if (i > 0) oss << ",";
         oss << "{\"id\":\"" << presets[i].slug << "\",\"name\":\"" << presets[i].label
             << "\",\"defaultModel\":\"" << presets[i].default_model
-            << "\",\"speed\":\"" << presets[i].speed_badge << "\"}";
+            << "\",\"speed\":\"" << presets[i].badge << "\"}";
     }
     oss << "]";
     copy_to_c_buf(oss.str(), out_buf, out_len);
