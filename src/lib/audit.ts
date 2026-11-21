@@ -99,17 +99,18 @@ export async function auditHtml(html: string, w: number, h: number): Promise<Aud
       }
     }
 
-    // sparse screens and dead zones
-    const bottoms = all.filter(vis).map((e) => e.getBoundingClientRect().bottom);
-    const content = Math.max(0, ...bottoms.filter((b) => b < doc.documentElement.scrollHeight + 1));
-    if (doc.documentElement.scrollHeight <= h + 4 && content < h * 0.62 && w < 900)
-      issues.push({ kind: "sparse", severe: true, msg: `content ends at ${Math.round((content / h) * 100)}% of the screen height; add real sections instead of empty space` });
-    const tops = Array.from(new Set(all.filter((e) => vis(e) && e.children.length === 0 || leaves.includes(e)).map((e) => Math.round(e.getBoundingClientRect().top)))).sort((a, b) => a - b);
-    const bots = (n: number) => Math.max(...all.filter((e) => vis(e) && Math.round(e.getBoundingClientRect().top) <= n).map((e) => e.getBoundingClientRect().bottom));
-    for (let i = 1; i < tops.length; i++) {
-      const gap = tops[i] - bots(tops[i - 1]);
-      if (gap > 150 && tops[i] < h) { issues.push({ kind: "gap", severe: true, msg: `a ${Math.round(gap)}px empty band at y=${tops[i - 1]}; tighten the layout` }); break; }
+    // dead bands: sweep visible atoms (leaves, media, empty blocks) top to bottom; a long stretch with nothing in it is wasted space
+    const atoms = all.filter((e) => vis(e) && (e.children.length === 0 || leaves.includes(e))).map((e) => e.getBoundingClientRect()).sort((p, q) => p.top - q.top);
+    let reach = 0;
+    for (const r of atoms) {
+      if (reach > 0 && r.top - reach > 150 && r.top < Math.max(h, doc.documentElement.scrollHeight)) {
+        issues.push({ kind: "gap", severe: true, msg: `a ${Math.round(r.top - reach)}px empty band starts at y=${Math.round(reach)}; add content or tighten the layout so the screen is filled` });
+        break;
+      }
+      reach = Math.max(reach, r.bottom);
     }
+    if (!issues.some((i) => i.kind === "gap") && doc.documentElement.scrollHeight <= h + 4 && reach < h * 0.6 && w < 900)
+      issues.push({ kind: "sparse", severe: true, msg: `content ends at ${Math.round((reach / h) * 100)}% of the screen height; add real sections instead of empty space` });
     return issues;
   } finally {
     frame.remove();
