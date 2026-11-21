@@ -6,6 +6,21 @@ Running log across agent sessions. Newest session first. Rules live in `AGENTS.m
 - Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop. Stable.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
 
+## Session 3
+Goal: fix the poor UI polish, real icons, clipped dialogs, element-level canvas control, stale desktop icon, and a world-class agent harness.
+
+Shipped:
+- Icons: official Material Symbols SVG paths via `scripts/icons.mjs` (no font, no letter fallbacks).
+- `Dropdown` and `Dialog` are portals that flip and clamp to the viewport; nothing clips.
+- Harness: component kit with per-system overrides, icon resolver, design-law enforcement, structure repair, bare-HTML recovery, lint chip in chat, rewritten system prompt.
+- Canvas: element edit mode with inspector, inline text edit, reorder, duplicate, delete, undo, Ask Zeus about element.
+- Desktop icon: `build.rs` tracks generated icons, rust-cache key includes the icon hash, NSIS installer icon set.
+
+In flight / next:
+- Run 26 failed at "create a release" (Resource not accessible by integration) after a clean Rust compile; watch whether it repeats.
+- Visual QA on Windows of the inspector and kit overrides for each design system.
+- Per-chat canvases.
+
 ## Session 2
 Goal: product-grade UI overhaul modeled on the Claude desktop and Claude Design flows (reference screenshots in issue #1), plus updater, icon, and repo hygiene.
 

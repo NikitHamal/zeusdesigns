@@ -52,8 +52,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0}
 a{color:inherit;text-decoration:none}
 ul,ol{list-style:none}
-svg,img{display:block;max-width:100%}
-.z-i{width:24px;height:24px;fill:currentColor;flex:none}
+img{display:block;max-width:100%}
+.z-i{display:inline-block;vertical-align:middle;width:24px;height:24px;fill:currentColor;flex:none}
 .z-i.sm{width:18px;height:18px}.z-i.lg{width:32px;height:32px}.z-i.xl{width:48px;height:48px}
 .z-screen{min-height:100vh;display:flex;flex-direction:column}
 .z-page{flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 28px}

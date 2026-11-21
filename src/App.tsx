@@ -83,7 +83,7 @@ export default function App() {
         )}
       </main>
       <SettingsDialog />
-      {toast && <div className="anim-pop fixed bottom-24 left-1/2 z-[200] -translate-x-1/2 rounded-xl bg-inverse-surface px-5 py-3 text-sm font-medium text-inverse-on-surface">{toast}</div>}
+      {toast && <div className="anim-pop fixed bottom-24 left-1/2 z-[600] -translate-x-1/2 rounded-xl bg-inverse-surface px-5 py-3 text-sm font-medium text-inverse-on-surface">{toast}</div>}
     </div>
   );
 }

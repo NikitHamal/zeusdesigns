@@ -16,9 +16,17 @@ These apply to the app UI and to every design-system prompt, skill, template and
 7. Everything shipped is real. No placeholder buttons, no dead menu items, no upgrade or paywall UI.
 
 ## Icons and type
-- Icons are the Material Symbols Rounded font, rendered with `<Icon name="..." />` from `src/components/Icon.tsx`. Never add inline SVG icons or an icon library.
+- Icons are the official Material Symbols Rounded paths, rendered by `<Icon name="..." />` (`src/components/Icon.tsx`) as inline SVG. There is no icon font and no ligature fallback, so an icon can never render as a letter.
+- `node scripts/icons.mjs` regenerates `src/lib/materialIcons.ts` and `src/lib/iconPaths.ts`. It bundles every quoted token in `src/` that is a real Material Symbol name, plus names listed in a `/* icons: a, b */` comment. Run it after adding an icon name. Icons missing from the npm package are cached in `scripts/extra-icons/`.
+- Generated screens use `<i data-i="name"></i>`; the harness swaps it for the same paths.
 - Fonts are bundled through npm (no CDN): Google Sans Flex / Roboto Flex for UI, Roboto Mono for code.
 - Colors come from the M3 tokens in `src/index.css` and `src/lib/theme.ts`. Do not hard-code hex values in components.
+
+## Design harness (`src/lib/harness.ts`)
+Every artboard goes through `harden()` before it reaches the canvas: structure repair, offline-safe output, shadow/emoji/LIVE/blue-purple-gradient removal, icon resolution, and injection of the active design system's token + component kit (`z-*` classes, per-system overrides in `DS_KIT`). `harnessPrompt()` is the generation prompt: protocol, laws, kit reference, craft rules, skeletons. Change a design rule in one place and it applies to prompt and enforcement together. `engine.ts` also recovers bare HTML documents that skip the `<artboard>` wrapper.
+
+## Canvas editing
+Edit mode (`ads_click` button on an artboard) injects `src/lib/editor.ts` into the sandboxed iframe: hover, select, inline text edit (double-click), delete, duplicate, reorder, undo, and the inspector (`src/components/Inspector.tsx`). A whole edit session becomes one version entry. "Ask Zeus" quotes the selected element into the chat.
 
 ## Repo map
 - `src/App.tsx` shell: sidebar, home, workspace split.
