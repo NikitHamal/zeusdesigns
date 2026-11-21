@@ -1,3 +1,4 @@
+import { quiet } from "../lib/harness";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import type { Artboard, CanvasEl, Device } from "../types";
@@ -50,7 +51,7 @@ const Frame = memo(function Frame({ id, html, interactive, editing }: { id: stri
     return () => { window.removeEventListener("message", onMsg); editorBridge.attach(null); };
   }, [editing, id]);
 
-  const src = editing ? injectEditor(doc) : html;
+  const src = quiet(editing ? injectEditor(doc) : html);
   return (
     <iframe
       ref={ref} title="design" srcDoc={src} sandbox="allow-scripts allow-forms allow-popups allow-modals"

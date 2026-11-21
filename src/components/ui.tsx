@@ -2,6 +2,7 @@ import { cloneElement, isValidElement, memo, ReactNode, useCallback, useEffect, 
 import { createPortal } from "react-dom";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
+import { quiet } from "../lib/harness";
 
 /* ---------- IconBtn ---------- */
 export function IconBtn({ children, label, onClick, active, className, size = 40, disabled, tonal }: {
@@ -167,7 +168,7 @@ export const Thumb = memo(function Thumb({ html, w, h, width, className }: { htm
   return (
     <div style={{ width, height: h * sc }} className={cn("overflow-hidden relative bg-white", className)}>
       <iframe
-        title="preview" srcDoc={html} sandbox="" tabIndex={-1}
+        title="preview" srcDoc={quiet(html)} sandbox="" tabIndex={-1}
         style={{ width: w, height: h, transform: `scale(${sc})`, transformOrigin: "0 0", border: 0, pointerEvents: "none" }}
       />
     </div>

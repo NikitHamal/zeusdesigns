@@ -20,6 +20,13 @@ import type { Device } from "../types";
    newspaper, task_alt, checklist, event, timer, history, refresh, sync, logout, login, open_in_new, fullscreen, zoom_in, palette,
    brush, layers, database, smartphone, laptop, directions_run, local_fire_department, favorite, pending, radio_button_checked */
 
+const QUIET = `<style data-zeus-quiet>*{scrollbar-width:none!important;-ms-overflow-style:none!important}::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}</style>`;
+/** Hides every scroll indicator inside a rendered design (scrolling still works). Applied at every iframe. */
+export function quiet(html: string): string {
+  if (!html || html.includes("data-zeus-quiet")) return html;
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + QUIET) : QUIET + html;
+}
+
 export const UI_ICON_NAMES = Object.keys(MATERIAL_ICONS).sort();
 
 /* ------------------------------------------------------------------ */

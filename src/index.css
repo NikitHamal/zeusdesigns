@@ -64,10 +64,15 @@ body {
 }
 textarea, input { user-select: text; }
 
-/* scrollbars */
-* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--m-outline) 40%, transparent) transparent; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--m-outline) 35%, transparent); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+/* scrollbars: invisible until the pointer is over the scroller, never a track, never a gutter */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: color-mix(in srgb, var(--m-outline) 45%, transparent) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+*:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--m-outline) 45%, transparent); background-clip: content-box; }
+.no-bar { scrollbar-width: none !important; }
+.no-bar::-webkit-scrollbar { display: none !important; }
 
 /* M3 state layer */
 .state { position: relative; overflow: hidden; transition: border-radius .35s var(--ease-spring), background-color .2s, transform .2s var(--ease-spring); }
