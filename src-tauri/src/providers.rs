@@ -264,11 +264,25 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: true,
                 },
                 ModelSpec {
+                    id: "gpt-6-luna".to_string(),
+                    label: "GPT-6 Luna (DeepAI)".to_string(),
+                    note: Some("Multimodal fast UI generator".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "deepseek-v4.1-flash".to_string(),
                     label: "DeepSeek V4.1 Flash".to_string(),
                     note: None,
                     reasoning: false,
                     vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4".to_string(),
+                    label: "Gemma 4 (DeepAI)".to_string(),
+                    note: None,
+                    reasoning: false,
+                    vision: true,
                 },
             ],
         },
@@ -1159,6 +1173,7 @@ where
 }
 
 /// Stream from LongCat (`https://longcat.chat/api/v1/chat-completion-oversea-V2`, LongCat 2.5 1.6T MoE).
+/// Ported from `/tmp/NEB/backend_python/api/longcat_proxy.py` with full `agentId` + `events` schema.
 pub fn stream_longcat<F>(
     system: &str,
     messages: &[ChatMessage],
@@ -1174,16 +1189,63 @@ where
         .header("Accept", "text/html")
         .send();
 
-    let mut prompt = String::new();
-    if !system.trim().is_empty() {
-        prompt.push_str(&format!("{}\n\n", system));
+    let last_user = messages
+        .last()
+        .map(|m| m.content.as_str())
+        .unwrap_or("");
+    let content = if system.trim().is_empty() {
+        last_user.chars().take(8000).collect::<String>()
+    } else {
+        format!("{}\n\n{}", &system[..system.len().min(4000)], last_user)
+            .chars()
+            .take(8000)
+            .collect::<String>()
+    };
+
+    let mut lc_msgs = Vec::new();
+    let history_len = messages.len().saturating_sub(1);
+    for m in messages.iter().take(history_len) {
+        if m.content.trim().is_empty() {
+            continue;
+        }
+        let msg_id = 10_000_000 + (pseudo_random_u64() % 89_000_000);
+        let ev_type = if m.role == "assistant" { "content" } else { "userMsg" };
+        let role = if m.role == "assistant" { "assistant" } else { "user" };
+        lc_msgs.push(json!({
+            "role": role,
+            "events": [{
+                "type": ev_type,
+                "content": m.content.chars().take(8000).collect::<String>(),
+                "status": "FINISHED"
+            }],
+            "chatStatus": "FINISHED",
+            "messageId": msg_id,
+            "idType": "custom"
+        }));
     }
-    for m in messages {
-        prompt.push_str(&format!("{}: {}\n\n", m.role, m.content));
-    }
+    lc_msgs.push(json!({
+        "role": "user",
+        "events": [{
+            "type": "userMsg",
+            "content": content,
+            "status": "FINISHED"
+        }],
+        "chatStatus": "FINISHED",
+        "messageId": 10_000_000 + (pseudo_random_u64() % 89_000_000),
+        "idType": "custom"
+    }));
+    lc_msgs.push(json!({
+        "role": "assistant",
+        "events": [],
+        "chatStatus": "LOADING",
+        "messageId": 10_000_000 + (pseudo_random_u64() % 89_000_000),
+        "idType": "custom"
+    }));
 
     let payload = json!({
-        "content": prompt.trim(),
+        "content": content,
+        "agentId": "1",
+        "messages": lc_msgs,
         "reasonEnabled": 1,
         "searchEnabled": 0,
         "regenerate": 0
