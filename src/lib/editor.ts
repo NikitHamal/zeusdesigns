@@ -89,7 +89,7 @@ function px(v){return parseFloat(v)||0}
 function simpleText(el){if(!el.childNodes.length)return false;return Array.prototype.every.call(el.childNodes,function(n){return n.nodeType===3||n.nodeName==="BR"||(n.nodeType===1&&/^(B|I|EM|STRONG|SPAN|SMALL|A)$/.test(n.nodeName)&&n.children.length===0)})}
 function info(el){var cs=getComputedStyle(el),r=el.getBoundingClientRect();
 return{path:pathOf(el)||[],tag:el.tagName.toLowerCase(),cls:(el.getAttribute("class")||"").replace(/\s+/g," ").trim().slice(0,60),
-text:simpleText(el)?el.textContent.slice(0,600):null,html:el.outerHTML.slice(0,700),
+text:simpleText(el)?el.textContent.slice(0,600):null,html:el.outerHTML.replace(/ data-z(?:sel|hov)=""/g,"").slice(0,700),
 s:{color:cs.color,bg:cs.backgroundColor,fs:px(cs.fontSize),fw:cs.fontWeight,ta:cs.textAlign,br:px(cs.borderTopLeftRadius),bw:px(cs.borderTopWidth),bc:cs.borderTopColor,op:cs.opacity===""?1:parseFloat(cs.opacity),
 pt:px(cs.paddingTop),pr:px(cs.paddingRight),pb:px(cs.paddingBottom),pl:px(cs.paddingLeft),gap:px(cs.columnGap)||px(cs.rowGap),display:cs.display,fd:cs.flexDirection,
 w:Math.round(r.width),h:Math.round(r.height),autoW:!el.style.width,autoH:!el.style.height}}}

@@ -14,6 +14,8 @@ const available = new Set([...readdirSync(root), ...readdirSync(extra)].filter((
 // Fetch (and cache) names the npm package lacks; the Google CDN always has them.
 const wanted = new Set();
 for (const f of walk("src").filter((f) => /\.(tsx?|css)$/.test(f) && !/materialIcons|iconPaths/.test(f)))
+  for (const m of readFileSync(f, "utf8").matchAll(/(?:<Icon\s+name\s*=\s*\{?|\bicon[A-Za-z]*\s*[:=]\s*\{?|\bi\s*:|\bic\()\s*[{(]?\s*["']([a-z][a-z0-9_]+)["']/g)) wanted.add(m[1]);
+for (const f of walk("src").filter((f) => /\.(tsx?|css)$/.test(f) && !/materialIcons|iconPaths/.test(f)))
   for (const m of readFileSync(f, "utf8").matchAll(/\/\*\s*icons:\s*([a-z0-9_,\s]+)\*\//g)) m[1].split(/[,\s]+/).filter(Boolean).forEach((n) => wanted.add(n));
 for (const n of wanted) {
   if (available.has(n)) continue;
@@ -24,8 +26,11 @@ for (const n of wanted) {
     } catch { /* offline: handled by the missing-icon report */ }
   }
   if (existsSync(`${extra}/${n}.svg`)) available.add(n);
+  else console.error("UNRESOLVED explicit icon:", n);
 }
-const names = new Set();
+for (const n of wanted) if (!available.has(n)) process.exitCode = 1;
+for (const n of wanted) available.has(n) && 0;
+const names = new Set(wanted);
 const screenNames = new Set();
 for (const f of walk("src").filter((f) => /\.(tsx?|css)$/.test(f) && !/materialIcons|iconPaths/.test(f))) {
   const s = readFileSync(f, "utf8");

@@ -86,7 +86,7 @@ function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart,
             className="h-7 w-40 rounded-lg bg-surface-high px-2 text-[13px] font-semibold text-on-surface outline-none ring-2 ring-primary"
           />
         ) : (
-          <span className={cn("max-w-[60%] truncate text-[13px] font-semibold", selected ? "text-primary" : "text-on-surface-variant")}>{a.name}</span>
+          <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold", selected ? "text-primary" : "text-on-surface-variant")}>{a.name}</span>
         )}
         {(a.version > 1 || a.history.length > 0) && (
           <Dropdown width={220} trigger={({ toggle }) => (
@@ -104,8 +104,7 @@ function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart,
           </Dropdown>
         )}
         {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container"><Icon name="sync_alt" size={12} className="mr-1" />{a.source}</span>}
-        <span className="flex-1" />
-        <div className={cn("flex items-center gap-0.5 rounded-full bg-surface-container/90 p-0.5 opacity-0 transition-opacity group-hover:opacity-100", selected && "opacity-100")}>
+        <div className={cn("shrink-0 items-center gap-0.5 rounded-full bg-surface-container p-0.5", selected || editing ? "flex" : "hidden group-hover:flex")}>
           <IconBtn label={editing ? "Done editing" : "Edit elements"} size={28} active={editing} onClick={() => {
             if (editing) { editor.finish(); return; }
             if (useEditor.getState().artboardId) editor.finish();
@@ -113,6 +112,7 @@ function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart,
             useEditor.getState().begin(a.id, a.html);
             patchUI({ editId: a.id, interactId: null });
             useStore.getState().setSel([a.id]);
+            setTimeout(() => canvasApi.fit([a.id], { right: 300 }), 40);
           }}><Icon name="ads_click" size={14} /></IconBtn>
           <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => { if (editing) editor.finish(); patchUI({ interactId: interacting ? null : a.id }); }}><Icon name="touch_app" size={14} /></IconBtn>
           <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Icon name="content_copy" size={14} /></IconBtn>
@@ -291,7 +291,7 @@ export function InfiniteCanvas() {
       const r = rootRef.current!.getBoundingClientRect();
       return toWorld(r.left + r.width / 2, r.top + r.height / 2);
     };
-    canvasApi.fit = (ids) => {
+    canvasApi.fit = (ids, inset) => {
       const st = useStore.getState();
       const r = rootRef.current?.getBoundingClientRect();
       if (!r) return;
@@ -302,8 +302,9 @@ export function InfiniteCanvas() {
       const x0 = Math.min(...items.map((i) => i.x)), y0 = Math.min(...items.map((i) => i.y));
       const x1 = Math.max(...items.map((i) => i.x + i.w)), y1 = Math.max(...items.map((i) => i.y + i.h));
       const pad = 90;
-      const z = clamp(Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2 - 60) / (y1 - y0)), 0.08, 1);
-      st.setViewport(st.activePageId, { z, x: (r.width - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - 60 - (y1 - y0) * z) / 2 - y0 * z + 20 });
+      const aw = r.width - (inset?.right ?? 0);
+      const z = clamp(Math.min((aw - pad * 2) / (x1 - x0), (r.height - pad * 2 - 60) / (y1 - y0)), 0.08, 1);
+      st.setViewport(st.activePageId, { z, x: (aw - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - 60 - (y1 - y0) * z) / 2 - y0 * z + 20 });
     };
     canvasApi.zoomBy = (f) => {
       const r = rootRef.current!.getBoundingClientRect();
