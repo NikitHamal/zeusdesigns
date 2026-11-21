@@ -736,9 +736,14 @@ where
     F: FnMut(&str),
 {
     let effective_model = match model {
-        "qwen4-max" | "qwen3.8-max" | "qwen3.8-flash" => "qwen3.8-flash",
-        "claude-haiku-5-5" => "claude-haiku-5-5",
-        "deepseek-v4.1-flash" => "deepseek-v4.1-flash",
+        "qwen4-max" | "qwen3-30b-a3b" | "qwen3.8-max" | "qwen3.8-flash" => "qwen3.8-flash",
+        "claude-haiku-5-5" | "gemini-2.5-flash-lite" => "claude-haiku-5-5",
+        "deepseek-v4.1-flash" | "deepseek-v3.2" => "deepseek-v4.1-flash",
+        "gpt-6-luna" | "gpt-4.1-nano" | "gpt-5-nano" | "gpt-4o-mini" => "gpt-6-luna",
+        "glm-5.3-flash" => "glm-5.3-flash",
+        "gemma-4" => "gemma-4",
+        "llama-3.3-70b-instruct" => "llama-3.3-70b-instruct",
+        "llama-3.1-8b-instant" => "llama-3.1-8b-instant",
         _ => "standard",
     };
 
@@ -1012,11 +1017,29 @@ fn acquire_qwen_account(engine: &ProviderEngine) -> Result<QwenAppAccount, Strin
     let fresh = provision_qwen_account()?;
     if let Ok(mut guard) = engine.state.lock() {
         guard.qwen_accounts.push(fresh.clone());
+        if guard.qwen_accounts.len() > 8 {
+            let drain = guard.qwen_accounts.len() - 8;
+            guard.qwen_accounts.drain(0..drain);
+        }
         if let Ok(raw) = serde_json::to_string_pretty(&guard.qwen_accounts) {
             let _ = std::fs::write(qwen_pool_file(), raw);
         }
     }
     Ok(fresh)
+}
+
+pub fn cool_qwen_account(engine: &ProviderEngine, email: &str, cooldown_secs: u64) {
+    let until = now_secs() + cooldown_secs;
+    if let Ok(mut guard) = engine.state.lock() {
+        for acct in &mut guard.qwen_accounts {
+            if acct.email == email {
+                acct.cool_until = until;
+            }
+        }
+        if let Ok(raw) = serde_json::to_string_pretty(&guard.qwen_accounts) {
+            let _ = std::fs::write(qwen_pool_file(), raw);
+        }
+    }
 }
 
 /// Stream from Qwen via the native Android App Gateway (`https://chat.qwen.ai/api/v2`, ported from `qwen_app.py`).
@@ -1701,4 +1724,44 @@ where
     }
 
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_catalog_contains_all_eight_keyless_providers() {
+        let cat = catalog();
+        let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"mercury3"));
+        assert!(ids.contains(&"geminiweb"));
+        assert!(ids.contains(&"qwen"));
+        assert!(ids.contains(&"k2horizon"));
+        assert!(ids.contains(&"motif"));
+        assert!(ids.contains(&"longcat"));
+        assert!(ids.contains(&"deepai"));
+        assert!(ids.contains(&"chatjimmy"));
+    }
+
+    #[test]
+    fn test_clean_chatjimmy_output_strips_stats_and_think() {
+        let raw = "<|think|>internal<|/think|>Material 3 Dashboard<|stats|>{\"tps\":21500}<|/stats|>";
+        assert_eq!(clean_chatjimmy_output(raw), "Material 3 Dashboard");
+    }
+
+    #[test]
+    fn test_split_k2_details_extracts_answer() {
+        let raw = "<details type=\"reasoning\">\n> step 1\n</details>\n<artboard name=\"Home\">UI</artboard>";
+        assert_eq!(split_k2_details(raw), "<artboard name=\"Home\">UI</artboard>");
+    }
+
+    #[test]
+    fn test_extract_activate_link_from_html() {
+        let html = "<a href=\"https://chat.qwen.ai/api/v2/auths/activate?token=abc&amp;id=1\">Activate</a>";
+        assert_eq!(
+            extract_activate_link(html).as_deref(),
+            Some("https://chat.qwen.ai/api/v2/auths/activate?token=abc&id=1")
+        );
+    }
 }
