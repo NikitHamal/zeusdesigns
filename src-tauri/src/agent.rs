@@ -140,7 +140,7 @@ fn execute_inline_workspace_tools(
                 let reg = crate::mcp::McpRegistry::default();
                 reg.invoke_tool(other, body)
             }
-            _ => (true, format!("Executed {}", name)),
+            _ => (false, format!("Unknown tool '{}'", name)),
         };
 
         let _ = app.emit(

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
-  Artboard, CanvasEl, Comment, Conversation, CustomProvider, Effort, McpServer, MemoryItem, Message, Page, Pin,
+  Artboard, CanvasEl, MemoryCategory, Comment, Conversation, CustomProvider, Effort, McpServer, MemoryItem, Message, Page, Pin,
   ShapeKind, Tool, ViewMode,
 } from "./types";
 import { DEVICE_SIZE } from "./types";
@@ -26,6 +26,8 @@ export interface Settings {
   memory: MemoryItem[];
   autoTitle: boolean;
   webSearch: boolean;
+  memoryOn: boolean;
+  selfCheck: boolean;
 }
 export interface Viewport { x: number; y: number; z: number }
 
@@ -100,7 +102,7 @@ interface State {
   setTitle: (id: string, t: string) => void;
   addMessage: (convId: string, m: Message) => void;
   patchMessage: (convId: string, id: string, p: Partial<Message>) => void;
-  addMemory: (text: string) => void;
+  addMemory: (text: string, category?: MemoryCategory) => void;
   removeMemory: (id: string) => void;
   setBusy: (b: boolean) => void;
 }
@@ -137,7 +139,7 @@ export const useStore = create<State>()(
       settings: {
         theme: "dark", hue: 17, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
         designSystemId: "m3e", skills: SKILLS.filter((s) => s.default).map((s) => s.id),
-        customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false,
+        customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true,
       },
       ui: {
         settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, editId: null, openPinId: null,
@@ -266,7 +268,7 @@ export const useStore = create<State>()(
       patchMessage: (convId, id, p) => set((s) => ({
         conversations: s.conversations.map((c) => (c.id === convId ? { ...c, messages: c.messages.map((m) => (m.id === id ? { ...m, ...p } : m)) } : c)),
       })),
-      addMemory: (text) => set((s) => ({ settings: { ...s.settings, memory: [{ id: uid(), text, at: Date.now() }, ...s.settings.memory] } })),
+      addMemory: (text, category = "preferences") => set((s) => ({ settings: { ...s.settings, memory: [{ id: uid(), text, at: Date.now(), category }, ...s.settings.memory] } })),
       removeMemory: (id) => set((s) => ({ settings: { ...s.settings, memory: s.settings.memory.filter((m) => m.id !== id) } })),
       setBusy: (b) => set({ busy: b }),
     }),

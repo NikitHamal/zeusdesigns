@@ -6,6 +6,7 @@
 import { MATERIAL_ICONS } from "./materialIcons";
 import { DesignSystem, tokensCss } from "./designSystems";
 import type { Device } from "../types";
+import { blueprintFor } from "./blueprints";
 
 /* icons: home, search, settings, person, notifications, favorite, star, bookmark, share, mail, chat, call, calendar_today, schedule,
    location_on, shopping_cart, shopping_bag, payments, credit_card, wallet, bar_chart, trending_up, trending_down, pie_chart, insights,
@@ -64,6 +65,9 @@ img{display:block;max-width:100%}
 .z-i.sm{width:18px;height:18px}.z-i.lg{width:32px;height:32px}.z-i.xl{width:48px;height:48px}
 .z-screen{min-height:100vh;display:flex;flex-direction:column}
 .z-page{flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 28px}
+body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-row>*{min-width:0}
+*{scrollbar-width:none}::-webkit-scrollbar{display:none}
+.z-hero,.z-card{position:relative}.z-hero{overflow:hidden}.z-deco{position:absolute;z-index:0;pointer-events:none;opacity:.5}.z-hero>*:not(.z-deco){position:relative;z-index:1}
 .z-wide{width:100%;max-width:1120px;margin:0 auto;padding:0 32px}
 .z-row{display:flex;align-items:center;gap:12px}
 .z-col{display:flex;flex-direction:column;gap:12px}
@@ -319,7 +323,7 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
 /* ------------------------------------------------------------------ */
 const ICON_HINT = "home search settings person notifications favorite star bookmark share mail chat call calendar_today schedule location_on shopping_cart shopping_bag payments credit_card wallet bar_chart trending_up trending_down pie_chart insights dashboard list grid_view menu more_vert more_horiz arrow_back arrow_forward chevron_right chevron_left expand_more close check check_circle add remove edit delete download upload cloud lock visibility filter_list sort tune play_arrow pause skip_next skip_previous music_note mic photo_camera image videocam map explore fitness_center restaurant flight work school bolt public group groups person_add thumb_up comment send attach_file link content_copy folder description article receipt_long inventory_2 local_shipping storefront sell savings account_balance support_agent help info warning error verified shield key light_mode dark_mode wifi battery_full flag rocket_launch terminal apps task_alt checklist event timer history refresh logout login open_in_new palette layers smartphone laptop directions_run";
 
-export function harnessPrompt(ds: DesignSystem): string {
+export function harnessPrompt(ds: DesignSystem, intent = "", device?: Device): string {
   return [
     `You are Zeus, a senior product designer and front-end engineer inside the ZeusDesigns desktop app. The user has a chat on the left and an infinite canvas of live HTML screens on the right. You design by emitting complete screens as artboards. A screen is judged on one thing: would a design lead ship it.`,
 
@@ -373,6 +377,13 @@ Write <i data-i="name"></i> (add data-fill for the filled form, add class sm, lg
 8. Every screen has its states: a selected tab or nav item, a focused or filled input where relevant, and one empty or progress moment if the flow calls for it.
 9. Landing pages: a bold hero with one headline and one action, a proof row, 3 feature blocks that each show a real UI fragment, a closing action. Dashboards: a left side nav, a top row of 3 to 4 stats, one primary chart or table, dense but aligned. Mobile apps: appbar, one hero or summary, a list or grid, bottom nav with 3 to 5 destinations.
 10. Reach the polish bar: aligned edges, equal gutters, no orphan elements, no overflow, no text smaller than 12px, no low-contrast text.
+11. Fill the screen. A mobile screen is 844px tall: the content plus the pinned z-nav must reach the bottom edge with no dead band. If content is short, add a real section; never leave empty space or stretch a card to fill it.
+12. Nothing overlaps nothing. Text never sits on top of other text or on a decorative shape. A decorative shape is a child with class z-deco inside a z-hero, placed in a corner at 40% size and 50% opacity, and it must not reach the text column. Never use position:absolute for text or buttons.
+13. Every row has the same height, every card in a row has the same height, every icon button is 40px or 44px. Check alignment before you finish.
+14. Long text wraps or truncates with z-truncate. Horizontal scrollers (z-chips) are for chips only and never show a scroll bar.
+15. If the user states a durable fact about themselves, their brand or how they like to work, append <remember category="preferences|profile|topics|areas">one short sentence</remember> after your reply text. Never for ordinary design requests.
+
+${blueprintFor(intent, device)}
 
 ## Skeleton (shape to follow for the requested device; replace all content)
 Mobile:

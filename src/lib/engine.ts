@@ -8,21 +8,26 @@ import { generateTitle, isNative, nativeChat, ChatEvent, ChatRequest } from "./b
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
+import { memoryBlock, extractRemember, addMemory as saveMemory } from "./memory";
+import { toolsPrompt } from "./tools";
+import { auditHtml, patchFor } from "./audit";
+import { canCallModel, oneShot } from "./oneshot";
+import { tokensCss } from "./designSystems";
 
 /* ------------------------------------------------------------------ */
 /* System prompt                                                       */
 /* ------------------------------------------------------------------ */
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(opts: { intent?: string; device?: Device; tools?: string } = {}): string {
   const s = useStore.getState();
   const ds = getDS(s.settings.designSystemId);
   const skills = SKILLS.filter((k) => s.settings.skills.includes(k.id));
   const boards = s.artboards.filter((a) => a.pageId === s.activePageId);
-  const mem = s.settings.memory;
   const ws = s.ui.workspace;
   return [
-    harnessPrompt(ds),
+    harnessPrompt(ds, opts.intent, opts.device),
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
-    mem.length ? `## Persistent memory about the user & project\n${mem.map((m) => `- ${m.text}`).join("\n")}` : "",
+    memoryBlock(),
+    opts.tools ?? "",
     boards.length ? `## Current canvas page\n${boards.map((a) => `- id=${a.id} name="${a.name}" device=${a.device} v${a.version}`).join("\n")}` : "## Current canvas page\n(empty)",
     ws ? `## Workspace\nOpen project folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top-level files: ${ws.tree.slice(0, 40).map((n) => n.name + (n.dir ? "/" : "")).join(", ")}. Match its stack and conventions when producing code.` : "",
   ].filter(Boolean).join("\n\n");
@@ -251,7 +256,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const linted = new Set<number>();
 
   const sync = (final = false) => {
-    const { text, blocks } = parseStream(full);
+    const { text, blocks } = parseStream(extractRemember(full).clean);
     const S = useStore.getState();
     blocks.forEach((b, i) => {
       let id = idMap.get(i);
@@ -301,6 +306,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
 
   const finish = (err?: string) => {
     sync(true);
+    for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);
     const S = useStore.getState();
     for (const id of idMap.values()) S.updateArtboard(id, { loading: false });
     S.patchMessage(convId, asstId, { streaming: false, ...(err ? { error: err } : {}) });
@@ -309,7 +315,58 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     controller = null; nativeCancel = null;
   };
 
-  const system = buildSystemPrompt();
+  const designTokensAnswer = (args?: string) => {
+    let sysId = useStore.getState().settings.designSystemId;
+    try { const a = JSON.parse(args ?? "{}"); const v = String(a.system ?? a.body ?? a.path ?? ""); if (v) sysId = v; } catch { /* keep active */ }
+    const d = getDS(sysId.replace("m3-expressive", "m3e").replace("apple-hig", "hig").replace("fluent2", "fluent"));
+    return `${d.name}\n${tokensCss(d)}`;
+  };
+
+  const selfCheck = async () => {
+    if (!useStore.getState().settings.selfCheck || signal.aborted) return;
+    for (const id of [...new Set(idMap.values())].slice(0, 4)) {
+      if (signal.aborted) return;
+      const a = useStore.getState().artboards.find((x) => x.id === id);
+      if (!a || a.html.length < 300 || a.html.includes("Empty frame")) continue;
+      const chip: ToolCall = { id: uid(), name: "design_audit", args: a.name, status: "running" };
+      tools.push(chip); sync();
+      try {
+        let issues = await auditHtml(a.html, a.w, a.h);
+        const patched = patchFor(a.html, issues);
+        if (patched !== a.html) useStore.getState().updateArtboard(id, { html: patched });
+        const log = issues.map((i) => i.msg);
+        const severe = issues.filter((i) => i.severe);
+        if (severe.length && canCallModel() && !signal.aborted) {
+          chip.name = "design_repair"; sync();
+          try {
+            const cur = useStore.getState().artboards.find((x) => x.id === id)!;
+            const bare = cur.html.replace(/<style data-zeus-kit>[\s\S]*?<\/style>/, "").replace(/<script data-zeus-kit-js>[\s\S]*?<\/script>/, "");
+            const raw = await oneShot(
+              "You repair layout defects in one HTML screen. Fix ONLY the listed defects with the smallest possible edits. Keep content, structure, classes and CSS variables. Do not add shadows, emoji, gradients or external resources. Reply with the complete fixed document inside <artboard name=\"fix\" mode=\"revise\">...</artboard> and nothing else.",
+              `Screen ${a.w}x${a.h}px. Defects:\n${severe.map((i) => `- ${i.msg}`).join("\n")}\n\n<artboard name="${a.name}" mode="revise">\n${bare.slice(0, 30000)}\n</artboard>`,
+              { effort: "low", timeoutMs: 90000 },
+            );
+            const b = parseStream(raw).blocks[0];
+            if (b && b.html.length > 300 && !signal.aborted) {
+              const fixed = harden(b.html, getDS(useStore.getState().settings.designSystemId)).html;
+              const again = await auditHtml(fixed, a.w, a.h);
+              if (again.filter((i) => i.severe).length < severe.length) {
+                useStore.getState().updateArtboard(id, { html: patchFor(fixed, again) });
+                log.push(`repaired: ${severe.length} defect${severe.length > 1 ? "s" : ""} fixed, ${again.filter((i) => i.severe).length} left`);
+                issues = again;
+              } else log.push("repair did not improve the screen, kept the original");
+            }
+          } catch (e) { log.push(`repair skipped: ${(e as Error).message}`); }
+        }
+        chip.status = "ok"; chip.output = log.length ? log.join("\n") : "No layout issues";
+      } catch (e) { chip.status = "error"; chip.output = (e as Error).message; }
+      sync();
+    }
+  };
+
+  const nativeOn = isNative && useStore.getState().ui.nativeReady;
+  const toolsText = nativeOn ? await toolsPrompt().catch(() => "") : "";
+  const system = buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText });
   const req: ChatRequest = {
     requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId, effort: settings.effort,
     system, messages: history, workspaceRoot: st.ui.workspace?.root,
@@ -323,18 +380,39 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   try {
-    if (isNative && useStore.getState().ui.nativeReady) {
-      await new Promise<void>((resolve, reject) => {
-        const onEvent = (e: ChatEvent) => {
-          if (e.type === "delta") onDelta(e.text);
-          else if (e.type === "tool_call") tools.push({ id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" });
-          else if (e.type === "tool_result") { const t = tools.find((x) => x.id === e.id); if (t) { t.status = e.ok ? "ok" : "error"; t.output = e.output; } sync(); }
-          else if (e.type === "error") reject(new Error(e.message));
-          else if (e.type === "done") resolve();
-        };
-        signal.addEventListener("abort", () => resolve());
-        nativeChat(req, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
-      });
+    if (nativeOn) {
+      let current = req;
+      let msgs: ChatRequest["messages"] = history;
+      for (let round = 0; ; round++) {
+        const roundTools: ToolCall[] = [];
+        let roundText = "";
+        await new Promise<void>((resolve, reject) => {
+          const onEvent = (e: ChatEvent) => {
+            if (e.type === "delta") { roundText += e.text; onDelta(e.text); }
+            else if (e.type === "tool_call") { const t: ToolCall = { id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" }; tools.push(t); roundTools.push(t); sync(); }
+            else if (e.type === "tool_result") {
+              const t = tools.find((x) => x.id === e.id);
+              if (t) { t.status = e.ok ? "ok" : "error"; t.output = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output; }
+              sync();
+            }
+            else if (e.type === "error") reject(new Error(e.message));
+            else if (e.type === "done") resolve();
+          };
+          signal.addEventListener("abort", () => resolve());
+          nativeChat(current, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
+        });
+        for (const t of roundTools) if (t.status === "running") t.status = "error";
+        if (signal.aborted || !roundTools.length || round >= 3) break;
+        const closeAt = roundText.lastIndexOf("</zeus_tool>");
+        const said = closeAt >= 0 ? roundText.slice(0, closeAt + 12) : roundText;
+        msgs = [
+          ...msgs,
+          { role: "assistant", content: said },
+          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
+        ];
+        current = { ...req, requestId: uid(), messages: msgs };
+        full += "\n\n";
+      }
     } else if (custom) {
       await streamCustom(req, onDelta, signal);
     } else {
@@ -342,6 +420,9 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
     }
     if (raf) cancelAnimationFrame(raf);
+    sync(true);
+    useStore.getState().patchMessage(convId, asstId, { streaming: false });
+    await selfCheck();
     finish();
   } catch (e) {
     if (raf) cancelAnimationFrame(raf);

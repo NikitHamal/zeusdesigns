@@ -167,11 +167,26 @@ export async function tryInvoke<T>(cmd: string, args?: Record<string, unknown>):
 
 /* ---------------- native persistent memory (falls back to the local store) ---------------- */
 import type { MemoryItem } from "../types";
-interface NativeMem { id: string; text: string; created_at?: number }
+interface NativeMem { id: string; text: string; category?: string; created_at?: number }
+const CATS = ["preferences", "profile", "topics", "areas"];
 const toItems = (l: NativeMem[] | null): MemoryItem[] | null =>
-  l ? l.map((m) => ({ id: m.id, text: m.text, at: (m.created_at ?? 0) > 1e12 ? (m.created_at as number) : (m.created_at ?? 0) * 1000 })) : null;
+  l ? l.map((m) => ({
+    id: m.id, text: m.text,
+    category: (CATS.includes(m.category ?? "") ? m.category : "preferences") as MemoryItem["category"],
+    at: (m.created_at ?? 0) > 1e12 ? (m.created_at as number) : (m.created_at ?? 0) * 1000,
+  })) : null;
 export const nativeMemory = {
   list: async () => toItems(await tryInvoke<NativeMem[]>("memory_list")),
-  add: async (text: string) => toItems(await tryInvoke<NativeMem[]>("memory_add", { text })),
+  add: async (text: string, category = "preferences") => toItems(await tryInvoke<NativeMem[]>("memory_add", { text, category })),
   remove: async (id: string) => toItems(await tryInvoke<NativeMem[]>("memory_delete", { id })),
+};
+
+/* ---------------- MCP (native registry) ---------------- */
+export interface McpToolInfo { server_id: string; server_name: string; name: string; description: string; input_schema: unknown }
+export interface NativeMcp { id: string; name: string; transport: string; command: string; args?: string[]; status?: string }
+export const nativeMcp = {
+  list: () => tryInvoke<NativeMcp[]>("mcp_list"),
+  add: (server: { id: string; name: string; command: string; args?: string[]; transport?: string }) => tryInvoke<NativeMcp[]>("mcp_add", { server }),
+  remove: (id: string) => tryInvoke<NativeMcp[]>("mcp_remove", { id }),
+  tools: () => tryInvoke<McpToolInfo[]>("mcp_tools"),
 };

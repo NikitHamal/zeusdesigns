@@ -67,8 +67,9 @@ export interface Message {
 export interface Conversation { id: string; title: string; messages: Message[]; at: number; titled?: boolean }
 
 export interface CustomProvider { id: string; name: string; format: "openai" | "anthropic"; baseUrl: string; apiKey: string; model: string }
-export interface McpServer { id: string; name: string; transport: "stdio" | "http"; command: string; enabled: boolean }
-export interface MemoryItem { id: string; text: string; at: number; pinned?: boolean }
+export interface McpServer { id: string; name: string; transport: "stdio" | "http" | "builtin"; command: string; args?: string[]; enabled: boolean; catalogId?: string }
+export type MemoryCategory = "preferences" | "profile" | "topics" | "areas";
+export interface MemoryItem { id: string; text: string; at: number; pinned?: boolean; category?: MemoryCategory }
 export interface FileNode { name: string; path: string; dir: boolean; children?: FileNode[] }
 
 export const DEVICE_SIZE: Record<Device, { w: number; h: number; label: string }> = {

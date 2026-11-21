@@ -4,7 +4,10 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::mpsc::{self, Receiver};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpServer {
@@ -178,7 +181,18 @@ impl McpRegistry {
                     });
                 }
             } else if s.transport == "stdio" {
+                let key = format!("{}|{}|{:?}", s.id, s.command, s.args);
+                let cached = tool_cache().lock().ok().and_then(|g| g.get(&key).cloned());
+                if let Some(c) = cached {
+                    tools.extend(c);
+                    continue;
+                }
                 if let Ok(discovered) = query_stdio_mcp_tools(&s) {
+                    if !discovered.is_empty() {
+                        if let Ok(mut g) = tool_cache().lock() {
+                            g.insert(key, discovered.clone());
+                        }
+                    }
                     tools.extend(discovered);
                 }
             }
@@ -187,135 +201,141 @@ impl McpRegistry {
     }
 }
 
-fn query_stdio_mcp_tools(server: &McpServer) -> Result<Vec<McpTool>, String> {
-    let mut child = Command::new(&server.command)
-        .args(&server.args)
+static TOOL_CACHE: OnceLock<Mutex<HashMap<String, Vec<McpTool>>>> = OnceLock::new();
+
+fn tool_cache() -> &'static Mutex<HashMap<String, Vec<McpTool>>> {
+    TOOL_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn spawn_server(server: &McpServer) -> Result<std::process::Child, String> {
+    let (prog, extra): (String, Vec<String>) = if server.args.is_empty() && server.command.trim().contains(' ') {
+        let mut it = server.command.split_whitespace().map(|s| s.to_string());
+        let p = it.next().unwrap_or_default();
+        (p, it.collect())
+    } else {
+        (server.command.clone(), server.args.clone())
+    };
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(&prog);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = Command::new(&prog);
+    cmd.args(&extra)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let init_req = json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": { "name": "ZeusDesigns", "version": "0.1.0" }
-            }
-        });
-        let list_req = json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/list",
-            "params": {}
-        });
-        let _ = writeln!(stdin, "{}", init_req);
-        let _ = writeln!(stdin, "{}", list_req);
-        let _ = stdin.flush();
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
     }
+    cmd.spawn()
+        .map_err(|e| format!("could not start '{}': {}", prog, e))
+}
 
-    let mut out = Vec::new();
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().take(10).flatten() {
-            if let Ok(v) = serde_json::from_str::<Value>(&line) {
-                if v.get("id").and_then(|i| i.as_i64()) == Some(2) {
-                    if let Some(arr) = v
-                        .get("result")
-                        .and_then(|r| r.get("tools"))
-                        .and_then(|t| t.as_array())
-                    {
-                        for item in arr {
-                            out.push(McpTool {
-                                server_id: server.id.clone(),
-                                server_name: server.name.clone(),
-                                name: item
-                                    .get("name")
-                                    .and_then(|n| n.as_str())
-                                    .unwrap_or("tool")
-                                    .to_string(),
-                                description: item
-                                    .get("description")
-                                    .and_then(|d| d.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                input_schema: item
-                                    .get("inputSchema")
-                                    .cloned()
-                                    .unwrap_or_else(|| json!({})),
-                            });
-                        }
+fn read_until_id(rx: &Receiver<Value>, id: i64, deadline: Instant) -> Result<Value, String> {
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return Err("MCP server timed out".to_string());
+        }
+        match rx.recv_timeout(deadline - now) {
+            Ok(v) => {
+                if v.get("id").and_then(|i| i.as_i64()) == Some(id) {
+                    if let Some(e) = v.get("error") {
+                        return Err(e.to_string());
                     }
+                    return Ok(v.get("result").cloned().unwrap_or(Value::Null));
+                }
+            }
+            Err(_) => return Err("MCP server closed or timed out".to_string()),
+        }
+    }
+}
+
+/// One full MCP session: initialize, initialized notification, a single request, then shut the server down.
+fn mcp_rpc(server: &McpServer, method: &str, params: Value, secs: u64) -> Result<Value, String> {
+    let mut child = spawn_server(server)?;
+    let mut stdin = child.stdin.take().ok_or_else(|| "no stdin".to_string())?;
+    let stdout = child.stdout.take().ok_or_else(|| "no stdout".to_string())?;
+    let (tx, rx) = mpsc::channel::<Value>();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                if tx.send(v).is_err() {
                     break;
                 }
             }
         }
-    }
+    });
+    let deadline = Instant::now() + Duration::from_secs(secs);
+    let mut send = |v: Value| {
+        let _ = writeln!(stdin, "{}", v);
+        let _ = stdin.flush();
+    };
+    send(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": { "name": "ZeusDesigns", "version": "0.1.0" }
+        }
+    }));
+    let out: Result<Value, String> = (|| {
+        read_until_id(&rx, 1, deadline)?;
+        send(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }));
+        send(json!({ "jsonrpc": "2.0", "id": 2, "method": method, "params": params }));
+        read_until_id(&rx, 2, deadline)
+    })();
     let _ = child.kill();
+    let _ = child.wait();
+    out
+}
+
+fn query_stdio_mcp_tools(server: &McpServer) -> Result<Vec<McpTool>, String> {
+    let res = mcp_rpc(server, "tools/list", json!({}), 90)?;
+    let mut out = Vec::new();
+    if let Some(arr) = res.get("tools").and_then(|t| t.as_array()) {
+        for item in arr {
+            out.push(McpTool {
+                server_id: server.id.clone(),
+                server_name: server.name.clone(),
+                name: item.get("name").and_then(|n| n.as_str()).unwrap_or("tool").to_string(),
+                description: item.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string(),
+                input_schema: item.get("inputSchema").cloned().unwrap_or_else(|| json!({})),
+            });
+        }
+    }
     Ok(out)
 }
 
 pub fn call_stdio_mcp_tool(server: &McpServer, tool_name: &str, args: &Value) -> Result<String, String> {
-    let mut child = Command::new(&server.command)
-        .args(&server.args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let init_req = json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": { "name": "ZeusDesigns", "version": "0.1.0" }
-            }
-        });
-        let call_req = json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": args
-            }
-        });
-        let _ = writeln!(stdin, "{}", init_req);
-        let _ = writeln!(stdin, "{}", call_req);
-        let _ = stdin.flush();
-    }
-
-    let mut result_text = String::new();
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().take(12).flatten() {
-            if let Ok(v) = serde_json::from_str::<Value>(&line) {
-                if v.get("id").and_then(|i| i.as_i64()) == Some(2) {
-                    if let Some(res) = v.get("result") {
-                        result_text = serde_json::to_string_pretty(res).unwrap_or_default();
-                    } else if let Some(err) = v.get("error") {
-                        let _ = child.kill();
-                        return Err(err.to_string());
-                    }
-                    break;
+    let res = mcp_rpc(server, "tools/call", json!({ "name": tool_name, "arguments": args }), 120)?;
+    let mut text = String::new();
+    if let Some(arr) = res.get("content").and_then(|c| c.as_array()) {
+        for part in arr {
+            if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
+                if !text.is_empty() {
+                    text.push('\n');
                 }
+                text.push_str(t);
+            } else if let Some(ty) = part.get("type").and_then(|t| t.as_str()) {
+                text.push_str(&format!("[{} content omitted]", ty));
             }
         }
     }
-    let _ = child.kill();
-    if result_text.is_empty() {
-        Err("MCP server returned no result for tools/call".to_string())
-    } else {
-        Ok(result_text)
+    if text.is_empty() {
+        text = serde_json::to_string_pretty(&res).unwrap_or_default();
     }
+    if res.get("isError").and_then(|b| b.as_bool()) == Some(true) {
+        return Err(text);
+    }
+    Ok(text)
 }
 
 impl McpRegistry {
@@ -340,22 +360,24 @@ impl McpRegistry {
             return (true, serde_json::to_string_pretty(&tokens).unwrap_or_default());
         }
 
+        let (sid, tool) = match clean.split_once(':') {
+            Some((a, b)) => (a.to_string(), b.to_string()),
+            None => (String::new(), clean.to_string()),
+        };
+        if tool == "sync_artboard_to_file" {
+            return (false, "Use the write_file tool to save a screen into the project folder".to_string());
+        }
         let parsed_args: Value = serde_json::from_str(raw_args).unwrap_or_else(|_| json!({ "input": raw_args }));
-        for s in self.list() {
-            if s.transport == "stdio" && (clean.starts_with(&s.id) || clean == s.name || !clean.is_empty()) {
-                let tool_name = clean.split(':').next_back().unwrap_or(clean);
-                if let Ok(out) = call_stdio_mcp_tool(&s, tool_name, &parsed_args) {
-                    return (true, out);
-                }
-            }
+        let servers = self.list();
+        if let Some(s) = servers.iter().find(|s| s.transport == "stdio" && !sid.is_empty() && s.id == sid) {
+            return match call_stdio_mcp_tool(s, &tool, &parsed_args) {
+                Ok(o) => (true, o),
+                Err(e) => (false, e),
+            };
         }
         (
-            true,
-            format!(
-                "Executed MCP tool '{}' across {} connected MCP servers",
-                clean,
-                self.list().len()
-            ),
+            false,
+            format!("No connected MCP server '{}' exposes the tool '{}'", sid, tool),
         )
     }
 }
