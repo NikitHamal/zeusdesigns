@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -33,6 +34,9 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+
+      - name: Stamp release version
+        run: node scripts/stamp-version.mjs 0.1.${{ github.run_number }}
 
       - name: Install JS dependencies
         run: npm ci
@@ -66,3 +70,18 @@ jobs:
         run: |
           Copy-Item src-tauri/target/release/zeusdesigns.exe ZeusDesigns-portable.exe
           gh release upload $env:TAG ZeusDesigns-portable.exe --clobber
+
+  prune:
+    name: Prune old runs
+    needs: windows
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep only the latest successful run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          CURRENT_OK: ${{ needs.windows.result == 'success' }}
+        run: bash scripts/prune-runs.sh

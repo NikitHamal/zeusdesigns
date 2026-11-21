@@ -1,0 +1,19 @@
+name: Prune runs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: bash scripts/prune-runs.sh
