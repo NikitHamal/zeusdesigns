@@ -1,0 +1,67 @@
+name: Windows Build & Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Build Windows exe + installer
+    runs-on: windows-latest
+    env:
+      TAG: v0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Type-check & build UI
+        run: npm run build
+
+      - name: Generate native icons
+        run: npx tauri icon public/app-icon.png
+
+      - name: Build native app + NSIS installer, publish GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ env.TAG }}
+          releaseName: "ZeusDesigns ${{ env.TAG }}"
+          releaseBody: |
+            Automated Windows build of **ZeusDesigns** (native Rust + WebView2, Material 3 Expressive).
+
+            - `ZeusDesigns_*_x64-setup.exe` — installer
+            - `ZeusDesigns-portable.exe` — standalone executable (needs WebView2, preinstalled on Windows 10/11)
+          releaseDraft: false
+          prerelease: false
+
+      - name: Attach portable standalone exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Copy-Item src-tauri/target/release/zeusdesigns.exe ZeusDesigns-portable.exe
+          gh release upload $env:TAG ZeusDesigns-portable.exe --clobber
