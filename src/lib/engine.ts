@@ -50,6 +50,7 @@ function parseAttrs(s: string) {
 
 export function parseStream(full: string): { text: string; blocks: Block[] } {
   full = full.replace(/<think>[\s\S]*?(<\/think>|$)/g, "");
+  full = full.replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, ""); // agent tool calls render as chips, not text
   let text = "";
   const blocks: Block[] = [];
   let i = 0;
