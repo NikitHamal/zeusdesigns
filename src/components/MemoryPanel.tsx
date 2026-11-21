@@ -39,6 +39,7 @@ function ItemRow({ m }: { m: MemoryItem }) {
 export function MemoryTab() {
   const mem = useStore((s) => s.settings.memory);
   const on = useStore((s) => s.settings.memoryOn);
+  const learn = useStore((s) => s.settings.learnOn);
   const patch = useStore((s) => s.patchSettings);
   const notify = useStore((s) => s.notify);
   const [open, setOpen] = useState<MemoryCategory | null>(null);
@@ -71,6 +72,10 @@ export function MemoryTab() {
             <div className="flex items-center gap-4 rounded-xl border border-outline-variant px-4 py-3">
               <div className="min-w-0 flex-1"><div className="text-sm font-medium text-on-surface">Use memory in every chat</div></div>
               <Toggle on={on} onChange={(v) => patch({ memoryOn: v })} />
+            </div>
+            <div className={cn("flex items-center gap-4 rounded-xl border border-outline-variant px-4 py-3", !on && "opacity-50")}>
+              <div className="min-w-0 flex-1"><div className="text-sm font-medium text-on-surface">Learn from my messages</div></div>
+              <Toggle on={learn && on} onChange={(v) => on && patch({ learnOn: v })} />
             </div>
             {CATEGORIES.map((c) => {
               const l = inCat(c.id);

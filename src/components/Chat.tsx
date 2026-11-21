@@ -34,7 +34,7 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
 
 const TOOL_LABEL: Record<string, string> = {
   design_lint: "Cleaned up", design_audit: "Checked layout", design_repair: "Repairing layout", read_file: "Read file", write_file: "Wrote file",
-  list_dir: "Listed folder", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
+  list_dir: "Listed folder", studio_brief: "Read the brief", studio_palette: "Built a palette", studio_contrast: "Checked contrast", studio_fonts: "Picked fonts", studio_icons: "Searched icons", studio_components: "Read the component kit", studio_tokens: "Read design tokens", studio_systems: "Listed design systems", studio_screens: "Listed screens", studio_read_screen: "Read a screen", studio_lint: "Linted a screen", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
 };
 function toolTitle(name: string): { label: string; sub?: string } {
   if (name.startsWith("mcp:")) { const [, server, ...tool] = name.split(":"); return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, "") }; }
@@ -71,7 +71,7 @@ function ArtboardCards({ ids }: { ids: string[] }) {
             <Thumb html={a.html} w={a.w} h={a.h} width={118} className={a.loading ? "opacity-60" : ""} />
           </div>
           <div className="mt-1.5 truncate px-1 text-xs font-semibold text-on-surface">{a.name}</div>
-          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? "Designing…" : `v${a.version} · open on canvas`}</div>
+          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? "Designing…" : `v${a.version}`}</div>
         </button>
       ))}
     </div>

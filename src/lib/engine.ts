@@ -8,7 +8,7 @@ import { generateTitle, isNative, nativeChat, ChatEvent, ChatRequest } from "./b
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
-import { memoryBlock, extractRemember, addMemory as saveMemory } from "./memory";
+import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
@@ -199,6 +199,7 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, sign
 /* ------------------------------------------------------------------ */
 /* Orchestrator                                                        */
 /* ------------------------------------------------------------------ */
+const DESIGN_INTENT = /(design|screen|landing|dashboard|mockup|mock-up|wireframe|\bui\b|\bux\b|layout|onboarding|\bapp\b|\bpage\b|redesign|variant|login|checkout|profile|settings page|hero)/i;
 let controller: AbortController | null = null;
 let nativeCancel: (() => void) | null = null;
 
@@ -229,6 +230,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   st.addMessage(convId, userMsg);
   st.addMessage(convId, { id: asstId, role: "assistant", text: "", streaming: true, model: modelLabel, at: Date.now(), tools: [], artboardIds: [] });
   st.setBusy(true);
+  void learnFromText(opts.text).then((l) => { if (l.length) useStore.getState().notify(l.length === 1 ? "Saved to memory" : `Saved ${l.length} lines to memory`); });
 
   // instant title via ChatJimmy (micro-task engine)
   if (settings.autoTitle && !conv.titled && conv.messages.length === 0) {
@@ -385,6 +387,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     if (nativeOn) {
       let current = req;
       let msgs: ChatRequest["messages"] = history;
+      let nudged = false;
       for (let round = 0; ; round++) {
         const roundTools: ToolCall[] = [];
         const studioRuns = new Map<string, Promise<void>>();
@@ -417,7 +420,21 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         });
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (signal.aborted || !roundTools.length || round >= 4) break;
+        if (signal.aborted || round >= 4) break;
+        if (!roundTools.length) {
+          // Recovery: a design request that produced no artboard never reaches the canvas. Weak models do this often; ask once more, strictly.
+          const produced = parseStream(extractRemember(full).clean).blocks.length > 0;
+          if (produced || nudged || !DESIGN_INTENT.test(opts.text) || roundText.trim().length === 0 && round > 0) break;
+          nudged = true;
+          if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
+          msgs = [
+            ...msgs,
+            { role: "assistant", content: roundText },
+            { role: "user", content: 'Your reply had no <artboard> block, so nothing reached the canvas. Reply again in the exact output protocol: one short sentence, then complete <artboard name="..." device="mobile|tablet|web" mode="new"> documents. No code fences, no explanation of how to build it.' },
+          ];
+          current = { ...req, requestId: uid(), messages: msgs };
+          continue;
+        }
         const closeAt = roundText.lastIndexOf("</zeus_tool>");
         const said = closeAt >= 0 ? roundText.slice(0, closeAt + 12) : roundText;
         msgs = [

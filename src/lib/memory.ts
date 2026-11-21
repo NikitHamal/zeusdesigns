@@ -79,3 +79,31 @@ export async function editWithAI(instruction: string): Promise<string> {
   for (const a of op.add ?? []) if (a.text) { await addMemory(a.text, a.category && isCategory(a.category) ? a.category : "preferences"); added++; }
   return added || removed ? `${added ? `Added ${added}` : ""}${added && removed ? ", " : ""}${removed ? `removed ${removed}` : ""}` : "Nothing to change";
 }
+
+/* ------------------------------------------------------------------ */
+/* Learning from chats: deterministic, instant, no model call          */
+/* ------------------------------------------------------------------ */
+const LEARN: { cat: MemoryCategory; re: RegExp }[] = [
+  { cat: "preferences", re: /^(?:please\s+)?(?:remember(?:\s+that|:)?\s+)?(?:i\s+(?:always|never|prefer|only|don'?t like|do not like|hate|dislike)\b|(?:always|never)\s+(?:use|make|give|keep|avoid|add|write|show)\b|i\s+like\s+(?:my|designs?|it\s+when|things)\b)/i },
+  { cat: "profile", re: /^(?:remember(?:\s+that|:)?\s+)?(?:i\s*(?:am|'m)\s+(?:a|an|the)\s+\w+|i\s+work\s+(?:at|as|for|in)\b|my\s+(?:name|role|job|title|studio|team)\s+(?:is|are)\b)/i },
+  { cat: "areas", re: /^(?:remember(?:\s+that|:)?\s+)?(?:(?:my|our)\s+(?:brand|app|product|project|startup|company|website|client|business)\s+(?:is|are|called|named)\b|(?:we|i)(?:'re|\s+are|'m|\s+am)\s+(?:building|making|designing|working\s+on|launching)\b)/i },
+];
+
+/** Durable first-person statements in a user message become memory lines. Returns what was saved. */
+export async function learnFromText(text: string): Promise<string[]> {
+  const st = useStore.getState().settings;
+  if (!st.memoryOn || !st.learnOn) return [];
+  const saved: string[] = [];
+  const sentences = text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter((x) => x.length > 10 && x.length <= 180);
+  for (const sent of sentences) {
+    const hit = LEARN.find((l) => l.re.test(sent));
+    if (!hit || /\?$/.test(sent)) continue;
+    const line = sent.replace(/^(?:please\s+)?remember(?:\s+that|:)?\s+/i, "").replace(/[.!]+$/, "");
+    const final = line[0].toUpperCase() + line.slice(1);
+    if (items().some((m) => m.text.toLowerCase() === final.toLowerCase())) continue;
+    await addMemory(final, hit.cat);
+    saved.push(final);
+    if (saved.length >= 3) break;
+  }
+  return saved;
+}
