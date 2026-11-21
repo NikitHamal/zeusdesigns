@@ -18,6 +18,8 @@ void zeus_split_k2_details(const char* raw_content, char* out_answer, size_t out
 int zeus_chat_stream(const char* req_json, zeus_stream_event_cb cb, void* user_data);
 int zeus_chat_cancel(const char* request_id);
 int zeus_title_generate(const char* user_text, char* out_buf, size_t out_len);
+int zeus_providers_catalog_json(char* out_buf, size_t out_len);
+int zeus_workspace_index_count(const char* folder_path);
 
 #ifdef __cplusplus
 }

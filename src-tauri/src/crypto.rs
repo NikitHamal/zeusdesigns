@@ -140,7 +140,74 @@ pub fn fake_ipv4() -> String {
 /// Ported directly from `/tmp/NEB/backend_python/api/deepai_proxy.py`:
 /// `_SALT = "hackers_become_a_little_stinkier_every_time_they_hack"`
 /// `inner = _h(USER_AGENT + _h(USER_AGENT + _h(USER_AGENT + random_num + _SALT)))`
+extern "C" {
+    fn zeus_generate_deepai_tryit_key(
+        user_agent: *const std::os::raw::c_char,
+        out_buf: *mut std::os::raw::c_char,
+        out_len: usize,
+    );
+    fn zeus_clean_chatjimmy_output(
+        raw_text: *const std::os::raw::c_char,
+        out_buf: *mut std::os::raw::c_char,
+        out_len: usize,
+    );
+    fn zeus_split_k2_details(
+        raw_content: *const std::os::raw::c_char,
+        out_answer: *mut std::os::raw::c_char,
+        out_len: usize,
+    );
+}
+
+/// Calls the linked C++20 `zeus_engine` library to strip `<|stats|>` and `<|think|>` blocks
+/// from ChatJimmy responses via zero-copy stack buffer FFI.
+pub fn cpp_clean_chatjimmy_output(raw: &str) -> Option<String> {
+    let c_in = std::ffi::CString::new(raw).ok()?;
+    let mut buf = vec![0u8; raw.len() + 64];
+    unsafe {
+        zeus_clean_chatjimmy_output(
+            c_in.as_ptr(),
+            buf.as_mut_ptr() as *mut std::os::raw::c_char,
+            buf.len(),
+        );
+        let c_str = std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::os::raw::c_char);
+        Some(c_str.to_string_lossy().to_string())
+    }
+}
+
+/// Calls the linked C++20 `zeus_engine` library to split K2Horizon `<details>` reasoning blocks.
+pub fn cpp_split_k2_details(raw: &str) -> Option<String> {
+    let c_in = std::ffi::CString::new(raw).ok()?;
+    let mut buf = vec![0u8; raw.len() + 64];
+    unsafe {
+        zeus_split_k2_details(
+            c_in.as_ptr(),
+            buf.as_mut_ptr() as *mut std::os::raw::c_char,
+            buf.len(),
+        );
+        let c_str = std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::os::raw::c_char);
+        Some(c_str.to_string_lossy().to_string())
+    }
+}
+
+/// Ported directly from `/tmp/NEB/backend_python/api/deepai_proxy.py`:
+/// `_SALT = "hackers_become_a_little_stinkier_every_time_they_hack"`
+/// `inner = _h(USER_AGENT + _h(USER_AGENT + _h(USER_AGENT + random_num + _SALT)))`
 pub fn generate_deepai_tryit_key(user_agent: &str) -> String {
+    if let Ok(c_ua) = std::ffi::CString::new(user_agent) {
+        let mut buf = [0u8; 160];
+        unsafe {
+            zeus_generate_deepai_tryit_key(
+                c_ua.as_ptr(),
+                buf.as_mut_ptr() as *mut std::os::raw::c_char,
+                buf.len(),
+            );
+            if let Ok(s) = std::ffi::CStr::from_ptr(buf.as_ptr() as *const std::os::raw::c_char).to_str() {
+                if s.starts_with("tryit-") && s.len() > 70 {
+                    return s.to_string();
+                }
+            }
+        }
+    }
     const SALT: &str = "hackers_become_a_little_stinkier_every_time_they_hack";
     let random_num = (pseudo_random_u64() % 100_000_000_000).to_string();
     let h1 = sha256_hex(format!("{}{}{}", user_agent, random_num, SALT).as_bytes());
@@ -166,5 +233,17 @@ mod tests {
         let k = generate_deepai_tryit_key("Mozilla/5.0");
         assert!(k.starts_with("tryit-"));
         assert!(k.len() > 70);
+    }
+
+    #[test]
+    fn test_cpp_ffi_chatjimmy_cleaner() {
+        let cleaned = cpp_clean_chatjimmy_output("Material 3 Audio App<|stats|>{\"tps\":21000}<|/stats|>").unwrap();
+        assert_eq!(cleaned, "Material 3 Audio App");
+    }
+
+    #[test]
+    fn test_cpp_ffi_k2_details_splitter() {
+        let ans = cpp_split_k2_details("<details>thinking</details>\nFinal UI Screen").unwrap();
+        assert_eq!(ans, "Final UI Screen");
     }
 }

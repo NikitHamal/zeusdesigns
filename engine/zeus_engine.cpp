@@ -389,4 +389,55 @@ void zeus_split_k2_details(const char* raw_content, char* out_answer, size_t out
     copy_to_c_buf(answer, out_answer, out_len);
 }
 
+int zeus_chat_stream(const char* req_json, zeus_stream_event_cb cb, void* user_data) {
+    if (!req_json || !cb) return -1;
+    std::string payload = R"({"type":"done","engine":"cpp20-ffi"})";
+    cb(payload.c_str(), user_data);
+    return 0;
+}
+
+int zeus_chat_cancel(const char* request_id) {
+    return request_id ? 0 : -1;
+}
+
+int zeus_title_generate(const char* user_text, char* out_buf, size_t out_len) {
+    if (!out_buf || out_len == 0) return -1;
+    std::string raw = zeus::KeylessProviderEngine::strip_chatjimmy_tags(user_text ? user_text : "");
+    std::istringstream iss(raw);
+    std::string word, result;
+    int count = 0;
+    while (iss >> word && count < 5) {
+        if (!result.empty()) result += " ";
+        result += word;
+        ++count;
+    }
+    if (result.empty()) result = "New Design Session";
+    copy_to_c_buf(result, out_buf, out_len);
+    return 0;
+}
+
+int zeus_providers_catalog_json(char* out_buf, size_t out_len) {
+    if (!out_buf || out_len == 0) return -1;
+    zeus::KeylessProviderEngine engine;
+    std::ostringstream oss;
+    oss << "[";
+    const auto& presets = engine.presets();
+    for (size_t i = 0; i < presets.size(); ++i) {
+        if (i > 0) oss << ",";
+        oss << "{\"id\":\"" << presets[i].slug << "\",\"name\":\"" << presets[i].label
+            << "\",\"defaultModel\":\"" << presets[i].default_model
+            << "\",\"speed\":\"" << presets[i].speed_badge << "\"}";
+    }
+    oss << "]";
+    copy_to_c_buf(oss.str(), out_buf, out_len);
+    return static_cast<int>(presets.size());
+}
+
+int zeus_workspace_index_count(const char* folder_path) {
+    if (!folder_path) return -1;
+    zeus::WorkspaceEngine ws;
+    if (!ws.open_workspace(folder_path)) return -1;
+    return static_cast<int>(ws.indexed_files().size());
+}
+
 } // extern "C"
