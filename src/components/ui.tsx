@@ -1,4 +1,5 @@
-import { cloneElement, isValidElement, memo, ReactNode, useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, memo, ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
 
@@ -21,7 +22,7 @@ export function IconBtn({ children, label, onClick, active, className, size = 40
   );
 }
 
-/* ---------- Dropdown ---------- */
+/* ---------- Dropdown: portal menu, flips and clamps to the viewport so it can never be clipped ---------- */
 export function Dropdown({ trigger, children, up, align = "left", className, width = 260 }: {
   trigger: (o: { open: boolean; toggle: () => void }) => ReactNode;
   children: (close: () => void) => ReactNode;
@@ -29,28 +30,59 @@ export function Dropdown({ trigger, children, up, align = "left", className, wid
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; maxH: number; w: number } | null>(null);
+
+  const place = useCallback(() => {
+    const t = ref.current?.getBoundingClientRect();
+    const m = menu.current;
+    if (!t || !m) return;
+    const pad = 8, gap = 6, vw = window.innerWidth, vh = window.innerHeight;
+    const want = typeof width === "number" ? width : m.offsetWidth;
+    const w = Math.min(want, vw - pad * 2);
+    const h = m.scrollHeight;
+    const below = vh - t.bottom - pad - gap, above = t.top - pad - gap;
+    const flipUp = up ? above >= Math.min(h, 220) || above >= below : below < Math.min(h, 220) && above > below;
+    const maxH = Math.max(120, flipUp ? above : below);
+    const eff = Math.min(h, maxH);
+    let left = align === "right" ? t.right - w : align === "center" ? t.left + t.width / 2 - w / 2 : t.left;
+    left = Math.max(pad, Math.min(left, vw - w - pad));
+    setPos({ left, top: flipUp ? t.top - gap - eff : t.bottom + gap, maxH, w });
+  }, [align, up, width]);
+
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    place();
+    const again = requestAnimationFrame(place);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { cancelAnimationFrame(again); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, place]);
+
   useEffect(() => {
     if (!open) return;
-    const h = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const h = (e: PointerEvent) => {
+      const n = e.target as Node;
+      if (!ref.current?.contains(n) && !menu.current?.contains(n)) setOpen(false);
+    };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } };
     document.addEventListener("pointerdown", h);
-    document.addEventListener("keydown", k);
-    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k); };
+    document.addEventListener("keydown", k, true);
+    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k, true); };
   }, [open]);
+
   return (
     <div ref={ref} className={cn("relative inline-block", className)}>
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
-      {open && (
+      {open && createPortal(
         <div
-          style={{ width }}
-          className={cn(
-            "anim-pop absolute z-50 rounded-[22px] bg-surface-container border border-outline-variant/60 p-1.5   max-h-[70vh] overflow-auto",
-            up ? "bottom-full mb-2" : "top-full mt-2",
-            align === "left" && "left-0", align === "right" && "right-0", align === "center" && "left-1/2 -translate-x-1/2",
-          )}
+          ref={menu}
+          style={{ position: "fixed", left: pos?.left ?? 0, top: pos?.top ?? 0, width: pos?.w ?? (typeof width === "number" ? width : undefined), maxHeight: pos?.maxH ?? "70vh", visibility: pos ? "visible" : "hidden" }}
+          className="anim-fade z-[400] overflow-y-auto overflow-x-hidden rounded-[20px] border border-outline-variant bg-surface-container p-1.5"
         >
           {children(() => setOpen(false))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -82,7 +114,7 @@ export const MenuLabel = ({ children }: { children: ReactNode }) => (
   <div className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant/80">{children}</div>
 );
 
-/* ---------- Dialog ---------- */
+/* ---------- Dialog: portal, always fits the window; content scrolls instead of clipping ---------- */
 export function Dialog({ open, onClose, children, className, title }: { open: boolean; onClose: () => void; children: ReactNode; className?: string; title?: string }) {
   useEffect(() => {
     if (!open) return;
@@ -91,18 +123,22 @@ export function Dialog({ open, onClose, children, className, title }: { open: bo
     return () => window.removeEventListener("keydown", k);
   }, [open, onClose]);
   if (!open) return null;
-  return (
-    <div className="anim-fade fixed inset-0 z-[100] grid place-items-center bg-black/45 backdrop-blur-[3px] p-6" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={cn("anim-pop relative flex flex-col rounded-[32px] bg-surface text-on-surface  max-h-full overflow-hidden", className)}>
+  return createPortal(
+    <div className="anim-fade fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div
+        style={{ maxHeight: "calc(100vh - 32px)", maxWidth: "calc(100vw - 32px)" }}
+        className={cn("anim-pop relative flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-outline-variant bg-surface text-on-surface", className)}
+      >
         {title && (
-          <div className="flex items-center justify-between px-6 pt-5 pb-2">
+          <div className="flex shrink-0 items-center justify-between px-6 pt-5 pb-2">
             <h2 className="font-display text-xl font-semibold">{title}</h2>
             <IconBtn label="Close" onClick={onClose}><Icon name="close" size={20} /></IconBtn>
           </div>
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
