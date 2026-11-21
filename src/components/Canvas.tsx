@@ -1,0 +1,510 @@
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Copy, History, Monitor, MoreHorizontal, MousePointerClick, Pencil, Smartphone, Tablet, Trash2, GitCompare } from "lucide-react";
+import { useStore } from "../store";
+import type { Artboard, CanvasEl, Device } from "../types";
+import { DEVICE_SIZE } from "../types";
+import { canvasApi } from "../lib/canvasApi";
+import { NOTE_COLORS, INK_COLORS } from "../lib/actions";
+import { cn } from "../utils/cn";
+import { Dropdown, IconBtn, MenuItem, MenuLabel } from "./ui";
+import { ExportMenu } from "./ExportMenu";
+import { PinDraft, PinView } from "./Pins";
+import { EmptyCanvas } from "./EmptyCanvas";
+
+const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+const DevIcon = { mobile: Smartphone, tablet: Tablet, web: Monitor } as const;
+
+/* ------------------------------------------------------------------ */
+/* Artboard                                                            */
+/* ------------------------------------------------------------------ */
+const Frame = memo(function Frame({ html, interactive }: { html: string; interactive: boolean }) {
+  return (
+    <iframe
+      title="design" srcDoc={html} sandbox="allow-scripts allow-forms allow-popups allow-modals"
+      style={{ width: "100%", height: "100%", border: 0, background: "#fff", pointerEvents: interactive ? "auto" : "none" }}
+    />
+  );
+});
+
+function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResizeStart }: {
+  a: Artboard; z: number; selected: boolean; interacting: boolean; tool: string;
+  onMoveStart: (e: React.PointerEvent, id: string) => void; onResizeStart: (e: React.PointerEvent, id: string) => void;
+}) {
+  const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
+  const [renaming, setRenaming] = useState(false);
+  const s = clamp(0.8 / z, 1, 4);
+  const Icon = DevIcon[a.device];
+  const radius = a.device === "mobile" ? 38 : a.device === "tablet" ? 26 : 12;
+  const selectable = tool === "select";
+  const setDevice = (d: Device) => updateArtboard(a.id, { device: d, w: DEVICE_SIZE[d].w, h: DEVICE_SIZE[d].h });
+  return (
+    <div className="group absolute" style={{ left: a.x, top: a.y, width: a.w, pointerEvents: selectable ? "auto" : "none" }}>
+      {/* header */}
+      <div
+        className="absolute left-0 flex items-center gap-1.5 select-none"
+        style={{ bottom: "100%", marginBottom: 6 * s, width: a.w / s, transform: `scale(${s})`, transformOrigin: "left bottom", height: 34 }}
+        onPointerDown={(e) => { if (!selectable) return; e.stopPropagation(); if ((e.target as HTMLElement).closest("button,input")) return; onMoveStart(e, a.id); }}
+        onDoubleClick={() => setRenaming(true)}
+      >
+        <Icon size={14} className={selected ? "text-primary" : "text-on-surface-variant"} />
+        {renaming ? (
+          <input
+            autoFocus defaultValue={a.name} onBlur={(e) => { updateArtboard(a.id, { name: e.target.value || a.name }); setRenaming(false); }}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            className="h-7 w-40 rounded-lg bg-surface-high px-2 text-[13px] font-semibold text-on-surface outline-none ring-2 ring-primary"
+          />
+        ) : (
+          <span className={cn("max-w-[60%] truncate text-[13px] font-semibold", selected ? "text-primary" : "text-on-surface-variant")}>{a.name}</span>
+        )}
+        {(a.version > 1 || a.history.length > 0) && (
+          <Dropdown width={220} trigger={({ toggle }) => (
+            <button onClick={toggle} className="state rounded-full bg-surface-highest px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">v{a.version}</button>
+          )}>
+            {(close) => (
+              <>
+                <MenuLabel>Version history</MenuLabel>
+                <MenuItem icon={<History size={15} />} label={`v${a.version} · current`} active />
+                {a.history.map((_, i) => ({ i, v: i + 1 })).reverse().map(({ i, v }) => (
+                  <MenuItem key={i} icon={<History size={15} />} label={`Restore v${v}`} onClick={() => { restoreVersion(a.id, i); close(); }} />
+                ))}
+              </>
+            )}
+          </Dropdown>
+        )}
+        {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container">⇄ {a.source}</span>}
+        <span className="flex-1" />
+        <div className={cn("flex items-center gap-0.5 rounded-full bg-surface-container/90 p-0.5 opacity-0 transition-opacity group-hover:opacity-100", selected && "opacity-100")}>
+          <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => patchUI({ interactId: interacting ? null : a.id })}><MousePointerClick size={14} /></IconBtn>
+          <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Copy size={14} /></IconBtn>
+          <ExportMenu a={a} size={28} />
+          <Dropdown width={220} align="right" trigger={({ toggle }) => <IconBtn label="More" size={28} onClick={toggle}><MoreHorizontal size={14} /></IconBtn>}>
+            {(close) => (
+              <>
+                <MenuItem icon={<Pencil size={15} />} label="Rename" onClick={() => { setRenaming(true); close(); }} />
+                <MenuItem icon={<GitCompare size={15} />} label="Compare with…" onClick={() => {
+                  const others = useStore.getState().artboards.filter((x) => x.id !== a.id && x.pageId === a.pageId);
+                  const other = others.find((x) => x.groupId === a.groupId) ?? others[others.length - 1];
+                  if (!other) { useStore.getState().notify("Duplicate or generate another screen to compare"); } else patchUI({ compare: [a.id, other.id] });
+                  close();
+                }} />
+                <MenuLabel>Device size</MenuLabel>
+                {(["mobile", "tablet", "web"] as Device[]).map((d) => (
+                  <MenuItem key={d} label={DEVICE_SIZE[d].label} desc={`${DEVICE_SIZE[d].w}×${DEVICE_SIZE[d].h}`} active={a.device === d} onClick={() => { setDevice(d); close(); }} />
+                ))}
+                <MenuItem icon={<Trash2 size={15} />} danger label="Delete" onClick={() => { removeArtboards([a.id]); close(); }} />
+              </>
+            )}
+          </Dropdown>
+        </div>
+      </div>
+
+      {/* body */}
+      <div
+        className={cn("relative overflow-hidden bg-white shadow-xl shadow-black/20 transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
+        style={{ width: a.w, height: a.h, borderRadius: radius }}
+      >
+        <Frame html={a.html} interactive={interacting} />
+        {selectable && !interacting && (
+          <div
+            className="absolute inset-0 cursor-default"
+            onPointerDown={(e) => { e.stopPropagation(); onMoveStart(e, a.id); }}
+            onDoubleClick={() => patchUI({ interactId: a.id })}
+          />
+        )}
+        {a.loading && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <div className="shimmer absolute inset-0" />
+            <div className="relative flex items-center gap-2 rounded-full bg-inverse-surface px-4 py-2 text-sm font-medium text-inverse-on-surface shadow-lg">
+              <span className="inline-block size-2.5 animate-ping rounded-full bg-primary" /> Zeus is designing…
+            </div>
+          </div>
+        )}
+      </div>
+      {selected && selectable && (
+        <div
+          onPointerDown={(e) => { e.stopPropagation(); onResizeStart(e, a.id); }}
+          className="absolute -bottom-2 -right-2 size-4 cursor-nwse-resize rounded-full border-2 border-primary bg-surface"
+          style={{ transform: `scale(${1 / z})`, transformOrigin: "center" }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas elements (notes, text, shapes, pen)                          */
+/* ------------------------------------------------------------------ */
+function ShapeSvg({ el }: { el: CanvasEl }) {
+  const { w, h, color, shape } = el;
+  const common = { fill: "none", stroke: color, strokeWidth: 3, strokeLinejoin: "round" as const, strokeLinecap: "round" as const, vectorEffect: "non-scaling-stroke" as const };
+  const fill = `color-mix(in srgb, ${color} 14%, transparent)`;
+  return (
+    <svg width={w} height={h} className="overflow-visible">
+      {shape === "rect" && <rect x={1.5} y={1.5} width={w - 3} height={h - 3} rx={Math.min(24, w / 5, h / 5)} {...common} fill={fill} />}
+      {shape === "ellipse" && <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - 1.5} ry={h / 2 - 1.5} {...common} fill={fill} />}
+      {shape === "triangle" && <polygon points={`${w / 2},2 ${w - 2},${h - 2} 2,${h - 2}`} {...common} fill={fill} />}
+      {shape === "star" && <polygon points={Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 0.42 : 1; const an = -Math.PI / 2 + (i * Math.PI) / 5; return `${w / 2 + Math.cos(an) * r * (w / 2 - 2)},${h / 2 + Math.sin(an) * r * (h / 2 - 2)}`; }).join(" ")} {...common} fill={fill} />}
+      {(shape === "line" || shape === "arrow") && el.points && (
+        <>
+          <defs><marker id={`ah-${el.id}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill={color} /></marker></defs>
+          <line x1={el.points[0][0]} y1={el.points[0][1]} x2={el.points[1][0]} y2={el.points[1][1]} {...common} markerEnd={shape === "arrow" ? `url(#ah-${el.id})` : undefined} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function penPath(pts: [number, number][]) {
+  if (pts.length < 2) return `M${pts[0]?.[0] ?? 0} ${pts[0]?.[1] ?? 0}`;
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2;
+    d += ` Q${pts[i][0]} ${pts[i][1]} ${mx} ${my}`;
+  }
+  const l = pts[pts.length - 1];
+  return d + ` L${l[0]} ${l[1]}`;
+}
+
+function ElementView({ el, z, selected, editing, setEditing, tool, onMoveStart, onResizeStart }: {
+  el: CanvasEl; z: number; selected: boolean; editing: boolean; setEditing: (id: string | null) => void; tool: string;
+  onMoveStart: (e: React.PointerEvent, id: string) => void; onResizeStart: (e: React.PointerEvent, id: string) => void;
+}) {
+  const { updateElement } = useStore.getState();
+  const selectable = tool === "select";
+  const style: React.CSSProperties = { left: el.x, top: el.y, width: el.w, height: el.h, pointerEvents: selectable ? "auto" : "none" };
+  return (
+    <div
+      className={cn("absolute", selected && "outline outline-2 outline-offset-4 outline-primary/70 rounded-md")} style={style}
+      onPointerDown={(e) => { if (!selectable || editing) return; e.stopPropagation(); onMoveStart(e, el.id); }}
+      onDoubleClick={() => (el.kind === "note" || el.kind === "text") && setEditing(el.id)}
+    >
+      {el.kind === "note" && (
+        <div className="flex h-full w-full flex-col rounded-[6px] rounded-br-[34px] p-3 shadow-lg shadow-black/15" style={{ background: el.color, color: "#33290a" }}>
+          <textarea
+            value={el.text ?? ""} readOnly={!editing} autoFocus={editing} placeholder="Sticky note…"
+            onChange={(e) => updateElement(el.id, { text: e.target.value })} onBlur={() => setEditing(null)}
+            className="h-full w-full resize-none bg-transparent text-[17px] leading-snug outline-none placeholder:text-black/30"
+            style={{ pointerEvents: editing ? "auto" : "none", fontFamily: "var(--font-display)" }}
+          />
+        </div>
+      )}
+      {el.kind === "text" && (
+        <textarea
+          value={el.text ?? ""} readOnly={!editing} autoFocus={editing} placeholder="Type something"
+          onChange={(e) => updateElement(el.id, { text: e.target.value, h: Math.max(40, e.target.scrollHeight) })} onBlur={() => setEditing(null)}
+          className="h-full w-full resize-none overflow-hidden bg-transparent font-display text-[32px] font-semibold leading-tight outline-none placeholder:text-on-surface-variant/40"
+          style={{ color: el.color, pointerEvents: editing ? "auto" : "none" }}
+        />
+      )}
+      {el.kind === "shape" && <ShapeSvg el={el} />}
+      {el.kind === "pen" && el.points && (
+        <svg width={el.w} height={el.h} className="overflow-visible"><path d={penPath(el.points)} fill="none" stroke={el.color} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" /></svg>
+      )}
+      {selected && selectable && el.kind !== "pen" && (
+        <div
+          onPointerDown={(e) => { e.stopPropagation(); onResizeStart(e, el.id); }}
+          className="absolute -bottom-3 -right-3 size-3.5 cursor-nwse-resize rounded-full border-2 border-primary bg-surface"
+          style={{ transform: `scale(${1 / z})` }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Infinite canvas                                                     */
+/* ------------------------------------------------------------------ */
+export function InfiniteCanvas() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pageId = useStore((s) => s.activePageId);
+  const vp = useStore((s) => s.viewport[pageId]) ?? DEFAULT_VP;
+  const tool = useStore((s) => s.tool);
+  const sel = useStore((s) => s.sel);
+  const interactId = useStore((s) => s.ui.interactId);
+  const allBoards = useStore((s) => s.artboards);
+  const allEls = useStore((s) => s.elements);
+  const allPins = useStore((s) => s.pins);
+  const boards = useMemo(() => allBoards.filter((a) => a.pageId === pageId), [allBoards, pageId]);
+  const els = useMemo(() => allEls.filter((a) => a.pageId === pageId), [allEls, pageId]);
+  const pins = useMemo(() => allPins.filter((a) => a.pageId === pageId), [allPins, pageId]);
+  const vpRef = useRef(vp);
+  vpRef.current = vp;
+  const [space, setSpace] = useState(false);
+  const [draft, setDraft] = useState<{ kind: "frame" | "shape" | "pen"; x0: number; y0: number; x1: number; y1: number; pts: [number, number][] } | null>(null);
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftPin, setDraftPin] = useState<{ x: number; y: number; artboardId?: string } | null>(null);
+  const [panning, setPanning] = useState(false);
+
+  const setVp = useCallback((v: { x: number; y: number; z: number }) => useStore.getState().setViewport(pageId, v), [pageId]);
+  const toWorld = useCallback((cx: number, cy: number) => {
+    const r = rootRef.current!.getBoundingClientRect();
+    const v = vpRef.current;
+    return { x: (cx - r.left - v.x) / v.z, y: (cy - r.top - v.y) / v.z };
+  }, []);
+
+  /* register imperative API */
+  useEffect(() => {
+    canvasApi.screenToWorld = toWorld;
+    canvasApi.viewCenter = () => {
+      const r = rootRef.current!.getBoundingClientRect();
+      return toWorld(r.left + r.width / 2, r.top + r.height / 2);
+    };
+    canvasApi.fit = (ids) => {
+      const st = useStore.getState();
+      const r = rootRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const bs = st.artboards.filter((a) => a.pageId === st.activePageId && (!ids || ids.includes(a.id)));
+      const es = ids ? [] : st.elements.filter((a) => a.pageId === st.activePageId);
+      const items = [...bs, ...es];
+      if (!items.length) { st.setViewport(st.activePageId, DEFAULT_VP); return; }
+      const x0 = Math.min(...items.map((i) => i.x)), y0 = Math.min(...items.map((i) => i.y));
+      const x1 = Math.max(...items.map((i) => i.x + i.w)), y1 = Math.max(...items.map((i) => i.y + i.h));
+      const pad = 90;
+      const z = clamp(Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2 - 60) / (y1 - y0)), 0.08, 1);
+      st.setViewport(st.activePageId, { z, x: (r.width - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - 60 - (y1 - y0) * z) / 2 - y0 * z + 20 });
+    };
+    canvasApi.zoomBy = (f) => {
+      const r = rootRef.current!.getBoundingClientRect();
+      const v = vpRef.current;
+      const nz = clamp(v.z * f, 0.05, 3);
+      const cx = r.width / 2, cy = r.height / 2;
+      setVp({ z: nz, x: cx - (cx - v.x) * (nz / v.z), y: cy - (cy - v.y) * (nz / v.z) });
+    };
+    canvasApi.reset = () => setVp(DEFAULT_VP);
+  }, [toWorld, setVp]);
+
+  /* wheel: pan / ctrl-zoom */
+  useEffect(() => {
+    const el = rootRef.current!;
+    const h = (e: WheelEvent) => {
+      e.preventDefault();
+      const v = vpRef.current;
+      if (e.ctrlKey || e.metaKey) {
+        const r = el.getBoundingClientRect();
+        const nz = clamp(v.z * Math.exp(-e.deltaY * 0.01), 0.05, 3);
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        setVp({ z: nz, x: cx - (cx - v.x) * (nz / v.z), y: cy - (cy - v.y) * (nz / v.z) });
+      } else {
+        setVp({ ...v, x: v.x - (e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX), y: v.y - (e.shiftKey && !e.deltaX ? 0 : e.deltaY) });
+      }
+    };
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  }, [setVp]);
+
+  /* keyboard */
+  useEffect(() => {
+    const typing = (e: KeyboardEvent) => ["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName);
+    const down = (e: KeyboardEvent) => {
+      if (typing(e)) return;
+      const st = useStore.getState();
+      if (e.code === "Space") { setSpace(true); e.preventDefault(); return; }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "0") { e.preventDefault(); canvasApi.fit(); }
+        if (e.key === "d") { e.preventDefault(); st.sel.forEach((id) => st.duplicateArtboard(id)); }
+        if (e.key === "=" || e.key === "+") { e.preventDefault(); canvasApi.zoomBy(1.2); }
+        if (e.key === "-") { e.preventDefault(); canvasApi.zoomBy(1 / 1.2); }
+        return;
+      }
+      const map: Record<string, () => void> = {
+        v: () => st.setTool("select"), h: () => st.setTool("hand"), t: () => st.setTool("text"), f: () => st.setTool("frame"),
+        n: () => st.setTool("note"), p: () => st.setTool("pen"), s: () => st.setTool("shape"), c: () => st.setTool("pin"),
+        Escape: () => { st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
+        Delete: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
+        Backspace: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
+        "1": () => canvasApi.fit(), "2": () => st.sel.length && canvasApi.fit(st.sel),
+      };
+      map[e.key]?.();
+    };
+    const up = (e: KeyboardEvent) => e.code === "Space" && setSpace(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+  }, []);
+
+  /* move / resize */
+  const onMoveStart = useCallback((e: React.PointerEvent, id: string) => {
+    const st = useStore.getState();
+    if (e.button !== 0) return;
+    let ids = st.sel;
+    if (e.shiftKey) ids = ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id];
+    else if (!ids.includes(id)) ids = [id];
+    st.setSel(ids);
+    if (st.ui.interactId && st.ui.interactId !== id) st.patchUI({ interactId: null });
+    const start = { x: e.clientX, y: e.clientY };
+    const origA = new Map(st.artboards.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y }]));
+    const origE = new Map(st.elements.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y }]));
+    let moved = false;
+    const mv = (ev: PointerEvent) => {
+      const z = vpRef.current.z;
+      const dx = (ev.clientX - start.x) / z, dy = (ev.clientY - start.y) / z;
+      if (!moved && Math.hypot(dx, dy) * z < 3) return;
+      moved = true;
+      useStore.setState((s) => ({
+        artboards: s.artboards.map((a) => (origA.has(a.id) ? { ...a, x: origA.get(a.id)!.x + dx, y: origA.get(a.id)!.y + dy } : a)),
+        elements: s.elements.map((a) => (origE.has(a.id) ? { ...a, x: origE.get(a.id)!.x + dx, y: origE.get(a.id)!.y + dy } : a)),
+      }));
+    };
+    const upH = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH); };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", upH);
+  }, []);
+
+  const onResizeStart = useCallback((e: React.PointerEvent, id: string) => {
+    const st = useStore.getState();
+    const a = st.artboards.find((x) => x.id === id);
+    const el = st.elements.find((x) => x.id === id);
+    const o = a ?? el;
+    if (!o) return;
+    const start = { x: e.clientX, y: e.clientY, w: o.w, h: o.h };
+    const mv = (ev: PointerEvent) => {
+      const z = vpRef.current.z;
+      const w = Math.max(a ? 200 : 40, start.w + (ev.clientX - start.x) / z), h = Math.max(a ? 200 : 40, start.h + (ev.clientY - start.y) / z);
+      if (a) useStore.getState().updateArtboard(id, { w, h }); else useStore.getState().updateElement(id, { w, h });
+    };
+    const upH = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH); };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", upH);
+  }, []);
+
+  /* root pointer: pan / marquee / create tools */
+  const onPointerDown = (e: React.PointerEvent) => {
+    const st = useStore.getState();
+    if (e.button === 1 || (e.button === 0 && (tool === "hand" || space))) {
+      e.preventDefault();
+      setPanning(true);
+      const s0 = { x: e.clientX, y: e.clientY, vx: vpRef.current.x, vy: vpRef.current.y };
+      const mv = (ev: PointerEvent) => setVp({ ...vpRef.current, x: s0.vx + ev.clientX - s0.x, y: s0.vy + ev.clientY - s0.y });
+      const upH = () => { setPanning(false); window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH); };
+      window.addEventListener("pointermove", mv);
+      window.addEventListener("pointerup", upH);
+      return;
+    }
+    if (e.button !== 0) return;
+    const w = toWorld(e.clientX, e.clientY);
+    if (tool === "select") {
+      st.setSel([]);
+      st.patchUI({ interactId: null, openPinId: null });
+      setEditing(null);
+      setDraftPin(null);
+      setMarquee({ x0: w.x, y0: w.y, x1: w.x, y1: w.y });
+      const mv = (ev: PointerEvent) => { const p = toWorld(ev.clientX, ev.clientY); setMarquee((m) => (m ? { ...m, x1: p.x, y1: p.y } : m)); };
+      const upH = (ev: PointerEvent) => {
+        window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH);
+        const p = toWorld(ev.clientX, ev.clientY);
+        const x0 = Math.min(w.x, p.x), x1 = Math.max(w.x, p.x), y0 = Math.min(w.y, p.y), y1 = Math.max(w.y, p.y);
+        if (x1 - x0 > 4 || y1 - y0 > 4) {
+          const S = useStore.getState();
+          const hit = [...S.artboards, ...S.elements].filter((i) => i.pageId === S.activePageId && i.x < x1 && i.x + i.w > x0 && i.y < y1 && i.y + i.h > y0).map((i) => i.id);
+          S.setSel(hit);
+        }
+        setMarquee(null);
+      };
+      window.addEventListener("pointermove", mv);
+      window.addEventListener("pointerup", upH);
+      return;
+    }
+    if (tool === "text" || tool === "note") {
+      const el = st.addElement(tool === "note"
+        ? { kind: "note", x: w.x - 100, y: w.y - 100, w: 210, h: 200, color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)], text: "" }
+        : { kind: "text", x: w.x, y: w.y - 20, w: 320, h: 48, color: "var(--m-on-surface)", text: "" });
+      st.setSel([el.id]); setEditing(el.id); st.setTool("select");
+      return;
+    }
+    if (tool === "pin") {
+      const hit = [...st.artboards].reverse().find((a) => a.pageId === st.activePageId && w.x >= a.x && w.x <= a.x + a.w && w.y >= a.y && w.y <= a.y + a.h);
+      setDraftPin(hit ? { x: w.x - hit.x, y: w.y - hit.y, artboardId: hit.id } : { x: w.x, y: w.y });
+      return;
+    }
+    // frame | shape | pen drags
+    const kind = tool === "frame" ? "frame" : tool === "shape" ? "shape" : "pen";
+    setDraft({ kind, x0: w.x, y0: w.y, x1: w.x, y1: w.y, pts: [[w.x, w.y]] });
+    const mv = (ev: PointerEvent) => {
+      const p = toWorld(ev.clientX, ev.clientY);
+      setDraft((d) => (d ? { ...d, x1: p.x, y1: p.y, pts: kind === "pen" ? [...d.pts, [p.x, p.y]] : d.pts } : d));
+    };
+    const upH = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH);
+      const p = toWorld(ev.clientX, ev.clientY);
+      setDraft((d) => {
+        if (!d) return null;
+        const S = useStore.getState();
+        const x = Math.min(d.x0, p.x), y = Math.min(d.y0, p.y), ww = Math.abs(p.x - d.x0), hh = Math.abs(p.y - d.y0);
+        if (kind === "frame") {
+          const big = ww > 40 && hh > 40;
+          const ab = S.addBlankFrame(big ? x : d.x0, big ? y : d.y0, big ? ww : 390, big ? hh : 844);
+          S.setSel([ab.id]); S.setTool("select");
+        } else if (kind === "shape") {
+          const sh = S.shape;
+          const line = sh === "line" || sh === "arrow";
+          if (ww > 6 || hh > 6) {
+            const el = S.addElement({
+              kind: "shape", shape: sh, x, y, w: Math.max(ww, line ? 1 : 12), h: Math.max(hh, line ? 1 : 12), color: "var(--m-primary)",
+              points: line ? [[d.x0 - x, d.y0 - y], [p.x - x, p.y - y]] : undefined,
+            });
+            S.setSel([el.id]); S.setTool("select");
+          }
+        } else if (d.pts.length > 2) {
+          const xs = d.pts.map((q) => q[0]), ys = d.pts.map((q) => q[1]);
+          const bx = Math.min(...xs), by = Math.min(...ys);
+          S.addElement({ kind: "pen", x: bx, y: by, w: Math.max(...xs) - bx, h: Math.max(...ys) - by, color: "var(--m-primary)", points: d.pts.map(([a, b]) => [a - bx, b - by] as [number, number]) });
+        }
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", upH);
+  };
+
+  const cursor = panning ? "grabbing" : tool === "hand" || space ? "grab" : tool === "select" ? "default" : tool === "text" ? "text" : "crosshair";
+  const dx = draft ? { x: Math.min(draft.x0, draft.x1), y: Math.min(draft.y0, draft.y1), w: Math.abs(draft.x1 - draft.x0), h: Math.abs(draft.y1 - draft.y0) } : null;
+  const empty = !boards.length && !els.length;
+
+  return (
+    <div
+      ref={rootRef} onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()}
+      className="dots relative h-full w-full overflow-hidden bg-surface-lowest touch-none"
+      style={{ cursor, backgroundSize: `${28 * vp.z}px ${28 * vp.z}px`, backgroundPosition: `${vp.x}px ${vp.y}px` }}
+    >
+      <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.z})` }}>
+        {boards.map((a) => (
+          <ArtboardView key={a.id} a={a} z={vp.z} tool={tool} selected={sel.includes(a.id)} interacting={interactId === a.id} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
+        ))}
+        {els.map((el) => (
+          <ElementView key={el.id} el={el} z={vp.z} tool={tool} selected={sel.includes(el.id)} editing={editing === el.id} setEditing={setEditing} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
+        ))}
+        {pins.map((p) => <PinView key={p.id} pin={p} z={vp.z} />)}
+        {draftPin && <PinDraft {...draftPin} z={vp.z} onDone={() => { setDraftPin(null); useStore.getState().setTool("select"); }} />}
+        {dx && draft?.kind === "frame" && <div className="pointer-events-none absolute rounded-[24px] border-2 border-dashed border-primary bg-primary/10" style={{ left: dx.x, top: dx.y, width: dx.w, height: dx.h }} />}
+        {dx && draft?.kind === "shape" && <div className="pointer-events-none absolute border-2 border-primary/70 bg-primary/10" style={{ left: dx.x, top: dx.y, width: dx.w, height: dx.h, borderRadius: useStore.getState().shape === "ellipse" ? "50%" : 12 }} />}
+        {draft?.kind === "pen" && (
+          <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}><path d={penPath(draft.pts)} fill="none" stroke="var(--m-primary)" strokeWidth={4 / vp.z} strokeLinecap="round" /></svg>
+        )}
+        {marquee && <div className="pointer-events-none absolute border border-primary bg-primary/10" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
+      </div>
+      {empty && <EmptyCanvas />}
+      <InkPalette />
+    </div>
+  );
+}
+
+/* color picker for the selected drawing/text elements */
+function InkPalette() {
+  const sel = useStore((s) => s.sel);
+  const els = useStore((s) => s.elements);
+  const chosen = els.filter((e) => sel.includes(e.id));
+  if (!chosen.length) return null;
+  const note = chosen.every((e) => e.kind === "note");
+  const cols = note ? NOTE_COLORS : INK_COLORS;
+  return (
+    <div onPointerDown={(e) => e.stopPropagation()} className="anim-pop absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface-container px-3 py-2 shadow-xl shadow-black/15">
+      {cols.map((c) => (
+        <button key={c} onClick={() => chosen.forEach((e) => useStore.getState().updateElement(e.id, { color: c }))} className="size-6 rounded-full border-2 border-white/70 transition-transform ease-spring hover:scale-125" style={{ background: c }} />
+      ))}
+      <span className="mx-1 h-5 w-px bg-outline-variant" />
+      <IconBtn label="Delete" size={28} onClick={() => useStore.getState().removeElements(chosen.map((e) => e.id))}><Trash2 size={15} /></IconBtn>
+    </div>
+  );
+}

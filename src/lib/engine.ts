@@ -1,0 +1,330 @@
+import { activeConv, uid, useStore } from "../store";
+import type { Artboard, Attachment, Device, Message, Quote, ToolCall } from "../types";
+import { DEVICE_SIZE } from "../types";
+import { getDS, tokensCss } from "./designSystems";
+import { SKILLS } from "./skills";
+import { detectArchetype, renderScreen, VARIANT_NAMES } from "./templates";
+import { generateTitle, isNative, nativeChat, ChatEvent, ChatRequest } from "./bridge";
+import { findProvider } from "./providers";
+import { canvasApi } from "./canvasApi";
+
+/* ------------------------------------------------------------------ */
+/* System prompt                                                       */
+/* ------------------------------------------------------------------ */
+export function buildSystemPrompt(): string {
+  const s = useStore.getState();
+  const ds = getDS(s.settings.designSystemId);
+  const skills = SKILLS.filter((k) => s.settings.skills.includes(k.id));
+  const boards = s.artboards.filter((a) => a.pageId === s.activePageId);
+  const mem = s.settings.memory;
+  const ws = s.ui.workspace;
+  return [
+    `You are Zeus, an expert AI product designer and front-end engineer inside the ZeusDesigns desktop app. The user sees a chat on the left and an infinite multi-artboard canvas on the right. You design by emitting LIVE, interactive screens onto the canvas.`,
+    `## Output protocol
+Explain briefly in markdown (2–5 short sentences / bullets — never dump code in the chat), and put every screen in its own block:
+<artboard name="Short screen name" device="mobile|tablet|web" mode="new">
+<!doctype html> …one complete self-contained HTML document with <style> and optional vanilla <script>… 
+</artboard>
+- To change an existing screen in place use mode="revise" and id="<existing id>" and output the FULL updated document.
+- Screens must be self-contained (no external assets/CDNs), pixel-polished, with realistic content, hover/press states and light interactivity (tabs, toggles, chips).
+- mobile = 390×844 viewport, tablet = 820×1100, web = 1280×800. Respect the viewport; make the body scroll naturally.
+- When the user does not specify a single direction, produce 3 meaningfully different variants.`,
+    `## Active design system: ${ds.name} (${ds.vendor})\n${ds.guidelines}\nPreferred token stylesheet — start your <style> with this and use these CSS variables:\n${tokensCss(ds)}`,
+    skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
+    mem.length ? `## Persistent memory about the user & project\n${mem.map((m) => `- ${m.text}`).join("\n")}` : "",
+    boards.length ? `## Current canvas page\n${boards.map((a) => `- id=${a.id} name="${a.name}" device=${a.device} v${a.version}`).join("\n")}` : "## Current canvas page\n(empty)",
+    ws ? `## Workspace\nOpen project folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top-level files: ${ws.tree.slice(0, 40).map((n) => n.name + (n.dir ? "/" : "")).join(", ")}. Match its stack and conventions when producing code.` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Streaming parser for <artboard> blocks                              */
+/* ------------------------------------------------------------------ */
+interface Block { attrs: Record<string, string>; html: string; closed: boolean }
+
+function parseAttrs(s: string) {
+  const out: Record<string, string> = {};
+  for (const m of s.matchAll(/(\w+)\s*=\s*"([^"]*)"/g)) out[m[1]] = m[2];
+  return out;
+}
+
+export function parseStream(full: string): { text: string; blocks: Block[] } {
+  full = full.replace(/<think>[\s\S]*?(<\/think>|$)/g, "");
+  let text = "";
+  const blocks: Block[] = [];
+  let i = 0;
+  for (;;) {
+    const s = full.indexOf("<artboard", i);
+    if (s < 0) { text += full.slice(i); break; }
+    text += full.slice(i, s);
+    const gt = full.indexOf(">", s);
+    if (gt < 0) break;
+    const attrs = parseAttrs(full.slice(s + 9, gt));
+    const e = full.indexOf("</artboard>", gt + 1);
+    const clean = (h: string) => h.replace(/^\s*```(?:html)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    if (e < 0) { blocks.push({ attrs, html: clean(full.slice(gt + 1)), closed: false }); break; }
+    blocks.push({ attrs, html: clean(full.slice(gt + 1, e)), closed: true });
+    i = e + 11;
+  }
+  return { text: text.replace(/\n{3,}/g, "\n\n").trim(), blocks };
+}
+
+/* ------------------------------------------------------------------ */
+/* Demo engine (offline template designer)                             */
+/* ------------------------------------------------------------------ */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function demoRevise(html: string, instruction: string): { html: string; note: string } {
+  const t = instruction.toLowerCase();
+  const css: string[] = [];
+  const notes: string[] = [];
+  if (/dark|night/.test(t)) { css.push(":root{--bg:#111116;--surface:#1c1c24;--surface-2:#272731;--text:#f3f3f7;--muted:#a6a6b5;--outline:#3b3b48;--container:#2f2a55;--on-container:#e6deff}"); notes.push("switched to a dark palette"); }
+  if (/round|soft|pill/.test(t)) { css.push(":root{--r-card:32px;--r-lg:28px;--r-md:22px;--r-btn:999px}"); notes.push("increased corner radii"); }
+  if (/sharp|square|boxy/.test(t)) { css.push(":root{--r-card:4px;--r-lg:4px;--r-md:3px;--r-btn:4px}"); notes.push("squared the corners"); }
+  if (/big|large|bigger|larger|readab/.test(t)) { css.push("body{font-size:17px}h1{font-size:1.2em}.btn{height:56px}"); notes.push("scaled up type and tap targets"); }
+  if (/compact|dense|tight|small/.test(t)) { css.push(".scroll{gap:10px!important}.item{padding:8px 12px!important}.card{padding:12px!important}"); notes.push("tightened spacing"); }
+  const colors: Record<string, [string, string, string]> = {
+    red: ["#d32f2f", "#ffdad6", "#410002"], orange: ["#ef6c00", "#ffe0b2", "#3e1d00"], yellow: ["#f9a825", "#fff1b8", "#3b2f00"],
+    green: ["#2e7d32", "#c8f2cb", "#00210a"], teal: ["#00796b", "#bff5ec", "#00201b"], blue: ["#1565c0", "#d3e4ff", "#001c3b"],
+    purple: ["#7b1fa2", "#f3d9ff", "#2d0040"], pink: ["#d81b60", "#ffd8e6", "#3e001d"], black: ["#111111", "#e6e6e6", "#111111"],
+  };
+  for (const c of Object.keys(colors)) if (new RegExp(`\\b${c}\\b`).test(t)) { css.push(`:root{--primary:${colors[c][0]};--container:${colors[c][1]};--on-container:${colors[c][2]};--tertiary:${colors[c][0]}}`); notes.push(`recolored with ${c}`); break; }
+  if (!css.length) { css.push(".card,.item{box-shadow:0 8px 24px rgba(0,0,0,.08)}.btn{letter-spacing:.01em}"); notes.push("polished depth and spacing"); }
+  const tag = `<style data-zeus-rev>${css.join("")}</style>`;
+  return { html: html.includes("</head>") ? html.replace("</head>", tag + "</head>") : tag + html, note: notes.join(", ") };
+}
+
+async function demoRun(opts: {
+  prompt: string; device: Device; target?: Artboard; onDelta: (t: string) => void; signal: AbortSignal; asVariant?: boolean;
+}) {
+  const s = useStore.getState();
+  const ds = getDS(s.settings.designSystemId);
+  const emit = async (text: string, chunk = 900, delay = 10) => {
+    for (let i = 0; i < text.length; i += chunk) {
+      if (opts.signal.aborted) return;
+      opts.onDelta(text.slice(i, i + chunk));
+      await sleep(delay);
+    }
+  };
+  if (opts.target && !opts.asVariant) {
+    const r = demoRevise(opts.target.html, opts.prompt);
+    await emit(`Updated **${opts.target.name}** — ${r.note}.\n\n_Demo engine: connect a real model (Mercury 3, Qwen…) in the native app for full redesigns._\n\n`, 40, 12);
+    await emit(`<artboard name="${opts.target.name}" device="${opts.target.device}" mode="revise" id="${opts.target.id}">\n${r.html}\n</artboard>`);
+    return;
+  }
+  const device: Device = opts.target?.device ?? opts.device;
+  const arche = detectArchetype(opts.prompt, device);
+  const title = (opts.prompt.match(/(?:for|called|named)\s+(?:an?\s+|the\s+)?([A-Z][\w-]+(?:\s[A-Z][\w-]+)?)/)?.[1]) ?? "Zeus";
+  const count = opts.target ? 1 : 3;
+  await emit(`Exploring **${count === 1 ? "a new direction" : "3 directions"}** for your ${arche} ${device === "web" ? "web page" : "screen"} in **${ds.name}**:\n\n${count === 1 ? "- A fresh take on the selected screen\n" : "- **Balanced** — familiar hierarchy, calm surfaces\n- **Bold** — oversized type & expressive color blocks\n- **Compact** — denser, list-first layout\n"}\nTap around — tabs, chips, switches and hearts are live. Pin a comment or use *Ask Zeus* to refine any of them.\n\n`, 30, 14);
+  for (let v = 0; v < count; v++) {
+    if (opts.signal.aborted) return;
+    const vi = opts.target ? (opts.target.version + 1) % 3 : v;
+    const html = renderScreen(ds, arche, vi, device, title);
+    await emit(`<artboard name="${arche[0].toUpperCase() + arche.slice(1)} · ${VARIANT_NAMES[vi]}" device="${device}" mode="new">\n${html}\n</artboard>\n`, 1400, 8);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Custom OpenAI / Anthropic streaming (browser fallback)              */
+/* ------------------------------------------------------------------ */
+async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, signal: AbortSignal) {
+  const c = req.custom!;
+  const base = c.baseUrl.replace(/\/+$/, "");
+  const sse = async (res: Response, pick: (j: any) => string) => {
+    if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}: ${(await res.text()).slice(0, 300)}`);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const l of lines) {
+        if (!l.startsWith("data:")) continue;
+        const d = l.slice(5).trim();
+        if (!d || d === "[DONE]") continue;
+        try { const t = pick(JSON.parse(d)); if (t) onDelta(t); } catch { /* ignore partial */ }
+      }
+    }
+  };
+  const msgs = req.messages.map((m) => {
+    const imgs = (m.attachments ?? []).filter((a) => a.mime.startsWith("image/"));
+    if (!imgs.length) return { role: m.role, content: m.content };
+    return {
+      role: m.role,
+      content: c.format === "anthropic"
+        ? [...imgs.map((i) => ({ type: "image", source: { type: "base64", media_type: i.mime, data: i.dataUrl.split(",")[1] } })), { type: "text", text: m.content }]
+        : [...imgs.map((i) => ({ type: "image_url", image_url: { url: i.dataUrl } })), { type: "text", text: m.content }],
+    };
+  });
+  if (c.format === "anthropic") {
+    const res = await fetch(`${base}/v1/messages`, {
+      method: "POST", signal,
+      headers: { "content-type": "application/json", "x-api-key": c.apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: req.model, max_tokens: 16000, stream: true, system: req.system, messages: msgs }),
+    });
+    await sse(res, (j) => (j.type === "content_block_delta" ? j.delta?.text ?? "" : ""));
+  } else {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST", signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${c.apiKey}` },
+      body: JSON.stringify({ model: req.model, stream: true, messages: [{ role: "system", content: req.system }, ...msgs], ...(req.effort !== "medium" ? { reasoning_effort: req.effort === "max" ? "high" : req.effort } : {}) }),
+    });
+    await sse(res, (j) => j.choices?.[0]?.delta?.content ?? "");
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Orchestrator                                                        */
+/* ------------------------------------------------------------------ */
+let controller: AbortController | null = null;
+let nativeCancel: (() => void) | null = null;
+
+export function stopGeneration() {
+  controller?.abort();
+  nativeCancel?.();
+}
+
+const quoteToText = (q: Quote, boards: Artboard[]) => {
+  const a = q.artboardId ? boards.find((b) => b.id === q.artboardId) : undefined;
+  return `[Context: ${q.kind === "pin" ? "pinned comment on" : "selected"} screen "${a?.name ?? q.label}"${a ? ` (id=${a.id})` : ""}${q.text ? ` — "${q.text}"` : ""}]`;
+};
+
+export async function sendMessage(opts: { text: string; attachments?: Attachment[]; quote?: Quote; asVariant?: boolean }) {
+  const st = useStore.getState();
+  if (st.busy || !opts.text.trim()) return;
+  const convId = st.activeConvId;
+  const conv = activeConv(st);
+  const { settings } = st;
+  const target = opts.quote?.artboardId ? st.artboards.find((a) => a.id === opts.quote!.artboardId) : undefined;
+
+  const userMsg: Message = { id: uid(), role: "user", text: opts.text.trim(), quote: opts.quote, attachments: opts.attachments, at: Date.now() };
+  const asstId = uid();
+  const prov = settings.providerId.startsWith("custom:") ? null : findProvider(settings.providerId);
+  const custom = settings.providerId.startsWith("custom:") ? settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId) : undefined;
+  const modelLabel = custom ? custom.model : prov?.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
+  st.addMessage(convId, userMsg);
+  st.addMessage(convId, { id: asstId, role: "assistant", text: "", streaming: true, model: modelLabel, at: Date.now(), tools: [], artboardIds: [] });
+  st.setBusy(true);
+
+  // instant title via ChatJimmy (micro-task engine)
+  if (settings.autoTitle && !conv.titled && conv.messages.length === 0) {
+    generateTitle(opts.text).then((t) => useStore.getState().setTitle(convId, t));
+  }
+
+  const boards = st.artboards.filter((a) => a.pageId === st.activePageId);
+  const history = [...conv.messages, userMsg].filter((m) => !m.error).map((m) => {
+    let content = m.text;
+    if (m.quote) content = quoteToText(m.quote, boards) + "\n" + content;
+    if (m.attachments) for (const a of m.attachments) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 20000)}`;
+    return { role: m.role, content, attachments: (m.attachments ?? []).filter((a) => a.dataUrl && a.mime.startsWith("image/")).map((a) => ({ name: a.name, mime: a.mime, dataUrl: a.dataUrl! })) };
+  });
+  if (target) {
+    const last = history[history.length - 1];
+    last.content += `\n\n<current_artboard id="${target.id}" name="${target.name}" device="${target.device}">\n${target.html.slice(0, 40000)}\n</current_artboard>\n${opts.asVariant ? 'Create this as a NEW variant (mode="new").' : 'Revise in place (mode="revise", same id).'}`;
+  }
+
+  controller = new AbortController();
+  const signal = controller.signal;
+  let full = "";
+  const t0 = performance.now();
+  const idMap = new Map<number, string>();
+  const created: string[] = [];
+  const lastPush = new Map<number, { t: number; len: number }>();
+  const tools: ToolCall[] = [];
+
+  const sync = (final = false) => {
+    const { text, blocks } = parseStream(full);
+    const S = useStore.getState();
+    blocks.forEach((b, i) => {
+      let id = idMap.get(i);
+      if (!id) {
+        const existing = b.attrs.mode === "revise" && b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
+        if (existing) {
+          id = existing.id;
+          S.updateArtboard(id, { loading: true });
+        } else {
+          const device = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? "mobile") as Device;
+          const ab = S.addArtboard({
+            name: b.attrs.name || `Screen ${S.artboards.length + 1}`, device, html: "", loading: true,
+            groupId: opts.asVariant && target ? target.groupId : undefined,
+            w: DEVICE_SIZE[device].w, h: DEVICE_SIZE[device].h,
+          });
+          id = ab.id;
+          created.push(id);
+          if (created.length === 1) setTimeout(() => canvasApi.fit(created), 60);
+        }
+        idMap.set(i, id);
+        lastPush.set(i, { t: 0, len: 0 });
+      }
+      const lp = lastPush.get(i)!;
+      const now = performance.now();
+      const isRevise = b.attrs.mode === "revise" && !created.includes(id);
+      if (b.closed) {
+        if (isRevise) S.reviseArtboard(id, b.html); else S.updateArtboard(id, { html: b.html });
+        S.updateArtboard(id, { loading: false });
+        lastPush.set(i, { t: now, len: -1 });
+      } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
+        S.updateArtboard(id, { html: b.html });
+        lastPush.set(i, { t: now, len: b.html.length });
+      }
+    });
+    const ms = performance.now() - t0;
+    S.patchMessage(convId, asstId, {
+      text, artboardIds: [...new Set([...idMap.values()])], tools: [...tools],
+      stats: final ? { ms, tokens: Math.round(full.length / 4), tps: Math.round(full.length / 4 / (ms / 1000)) } : undefined,
+    });
+  };
+
+  const finish = (err?: string) => {
+    sync(true);
+    const S = useStore.getState();
+    for (const id of idMap.values()) S.updateArtboard(id, { loading: false });
+    S.patchMessage(convId, asstId, { streaming: false, ...(err ? { error: err } : {}) });
+    S.setBusy(false);
+    if (created.length) setTimeout(() => canvasApi.fit(created), 80);
+    controller = null; nativeCancel = null;
+  };
+
+  const system = buildSystemPrompt();
+  const req: ChatRequest = {
+    requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId, effort: settings.effort,
+    system, messages: history, workspaceRoot: st.ui.workspace?.root,
+    custom: custom ? { baseUrl: custom.baseUrl, apiKey: custom.apiKey, format: custom.format } : undefined,
+  };
+  const device: Device = target?.device ?? "mobile";
+  let raf = 0;
+  const onDelta = (t: string) => {
+    full += t;
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
+  };
+
+  try {
+    if (isNative && useStore.getState().ui.nativeReady) {
+      await new Promise<void>((resolve, reject) => {
+        const onEvent = (e: ChatEvent) => {
+          if (e.type === "delta") onDelta(e.text);
+          else if (e.type === "tool_call") tools.push({ id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" });
+          else if (e.type === "tool_result") { const t = tools.find((x) => x.id === e.id); if (t) { t.status = e.ok ? "ok" : "error"; t.output = e.output; } sync(); }
+          else if (e.type === "error") reject(new Error(e.message));
+          else if (e.type === "done") resolve();
+        };
+        signal.addEventListener("abort", () => resolve());
+        nativeChat(req, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
+      });
+    } else if (custom) {
+      await streamCustom(req, onDelta, signal);
+    } else {
+      if (prov && prov.id !== "demo") onDelta(`> ℹ️ Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
+      await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
+    }
+    if (raf) cancelAnimationFrame(raf);
+    finish();
+  } catch (e) {
+    if (raf) cancelAnimationFrame(raf);
+    finish(signal.aborted ? undefined : (e as Error).message || "Request failed");
+  }
+}
