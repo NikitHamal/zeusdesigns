@@ -148,3 +148,23 @@ pub fn generate_deepai_tryit_key(user_agent: &str) -> String {
     let inner = sha256_hex(format!("{}{}", user_agent, h2).as_bytes());
     format!("tryit-{}-{}", random_num, inner)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sha256_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn test_deepai_tryit_key_format() {
+        let k = generate_deepai_tryit_key("Mozilla/5.0");
+        assert!(k.starts_with("tryit-"));
+        assert!(k.len() > 70);
+    }
+}
