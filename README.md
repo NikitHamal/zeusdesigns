@@ -13,6 +13,13 @@ split-screen studio with an infinite multi-artboard canvas, free keyless AI prov
 | **Workspace** | Open any local folder; the agent reads, designs, edits and syncs live screens into real files. Persistent Memory, shell tool, MCP client |
 | **Library** | Design systems: Material 3 Expressive, Material 3, Apple HIG, Fluent 2, shadcn/ui, IBM Carbon, Ant Design, Polaris, Atlassian, Neo-brutalism, Glassmorphism, Editorial, Claude Warm · 17 frontend skills |
 
+## What is inside
+
+- **Chat and canvas**: sidebar with date-grouped chats, a split chat and infinite canvas, one model and effort picker, per-screen export, pages.
+- **Memory**: four buckets (preferences, profile, topics, areas) that you can edit by hand or by telling Zeus what to change. Stored natively in `.zeusdesigns/memory.json` and added to every prompt.
+- **Connectors**: built-in design token and workspace tools, plus a store of real keyless MCP servers (shadcn/ui, Magic UI, Playwright, Chrome DevTools, Context7, Fetch, Filesystem, Knowledge graph, Sequential thinking, Time) and custom stdio servers. Node.js (npx) or uv (uvx) must be installed for the server you pick.
+- **Harness**: per-design-system component kit, archetype blueprints, a tool loop that feeds results back to the model, and an automatic layout audit that renders each screen off-screen, measures overflow, overlap, contrast, clipping and dead space, then repairs severe defects.
+
 ## Download
 Every push to `main` builds and publishes a Windows installer + portable `.exe` to
 [Releases](../../releases/latest).
