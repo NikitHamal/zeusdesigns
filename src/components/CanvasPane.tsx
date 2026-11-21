@@ -16,7 +16,7 @@ function ProjectName() {
   return (
     <input
       value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} aria-label="Project name"
-      className="h-10 w-40 rounded-xl border border-outline-variant bg-surface-container px-3 text-sm font-medium text-on-surface outline-none focus:border-primary max-xl:hidden"
+      className="h-10 w-40 min-w-0 shrink rounded-xl border border-outline-variant bg-surface-container px-3 text-sm font-medium text-on-surface outline-none focus:border-primary @max-[900px]:hidden"
     />
   );
 }
@@ -96,17 +96,17 @@ export function CanvasPane() {
   };
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface-lowest">
+    <div className="@container relative h-full w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface-lowest">
       {view === "canvas" ? <InfiniteCanvas /> : view === "grid" ? <GridView /> : <SingleView />}
 
       {/* header overlay */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 p-3.5" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+        <div className="pointer-events-auto flex min-w-0 shrink items-center gap-2">
           <ProjectName />
           {chatCollapsed && <IconBtn label="Show chat" tonal onClick={() => patchUI({ chatCollapsed: false })}><Icon name="left_panel_open" size={18} /></IconBtn>}
           <PageTabs />
         </div>
-        <div className="pointer-events-auto flex items-center gap-2">
+        <div className="pointer-events-auto flex shrink-0 items-center gap-2">
           <Segmented
             value={view} onChange={setView}
             options={[
@@ -117,7 +117,7 @@ export function CanvasPane() {
           />
           <Dropdown align="right" width={260} trigger={({ toggle }) => (
             <button onClick={toggle} disabled={boards.length === 0} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
-              <Icon name="download" size={16} /><span className="max-xl:hidden">Export</span>
+              <Icon name="download" size={16} /><span className="@max-[900px]:hidden">Export</span>
             </button>
           )}>
             {(close) => (
@@ -141,7 +141,7 @@ export function CanvasPane() {
           </Dropdown>
           <Dropdown align="right" width={250} trigger={({ toggle }) => (
             <button onClick={toggle} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
-              <Icon name="compare" size={16} /><span className="max-xl:hidden">Compare</span>
+              <Icon name="compare" size={16} /><span className="@max-[900px]:hidden">Compare</span>
             </button>
           )}>
             {(close) => (

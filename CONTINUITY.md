@@ -6,6 +6,22 @@ Running log across agent sessions. Newest session first. Rules live in `AGENTS.m
 - Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop. Stable.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
 
+## Session 4
+Goal: fix layout defects seen in the issue #1 comparison, add an in-app MCP, make the harness carry weak models, and rewrite history under one author.
+
+Shipped:
+- History rewritten so every commit and tag is authored by NikitHamal only.
+- Canvas dock: toolbar and zoom controls share one centered flex row, so zoom no longer hides behind the Ask Zeus pill. Canvas header collapses labels by pane width (container query), not window width.
+- Account menu: Get help and Source code use the same `MenuItem` as every other row (aligned icons); System theme uses the laptop icon.
+- Zeus Studio (`src/lib/studio.ts`): built-in MCP, 11 tools (`studio_brief`, `studio_palette`, `studio_contrast`, `studio_fonts`, `studio_icons`, `studio_components`, `studio_tokens`, `studio_systems`, `studio_screens`, `studio_read_screen`, `studio_lint`). Runs in the webview, answered locally in `engine.ts` (the Rust loop returns "unknown tool", which the UI ignores for `studio_*`). Toggle in Connectors > Built in.
+- Harness: `studioBrief()` is injected into every system prompt: detected product domain, audience, primary action, nav labels, bundled icons, real content seeds, optional display font, blueprint. 14 domains.
+- Harness: a design request whose reply has no `<artboard>` is retried once with a strict protocol reminder; text after a tool call is dropped; tool rounds raised to 5.
+- Memory: `learnFromText()` saves durable first-person facts from user messages (preferences, profile, areas) with no model call; toggle "Learn from my messages".
+
+In flight / next:
+- Rust unchanged this session; no CI risk from it. Visual QA on Windows of the dock and header at narrow widths.
+- Per-chat canvases.
+
 ## Session 3
 Goal: fix the poor UI polish, real icons, clipped dialogs, element-level canvas control, stale desktop icon, and a world-class agent harness.
 

@@ -25,6 +25,9 @@ These apply to the app UI and to every design-system prompt, skill, template and
 ## Design harness (`src/lib/harness.ts`)
 Every artboard goes through `harden()` before it reaches the canvas: structure repair, offline-safe output, shadow/emoji/LIVE/blue-purple-gradient removal, icon resolution, and injection of the active design system's token + component kit (`z-*` classes, per-system overrides in `DS_KIT`). `harnessPrompt()` is the generation prompt: protocol, laws, kit reference, craft rules, skeletons. Change a design rule in one place and it applies to prompt and enforcement together. `engine.ts` also recovers bare HTML documents that skip the `<artboard>` wrapper.
 
+## Zeus Studio (built-in MCP)
+`src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.
+
 ## Canvas editing
 Edit mode (`ads_click` button on an artboard) injects `src/lib/editor.ts` into the sandboxed iframe: hover, select, inline text edit (double-click), delete, duplicate, reorder, undo, and the inspector (`src/components/Inspector.tsx`). A whole edit session becomes one version entry. "Ask Zeus" quotes the selected element into the chat.
 
