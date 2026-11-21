@@ -70,3 +70,7 @@ The shell is Rust (Tauri 2 / WebView2). The native C++ engine plugs in through a
 
 Provider slugs sent by the UI: `mercury3`, `geminiweb`, `qwen`, `k2horizon`, `motif`, `longcat`, `deepai`, `chatjimmy`, `custom`.
 Unknown model ids must fall back to the provider's default model.
+
+## Updater
+- `update_check() -> { current, latest, available, pageUrl, publishedAt, installerUrl, installerName, size }` reads `releases/latest` of `NikitHamal/zeusdesigns`; `available` needs a newer tag and a `*setup.exe` asset.
+- `update_install(url, name)` accepts only `https://github.com/NikitHamal/zeusdesigns/releases/download/...`, streams the installer to the temp dir emitting `zeus://update/progress { done, total }`, starts it with `/P /R /UPDATE`, then exits the app.

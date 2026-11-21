@@ -1,4 +1,4 @@
-# ⚡ ZeusDesigns
+# ZeusDesigns
 
 Open-source, ultra-light **native Windows** AI design & coding workspace — a Claude Design–style
 split-screen studio with an infinite multi-artboard canvas, free keyless AI providers and a full agent toolbox.
@@ -16,6 +16,9 @@ split-screen studio with an infinite multi-artboard canvas, free keyless AI prov
 ## Download
 Every push to `main` builds and publishes a Windows installer + portable `.exe` to
 [Releases](../../releases/latest).
+
+## Updates
+The app checks the latest GitHub Release on start and from Settings > Updates, downloads the installer with progress, and restarts into the new version.
 
 ## Shortcuts
 `V` select · `H` pan (or hold `Space`) · `F` frame · `T` text · `N` note · `P` pen · `S` shapes · `C` pin comment ·
