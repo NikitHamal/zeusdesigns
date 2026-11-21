@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FolderOpen, Moon, Settings, Sun, Zap, Cpu } from "lucide-react";
 import { useStore } from "./store";
 import { applyTheme } from "./lib/theme";
-import { nativeAvailable, openWorkspace, isNative } from "./lib/bridge";
+import { nativeAvailable, nativeMemory, openWorkspace, isNative } from "./lib/bridge";
 import { findProvider } from "./lib/providers";
 import { ChatPane } from "./components/Chat";
 import { CanvasPane } from "./components/CanvasPane";
@@ -67,7 +67,10 @@ export default function App() {
     return () => mq.removeEventListener("change", h);
   }, [theme, hue]);
 
-  useEffect(() => { nativeAvailable().then((ok) => patchUI({ nativeReady: ok })); }, [patchUI]);
+  useEffect(() => {
+    nativeAvailable().then((ok) => patchUI({ nativeReady: ok }));
+    nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: l.reverse() }));
+  }, [patchUI]);
   useEffect(() => { localStorage.setItem("zeus-chat-w", String(w)); }, [w]);
 
   const startDrag = (e: React.PointerEvent) => {

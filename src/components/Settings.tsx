@@ -8,7 +8,7 @@ import { SKILLS } from "../lib/skills";
 import { ACCENTS } from "../lib/theme";
 import { renderScreen } from "../lib/templates";
 import { DEVICE_SIZE } from "../types";
-import { tryInvoke } from "../lib/bridge";
+import { nativeMemory, tryInvoke } from "../lib/bridge";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 
@@ -173,14 +173,24 @@ function MemoryTab() {
   const mem = useStore((s) => s.settings.memory);
   const { addMemory, removeMemory } = useStore.getState();
   const [t, setT] = useState("");
-  const add = () => { if (!t.trim()) return; addMemory(t.trim()); tryInvoke("memory_add", { text: t.trim() }); setT(""); };
+  const add = async () => {
+    const v = t.trim();
+    if (!v) return;
+    setT("");
+    const list = await nativeMemory.add(v);
+    if (list) useStore.getState().patchSettings({ memory: list.reverse() }); else addMemory(v);
+  };
+  const forget = async (id: string) => {
+    const list = await nativeMemory.remove(id);
+    if (list) useStore.getState().patchSettings({ memory: list.reverse() }); else removeMemory(id);
+  };
   return (
     <div className="space-y-4">
       <p className="text-sm text-on-surface-variant">Memory persists across every chat and project. Zeus reads it before each reply — brand colors, audience, tech stack, preferences.</p>
       <div className="flex gap-2"><input className={field} placeholder="e.g. “Our brand is teal, audience is Gen-Z, Android-first (Compose)”" value={t} onChange={(e) => setT(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} /><button onClick={add} className="state morph h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-semibold text-on-primary">Remember</button></div>
       {mem.length === 0 && <div className="grid place-items-center rounded-[28px] bg-surface-container py-12 text-center text-sm text-on-surface-variant"><Brain size={32} className="mb-2 text-primary" />Nothing remembered yet.<br />Hover any reply in chat and tap the bookmark to save it.</div>}
       {mem.map((m) => (
-        <div key={m.id} className="anim-pop flex items-start gap-3 rounded-[22px] bg-surface-container px-4 py-3"><Sparkles size={16} className="mt-0.5 shrink-0 text-primary" /><p className="flex-1 select-text text-sm">{m.text}</p><IconBtn label="Forget" size={30} onClick={() => { removeMemory(m.id); tryInvoke("memory_delete", { id: m.id }); }}><Trash2 size={14} /></IconBtn></div>
+        <div key={m.id} className="anim-pop flex items-start gap-3 rounded-[22px] bg-surface-container px-4 py-3"><Sparkles size={16} className="mt-0.5 shrink-0 text-primary" /><p className="flex-1 select-text text-sm">{m.text}</p><IconBtn label="Forget" size={30} onClick={() => forget(m.id)}><Trash2 size={14} /></IconBtn></div>
       ))}
     </div>
   );

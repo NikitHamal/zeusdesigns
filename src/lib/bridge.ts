@@ -164,3 +164,14 @@ export async function tryInvoke<T>(cmd: string, args?: Record<string, unknown>):
   if (!isNative) return null;
   try { return await invoke<T>(cmd, args); } catch { return null; }
 }
+
+/* ---------------- native persistent memory (falls back to the local store) ---------------- */
+import type { MemoryItem } from "../types";
+interface NativeMem { id: string; text: string; created_at?: number }
+const toItems = (l: NativeMem[] | null): MemoryItem[] | null =>
+  l ? l.map((m) => ({ id: m.id, text: m.text, at: (m.created_at ?? 0) > 1e12 ? (m.created_at as number) : (m.created_at ?? 0) * 1000 })) : null;
+export const nativeMemory = {
+  list: async () => toItems(await tryInvoke<NativeMem[]>("memory_list")),
+  add: async (text: string) => toItems(await tryInvoke<NativeMem[]>("memory_add", { text })),
+  remove: async (id: string) => toItems(await tryInvoke<NativeMem[]>("memory_delete", { id })),
+};

@@ -9,7 +9,7 @@ import { sendMessage, stopGeneration } from "../lib/engine";
 import { EFFORTS, findProvider, PROVIDERS } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
-import { openWorkspace, readWorkspaceFile } from "../lib/bridge";
+import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 
@@ -114,7 +114,7 @@ function MessageView({ m }: { m: Message }) {
           <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
             <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Copy size={13} /></IconBtn>
             <IconBtn label="Retry" size={28} onClick={() => retry(m)}><RotateCcw size={13} /></IconBtn>
-            <IconBtn label="Remember this" size={28} onClick={() => { addMemory(m.text.slice(0, 240)); notify("Saved to Memory"); }}><BookmarkPlus size={13} /></IconBtn>
+            <IconBtn label="Remember this" size={28} onClick={async () => { const v = m.text.slice(0, 240); const l = await nativeMemory.add(v); if (l) useStore.getState().patchSettings({ memory: l.reverse() }); else addMemory(v); notify("Saved to Memory"); }}><BookmarkPlus size={13} /></IconBtn>
             {m.model && <span className="ml-1">{m.model}</span>}
             {m.stats?.tps ? <span className="rounded-full bg-tertiary-container px-2 py-0.5 font-semibold text-on-tertiary-container">⚡ {m.stats.tps.toLocaleString()} tok/s</span> : null}
           </div>
