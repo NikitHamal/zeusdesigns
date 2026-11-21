@@ -281,3 +281,26 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
     visit(root_path, &nodes, &needle, &mut matches, max_results);
     matches
 }
+
+#[tauri::command]
+pub fn workspace_search(root: String, query: String, limit: Option<usize>) -> Vec<Value> {
+    search_workspace_code(&root, &query, limit.unwrap_or(25).min(100))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_language_ui_components() {
+        assert_eq!(detect_language("tsx"), ("typescriptreact", true));
+        assert_eq!(detect_language("kt"), ("kotlin", true));
+        assert_eq!(detect_language("rs"), ("rust", false));
+    }
+
+    #[test]
+    fn test_safe_join_blocks_traversal() {
+        assert!(safe_join("/tmp", "../etc/passwd").is_err());
+        assert!(safe_join("/tmp", "src/App.tsx").is_ok());
+    }
+}

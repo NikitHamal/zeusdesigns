@@ -53,6 +53,7 @@ pub fn run() {
             agent::title_generate,
             workspace::workspace_open,
             workspace::workspace_tree,
+            workspace::workspace_search,
             workspace::fs_read,
             workspace::fs_write,
             workspace::shell_run,

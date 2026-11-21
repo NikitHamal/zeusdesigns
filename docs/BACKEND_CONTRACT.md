@@ -15,10 +15,11 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `title_generate` | `{text}` | `string` (ChatJimmy micro-task: ≤6 word conversation title) |
 | `workspace_open` | `{path}` | `{root, name}` |
 | `workspace_tree` | `{root, depth?}` | `FileNode[]` (name, path, dir, children?) |
+| `workspace_search` | `{root, query, limit?}` | `{path, line, snippet}[]` |
 | `fs_read` / `fs_write` | `{root, path, content?}` | `string` / `()` |
 | `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` |
 | `memory_list` / `memory_add` / `memory_delete` | `{text}` / `{id}` | `MemoryItem[]` |
-| `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` | server config | status / tools |
+| `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
 
 ### `ChatRequest`
 ```ts
