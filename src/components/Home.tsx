@@ -25,8 +25,8 @@ export function Home() {
   const patchUI = useStore((s) => s.patchUI);
   const recent = boards.slice(-3).reverse();
   return (
-    <div className="flex h-full flex-col items-center overflow-y-auto px-6">
-      <div className="flex w-full max-w-[680px] flex-1 flex-col justify-center py-10">
+    <div className="flex h-full w-full flex-1 flex-col items-center overflow-y-auto px-6">
+      <div className="mx-auto flex w-full max-w-[700px] flex-1 flex-col justify-center py-10">
         <h1 className="greeting mb-8 flex items-center justify-center gap-3 text-[40px] leading-none text-on-surface">
           <Icon name="auto_awesome" size={34} fill className="text-primary" />{greeting()}
         </h1>
