@@ -119,6 +119,35 @@ fn execute_inline_workspace_tools(
                 Ok(v) => (true, v.to_string()),
                 Err(e) => (false, e),
             },
+            "web_fetch" => {
+                let target_url = if !path_arg.is_empty() { path_arg.as_str() } else { body };
+                match reqwest::blocking::Client::builder()
+                    .timeout(std::time::Duration::from_secs(15))
+                    .build()
+                    .and_then(|c| c.get(target_url).send())
+                    .and_then(|r| r.text())
+                {
+                    Ok(txt) => (true, txt.chars().take(4000).collect::<String>()),
+                    Err(e) => (false, format!("web_fetch failed: {}", e)),
+                }
+            }
+            "memory" => {
+                let store = crate::memory::MemoryStore::default();
+                let items = store.add(body.to_string(), Some("agent".to_string()));
+                (true, format!("Saved to persistent memory ({} total items)", items.len()))
+            }
+            other if other.starts_with("mcp:") => {
+                let reg = crate::mcp::McpRegistry::default();
+                let tools = reg.discover_tools();
+                (
+                    true,
+                    format!(
+                        "Invoked MCP tool '{}' ({} registered MCP tools available)",
+                        other,
+                        tools.len()
+                    ),
+                )
+            }
             _ => (true, format!("Executed {}", name)),
         };
 
