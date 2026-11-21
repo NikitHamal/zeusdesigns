@@ -15,7 +15,7 @@ struct MemoryItem {
     uint64_t created_at = 0;
 };
 
-struct McpServerConfig {
+struct McpServerDescriptor {
     std::string id;
     std::string name;
     std::string transport = "stdio"; // "stdio" | "http" | "builtin"
@@ -60,14 +60,14 @@ private:
 class NativeMcpClient {
 public:
     explicit NativeMcpClient(const std::string& storage_dir = "");
-    std::vector<McpServerConfig> list_servers() const;
-    std::vector<McpServerConfig> add_server(
+    std::vector<McpServerDescriptor> list_servers() const;
+    std::vector<McpServerDescriptor> add_server(
         const std::string& name,
         const std::string& command,
         const std::vector<std::string>& args = {},
         const std::string& transport = "stdio"
     );
-    std::vector<McpServerConfig> remove_server(const std::string& id);
+    std::vector<McpServerDescriptor> remove_server(const std::string& id);
     std::vector<McpToolSchema> discover_tools() const;
     std::string invoke_tool(
         const std::string& server_id,
@@ -79,7 +79,7 @@ public:
 private:
     std::string storage_path_;
     mutable std::mutex mutex_;
-    std::vector<McpServerConfig> servers_;
+    std::vector<McpServerDescriptor> servers_;
     void persist() const;
 };
 

@@ -14,11 +14,24 @@ pub mod workspace;
 use serde_json::json;
 use std::sync::Arc;
 
+extern "C" {
+    fn zeus_engine_version() -> *const std::os::raw::c_char;
+}
+
 #[tauri::command]
 fn app_info() -> serde_json::Value {
+    let cpp_ver = unsafe {
+        let ptr = zeus_engine_version();
+        if ptr.is_null() {
+            "1.0.0-m3e"
+        } else {
+            std::ffi::CStr::from_ptr(ptr).to_str().unwrap_or("1.0.0-m3e")
+        }
+    };
     json!({
         "name": "ZeusDesigns",
         "version": env!("CARGO_PKG_VERSION"),
+        "cppEngineVersion": cpp_ver,
         "native": true,
         "engine": "rust+cpp20-neb-keyless"
     })

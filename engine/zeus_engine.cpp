@@ -356,32 +356,37 @@ bool WorkspaceEngine::sync_artboard_to_codebase(
 
 } // namespace zeus
 
+namespace {
+void copy_to_c_buf(const std::string& src, char* out_buf, size_t out_len) {
+    if (!out_buf || out_len == 0) return;
+    size_t n = std::min(src.size(), out_len - 1);
+    if (n > 0) {
+        std::memcpy(out_buf, src.data(), n);
+    }
+    out_buf[n] = '\0';
+}
+} // namespace
+
 extern "C" {
 
 const char* zeus_engine_version(void) {
-    return zeus::VERSION;
+    return ZEUS_VERSION_STRING;
 }
 
 void zeus_generate_deepai_tryit_key(const char* user_agent, char* out_buf, size_t out_len) {
-    if (!out_buf || out_len == 0) return;
     std::string key = zeus::KeylessProviderEngine::generate_deepai_tryit_key(user_agent ? user_agent : "Mozilla/5.0");
-    std::strncpy(out_buf, key.c_str(), out_len - 1);
-    out_buf[out_len - 1] = '\0';
+    copy_to_c_buf(key, out_buf, out_len);
 }
 
 void zeus_clean_chatjimmy_output(const char* raw_text, char* out_buf, size_t out_len) {
-    if (!out_buf || out_len == 0) return;
     std::string cleaned = zeus::KeylessProviderEngine::strip_chatjimmy_tags(raw_text ? raw_text : "");
-    std::strncpy(out_buf, cleaned.c_str(), out_len - 1);
-    out_buf[out_len - 1] = '\0';
+    copy_to_c_buf(cleaned, out_buf, out_len);
 }
 
 void zeus_split_k2_details(const char* raw_content, char* out_answer, size_t out_len) {
-    if (!out_answer || out_len == 0) return;
     std::string reasoning, answer;
     zeus::KeylessProviderEngine::parse_k2horizon_details(raw_content ? raw_content : "", reasoning, answer);
-    std::strncpy(out_answer, answer.c_str(), out_len - 1);
-    out_answer[out_len - 1] = '\0';
+    copy_to_c_buf(answer, out_answer, out_len);
 }
 
 } // extern "C"
