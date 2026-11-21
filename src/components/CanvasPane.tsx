@@ -8,6 +8,7 @@ import { InfiniteCanvas } from "./Canvas";
 import { BottomToolbar } from "./BottomToolbar";
 import { CompareDialog, GridView, SingleView } from "./Views";
 import { Icon } from "./Icon";
+import { Inspector } from "./Inspector";
 
 function ProjectName() {
   const name = useStore((s) => s.projectName);
@@ -142,6 +143,7 @@ export function CanvasPane() {
       </div>
 
       {view === "canvas" && <ZoomControls />}
+      <Inspector />
       <BottomToolbar />
       <CompareDialog />
     </div>

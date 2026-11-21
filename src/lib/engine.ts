@@ -188,6 +188,7 @@ export function stopGeneration() {
 
 const quoteToText = (q: Quote, boards: Artboard[]) => {
   const a = q.artboardId ? boards.find((b) => b.id === q.artboardId) : undefined;
+  if (q.kind === "element") return `[Context: the user selected the element <${q.label}> inside screen "${a?.name ?? "screen"}"${a ? ` (id=${a.id})` : ""}. Its HTML: ${q.text ?? ""}. Apply the request to this element only, leave the rest of the screen untouched, and return the full document with mode="revise" and the same id.]`;
   return `[Context: ${q.kind === "pin" ? "pinned comment on" : "selected"} screen "${a?.name ?? q.label}"${a ? ` (id=${a.id})` : ""}${q.text ? ` — "${q.text}"` : ""}]`;
 };
 

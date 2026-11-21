@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import type { Artboard, CanvasEl, Device } from "../types";
 import { DEVICE_SIZE } from "../types";
@@ -10,6 +10,7 @@ import { ExportMenu } from "./ExportMenu";
 import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
+import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
 
 const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -18,17 +19,48 @@ const DEV_ICON = { mobile: "smartphone", tablet: "tablet", web: "desktop_windows
 /* ------------------------------------------------------------------ */
 /* Artboard                                                            */
 /* ------------------------------------------------------------------ */
-const Frame = memo(function Frame({ html, interactive }: { html: string; interactive: boolean }) {
+const Frame = memo(function Frame({ id, html, interactive, editing }: { id: string; html: string; interactive: boolean; editing: boolean }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [doc, setDoc] = useState(html);
+  const emitted = useRef<string | null>(null);
+
+  // entering edit mode reloads the document with the editor runtime; outside changes (AI revise, undo) reload too
+  useLayoutEffect(() => { if (editing) { emitted.current = null; setDoc(html); } }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (editing && html !== emitted.current) setDoc(html); }, [html, editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onMsg = (e: MessageEvent) => {
+      const w = ref.current?.contentWindow;
+      const d = e.data;
+      if (!w || e.source !== w || !d || d.zeus !== "edit") return;
+      const ed = useEditor.getState();
+      if (d.type === "ready") editorBridge.attach(w);
+      else if (d.type === "select") ed.setSel(d.info);
+      else if (d.type === "undo") editor.undo();
+      else if (d.type === "html") {
+        const cur = useStore.getState().artboards.find((x) => x.id === id);
+        if (!cur || cur.html === d.html) return;
+        ed.record(cur.html);
+        emitted.current = d.html;
+        useStore.getState().updateArtboard(id, { html: d.html });
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => { window.removeEventListener("message", onMsg); editorBridge.attach(null); };
+  }, [editing, id]);
+
+  const src = editing ? injectEditor(doc) : html;
   return (
     <iframe
-      title="design" srcDoc={html} sandbox="allow-scripts allow-forms allow-popups allow-modals"
-      style={{ width: "100%", height: "100%", border: 0, background: "#fff", pointerEvents: interactive ? "auto" : "none" }}
+      ref={ref} title="design" srcDoc={src} sandbox="allow-scripts allow-forms allow-popups allow-modals"
+      style={{ width: "100%", height: "100%", border: 0, background: "#fff", pointerEvents: interactive || editing ? "auto" : "none" }}
     />
   );
 });
 
-function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResizeStart }: {
-  a: Artboard; z: number; selected: boolean; interacting: boolean; tool: string;
+function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart, onResizeStart }: {
+  a: Artboard; z: number; selected: boolean; interacting: boolean; editing: boolean; tool: string;
   onMoveStart: (e: React.PointerEvent, id: string) => void; onResizeStart: (e: React.PointerEvent, id: string) => void;
 }) {
   const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
@@ -74,7 +106,15 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
         {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container"><Icon name="sync_alt" size={12} className="mr-1" />{a.source}</span>}
         <span className="flex-1" />
         <div className={cn("flex items-center gap-0.5 rounded-full bg-surface-container/90 p-0.5 opacity-0 transition-opacity group-hover:opacity-100", selected && "opacity-100")}>
-          <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => patchUI({ interactId: interacting ? null : a.id })}><Icon name="touch_app" size={14} /></IconBtn>
+          <IconBtn label={editing ? "Done editing" : "Edit elements"} size={28} active={editing} onClick={() => {
+            if (editing) { editor.finish(); return; }
+            if (useEditor.getState().artboardId) editor.finish();
+            if (a.loading) return;
+            useEditor.getState().begin(a.id, a.html);
+            patchUI({ editId: a.id, interactId: null });
+            useStore.getState().setSel([a.id]);
+          }}><Icon name="ads_click" size={14} /></IconBtn>
+          <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => { if (editing) editor.finish(); patchUI({ interactId: interacting ? null : a.id }); }}><Icon name="touch_app" size={14} /></IconBtn>
           <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Icon name="content_copy" size={14} /></IconBtn>
           <ExportMenu a={a} size={28} />
           <Dropdown width={220} align="right" trigger={({ toggle }) => <IconBtn label="More" size={28} onClick={toggle}><Icon name="more_horiz" size={14} /></IconBtn>}>
@@ -103,8 +143,8 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
         className={cn("relative overflow-hidden bg-white   transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
-        <Frame html={a.html} interactive={interacting} />
-        {selectable && !interacting && (
+        <Frame id={a.id} html={a.html} interactive={interacting} editing={editing} />
+        {selectable && !interacting && !editing && (
           <div
             className="absolute inset-0 cursor-default"
             onPointerDown={(e) => { e.stopPropagation(); onMoveStart(e, a.id); }}
@@ -221,6 +261,7 @@ export function InfiniteCanvas() {
   const tool = useStore((s) => s.tool);
   const sel = useStore((s) => s.sel);
   const interactId = useStore((s) => s.ui.interactId);
+  const editId = useStore((s) => s.ui.editId);
   const allBoards = useStore((s) => s.artboards);
   const allEls = useStore((s) => s.elements);
   const allPins = useStore((s) => s.pins);
@@ -310,7 +351,7 @@ export function InfiniteCanvas() {
       const map: Record<string, () => void> = {
         v: () => st.setTool("select"), h: () => st.setTool("hand"), t: () => st.setTool("text"), f: () => st.setTool("frame"),
         n: () => st.setTool("note"), p: () => st.setTool("pen"), s: () => st.setTool("shape"), c: () => st.setTool("pin"),
-        Escape: () => { st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
+        Escape: () => { if (st.ui.editId) editor.finish(); st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
         Delete: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         Backspace: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         "1": () => canvasApi.fit(), "2": () => st.sel.length && canvasApi.fit(st.sel),
@@ -468,7 +509,7 @@ export function InfiniteCanvas() {
     >
       <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.z})` }}>
         {boards.map((a) => (
-          <ArtboardView key={a.id} a={a} z={vp.z} tool={tool} selected={sel.includes(a.id)} interacting={interactId === a.id} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
+          <ArtboardView key={a.id} a={a} z={vp.z} tool={tool} selected={sel.includes(a.id)} interacting={interactId === a.id} editing={editId === a.id} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
         ))}
         {els.map((el) => (
           <ElementView key={el.id} el={el} z={vp.z} tool={tool} selected={sel.includes(el.id)} editing={editing === el.id} setEditing={setEditing} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />

@@ -35,6 +35,7 @@ interface UI {
   leftTab: "chat" | "files";
   compare: string[] | null;
   interactId: string | null;
+  editId: string | null;
   openPinId: string | null;
   focusArtboard: string | null;
   toast: string | null;
@@ -139,7 +140,7 @@ export const useStore = create<State>()(
         customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false,
       },
       ui: {
-        settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, openPinId: null,
+        settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, editId: null, openPinId: null,
         focusArtboard: null, toast: null, workspace: null, nativeReady: false, chatCollapsed: false,
         sidebarOpen: true, showCanvas: false, update: null, version: "",
       },

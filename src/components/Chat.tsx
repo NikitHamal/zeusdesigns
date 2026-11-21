@@ -23,7 +23,7 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
       {a && <Thumb html={a.html} w={a.w} h={a.h} width={a.device === "web" ? 64 : 34} className="shrink-0 rounded-lg" />}
       <span className="min-w-0 flex-1 self-center">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-          {q.kind === "pin" ? <><Icon name="push_pin" size={11} /> Pinned comment</> : <><Icon name="chat_bubble" size={11} /> Screen</>}
+          {q.kind === "pin" ? <><Icon name="push_pin" size={11} /> Pinned comment</> : q.kind === "element" ? <><Icon name="ads_click" size={11} /> Element</> : <><Icon name="chat_bubble" size={11} /> Screen</>}
           <span className="truncate normal-case tracking-normal text-on-surface-variant">· {a?.name ?? q.label}</span>
         </span>
         {q.text && <span className="mt-0.5 block truncate text-[13px] italic text-on-surface-variant">“{q.text}”</span>}
@@ -216,6 +216,11 @@ export function Composer({ hero }: { hero?: boolean }) {
     window.addEventListener("zeus:prefill", f);
     return () => window.removeEventListener("zeus:prefill", f);
   }, [hero]);
+  useEffect(() => {
+    const h = (e: Event) => { setQuote((e as CustomEvent<Quote>).detail); ta.current?.focus(); };
+    window.addEventListener("zeus:quote", h);
+    return () => window.removeEventListener("zeus:quote", h);
+  }, []);
   useEffect(() => {
     const h = (e: Event) => setAtts((a) => [...a, (e as CustomEvent<Attachment>).detail]);
     window.addEventListener("zeus:attach", h);
