@@ -21,6 +21,20 @@ Every push to `main` builds and publishes a Windows installer + portable `.exe` 
 `V` select · `H` pan (or hold `Space`) · `F` frame · `T` text · `N` note · `P` pen · `S` shapes · `C` pin comment ·
 `Ctrl+K` Ask Zeus · `1` fit all · `2` zoom to selection · `Ctrl+D` duplicate as variant · `Del` delete · double-click a screen to interact with it
 
+## Native Engine Architecture (`src-tauri` + `engine/zeus_engine.cpp`)
+- **Keyless AI Provider Engine (`src-tauri/src/providers.rs`, `engine/zeus_engine.cpp`)**:
+  - **Mercury 3** (`chat.inceptionlabs.ai`): 1,000–2,000+ tok/s diffusion LLM with automatic `/api/session` token caching and 403 rotation.
+  - **ChatJimmy** (`chatjimmy.ai/api/chat`): 20,000+ tok/s Llama 3.1 8B instant conversation title generator and micro-task engine with `<|stats|>` / `<|think|>` tag stripping and `X-Real-IP` rotation.
+  - **Qwen** (`chat.qwen.ai/api/v2`): Native Android App Gateway (`X-Platform: android`, `app_waf`) with automatic `0mail.tech` account provisioning and `.zeusdesigns/qwen_pool.json` rotation.
+  - **K2Horizon** (`chat.ifm.ai`): IFM/K2-Horizon-375B-A23B guest SSE stream with cumulative `<details type="reasoning">` delta extraction.
+  - **Motif** (`chat.motiftech.io`): Enterprise guest SSE stream (`motif-102b`, `motif-12-7b-reasoning`) with `shared.data.conversation_id` tracking.
+  - **DeepAI** (`api.deepai.org`): Pure Rust & C++20 triple-SHA-256 `tryit-{rand}-{hash}` key generator.
+  - **LongCat** (`longcat.chat`): LongCat 2.5 1.6T MoE `chat-completion-oversea-V2` stream.
+  - **Gemini Web** (`gemini.google.com/app`): Anonymous `FdrFJe` / `cfb2h` / `SNlM0e` warmup and `StreamGenerate` `wrb.fr` parser.
+  - **Custom BYOK**: Full OpenAI-compatible (`/v1/chat/completions`) and Anthropic (`/v1/messages`) streaming support.
+- **Workspace Indexer, Persistent Memory & MCP (`workspace.rs`, `memory.rs`, `mcp.rs`, `agent.rs`)**:
+  - Recursive codebase indexer, safe file read/write/sync, shell execution, `.zeusdesigns/memory.json` persistence, and JSON-RPC 2.0 MCP tool discovery.
+
 ## Develop
 ```
 npm install
