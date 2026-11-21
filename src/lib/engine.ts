@@ -263,7 +263,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       const lp = lastPush.get(i)!;
       const now = performance.now();
       const isRevise = b.attrs.mode === "revise" && !created.includes(id);
-      if (b.closed) {
+      if (b.closed || final) {
         if (isRevise) S.reviseArtboard(id, b.html); else S.updateArtboard(id, { html: b.html });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });

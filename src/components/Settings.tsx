@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Brain, Check, Cpu, KeyRound, Library, Palette, Plug, Plus, Search, Sparkles, Trash2, Zap, BookOpen, Info, Plus as PlusIcon } from "lucide-react";
+import { Brain, Check, Cpu, KeyRound, Library, Palette, Plug, Plus, Search, Sparkles, Trash2, Zap, BookOpen, Info, Plus as PlusIcon, X } from "lucide-react";
 import { useStore } from "../store";
 import { Dialog, IconBtn, Segmented, Thumb, Toggle } from "./ui";
 import { PROVIDERS } from "../lib/providers";
@@ -280,7 +280,7 @@ export function SettingsDialog() {
           {tab === "about" && <AboutTab />}
         </div>
       </div>
-      <button onClick={() => patchUI({ settingsOpen: false })} className="absolute right-4 top-4 hidden" />
+      <div className="absolute right-4 top-4"><IconBtn label="Close" onClick={() => patchUI({ settingsOpen: false })}><X size={20} /></IconBtn></div>
     </Dialog>
   );
 }

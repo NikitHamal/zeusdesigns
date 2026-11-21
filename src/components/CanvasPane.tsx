@@ -130,8 +130,7 @@ export function CanvasPane() {
       </div>
 
       {view === "canvas" && <ZoomControls />}
-      {view === "canvas" && <BottomToolbar />}
-      {view !== "canvas" && <BottomToolbar />}
+      <BottomToolbar />
       <CompareDialog />
     </div>
   );

@@ -34,6 +34,7 @@ export function BottomToolbar() {
   const sel = useStore((s) => s.sel);
   const boards = useStore((s) => s.artboards);
   const busy = useStore((s) => s.busy);
+  const view = useStore((s) => s.view);
   const target = boards.find((b) => sel.includes(b.id));
   const [ask, setAsk] = useState(false);
   const [text, setText] = useState("");
@@ -65,7 +66,7 @@ export function BottomToolbar() {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-4" onPointerDown={(e) => e.stopPropagation()}>
       <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-container p-1.5 shadow-2xl shadow-black/20 ring-1 ring-outline-variant/50 transition-all">
-        {!ask && (
+        {!ask && view === "canvas" && (
           <>
             {TOOLS.slice(0, 2).map((t) => (
               <IconBtn key={t.id} label={`${t.label} (${t.key})`} active={tool === t.id} onClick={() => setTool(t.id)}>{t.icon}</IconBtn>

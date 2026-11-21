@@ -19,7 +19,7 @@ function TopBar() {
   const patchUI = useStore((s) => s.patchUI);
   const patch = useStore((s) => s.patchSettings);
   const notify = useStore((s) => s.notify);
-  const dark = document.documentElement.dataset.theme === "dark";
+  const dark = settings.theme === "dark" || (settings.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const prov = settings.providerId.startsWith("custom:") ? null : findProvider(settings.providerId);
   return (
     <header className="flex h-[52px] shrink-0 items-center gap-3 px-3">

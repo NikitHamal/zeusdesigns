@@ -235,7 +235,7 @@ function Composer() {
               <div className="min-w-0 flex-1">
                 <QuoteCard compact q={quote ?? { kind: "artboard", artboardId: selected!.id, label: selected!.name }} />
               </div>
-              {quote && <IconBtn label="Remove" size={28} onClick={() => setQuote(null)}><X size={14} /></IconBtn>}
+              <IconBtn label="Stop targeting this screen" size={28} onClick={() => (quote ? setQuote(null) : useStore.getState().setSel([]))}><X size={14} /></IconBtn>
             </div>
           </div>
         )}
