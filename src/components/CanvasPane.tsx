@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../store";
 import { canvasApi } from "../lib/canvasApi";
-import { download } from "../lib/bridge";
+import { download, refreshTree, writeWorkspaceFile } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, MenuItem, MenuLabel, Segmented } from "./ui";
 import { InfiniteCanvas } from "./Canvas";
@@ -115,6 +115,30 @@ export function CanvasPane() {
               { id: "single", icon: <Icon name="crop_landscape" size={16} />, title: "Single screen" },
             ]}
           />
+          <Dropdown align="right" width={260} trigger={({ toggle }) => (
+            <button onClick={toggle} disabled={boards.length === 0} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
+              <Icon name="download" size={16} /><span className="max-xl:hidden">Export</span>
+            </button>
+          )}>
+            {(close) => (
+              <>
+                <MenuItem icon={<Icon name="download" size={16} />} label="All screens as HTML" onClick={() => { exportAll(); close(); }} />
+                <MenuItem
+                  icon={<Icon name="folder_open" size={16} />} label="Save into project folder"
+                  onClick={async () => {
+                    close();
+                    const ws = useStore.getState().ui.workspace;
+                    if (!ws) { useStore.getState().notify("Open a project folder first"); return; }
+                    try {
+                      for (const b of boards) await writeWorkspaceFile(ws, `design/${b.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "screen"}.html`, b.html);
+                      useStore.getState().patchUI({ workspace: { ...ws, tree: await refreshTree(ws) } });
+                      useStore.getState().notify(`Saved ${boards.length} screen${boards.length > 1 ? "s" : ""} to design/`);
+                    } catch (e) { useStore.getState().notify((e as Error).message || "Could not write files"); }
+                  }}
+                />
+              </>
+            )}
+          </Dropdown>
           <Dropdown align="right" width={250} trigger={({ toggle }) => (
             <button onClick={toggle} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
               <Icon name="compare" size={16} /><span className="max-xl:hidden">Compare</span>

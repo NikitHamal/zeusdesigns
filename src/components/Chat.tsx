@@ -282,7 +282,7 @@ export function Composer({ hero }: { hero?: boolean }) {
           </Dropdown>
           <Dropdown up width={290} trigger={({ toggle }) => (
             <button onClick={toggle} title="Design system" className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-on-surface-variant">
-              <Icon name="palette" size={15} /><span className="hidden max-w-[110px] truncate @[440px]:inline">{ds.name}</span>
+              <Icon name="palette" size={15} /><span className="hidden max-w-[110px] truncate @[520px]:inline">{ds.name}</span>
             </button>
           )}>
             {(close) => (
@@ -375,6 +375,7 @@ export function ChatPane() {
   const [editing, setEditing] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const [away, setAway] = useState(false);
   const last = conv.messages[conv.messages.length - 1];
 
   useEffect(() => {
@@ -402,8 +403,17 @@ export function ChatPane() {
         <IconBtn label="Hide chat" size={36} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={20} /></IconBtn>
       </div>
       {leftTab === "files" ? <FilesPanel /> : (
-        <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">
+        <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">
           {conv.messages.map((m) => <MessageView key={m.id} m={m} />)}
+        </div>
+      )}
+      {away && leftTab !== "files" && (
+        <div className="pointer-events-none relative h-0">
+          <button
+            onClick={() => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }}
+            title="Jump to latest" aria-label="Jump to latest"
+            className="state pointer-events-auto absolute -top-12 left-1/2 grid size-9 -translate-x-1/2 place-items-center rounded-full border border-outline-variant bg-surface-container text-on-surface"
+          ><Icon name="arrow_downward" size={18} /></button>
         </div>
       )}
       <Composer />

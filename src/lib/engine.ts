@@ -341,11 +341,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           try {
             const cur = useStore.getState().artboards.find((x) => x.id === id)!;
             const bare = cur.html.replace(/<style data-zeus-kit>[\s\S]*?<\/style>/, "").replace(/<script data-zeus-kit-js>[\s\S]*?<\/script>/, "");
-            const raw = await oneShot(
+            const raw = await Promise.race([oneShot(
               "You repair layout defects in one HTML screen. Fix ONLY the listed defects with the smallest possible edits. Keep content, structure, classes and CSS variables. Do not add shadows, emoji, gradients or external resources. Reply with the complete fixed document inside <artboard name=\"fix\" mode=\"revise\">...</artboard> and nothing else.",
               `Screen ${a.w}x${a.h}px. Defects:\n${severe.map((i) => `- ${i.msg}`).join("\n")}\n\n<artboard name="${a.name}" mode="revise">\n${bare.slice(0, 30000)}\n</artboard>`,
               { effort: "low", timeoutMs: 90000 },
-            );
+            ), new Promise<string>((_, rej) => signal.addEventListener("abort", () => rej(new Error("stopped"))))]);
             const b = parseStream(raw).blocks[0];
             if (b && b.html.length > 300 && !signal.aborted) {
               const fixed = harden(b.html, getDS(useStore.getState().settings.designSystemId)).html;
