@@ -89,11 +89,14 @@ export function Dropdown({ trigger, children, up, align = "left", className, wid
   );
 }
 
-export function MenuItem({ icon, label, desc, onClick, active, danger, right }: {
-  icon?: ReactNode; label: string; desc?: string; onClick?: () => void; active?: boolean; danger?: boolean; right?: ReactNode;
+export function MenuItem({ icon, label, desc, onClick, active, danger, right, href }: {
+  icon?: ReactNode; label: string; desc?: string; onClick?: () => void; active?: boolean; danger?: boolean; right?: ReactNode; href?: string;
 }) {
+  const Tag = (href ? "a" : "button") as "button";
+  const extra = href ? ({ href, target: "_blank", rel: "noreferrer" } as Record<string, string>) : {};
   return (
-    <button
+    <Tag
+      {...extra}
       onClick={onClick}
       className={cn(
         "state w-full flex items-center gap-3 rounded-[16px] px-3 py-2 text-left text-sm text-on-surface",
@@ -107,7 +110,7 @@ export function MenuItem({ icon, label, desc, onClick, active, danger, right }: 
       </span>
       {right}
       {active && <Icon name="check" size={16} className="shrink-0" />}
-    </button>
+    </Tag>
   );
 }
 

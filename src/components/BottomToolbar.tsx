@@ -24,7 +24,7 @@ const TOOLS: { id: Tool; icon: React.ReactNode; label: string; key: string }[] =
   { id: "pen", icon: <Icon name="edit" size={19} />, label: "Freehand pen", key: "P" },
 ];
 
-export function BottomToolbar() {
+export function BottomToolbar({ children }: { children?: React.ReactNode }) {
   const tool = useStore((s) => s.tool);
   const shape = useStore((s) => s.shape);
   const setTool = useStore((s) => s.setTool);
@@ -62,8 +62,8 @@ export function BottomToolbar() {
   const ShapeIcon = SHAPES.find((s) => s.id === shape)!.icon;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-4" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-container p-1.5   ring-1 ring-outline-variant/50 transition-all">
+    <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex flex-wrap items-center justify-center gap-2 px-4" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-container p-1.5 ring-1 ring-outline-variant/50">
         {!ask && view === "canvas" && (
           <>
             {TOOLS.slice(0, 2).map((t) => (
@@ -91,7 +91,7 @@ export function BottomToolbar() {
           </>
         )}
         {ask ? (
-          <div className="flex w-[min(680px,70vw)] items-center gap-1.5 pl-3 anim-fade">
+          <div className="flex w-[min(620px,calc(100vw-120px))] items-center gap-1.5 pl-3 anim-fade">
             <Icon name="auto_awesome" size={18} className="shrink-0 text-primary" />
             {target ? (
               <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary-container">
@@ -101,7 +101,7 @@ export function BottomToolbar() {
             <input
               ref={input} value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setAsk(false); }}
-              placeholder={target ? "Make this…  e.g. “bolder hero, rounder cards”" : "Ask Zeus to design something…"}
+              placeholder={target ? "Edit this screen" : "Ask Zeus"}
               className="h-10 min-w-0 flex-1 bg-transparent px-1 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/60"
             />
             {target && (
@@ -121,6 +121,7 @@ export function BottomToolbar() {
           </button>
         )}
       </div>
+      {!ask && children}
     </div>
   );
 }

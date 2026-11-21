@@ -13,6 +13,7 @@ import { toolsPrompt } from "./tools";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { tokensCss } from "./designSystems";
+import { isStudioTool, runStudioTool, studioBrief } from "./studio";
 
 /* ------------------------------------------------------------------ */
 /* System prompt                                                       */
@@ -26,6 +27,7 @@ export function buildSystemPrompt(opts: { intent?: string; device?: Device; tool
   return [
     harnessPrompt(ds, opts.intent, opts.device),
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
+    studioBrief(opts.intent ?? "", ds, opts.device),
     memoryBlock(),
     opts.tools ?? "",
     boards.length ? `## Current canvas page\n${boards.map((a) => `- id=${a.id} name="${a.name}" device=${a.device} v${a.version}`).join("\n")}` : "## Current canvas page\n(empty)",
@@ -385,12 +387,24 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       let msgs: ChatRequest["messages"] = history;
       for (let round = 0; ; round++) {
         const roundTools: ToolCall[] = [];
+        const studioRuns = new Map<string, Promise<void>>();
         let roundText = "";
         await new Promise<void>((resolve, reject) => {
           const onEvent = (e: ChatEvent) => {
-            if (e.type === "delta") { roundText += e.text; onDelta(e.text); }
-            else if (e.type === "tool_call") { const t: ToolCall = { id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" }; tools.push(t); roundTools.push(t); sync(); }
+            if (e.type === "delta") {
+              if (roundText.includes("</zeus_tool>")) return; // a tool call ends the turn; anything after it would be invented
+              const before = roundText.length;
+              roundText += e.text;
+              const ci = roundText.indexOf("</zeus_tool>");
+              const piece = ci >= 0 ? roundText.slice(before, ci + 12) : e.text;
+              if (ci >= 0) roundText = roundText.slice(0, ci + 12);
+              if (piece) onDelta(piece);
+            }
+            else if (e.type === "tool_call") { const t: ToolCall = { id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" }; tools.push(t); roundTools.push(t);
+              if (isStudioTool(e.name)) studioRuns.set(e.id, runStudioTool(e.name, t.args).then((r) => { t.status = r.ok ? "ok" : "error"; t.output = r.output; sync(); }));
+              sync(); }
             else if (e.type === "tool_result") {
+              if (studioRuns.has(e.id)) return; // built-in Zeus Studio tools are answered locally
               const t = tools.find((x) => x.id === e.id);
               if (t) { t.status = e.ok ? "ok" : "error"; t.output = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output; }
               sync();
@@ -401,8 +415,9 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           signal.addEventListener("abort", () => resolve());
           nativeChat(current, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
         });
+        await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (signal.aborted || !roundTools.length || round >= 3) break;
+        if (signal.aborted || !roundTools.length || round >= 4) break;
         const closeAt = roundText.lastIndexOf("</zeus_tool>");
         const said = closeAt >= 0 ? roundText.slice(0, closeAt + 12) : roundText;
         msgs = [

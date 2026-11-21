@@ -28,6 +28,7 @@ export interface Settings {
   webSearch: boolean;
   memoryOn: boolean;
   selfCheck: boolean;
+  studioOn: boolean;
 }
 export interface Viewport { x: number; y: number; z: number }
 
@@ -139,7 +140,7 @@ export const useStore = create<State>()(
       settings: {
         theme: "dark", hue: 17, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
         designSystemId: "m3e", skills: SKILLS.filter((s) => s.default).map((s) => s.id),
-        customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true,
+        customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true, studioOn: true,
       },
       ui: {
         settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, editId: null, openPinId: null,

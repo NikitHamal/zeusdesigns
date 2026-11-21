@@ -1,6 +1,7 @@
 // Agent tool protocol shown to the model: built-in project tools plus whatever the enabled MCP servers expose.
 import { useStore } from "../store";
 import { nativeMcp, type McpToolInfo } from "./bridge";
+import { studioToolsPrompt } from "./studio";
 
 let cache: { key: string; at: number; tools: McpToolInfo[] } | null = null;
 
@@ -44,6 +45,7 @@ export async function toolsPrompt(): Promise<string> {
     "Use tools only when the task needs something you cannot know otherwise: a project file, a URL the user gave, a saved fact, library docs. A plain design request needs no tools. Never invent a tool result.",
     ws ? "- read_file path=\"relative/file\" | list_dir | search_code (BODY=text to find) | write_file path=\"relative/file\" (BODY=full content) | shell (BODY=command)" : "",
     "- web_fetch path=\"https://...\" | memory (BODY=one durable fact worth keeping)",
+    studioToolsPrompt(),
     ...(mcp.length ? ["MCP tools, BODY is a JSON object of arguments:", ...mcp.map((t) => `- name="mcp:${t.server_id}:${t.name}" ${sig(t.input_schema)} ${t.description.replace(/\s+/g, " ").slice(0, 110)}`)] : []),
   ];
   return lines.filter(Boolean).join("\n");

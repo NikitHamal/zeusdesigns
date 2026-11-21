@@ -60,7 +60,7 @@ function ZoomControls() {
   const z = useStore((s) => s.viewport[pageId]?.z ?? 0.7);
   const sel = useStore((s) => s.sel);
   return (
-    <div className="absolute bottom-5 right-5 z-30 flex items-center gap-0.5 rounded-full bg-surface-container p-1   ring-1 ring-outline-variant/50" onPointerDown={(e) => e.stopPropagation()}>
+    <div className="pointer-events-auto flex items-center gap-0.5 rounded-full bg-surface-container p-1 ring-1 ring-outline-variant/50">
       <IconBtn label="Zoom out" size={34} onClick={() => canvasApi.zoomBy(1 / 1.25)}><Icon name="remove" size={16} /></IconBtn>
       <button onClick={() => canvasApi.reset()} title="Reset zoom" className="state w-12 rounded-full py-1.5 text-center text-xs font-semibold tabular-nums text-on-surface">{Math.round(z * 100)}%</button>
       <IconBtn label="Zoom in" size={34} onClick={() => canvasApi.zoomBy(1.25)}><Icon name="add" size={16} /></IconBtn>
@@ -167,9 +167,8 @@ export function CanvasPane() {
         </div>
       </div>
 
-      {view === "canvas" && <ZoomControls />}
       <Inspector />
-      <BottomToolbar />
+      <BottomToolbar>{view === "canvas" && <ZoomControls />}</BottomToolbar>
       <CompareDialog />
     </div>
   );

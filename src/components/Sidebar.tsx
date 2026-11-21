@@ -97,7 +97,6 @@ function AccountMenu() {
   const patchUI = useStore((s) => s.patchUI);
   const version = useStore((s) => s.ui.version);
   const update = useStore((s) => s.ui.update);
-  const link = "state flex w-full items-center gap-3 rounded-[16px] px-3 py-2 text-left text-sm text-on-surface";
   return (
     <Dropdown up width={248} className="w-full" trigger={({ toggle, open }) => (
       <button onClick={toggle} className={cn("state flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left", open && "bg-surface-high")}>
@@ -112,13 +111,13 @@ function AccountMenu() {
           <MenuItem icon={<Icon name="psychology" size={18} />} label="Memory" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "memory" }); }} />
           <MenuItem icon={<Icon name="extension" size={18} />} label="Connectors" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "mcp" }); }} />
           <div className="my-1.5 border-t border-outline-variant/70" />
-          {([["light", "Light", "light_mode"], ["dark", "Dark", "dark_mode"], ["system", "System", "computer"]] as const).map(([id, label, icon]) => (
+          {([["light", "Light", "light_mode"], ["dark", "Dark", "dark_mode"], ["system", "System", "laptop"]] as const).map(([id, label, icon]) => (
             <MenuItem key={id} icon={<Icon name={icon} size={18} />} label={label} active={theme === id} onClick={() => patch({ theme: id })} />
           ))}
           <div className="my-1.5 border-t border-outline-variant/70" />
           <MenuItem icon={<Icon name={update?.available ? "system_update" : "refresh"} size={18} />} label={update?.available ? `Update to ${update.latest}` : "Check for updates"} onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "updates" }); }} />
-          <a href="https://github.com/NikitHamal/zeusdesigns/issues" target="_blank" rel="noreferrer" className={link}><Icon name="help" size={18} />Get help</a>
-          <a href="https://github.com/NikitHamal/zeusdesigns" target="_blank" rel="noreferrer" className={link}><Icon name="open_in_new" size={18} />Source code</a>
+          <MenuItem href="https://github.com/NikitHamal/zeusdesigns/issues" icon={<Icon name="help" size={18} />} label="Get help" />
+          <MenuItem href="https://github.com/NikitHamal/zeusdesigns" icon={<Icon name="open_in_new" size={18} />} label="Source code" />
         </>
       )}
     </Dropdown>

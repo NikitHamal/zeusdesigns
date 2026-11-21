@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
 import type { McpServer } from "../types";
+import { STUDIO_TOOLS } from "../lib/studio";
 import { BUILTIN_SERVERS, BUILTIN_TOOLS, CATALOG, type CatalogEntry, type McpCategory } from "../lib/mcpCatalog";
 import { isNative, nativeMcp, type McpToolInfo } from "../lib/bridge";
 import { enabledMcpTools, resetToolCache } from "../lib/tools";
@@ -72,6 +73,7 @@ export function ConnectorsTab() {
   const mcp = useStore((s) => s.settings.mcp);
   const ws = useStore((s) => s.ui.workspace);
   const patch = useStore((s) => s.patchSettings);
+  const studioOn = useStore((s) => s.settings.studioOn);
   const [view, setView] = useState<"installed" | "store">("installed");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<"All" | McpCategory>("All");
@@ -101,6 +103,10 @@ export function ConnectorsTab() {
           <section>
             <h4 className="mb-1 text-[13px] font-medium text-on-surface-variant">Built in</h4>
             <div>
+              <Row icon="auto_awesome" title="Zeus Studio" sub={`${STUDIO_TOOLS.length} tools: palettes, contrast, fonts, icons, components, screen lint`} onClick={() => setOpenId(openId === "studio" ? null : "studio")} right={<span onClick={(e) => e.stopPropagation()}><Toggle on={studioOn} onChange={(v) => patch({ studioOn: v })} /></span>} />
+              {openId === "studio" && (
+                <div className="flex flex-wrap gap-1.5 pb-3 pl-12">{STUDIO_TOOLS.map((t) => <span key={t.name} title={t.desc} className="rounded-md bg-surface-high px-2 py-1 font-mono text-xs text-on-surface">{t.name}</span>)}</div>
+              )}
               {BUILTIN_SERVERS.map((b) => <Row key={b.id} icon={b.icon} title={b.name} sub={b.desc} right={<span className="text-[13px] text-on-surface-variant">Always on</span>} />)}
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">{BUILTIN_TOOLS.map((t) => <span key={t.name} title={t.desc} className="rounded-md bg-surface-high px-2 py-1 font-mono text-xs text-on-surface">{t.name}</span>)}</div>
