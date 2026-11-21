@@ -1,4 +1,7 @@
 fn main() {
+    for icon in ["icons/icon.ico", "icons/icon.png", "icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"] {
+        println!("cargo:rerun-if-changed={icon}");
+    }
     println!("cargo:rerun-if-changed=../engine/zeus_engine.cpp");
     println!("cargo:rerun-if-changed=../include/zeus/c_api.h");
     println!("cargo:rerun-if-changed=../include/zeus/providers.hpp");

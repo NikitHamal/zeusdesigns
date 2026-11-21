@@ -1,0 +1,359 @@
+// Zeus design harness. Everything that makes weak models produce strong, law-abiding screens:
+//  1. kitCss / kitExample  - a per-design-system component kit the model composes instead of inventing CSS
+//  2. resolveIcons         - <i data-i="home"></i> and Material Symbols markup become real inline SVG paths
+//  3. harden               - structure repair + design-law enforcement + offline-safe output on every artboard
+//  4. harnessPrompt        - the system prompt sections that drive generation
+import { MATERIAL_ICONS } from "./materialIcons";
+import { DesignSystem, tokensCss } from "./designSystems";
+import type { Device } from "../types";
+
+/* icons: home, search, settings, person, notifications, favorite, star, bookmark, share, mail, chat, call, calendar_today, schedule,
+   location_on, shopping_cart, shopping_bag, payments, credit_card, wallet, bar_chart, trending_up, trending_down, pie_chart, insights,
+   analytics, dashboard, list, grid_view, menu, more_vert, more_horiz, arrow_back, arrow_forward, arrow_upward, arrow_downward,
+   chevron_right, chevron_left, expand_less, close, check, check_circle, add, remove, edit, delete, download, upload, cloud, lock,
+   visibility, visibility_off, filter_list, sort, tune, play_arrow, pause, skip_next, skip_previous, shuffle, repeat, volume_up,
+   music_note, mic, photo_camera, image, videocam, map, explore, fitness_center, restaurant, local_cafe, flight, hotel, work, school,
+   bolt, language, public, group, groups, person_add, thumb_up, comment, send, attach_file, link, content_copy, folder, description,
+   article, receipt_long, inventory_2, local_shipping, storefront, sell, percent, savings, account_balance, support_agent, help, info,
+   warning, error, verified, shield, key, fingerprint, light_mode, dark_mode, wifi, battery_full, signal_cellular_alt, bluetooth, flag,
+   rocket_launch, terminal, bug_report, apps, spa, water_drop, thermostat, nature, sports_esports, movie, headphones, podcasts,
+   newspaper, task_alt, checklist, event, timer, history, refresh, sync, logout, login, open_in_new, fullscreen, zoom_in, palette,
+   brush, layers, database, smartphone, laptop, directions_run, local_fire_department, favorite, pending, radio_button_checked */
+
+export const UI_ICON_NAMES = Object.keys(MATERIAL_ICONS).sort();
+
+/* ------------------------------------------------------------------ */
+/* Component kit                                                       */
+/* ------------------------------------------------------------------ */
+export function kitCss(): string {
+  return `
+*{box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;text-shadow:none!important}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4{font-family:var(--heading);font-weight:var(--weight);letter-spacing:-.015em;line-height:1.15}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none}
+svg,img{display:block;max-width:100%}
+.z-i{width:24px;height:24px;fill:currentColor;flex:none}
+.z-i.sm{width:18px;height:18px}.z-i.lg{width:32px;height:32px}.z-i.xl{width:48px;height:48px}
+.z-screen{min-height:100vh;display:flex;flex-direction:column}
+.z-page{flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 28px}
+.z-wide{width:100%;max-width:1120px;margin:0 auto;padding:0 32px}
+.z-row{display:flex;align-items:center;gap:12px}
+.z-col{display:flex;flex-direction:column;gap:12px}
+.z-between{justify-content:space-between}.z-wrap{flex-wrap:wrap}.z-center{justify-content:center;text-align:center}
+.z-grow{flex:1;min-width:0}.z-gap-4{gap:4px}.z-gap-8{gap:8px}.z-gap-16{gap:16px}.z-gap-24{gap:24px}.z-gap-32{gap:32px}
+.z-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.z-grid-2{display:grid;gap:16px;grid-template-columns:1fr 1fr}.z-grid-3{display:grid;gap:16px;grid-template-columns:repeat(3,1fr)}.z-grid-4{display:grid;gap:16px;grid-template-columns:repeat(4,1fr)}
+.z-display{font-size:clamp(40px,6.5vw,72px);line-height:1.02;letter-spacing:-.03em}
+.z-h1{font-size:30px}.z-h2{font-size:21px}.z-h3{font-size:16px;font-weight:600}
+.z-title{font-size:17px;font-weight:600}.z-body{font-size:15px}.z-small{font-size:13px}
+.z-muted{color:var(--muted)}.z-primary{color:var(--primary)}.z-error{color:var(--error)}.z-truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-appbar{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 20px;background:var(--bg)}
+.z-appbar h1{font-size:22px;flex:1}
+.z-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 22px;border-radius:var(--r-btn);background:var(--primary);color:var(--on-primary);border:var(--bw) solid transparent;font-weight:600;font-size:15px;transition:transform .2s cubic-bezier(.34,1.56,.64,1),border-radius .3s cubic-bezier(.34,1.56,.64,1),background-color .15s}
+.z-btn:hover{filter:brightness(.94)}.z-btn:active{transform:scale(.97)}
+.z-btn.tonal{background:var(--container);color:var(--on-container)}
+.z-btn.outline{background:transparent;color:var(--text);border:max(var(--bw),1px) solid var(--outline)}
+.z-btn.text{background:transparent;color:var(--primary);padding:0 12px}
+.z-btn.sm{height:34px;padding:0 14px;font-size:13px}.z-btn.lg{height:54px;padding:0 30px;font-size:16px}.z-btn.block{width:100%}
+.z-icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:var(--r-btn);color:var(--text);flex:none}
+.z-icon-btn:hover{background:var(--surface-2)}.z-icon-btn.tonal{background:var(--container);color:var(--on-container)}.z-icon-btn.filled{background:var(--primary);color:var(--on-primary)}
+.z-fab{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:var(--r-lg);background:var(--container);color:var(--on-container);position:sticky;bottom:96px;align-self:flex-end;margin-right:20px}
+.z-card{background:var(--surface);border:var(--bw) solid var(--outline);border-radius:var(--r-card);padding:20px;display:flex;flex-direction:column;gap:12px}
+.z-card.tonal{background:var(--surface-2);border-color:transparent}.z-card.accent{background:var(--container);color:var(--on-container);border-color:transparent}.z-card.flat{border-color:transparent}.z-card.bleed{padding:0;overflow:hidden}
+.z-hero{background:var(--container);color:var(--on-container);border-radius:var(--r-xl);padding:28px;display:flex;flex-direction:column;gap:14px}
+.z-chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:var(--r-btn);border:max(var(--bw),1px) solid var(--outline);font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;background:transparent}
+.z-chip.on{background:var(--container);color:var(--on-container);border-color:transparent}
+.z-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.z-badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-btn);background:var(--container);color:var(--on-container);font-size:12px;font-weight:600}
+.z-avatar{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--container);color:var(--on-container);font-weight:600;font-size:15px;flex:none}
+.z-avatar.lg{width:56px;height:56px;font-size:20px}
+.z-input{display:flex;align-items:center;gap:10px;height:48px;padding:0 16px;border-radius:var(--r-md);border:max(var(--bw),1px) solid var(--outline);background:var(--surface)}
+.z-input input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:100%}
+.z-input:focus-within{border-color:var(--primary)}
+.z-field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.z-list{display:flex;flex-direction:column}
+.z-item{display:flex;align-items:center;gap:14px;min-height:60px;padding:10px 4px;border-bottom:1px solid var(--outline)}
+.z-item:last-child{border-bottom:0}
+.z-item .z-lead{display:grid;place-items:center;width:44px;height:44px;border-radius:var(--r-md);background:var(--container);color:var(--on-container);flex:none}
+.z-divider{height:1px;background:var(--outline);border:0}
+.z-switch{position:relative;width:48px;height:28px;flex:none;appearance:none;-webkit-appearance:none;border-radius:99px;background:var(--surface-2);border:2px solid var(--outline);cursor:pointer;transition:background-color .2s}
+.z-switch::after{content:"";position:absolute;top:50%;left:5px;width:14px;height:14px;border-radius:50%;background:var(--outline);transform:translateY(-50%);transition:left .25s cubic-bezier(.34,1.56,.64,1),width .2s,height .2s,background-color .2s}
+.z-switch:checked{background:var(--primary);border-color:var(--primary)}.z-switch:checked::after{left:22px;width:20px;height:20px;background:var(--on-primary)}
+.z-tabs{display:flex;gap:4px;border-bottom:1px solid var(--outline)}
+.z-tab{padding:12px 16px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+.z-tab.on{color:var(--primary);border-bottom-color:var(--primary)}
+.z-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}.z-bar>i{display:block;height:100%;background:var(--primary);border-radius:99px}
+.z-stat{display:flex;flex-direction:column;gap:4px}.z-stat .v{font-family:var(--heading);font-size:32px;font-weight:var(--weight);letter-spacing:-.02em;line-height:1.1}
+.z-table{width:100%;border-collapse:collapse;font-size:14px}.z-table th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--outline)}
+.z-table td{padding:13px 14px;border-bottom:1px solid var(--outline)}.z-table tr:last-child td{border-bottom:0}
+.z-img{background:var(--container);border-radius:var(--r-md);min-height:120px;width:100%}
+.z-nav{position:sticky;bottom:0;display:flex;justify-content:space-around;padding:10px 8px 22px;background:var(--surface);border-top:1px solid var(--outline);margin-top:auto}
+.z-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.z-nav-pill{display:grid;place-items:center;width:64px;height:32px;border-radius:var(--r-btn);transition:background-color .2s}
+.z-nav-item.on{color:var(--text)}.z-nav-item.on .z-nav-pill{background:var(--container);color:var(--on-container)}
+.z-shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.z-side{display:flex;flex-direction:column;gap:4px;padding:20px 12px;background:var(--surface);border-right:1px solid var(--outline)}
+.z-side-item{display:flex;align-items:center;gap:12px;height:42px;padding:0 14px;border-radius:var(--r-md);font-weight:500;color:var(--muted);cursor:pointer}
+.z-side-item:hover{background:var(--surface-2)}.z-side-item.on{background:var(--container);color:var(--on-container);font-weight:600}
+.z-main{display:flex;flex-direction:column;gap:24px;padding:28px 36px;min-width:0}
+.z-top{display:flex;align-items:center;gap:16px;min-height:64px;padding:0 32px;border-bottom:1px solid var(--outline);background:var(--bg)}
+.z-section{display:flex;flex-direction:column;gap:16px;padding:72px 0}
+@media(max-width:700px){.z-grid-3,.z-grid-4{grid-template-columns:1fr 1fr}.z-shell{grid-template-columns:1fr}.z-side{display:none}.z-main{padding:20px}.z-wide{padding:0 20px}.z-top{padding:0 20px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+`.replace(/\n/g, "");
+}
+
+/** Tiny interaction runtime so kit components feel alive without model-written JS. */
+const KIT_JS = `(function(){var g=[".z-tab",".z-chip",".z-nav-item",".z-side-item",".z-seg"];document.addEventListener("click",function(e){var t=e.target&&e.target.closest&&e.target.closest(g.join(","));if(!t||!t.parentElement)return;if(t.matches(".z-chip")&&t.parentElement.dataset.multi!==undefined){t.classList.toggle("on");return}Array.prototype.forEach.call(t.parentElement.children,function(s){if(s.matches(g.join(",")))s.classList.remove("on")});t.classList.add("on")});document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a)e.preventDefault()})})();`;
+
+export function kitExample(device: Device): string {
+  if (device === "web") {
+    return `<div class="z-shell">
+  <aside class="z-side">
+    <h3 class="z-h2" style="padding:4px 14px 16px">Northwind</h3>
+    <a class="z-side-item on"><i data-i="dashboard" data-fill></i>Overview</a>
+    <a class="z-side-item"><i data-i="receipt_long"></i>Orders</a>
+    <a class="z-side-item"><i data-i="inventory_2"></i>Products</a>
+    <a class="z-side-item"><i data-i="group"></i>Customers</a>
+  </aside>
+  <main class="z-main">
+    <div class="z-row z-between"><h1 class="z-h1">Overview</h1><button class="z-btn"><i data-i="add" class="sm"></i>New order</button></div>
+    <div class="z-grid-3">
+      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Revenue</span><span class="v">$48,210</span></div><div class="z-bar"><i style="width:72%"></i></div></div>
+      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Orders</span><span class="v">1,284</span></div></div>
+      <div class="z-card accent"><div class="z-stat"><span class="z-small">Conversion</span><span class="v">3.8%</span></div></div>
+    </div>
+    <div class="z-card bleed"><table class="z-table"><tr><th>Order</th><th>Customer</th><th>Total</th></tr><tr><td>#4821</td><td>Maya Chen</td><td>$212.00</td></tr></table></div>
+  </main>
+</div>`;
+  }
+  return `<div class="z-screen">
+  <header class="z-appbar"><h1>Today</h1><button class="z-icon-btn"><i data-i="search"></i></button></header>
+  <div class="z-page">
+    <section class="z-hero"><span class="z-small">Weekly goal</span><h2 class="z-h1">12.4 of 20 km</h2><div class="z-bar"><i style="width:62%"></i></div><button class="z-btn">Start run</button></section>
+    <div class="z-chips"><span class="z-chip on">All</span><span class="z-chip">Runs</span><span class="z-chip">Rides</span></div>
+    <div class="z-list">
+      <div class="z-item"><span class="z-lead"><i data-i="directions_run"></i></span><div class="z-grow"><div class="z-title">Morning run</div><div class="z-muted z-small">6.2 km, 34 min</div></div><i data-i="chevron_right" class="z-muted"></i></div>
+    </div>
+  </div>
+  <nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="home" data-fill></i></span>Home</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="bar_chart"></i></span>Stats</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav>
+</div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Icon resolution                                                     */
+/* ------------------------------------------------------------------ */
+const svgFor = (name: string, fill: boolean, cls = "", style = ""): string => {
+  const e = MATERIAL_ICONS[name] ?? MATERIAL_ICONS.circle;
+  const d = fill && e[1] ? e[1] : e[0];
+  return `<svg class="z-i${cls ? " " + cls : ""}" viewBox="0 -960 960 960" aria-hidden="true"${style ? ` style="${style}"` : ""}><path d="${d}"/></svg>`;
+};
+
+const attr = (tag: string, n: string) => new RegExp(`\\b${n}\\s*=\\s*"([^"]*)"`, "i").exec(tag)?.[1] ?? "";
+
+export function resolveIcons(html: string, fixes: string[]): string {
+  let n = 0;
+  const unknown = new Set<string>();
+  const sub = (name: string, tag: string) => {
+    n++;
+    if (!MATERIAL_ICONS[name]) unknown.add(name);
+    return svgFor(name, /data-fill|\bfill\b|FILL/.test(tag), attr(tag, "class").replace(/\b(material-symbols[\w-]*|material-icons[\w-]*|ms|icon|z-i)\b/g, "").trim(), attr(tag, "style"));
+  };
+  // <i data-i="home"></i>  (also self-closed)
+  html = html.replace(/<i\b([^>]*?)\bdata-i\s*=\s*"([a-z0-9_]+)"([^>]*?)(?:\/>|>\s*<\/i>)/gi, (_m, a, name, b) => sub(name, a + " " + b));
+  // <span class="material-symbols-rounded">home</span>, <i class="material-icons">home</i>, <span class="icon">home</span>
+  html = html.replace(/<(span|i)\b([^>]*class\s*=\s*"[^"]*\b(?:material-symbols[\w-]*|material-icons[\w-]*|ms|icon)\b[^"]*"[^>]*)>\s*([a-z][a-z0-9_]{1,40})\s*<\/\1>/gi, (_m, _t, tag, name) => sub(name, tag));
+  if (n) fixes.push(`${n} icon${n > 1 ? "s" : ""} resolved to Material Symbols`);
+  if (unknown.size) fixes.push(`unknown icon replaced: ${[...unknown].slice(0, 4).join(", ")}`);
+  return html;
+}
+
+/* ------------------------------------------------------------------ */
+/* Design-law enforcement                                              */
+/* ------------------------------------------------------------------ */
+const EMOJI = /(?![\u00A9\u00AE\u2122\u2190-\u21FF\u2713\u2714\u25B6\u25C0])[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200D\uFE0F]/gu;
+const COLOR_NAMES = /\b(blue|purple|violet|indigo|navy|royalblue|dodgerblue|slateblue|blueviolet|mediumpurple|rebeccapurple|magenta|fuchsia|darkblue|deepskyblue|cornflowerblue|steelblue|orchid)\b/i;
+
+function hueOf(c: string): { h: number; s: number; l: number } | null {
+  let r = 0, g = 0, b = 0;
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(c);
+  if (hex) {
+    let h = hex[1];
+    if (h.length < 6) h = h.slice(0, 3).split("").map((x) => x + x).join("");
+    r = parseInt(h.slice(0, 2), 16); g = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(c);
+    if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+    else {
+      const hs = /^hsla?\(\s*([\d.]+)(?:deg)?[,\s]+([\d.]+)%[,\s]+([\d.]+)%/i.exec(c);
+      return hs ? { h: +hs[1] % 360, s: +hs[2] / 100, l: +hs[3] / 100 } : null;
+    }
+  }
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+  if (!d) return { h: 0, s: 0, l };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: (h * 60 + 360) % 360, s, l };
+}
+
+const COLOR_TOKEN = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|var\([^)]*\)|\b[a-z]{3,20}\b/gi;
+function flattenGradient(g: string): string | null {
+  const inner = g.slice(g.indexOf("(") + 1, -1);
+  const colors = inner.match(COLOR_TOKEN)?.filter((t) => !/^(to|left|right|top|bottom|deg|circle|ellipse|at|center|closest|farthest|side|corner|from|in|transparent|currentcolor|linear|radial|conic|gradient|repeating|turn|rad|px)$/i.test(t)) ?? [];
+  if (!colors.length) return null;
+  const bad = colors.some((c) => {
+    if (COLOR_NAMES.test(c)) return true;
+    const k = hueOf(c);
+    return !!k && k.s > 0.12 && k.l > 0.08 && k.l < 0.97 && k.h >= 190 && k.h <= 325;
+  });
+  return bad ? colors[0] : null;
+}
+
+function mapText(html: string, fn: (s: string) => string): string {
+  return html.split(/(<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>)/i).map((p, i) => (i % 2 ? p : fn(p))).join("");
+}
+
+export interface HardenResult { html: string; fixes: string[] }
+
+export function harden(input: string, ds: DesignSystem, opts: { partial?: boolean } = {}): HardenResult {
+  const fixes: string[] = [];
+  let html = input.trim();
+  if (!html) return { html, fixes };
+
+  // --- structure ---
+  const hasHtml = /<html[\s>]/i.test(html);
+  if (!hasHtml) {
+    html = `<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body>${html.replace(/<!doctype[^>]*>/i, "")}</body></html>`;
+    fixes.push("wrapped fragment in a full document");
+  }
+  if (!/<head[\s>]/i.test(html)) html = html.replace(/<html[^>]*>/i, (h) => `${h}<head></head>`);
+  if (!/^<!doctype/i.test(html)) html = "<!doctype html>" + html;
+  if (!opts.partial) {
+    if (!/<\/body>/i.test(html) && /<body[\s>]/i.test(html)) { html += "</body>"; fixes.push("closed truncated body"); }
+    if (!/<\/html>/i.test(html)) html += "</html>";
+  }
+
+  // --- offline safety ---
+  const before = html;
+  html = html.replace(/<link\b[^>]*href\s*=\s*["']https?:[^>]*>/gi, "")
+    .replace(/<script\b[^>]*src\s*=\s*["']https?:[^>]*>\s*<\/script>/gi, "")
+    .replace(/@import\s+(?:url\()?["']?https?:[^;]+;?/gi, "")
+    .replace(/<img\b([^>]*?)src\s*=\s*["']https?:[^"']*["']([^>]*)>/gi, (_m, a, b) => `<div class="z-img ${attr(a + b, "class")}" role="img" style="${attr(a + b, "style")}"></div>`);
+  if (html !== before) fixes.push("removed external resources");
+
+  // --- design laws ---
+  const shadowRe = /\b(box-shadow|text-shadow)\s*:\s*([^;}"']*)/gi;
+  let shadows = 0;
+  html = html.replace(shadowRe, (_m, prop: string, val: string) => {
+    if (/^\s*(none|initial|unset)\s*(!important)?\s*$/i.test(val) || /var\(--shadow\)/.test(val)) return `${prop}:none`;
+    shadows++;
+    const ring = /^\s*(inset\s+)?0(?:px)?\s+0(?:px)?\s+0(?:px)?\s+(\d+)px\s+(#[0-9a-f]{3,8}|[a-z]+|var\([^)]+\))\s*$/i.exec(val);
+    if (prop.toLowerCase() === "box-shadow" && ring) return `outline:${ring[2]}px solid ${ring[3]};outline-offset:${ring[1] ? "-" : ""}${ring[2]}px`;
+    return `${prop}:none`;
+  });
+  html = html.replace(/drop-shadow\((?:[^()]|\([^()]*\))*\)/gi, () => { shadows++; return ""; });
+  if (shadows) fixes.push(`removed ${shadows} shadow${shadows > 1 ? "s" : ""}`);
+
+  let grads = 0;
+  html = html.replace(/(?:repeating-)?(?:linear|radial|conic)-gradient\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/gi, (g) => {
+    const flat = flattenGradient(g);
+    if (!flat) return g;
+    grads++;
+    return flat;
+  });
+  if (grads) fixes.push(`flattened ${grads} blue/purple gradient${grads > 1 ? "s" : ""}`);
+
+  let emojis = 0;
+  html = mapText(html, (s) => s.replace(EMOJI, () => { emojis++; return ""; }));
+  if (emojis) fixes.push(`removed ${emojis} emoji`);
+
+  let live = 0;
+  html = html.replace(/<(span|div|small|b|i|em|strong|p|a|button|label)\b[^>]*>\s*(?:[\u25CF\u2022]\s*)?LIVE\s*<\/\1>/g, () => { live++; return ""; });
+  if (live) fixes.push(`removed ${live} LIVE badge${live > 1 ? "s" : ""}`);
+
+  // --- icons ---
+  html = resolveIcons(html, fixes);
+
+  // --- kit injection (first in <head>, so the model's own CSS always wins) ---
+  if (!html.includes("data-zeus-kit")) {
+    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${tokensCss(ds)}${kitCss()}</style>`);
+    if (!opts.partial) html = html.replace(/<\/body>/i, `<script data-zeus-kit-js>${KIT_JS}</script></body>`);
+  }
+  // metas go first so the charset declaration stays within the first 1024 bytes
+  if (!/<meta[^>]+viewport/i.test(html)) html = html.replace(/<head[^>]*>/i, (h) => `${h}<meta name="viewport" content="width=device-width,initial-scale=1">`);
+  if (!/<meta[^>]+charset/i.test(html)) html = html.replace(/<head[^>]*>/i, (h) => `${h}<meta charset="utf-8">`);
+  return { html, fixes };
+}
+
+/* ------------------------------------------------------------------ */
+/* Prompt                                                              */
+/* ------------------------------------------------------------------ */
+const ICON_HINT = "home search settings person notifications favorite star bookmark share mail chat call calendar_today schedule location_on shopping_cart shopping_bag payments credit_card wallet bar_chart trending_up trending_down pie_chart insights dashboard list grid_view menu more_vert more_horiz arrow_back arrow_forward chevron_right chevron_left expand_more close check check_circle add remove edit delete download upload cloud lock visibility filter_list sort tune play_arrow pause skip_next skip_previous music_note mic photo_camera image videocam map explore fitness_center restaurant flight work school bolt public group groups person_add thumb_up comment send attach_file link content_copy folder description article receipt_long inventory_2 local_shipping storefront sell savings account_balance support_agent help info warning error verified shield key light_mode dark_mode wifi battery_full flag rocket_launch terminal apps task_alt checklist event timer history refresh logout login open_in_new palette layers smartphone laptop directions_run";
+
+export function harnessPrompt(ds: DesignSystem): string {
+  return [
+    `You are Zeus, a senior product designer and front-end engineer inside the ZeusDesigns desktop app. The user has a chat on the left and an infinite canvas of live HTML screens on the right. You design by emitting complete screens as artboards. A screen is judged on one thing: would a design lead ship it.`,
+
+    `## Output protocol
+Reply with at most 3 short sentences or bullets of markdown (design intent, no code, no emoji, no taglines), then the artboards:
+<artboard name="Short screen name" device="mobile|tablet|web" mode="new">
+<!doctype html>...one complete HTML document...
+</artboard>
+- Revise an existing screen with mode="revise" id="<existing id>" and output the FULL updated document. Change only what was asked; keep everything else byte-identical in spirit.
+- mobile = 390x844, tablet = 820x1100, web = 1280x800. Pick the device that matches the request; default to mobile for apps and web for sites and dashboards.
+- Unspecified direction on a fresh request: 3 artboards with genuinely different layout structure, not recolors. A revise or a variant of one selected screen: exactly 1 artboard.
+- Every document must be complete and closed (</html>). Keep each screen under about 220 lines of HTML. A truncated screen is a failed screen, so cut sections before you cut the ending.
+- Self-contained only: no CDNs, web fonts, external images or libraries. Vanilla JS is optional and only for real interactions.
+- After the last </artboard> write nothing.`,
+
+    `## Design laws (the harness strips violations automatically, so never spend effort on them)
+- No box-shadow, text-shadow or drop-shadow. Depth comes from tonal surfaces, 1px borders and spacing.
+- No emojis anywhere. Icons are Material Symbols only (see Icons).
+- No LIVE badges or pulsing status dots. No fake "demo", "sample" or "placeholder" labels.
+- No blue or purple gradients. Prefer flat color; a gradient is allowed only in warm or neutral hues and only when it earns its place.
+- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout instead.
+- Prefer the choice that improves user experience, developer experience and agent experience together without breaking anything.`,
+
+    `## Active design system: ${ds.name} (${ds.vendor})
+${ds.guidelines}
+Tokens are already defined for you as CSS variables on :root (do not redefine them, and never hard-code a hex value that a token covers):
+${tokensCss(ds)}`,
+
+    `## Component kit (already loaded in every document, themed by the tokens above)
+Compose screens from these classes first; write extra CSS only for what the kit cannot express, and always with the tokens.
+- Layout: z-screen, z-page, z-wide, z-row, z-col, z-between, z-wrap, z-center, z-grow, z-gap-4/8/16/24/32, z-grid (auto-fit), z-grid-2/3/4, z-section
+- Type: z-display, z-h1, z-h2, z-h3, z-title, z-body, z-small, z-muted, z-primary, z-truncate
+- Actions: z-btn (+ tonal, outline, text, sm, lg, block), z-icon-btn (+ tonal, filled), z-fab, z-chip (+ on), z-chips
+- Surfaces: z-card (+ tonal, accent, flat, bleed), z-hero, z-divider, z-badge, z-avatar (initials inside), z-img (image block)
+- Data: z-list > z-item (z-lead, z-grow), z-table, z-stat (.v), z-bar > i, z-tabs > z-tab, z-switch (input type=checkbox)
+- Forms: z-input (icon + input), z-field
+- Navigation: z-appbar, z-nav > z-nav-item > z-nav-pill (mobile), z-shell > z-side > z-side-item + z-main, z-top (web)
+Tabs, chips, nav items and side items switch their "on" state on click automatically.
+
+## Icons
+Write <i data-i="name"></i> (add data-fill for the filled form, add class sm, lg or xl to resize). The harness swaps it for the official Material Symbols Rounded glyph. Never draw icons by hand, never use emoji, never use letters as icons. Safe names: ${ICON_HINT}.`,
+
+    `## Craft rules
+1. Decide silently before writing: who uses this, the ONE primary action, the 3 to 5 sections, the real content. Then build.
+2. Hierarchy comes from size, weight and space, not from more colors. One primary button per view. Type scale: 12, 13, 15, 17, 21, 30, 44+. Mobile body text at least 14px, touch targets at least 44px.
+3. Spacing on a 4px grid: 4, 8, 12, 16, 24, 32, 48. Group related items tight and separate groups generously. Consistent page margins (20px mobile, 32 to 36px web).
+4. Use only token colors: var(--primary) for the key action, var(--container) for selected or featured surfaces, var(--surface) and var(--surface-2) for tonal layers, var(--muted) for secondary text, var(--outline) for borders. Radii only from var(--r-*).
+5. Real, specific content: believable names, amounts, dates, places, product names with units and numbers. No lorem ipsum, no "Item 1", no "Acme", no "John Doe". 4 to 7 list rows, never a single row.
+6. No card inside a card. No centered paragraphs. Left-align text; center only short hero lines.
+7. Imagery is built from flat token-colored shapes and inline SVG (charts, avatars with initials, illustrations made of simple geometry). Charts use inline SVG with token colors and labeled axes.
+8. Every screen has its states: a selected tab or nav item, a focused or filled input where relevant, and one empty or progress moment if the flow calls for it.
+9. Landing pages: a bold hero with one headline and one action, a proof row, 3 feature blocks that each show a real UI fragment, a closing action. Dashboards: a left side nav, a top row of 3 to 4 stats, one primary chart or table, dense but aligned. Mobile apps: appbar, one hero or summary, a list or grid, bottom nav with 3 to 5 destinations.
+10. Reach the polish bar: aligned edges, equal gutters, no orphan elements, no overflow, no text smaller than 12px, no low-contrast text.
+
+## Skeleton (shape to follow for the requested device; replace all content)
+Mobile:
+${kitExample("mobile")}
+Web:
+${kitExample("web")}`,
+  ].join("\n\n");
+}

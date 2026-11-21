@@ -34,6 +34,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: icon-${{ hashFiles('public/app-icon.png') }}
 
       - name: Stamp release version
         run: node scripts/stamp-version.mjs 0.1.${{ github.run_number }}

@@ -11,6 +11,20 @@ const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return
 const extra = "scripts/extra-icons"; // icons absent from the npm package, cached from fonts.gstatic.com
 const available = new Set([...readdirSync(root), ...readdirSync(extra)].filter((f) => f.endsWith(".svg") && !f.endsWith("-fill.svg")).map((f) => f.slice(0, -4)));
 
+// Fetch (and cache) names the npm package lacks; the Google CDN always has them.
+const wanted = new Set();
+for (const f of walk("src").filter((f) => /\.(tsx?|css)$/.test(f) && !/materialIcons|iconPaths/.test(f)))
+  for (const m of readFileSync(f, "utf8").matchAll(/\/\*\s*icons:\s*([a-z0-9_,\s]+)\*\//g)) m[1].split(/[,\s]+/).filter(Boolean).forEach((n) => wanted.add(n));
+for (const n of wanted) {
+  if (available.has(n)) continue;
+  for (const [suffix, variant] of [["", "default"], ["-fill", "fill1"]]) {
+    try {
+      const r = await fetch(`https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsrounded/${n}/${variant}/24px.svg`);
+      if (r.ok) writeFileSync(`${extra}/${n}${suffix}.svg`, await r.text());
+    } catch { /* offline: handled by the missing-icon report */ }
+  }
+  if (existsSync(`${extra}/${n}.svg`)) available.add(n);
+}
 const names = new Set();
 const screenNames = new Set();
 for (const f of walk("src").filter((f) => /\.(tsx?|css)$/.test(f) && !/materialIcons|iconPaths/.test(f))) {

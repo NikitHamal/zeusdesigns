@@ -1,12 +1,13 @@
 import { activeConv, uid, useStore } from "../store";
 import type { Artboard, Attachment, Device, Message, Quote, ToolCall } from "../types";
 import { DEVICE_SIZE } from "../types";
-import { getDS, tokensCss } from "./designSystems";
+import { getDS } from "./designSystems";
 import { SKILLS } from "./skills";
 import { detectArchetype, renderScreen, VARIANT_NAMES } from "./templates";
 import { generateTitle, isNative, nativeChat, ChatEvent, ChatRequest } from "./bridge";
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
+import { harden, harnessPrompt } from "./harness";
 
 /* ------------------------------------------------------------------ */
 /* System prompt                                                       */
@@ -19,24 +20,7 @@ export function buildSystemPrompt(): string {
   const mem = s.settings.memory;
   const ws = s.ui.workspace;
   return [
-    `You are Zeus, an expert AI product designer and front-end engineer inside the ZeusDesigns desktop app. The user sees a chat on the left and an infinite multi-artboard canvas on the right. You design by emitting working, interactive screens onto the canvas.`,
-    `## Output protocol
-Explain briefly in markdown (2–5 short sentences / bullets — never dump code in the chat), and put every screen in its own block:
-<artboard name="Short screen name" device="mobile|tablet|web" mode="new">
-<!doctype html> …one complete self-contained HTML document with <style> and optional vanilla <script>… 
-</artboard>
-- To change an existing screen in place use mode="revise" and id="<existing id>" and output the FULL updated document.
-- Screens must be self-contained (no external assets/CDNs), pixel-polished, with realistic content, hover/press states and light interactivity (tabs, toggles, chips).
-- mobile = 390×844 viewport, tablet = 820×1100, web = 1280×800. Respect the viewport; make the body scroll naturally.
-- When the user does not specify a single direction, produce 3 meaningfully different variants.`,
-    `## Design laws (always)
-- No box shadows: depth comes from tonal surfaces, borders and spacing.
-- No emojis anywhere. Use inline SVG icons in the Material Symbols style.
-- No LIVE badges, no placeholder or sample-data labels.
-- No blue or purple gradients; prefer flat color.
-- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
-- Choose what lifts user experience, developer experience and agent experience together without breaking anything.`,
-    `## Active design system: ${ds.name} (${ds.vendor})\n${ds.guidelines}\nPreferred token stylesheet — start your <style> with this and use these CSS variables:\n${tokensCss(ds)}`,
+    harnessPrompt(ds),
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
     mem.length ? `## Persistent memory about the user & project\n${mem.map((m) => `- ${m.text}`).join("\n")}` : "",
     boards.length ? `## Current canvas page\n${boards.map((a) => `- id=${a.id} name="${a.name}" device=${a.device} v${a.version}`).join("\n")}` : "## Current canvas page\n(empty)",
@@ -249,6 +233,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const created: string[] = [];
   const lastPush = new Map<number, { t: number; len: number }>();
   const tools: ToolCall[] = [];
+  const linted = new Set<number>();
 
   const sync = (final = false) => {
     const { text, blocks } = parseStream(full);
@@ -277,12 +262,18 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       const lp = lastPush.get(i)!;
       const now = performance.now();
       const isRevise = b.attrs.mode === "revise" && !created.includes(id);
+      const dsNow = getDS(S.settings.designSystemId);
       if (b.closed || final) {
-        if (isRevise) S.reviseArtboard(id, b.html); else S.updateArtboard(id, { html: b.html });
+        const out = harden(b.html, dsNow);
+        if (isRevise) S.reviseArtboard(id, out.html); else S.updateArtboard(id, { html: out.html });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
+        if (out.fixes.length && !linted.has(i)) {
+          linted.add(i);
+          tools.push({ id: uid(), name: "design_lint", args: b.attrs.name || "screen", status: "ok", output: out.fixes.join("\n") });
+        }
       } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
-        S.updateArtboard(id, { html: b.html });
+        S.updateArtboard(id, { html: harden(b.html, dsNow, { partial: true }).html });
         lastPush.set(i, { t: now, len: b.html.length });
       }
     });

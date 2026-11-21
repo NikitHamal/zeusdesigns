@@ -33,7 +33,7 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "nsis": { "installMode": "currentUser", "displayLanguageSelector": false }
+      "nsis": { "installerIcon": "icons/icon.ico", "installMode": "currentUser", "displayLanguageSelector": false }
     }
   }
 }
