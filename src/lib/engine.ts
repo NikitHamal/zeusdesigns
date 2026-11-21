@@ -19,7 +19,7 @@ export function buildSystemPrompt(): string {
   const mem = s.settings.memory;
   const ws = s.ui.workspace;
   return [
-    `You are Zeus, an expert AI product designer and front-end engineer inside the ZeusDesigns desktop app. The user sees a chat on the left and an infinite multi-artboard canvas on the right. You design by emitting LIVE, interactive screens onto the canvas.`,
+    `You are Zeus, an expert AI product designer and front-end engineer inside the ZeusDesigns desktop app. The user sees a chat on the left and an infinite multi-artboard canvas on the right. You design by emitting working, interactive screens onto the canvas.`,
     `## Output protocol
 Explain briefly in markdown (2–5 short sentences / bullets — never dump code in the chat), and put every screen in its own block:
 <artboard name="Short screen name" device="mobile|tablet|web" mode="new">
@@ -29,6 +29,13 @@ Explain briefly in markdown (2–5 short sentences / bullets — never dump code
 - Screens must be self-contained (no external assets/CDNs), pixel-polished, with realistic content, hover/press states and light interactivity (tabs, toggles, chips).
 - mobile = 390×844 viewport, tablet = 820×1100, web = 1280×800. Respect the viewport; make the body scroll naturally.
 - When the user does not specify a single direction, produce 3 meaningfully different variants.`,
+    `## Design laws (always)
+- No box shadows: depth comes from tonal surfaces, borders and spacing.
+- No emojis anywhere. Use inline SVG icons in the Material Symbols style.
+- No LIVE badges, no placeholder or sample-data labels.
+- No blue or purple gradients; prefer flat color.
+- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
+- Choose what lifts user experience, developer experience and agent experience together without breaking anything.`,
     `## Active design system: ${ds.name} (${ds.vendor})\n${ds.guidelines}\nPreferred token stylesheet — start your <style> with this and use these CSS variables:\n${tokensCss(ds)}`,
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
     mem.length ? `## Persistent memory about the user & project\n${mem.map((m) => `- ${m.text}`).join("\n")}` : "",
@@ -90,7 +97,7 @@ function demoRevise(html: string, instruction: string): { html: string; note: st
     purple: ["#7b1fa2", "#f3d9ff", "#2d0040"], pink: ["#d81b60", "#ffd8e6", "#3e001d"], black: ["#111111", "#e6e6e6", "#111111"],
   };
   for (const c of Object.keys(colors)) if (new RegExp(`\\b${c}\\b`).test(t)) { css.push(`:root{--primary:${colors[c][0]};--container:${colors[c][1]};--on-container:${colors[c][2]};--tertiary:${colors[c][0]}}`); notes.push(`recolored with ${c}`); break; }
-  if (!css.length) { css.push(".card,.item{box-shadow:0 8px 24px rgba(0,0,0,.08)}.btn{letter-spacing:.01em}"); notes.push("polished depth and spacing"); }
+  if (!css.length) { css.push(".btn{letter-spacing:.01em}"); notes.push("polished depth and spacing"); }
   const tag = `<style data-zeus-rev>${css.join("")}</style>`;
   return { html: html.includes("</head>") ? html.replace("</head>", tag + "</head>") : tag + html, note: notes.join(", ") };
 }
@@ -325,7 +332,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     } else if (custom) {
       await streamCustom(req, onDelta, signal);
     } else {
-      if (prov && prov.id !== "demo") onDelta(`> ℹ️ Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
+      if (prov && prov.id !== "demo") onDelta(`> Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
     }
     if (raf) cancelAnimationFrame(raf);

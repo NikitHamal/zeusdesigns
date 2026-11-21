@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, History, Monitor, MoreHorizontal, MousePointerClick, Pencil, Smartphone, Tablet, Trash2, GitCompare } from "lucide-react";
 import { useStore } from "../store";
 import type { Artboard, CanvasEl, Device } from "../types";
 import { DEVICE_SIZE } from "../types";
@@ -10,10 +9,11 @@ import { Dropdown, IconBtn, MenuItem, MenuLabel } from "./ui";
 import { ExportMenu } from "./ExportMenu";
 import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
+import { Icon } from "./Icon";
 
 const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
-const DevIcon = { mobile: Smartphone, tablet: Tablet, web: Monitor } as const;
+const DEV_ICON = { mobile: "smartphone", tablet: "tablet", web: "desktop_windows" } as const;
 
 /* ------------------------------------------------------------------ */
 /* Artboard                                                            */
@@ -34,7 +34,6 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
   const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
   const [renaming, setRenaming] = useState(false);
   const s = clamp(0.8 / z, 1, 4);
-  const Icon = DevIcon[a.device];
   const radius = a.device === "mobile" ? 38 : a.device === "tablet" ? 26 : 12;
   const selectable = tool === "select";
   const setDevice = (d: Device) => updateArtboard(a.id, { device: d, w: DEVICE_SIZE[d].w, h: DEVICE_SIZE[d].h });
@@ -47,7 +46,7 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
         onPointerDown={(e) => { if (!selectable) return; e.stopPropagation(); if ((e.target as HTMLElement).closest("button,input")) return; onMoveStart(e, a.id); }}
         onDoubleClick={() => setRenaming(true)}
       >
-        <Icon size={14} className={selected ? "text-primary" : "text-on-surface-variant"} />
+        <Icon name={DEV_ICON[a.device]} size={14} className={selected ? "text-primary" : "text-on-surface-variant"} />
         {renaming ? (
           <input
             autoFocus defaultValue={a.name} onBlur={(e) => { updateArtboard(a.id, { name: e.target.value || a.name }); setRenaming(false); }}
@@ -64,25 +63,25 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
             {(close) => (
               <>
                 <MenuLabel>Version history</MenuLabel>
-                <MenuItem icon={<History size={15} />} label={`v${a.version} · current`} active />
+                <MenuItem icon={<Icon name="history" size={15} />} label={`v${a.version} · current`} active />
                 {a.history.map((_, i) => ({ i, v: i + 1 })).reverse().map(({ i, v }) => (
-                  <MenuItem key={i} icon={<History size={15} />} label={`Restore v${v}`} onClick={() => { restoreVersion(a.id, i); close(); }} />
+                  <MenuItem key={i} icon={<Icon name="history" size={15} />} label={`Restore v${v}`} onClick={() => { restoreVersion(a.id, i); close(); }} />
                 ))}
               </>
             )}
           </Dropdown>
         )}
-        {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container">⇄ {a.source}</span>}
+        {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container"><Icon name="sync_alt" size={12} className="mr-1" />{a.source}</span>}
         <span className="flex-1" />
         <div className={cn("flex items-center gap-0.5 rounded-full bg-surface-container/90 p-0.5 opacity-0 transition-opacity group-hover:opacity-100", selected && "opacity-100")}>
-          <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => patchUI({ interactId: interacting ? null : a.id })}><MousePointerClick size={14} /></IconBtn>
-          <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Copy size={14} /></IconBtn>
+          <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => patchUI({ interactId: interacting ? null : a.id })}><Icon name="touch_app" size={14} /></IconBtn>
+          <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Icon name="content_copy" size={14} /></IconBtn>
           <ExportMenu a={a} size={28} />
-          <Dropdown width={220} align="right" trigger={({ toggle }) => <IconBtn label="More" size={28} onClick={toggle}><MoreHorizontal size={14} /></IconBtn>}>
+          <Dropdown width={220} align="right" trigger={({ toggle }) => <IconBtn label="More" size={28} onClick={toggle}><Icon name="more_horiz" size={14} /></IconBtn>}>
             {(close) => (
               <>
-                <MenuItem icon={<Pencil size={15} />} label="Rename" onClick={() => { setRenaming(true); close(); }} />
-                <MenuItem icon={<GitCompare size={15} />} label="Compare with…" onClick={() => {
+                <MenuItem icon={<Icon name="edit" size={15} />} label="Rename" onClick={() => { setRenaming(true); close(); }} />
+                <MenuItem icon={<Icon name="compare" size={15} />} label="Compare with…" onClick={() => {
                   const others = useStore.getState().artboards.filter((x) => x.id !== a.id && x.pageId === a.pageId);
                   const other = others.find((x) => x.groupId === a.groupId) ?? others[others.length - 1];
                   if (!other) { useStore.getState().notify("Duplicate or generate another screen to compare"); } else patchUI({ compare: [a.id, other.id] });
@@ -92,7 +91,7 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
                 {(["mobile", "tablet", "web"] as Device[]).map((d) => (
                   <MenuItem key={d} label={DEVICE_SIZE[d].label} desc={`${DEVICE_SIZE[d].w}×${DEVICE_SIZE[d].h}`} active={a.device === d} onClick={() => { setDevice(d); close(); }} />
                 ))}
-                <MenuItem icon={<Trash2 size={15} />} danger label="Delete" onClick={() => { removeArtboards([a.id]); close(); }} />
+                <MenuItem icon={<Icon name="delete" size={15} />} danger label="Delete" onClick={() => { removeArtboards([a.id]); close(); }} />
               </>
             )}
           </Dropdown>
@@ -101,7 +100,7 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
 
       {/* body */}
       <div
-        className={cn("relative overflow-hidden bg-white shadow-xl shadow-black/20 transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
+        className={cn("relative overflow-hidden bg-white   transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
         <Frame html={a.html} interactive={interacting} />
@@ -115,7 +114,7 @@ function ArtboardView({ a, z, selected, interacting, tool, onMoveStart, onResize
         {a.loading && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
             <div className="shimmer absolute inset-0" />
-            <div className="relative flex items-center gap-2 rounded-full bg-inverse-surface px-4 py-2 text-sm font-medium text-inverse-on-surface shadow-lg">
+            <div className="relative flex items-center gap-2 rounded-full bg-inverse-surface px-4 py-2 text-sm font-medium text-inverse-on-surface ">
               <span className="inline-block size-2.5 animate-ping rounded-full bg-primary" /> Zeus is designing…
             </div>
           </div>
@@ -180,7 +179,7 @@ function ElementView({ el, z, selected, editing, setEditing, tool, onMoveStart, 
       onDoubleClick={() => (el.kind === "note" || el.kind === "text") && setEditing(el.id)}
     >
       {el.kind === "note" && (
-        <div className="flex h-full w-full flex-col rounded-[6px] rounded-br-[34px] p-3 shadow-lg shadow-black/15" style={{ background: el.color, color: "#33290a" }}>
+        <div className="flex h-full w-full flex-col rounded-[6px] rounded-br-[34px] p-3  " style={{ background: el.color, color: "#33290a" }}>
           <textarea
             value={el.text ?? ""} readOnly={!editing} autoFocus={editing} placeholder="Sticky note…"
             onChange={(e) => updateElement(el.id, { text: e.target.value })} onBlur={() => setEditing(null)}
@@ -498,12 +497,12 @@ function InkPalette() {
   const note = chosen.every((e) => e.kind === "note");
   const cols = note ? NOTE_COLORS : INK_COLORS;
   return (
-    <div onPointerDown={(e) => e.stopPropagation()} className="anim-pop absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface-container px-3 py-2 shadow-xl shadow-black/15">
+    <div onPointerDown={(e) => e.stopPropagation()} className="anim-pop absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface-container px-3 py-2  ">
       {cols.map((c) => (
         <button key={c} onClick={() => chosen.forEach((e) => useStore.getState().updateElement(e.id, { color: c }))} className="size-6 rounded-full border-2 border-white/70 transition-transform ease-spring hover:scale-125" style={{ background: c }} />
       ))}
       <span className="mx-1 h-5 w-px bg-outline-variant" />
-      <IconBtn label="Delete" size={28} onClick={() => useStore.getState().removeElements(chosen.map((e) => e.id))}><Trash2 size={15} /></IconBtn>
+      <IconBtn label="Delete" size={28} onClick={() => useStore.getState().removeElements(chosen.map((e) => e.id))}><Icon name="delete" size={15} /></IconBtn>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Columns2, Layers } from "lucide-react";
 import { useStore } from "../store";
 import type { Artboard } from "../types";
 import { DEVICE_SIZE } from "../types";
 import { cn } from "../utils/cn";
 import { Dialog, IconBtn, Segmented, Thumb } from "./ui";
 import { ExportMenu } from "./ExportMenu";
+import { Icon } from "./Icon";
 
 function usePageBoards() {
   const pageId = useStore((s) => s.activePageId);
@@ -58,11 +58,11 @@ export function SingleView() {
   return (
     <div className="flex h-full flex-col items-center pt-20">
       <div className="flex flex-1 items-center gap-4 overflow-auto px-6">
-        <IconBtn label="Previous" tonal onClick={() => go(-1)} size={48}><ChevronLeft /></IconBtn>
-        <div key={a.id} className="anim-pop overflow-hidden bg-white shadow-2xl shadow-black/25 ring-1 ring-black/10" style={{ width: a.w * sc, height: a.h * sc, borderRadius: a.device === "mobile" ? 38 * sc : 14 }}>
+        <IconBtn label="Previous" tonal onClick={() => go(-1)} size={48}><Icon name="chevron_left"  /></IconBtn>
+        <div key={a.id} className="anim-pop overflow-hidden bg-white   ring-1 ring-black/10" style={{ width: a.w * sc, height: a.h * sc, borderRadius: a.device === "mobile" ? 38 * sc : 14 }}>
           <iframe title={a.name} srcDoc={a.html} sandbox="allow-scripts allow-forms allow-popups" style={{ width: a.w, height: a.h, border: 0, transform: `scale(${sc})`, transformOrigin: "0 0" }} />
         </div>
-        <IconBtn label="Next" tonal onClick={() => go(1)} size={48}><ChevronRight /></IconBtn>
+        <IconBtn label="Next" tonal onClick={() => go(1)} size={48}><Icon name="chevron_right"  /></IconBtn>
       </div>
       <div className="flex w-full items-center justify-center gap-2 overflow-auto px-6 pb-24 pt-3">
         {boards.map((b) => (
@@ -76,7 +76,7 @@ export function SingleView() {
 /* ---------------- Compare ---------------- */
 function Pane({ a, scale, bare }: { a: Artboard; scale: number; bare?: boolean }) {
   return (
-    <div className={cn("overflow-hidden bg-white", !bare && "shadow-xl ring-1 ring-black/10")} style={{ width: a.w * scale, height: a.h * scale, borderRadius: bare ? 0 : a.device === "mobile" ? 30 : 10 }}>
+    <div className={cn("overflow-hidden bg-white", !bare && " ring-1 ring-black/10")} style={{ width: a.w * scale, height: a.h * scale, borderRadius: bare ? 0 : a.device === "mobile" ? 30 : 10 }}>
       <iframe title={a.name} srcDoc={a.html} sandbox="allow-scripts allow-forms" style={{ width: a.w, height: a.h, border: 0, transform: `scale(${scale})`, transformOrigin: "0 0" }} />
     </div>
   );
@@ -107,7 +107,7 @@ export function CompareDialog() {
         <span className="text-on-surface-variant">vs</span>
         <Select value={b.id} onChange={(v) => patchUI({ compare: [a.id, v] })} />
         <span className="flex-1" />
-        <Segmented value={mode} onChange={setMode} options={[{ id: "side", label: "Side by side", icon: <Columns2 size={14} /> }, { id: "overlay", label: "Slider", icon: <Layers size={14} /> }]} />
+        <Segmented value={mode} onChange={setMode} options={[{ id: "side", label: "Side by side", icon: <Icon name="view_column_2" size={14} /> }, { id: "overlay", label: "Slider", icon: <Icon name="layers" size={14} /> }]} />
       </div>
       <div className="flex flex-1 items-center justify-center gap-10 overflow-auto bg-surface-dim px-6 py-6">
         {mode === "side" ? (
@@ -117,13 +117,13 @@ export function CompareDialog() {
           </>
         ) : (
           <div className="text-center">
-            <div className="relative overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/10" style={{ width: a.w * sc(a), height: a.h * sc(a) }}>
+            <div className="relative overflow-hidden rounded-2xl  ring-1 ring-black/10" style={{ width: a.w * sc(a), height: a.h * sc(a) }}>
               <Pane a={a} scale={sc(a)} bare />
               <div className="absolute inset-0" style={{ clipPath: `inset(0 0 0 ${pos}%)` }}><Pane a={b} scale={sc(a)} bare /></div>
-              <div className="pointer-events-none absolute inset-y-0 w-1 -translate-x-1/2 bg-primary" style={{ left: `${pos}%` }}><span className="absolute left-1/2 top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-lg" /></div>
+              <div className="pointer-events-none absolute inset-y-0 w-1 -translate-x-1/2 bg-primary" style={{ left: `${pos}%` }}><span className="absolute left-1/2 top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary " /></div>
             </div>
             <input type="range" min={0} max={100} value={pos} onChange={(e) => setPos(+e.target.value)} className="mt-4 w-72 accent-[var(--m-primary)]" />
-            <div className="text-xs text-on-surface-variant">{a.name} ◂ ▸ {b.name}</div>
+            <div className="text-xs text-on-surface-variant">{a.name} / {b.name}</div>
           </div>
         )}
       </div>

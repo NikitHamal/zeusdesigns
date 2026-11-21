@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, memo, ReactNode, useEffect, useRef, useState } from "react";
-import { Check, X } from "lucide-react";
 import { cn } from "../utils/cn";
+import { Icon } from "./Icon";
 
 /* ---------- IconBtn ---------- */
 export function IconBtn({ children, label, onClick, active, className, size = 40, disabled, tonal }: {
@@ -44,7 +44,7 @@ export function Dropdown({ trigger, children, up, align = "left", className, wid
         <div
           style={{ width }}
           className={cn(
-            "anim-pop absolute z-50 rounded-[22px] bg-surface-container border border-outline-variant/60 p-1.5 shadow-2xl shadow-black/20 max-h-[70vh] overflow-auto",
+            "anim-pop absolute z-50 rounded-[22px] bg-surface-container border border-outline-variant/60 p-1.5   max-h-[70vh] overflow-auto",
             up ? "bottom-full mb-2" : "top-full mt-2",
             align === "left" && "left-0", align === "right" && "right-0", align === "center" && "left-1/2 -translate-x-1/2",
           )}
@@ -73,7 +73,7 @@ export function MenuItem({ icon, label, desc, onClick, active, danger, right }: 
         {desc && <span className="block text-xs text-on-surface-variant truncate">{desc}</span>}
       </span>
       {right}
-      {active && <Check size={16} className="shrink-0" />}
+      {active && <Icon name="check" size={16} className="shrink-0" />}
     </button>
   );
 }
@@ -93,11 +93,11 @@ export function Dialog({ open, onClose, children, className, title }: { open: bo
   if (!open) return null;
   return (
     <div className="anim-fade fixed inset-0 z-[100] grid place-items-center bg-black/45 backdrop-blur-[3px] p-6" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={cn("anim-pop relative flex flex-col rounded-[32px] bg-surface text-on-surface shadow-2xl max-h-full overflow-hidden", className)}>
+      <div className={cn("anim-pop relative flex flex-col rounded-[32px] bg-surface text-on-surface  max-h-full overflow-hidden", className)}>
         {title && (
           <div className="flex items-center justify-between px-6 pt-5 pb-2">
             <h2 className="font-display text-xl font-semibold">{title}</h2>
-            <IconBtn label="Close" onClick={onClose}><X size={20} /></IconBtn>
+            <IconBtn label="Close" onClick={onClose}><Icon name="close" size={20} /></IconBtn>
           </div>
         )}
         {children}
@@ -115,7 +115,7 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
           key={o.id} title={o.title ?? o.label} onClick={() => onChange(o.id)}
           className={cn(
             "state flex items-center gap-1.5 h-8 px-3 rounded-full text-[13px] font-medium text-on-surface-variant transition-all",
-            value === o.id && "bg-primary text-on-primary shadow-sm",
+            value === o.id && "bg-primary text-on-primary ",
           )}
         >
           {o.icon}{o.label}

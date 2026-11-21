@@ -1,29 +1,27 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowRight, Circle, Frame, Hand, Loader2, MessageCirclePlus, MousePointer2, Pencil, Send, Shapes, Sparkles, Square, StickyNote, Star, Triangle, Type, Minus, X,
-} from "lucide-react";
 import { useStore } from "../store";
 import type { ShapeKind, Tool } from "../types";
 import { sendMessage } from "../lib/engine";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn } from "./ui";
+import { Icon } from "./Icon";
 
 const SHAPES: { id: ShapeKind; icon: React.ReactNode; label: string }[] = [
-  { id: "rect", icon: <Square size={18} />, label: "Rectangle" },
-  { id: "ellipse", icon: <Circle size={18} />, label: "Ellipse" },
-  { id: "triangle", icon: <Triangle size={18} />, label: "Triangle" },
-  { id: "star", icon: <Star size={18} />, label: "Star" },
-  { id: "line", icon: <Minus size={18} />, label: "Line" },
-  { id: "arrow", icon: <ArrowRight size={18} />, label: "Arrow" },
+  { id: "rect", icon: <Icon name="stop" size={18} />, label: "Rectangle" },
+  { id: "ellipse", icon: <Icon name="circle" size={18} />, label: "Ellipse" },
+  { id: "triangle", icon: <Icon name="change_history" size={18} />, label: "Triangle" },
+  { id: "star", icon: <Icon name="star" size={18} />, label: "Star" },
+  { id: "line", icon: <Icon name="remove" size={18} />, label: "Line" },
+  { id: "arrow", icon: <Icon name="arrow_forward" size={18} />, label: "Arrow" },
 ];
 
 const TOOLS: { id: Tool; icon: React.ReactNode; label: string; key: string }[] = [
-  { id: "select", icon: <MousePointer2 size={19} />, label: "Select", key: "V" },
-  { id: "hand", icon: <Hand size={19} />, label: "Pan (hold Space)", key: "H" },
-  { id: "frame", icon: <Frame size={19} />, label: "Frame — draw a blank screen", key: "F" },
-  { id: "text", icon: <Type size={19} />, label: "Text", key: "T" },
-  { id: "note", icon: <StickyNote size={19} />, label: "Sticky note", key: "N" },
-  { id: "pen", icon: <Pencil size={19} />, label: "Freehand pen", key: "P" },
+  { id: "select", icon: <Icon name="arrow_selector_tool" size={19} />, label: "Select", key: "V" },
+  { id: "hand", icon: <Icon name="pan_tool" size={19} />, label: "Pan (hold Space)", key: "H" },
+  { id: "frame", icon: <Icon name="tag" size={19} />, label: "Frame — draw a blank screen", key: "F" },
+  { id: "text", icon: <Icon name="text_fields" size={19} />, label: "Text", key: "T" },
+  { id: "note", icon: <Icon name="sticky_note_2" size={19} />, label: "Sticky note", key: "N" },
+  { id: "pen", icon: <Icon name="edit" size={19} />, label: "Freehand pen", key: "P" },
 ];
 
 export function BottomToolbar() {
@@ -65,7 +63,7 @@ export function BottomToolbar() {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-4" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-container p-1.5 shadow-2xl shadow-black/20 ring-1 ring-outline-variant/50 transition-all">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-container p-1.5   ring-1 ring-outline-variant/50 transition-all">
         {!ask && view === "canvas" && (
           <>
             {TOOLS.slice(0, 2).map((t) => (
@@ -77,7 +75,7 @@ export function BottomToolbar() {
             ))}
             <Dropdown up align="center" width={216} trigger={({ toggle }) => (
               <IconBtn label="Shapes (S)" active={tool === "shape"} onClick={() => { if (tool === "shape") toggle(); else { setShape(shape); } }}>
-                {tool === "shape" ? ShapeIcon : <Shapes size={19} />}
+                {tool === "shape" ? ShapeIcon : <Icon name="shapes" size={19} />}
               </IconBtn>
             )}>
               {(close) => (
@@ -88,13 +86,13 @@ export function BottomToolbar() {
                 </div>
               )}
             </Dropdown>
-            <IconBtn label="Pin a comment (C)" active={tool === "pin"} onClick={() => setTool("pin")}><MessageCirclePlus size={19} /></IconBtn>
+            <IconBtn label="Pin a comment (C)" active={tool === "pin"} onClick={() => setTool("pin")}><Icon name="add_comment" size={19} /></IconBtn>
             <span className="mx-0.5 h-6 w-px bg-outline-variant" />
           </>
         )}
         {ask ? (
           <div className="flex w-[min(680px,70vw)] items-center gap-1.5 pl-3 anim-fade">
-            <Sparkles size={18} className="shrink-0 text-primary" />
+            <Icon name="auto_awesome" size={18} className="shrink-0 text-primary" />
             {target ? (
               <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary-container">
                 {target.name}
@@ -112,13 +110,13 @@ export function BottomToolbar() {
               </button>
             )}
             <button onClick={submit} disabled={!text.trim() || busy} className="state morph grid size-10 shrink-0 place-items-center rounded-full bg-primary text-on-primary">
-              {busy ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+              {busy ? <Icon name="progress_activity" size={17} className="animate-spin" /> : <Icon name="send" size={17} />}
             </button>
-            <IconBtn label="Close" size={40} onClick={() => setAsk(false)}><X size={18} /></IconBtn>
+            <IconBtn label="Close" size={40} onClick={() => setAsk(false)}><Icon name="close" size={18} /></IconBtn>
           </div>
         ) : (
           <button onClick={() => setAsk(true)} title="Ask Zeus (Ctrl+K)" className="state morph flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary">
-            <Sparkles size={16} /> Ask Zeus
+            <Icon name="auto_awesome" size={16} /> Ask Zeus
             {target && <span className="max-w-24 truncate rounded-full bg-on-primary/20 px-2 py-0.5 text-[11px]">{target.name}</span>}
           </button>
         )}

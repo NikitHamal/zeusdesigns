@@ -1,9 +1,28 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Google Sans Flex";
+  src: url("./assets/fonts/google-sans-flex.woff2") format("woff2-variations");
+  font-weight: 1 1000;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("./assets/fonts/roboto-mono.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Material Symbols Rounded";
+  src: url("./assets/fonts/material-symbols-rounded.woff2") format("woff2");
+  font-weight: 300 500;
+  font-display: block;
+}
+
 @theme {
-  --font-sans: "Segoe UI Variable Text", "Google Sans Flex", "Roboto Flex", "Inter", system-ui, -apple-system, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Google Sans Flex", "Roboto Flex", "Inter", system-ui, sans-serif;
-  --font-mono: "Cascadia Code", "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --font-sans: "Google Sans Flex", "Segoe UI Variable Text", system-ui, sans-serif;
+  --font-display: "Google Sans Flex", "Segoe UI Variable Display", system-ui, sans-serif;
+  --font-mono: "Roboto Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
 
   --color-primary: var(--m-primary);
   --color-on-primary: var(--m-on-primary);
@@ -45,6 +64,8 @@ body {
   color: var(--m-on-surface);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  font-variation-settings: "ROND" 100;
+  font-size: 14px;
   user-select: none;
 }
 textarea, input { user-select: text; }
@@ -55,7 +76,7 @@ textarea, input { user-select: text; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--m-outline) 35%, transparent); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
 
 /* M3 state layer */
-.state { position: relative; overflow: hidden; transition: border-radius .35s var(--ease-spring), background-color .2s, transform .2s var(--ease-spring), box-shadow .2s; }
+.state { position: relative; overflow: hidden; transition: border-radius .35s var(--ease-spring), background-color .2s, transform .2s var(--ease-spring); }
 .state::after { content: ""; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity .15s; pointer-events: none; border-radius: inherit; }
 .state:hover::after { opacity: .08; }
 .state:active::after, .state:focus-visible::after { opacity: .12; }
@@ -70,13 +91,11 @@ button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--m-primary) 50%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
 @keyframes blink { 50% { opacity: 0; } }
-@keyframes bolt { 0%,100% { transform: rotate(0) scale(1); } 50% { transform: rotate(-8deg) scale(1.12); } }
 .anim-pop { animation: pop-in .35s var(--ease-spring) both; }
 .anim-fade { animation: fade-in .25s var(--ease-emph) both; }
 .shimmer { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--m-primary) 14%, transparent), transparent); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
-.caret::after { content: "▍"; color: var(--m-primary); animation: blink 1s steps(2) infinite; margin-left: 1px; }
+.caret::after { content: ""; display: inline-block; width: 7px; height: 1em; vertical-align: -0.15em; border-radius: 2px; background: var(--m-primary); animation: blink 1s steps(2) infinite; margin-left: 2px; }
 
 /* chat markdown */
 .md p { margin: 0 0 .6em; line-height: 1.6; }
@@ -90,3 +109,6 @@ button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 .md pre code { background: none; padding: 0; }
 .md a { color: var(--m-primary); }
 .md blockquote { border-left: 3px solid var(--m-primary); margin: 0 0 .6em; padding: 2px 12px; color: var(--m-on-surface-variant); }
+
+.msr { font-family: "Material Symbols Rounded"; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; font-feature-settings: "liga"; -webkit-font-feature-settings: "liga"; flex-shrink: 0; user-select: none; overflow: hidden; vertical-align: middle; }
+.greeting { font-family: var(--font-display); font-weight: 420; letter-spacing: -0.02em; font-variation-settings: "ROND" 100; }

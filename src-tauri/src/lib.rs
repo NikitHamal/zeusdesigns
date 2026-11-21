@@ -9,6 +9,7 @@ pub mod crypto;
 pub mod mcp;
 pub mod memory;
 pub mod providers;
+pub mod updater;
 pub mod workspace;
 
 use serde_json::json;
@@ -47,6 +48,8 @@ pub fn run() {
         .manage(mcp::McpRegistry::default())
         .invoke_handler(tauri::generate_handler![
             app_info,
+            updater::update_check,
+            updater::update_install,
             agent::providers_list,
             agent::chat_stream,
             agent::chat_cancel,

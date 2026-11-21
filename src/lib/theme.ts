@@ -1,13 +1,13 @@
-// Material 3 Expressive runtime theming: generates tonal roles from a seed hue.
+// Material 3 Expressive runtime theming: warm neutral surfaces with a seed-hue accent.
 const t = (h: number, s: number, l: number) => `hsl(${((h % 360) + 360) % 360} ${s}% ${l}%)`;
 
 export const ACCENTS: { id: string; name: string; hue: number }[] = [
-  { id: "violet", name: "Zeus Violet", hue: 258 },
-  { id: "blue", name: "Azure", hue: 216 },
-  { id: "teal", name: "Lagoon", hue: 174 },
-  { id: "green", name: "Meadow", hue: 128 },
-  { id: "amber", name: "Amber", hue: 36 },
-  { id: "rose", name: "Rose", hue: 340 },
+  { id: "clay", name: "Clay", hue: 17 },
+  { id: "amber", name: "Amber", hue: 38 },
+  { id: "moss", name: "Moss", hue: 110 },
+  { id: "teal", name: "Teal", hue: 172 },
+  { id: "rose", name: "Rose", hue: 346 },
+  { id: "slate", name: "Graphite", hue: 30 },
 ];
 
 export function applyTheme(mode: "light" | "dark" | "system", hue: number) {
@@ -15,24 +15,24 @@ export function applyTheme(mode: "light" | "dark" | "system", hue: number) {
   const h = hue;
   const v: Record<string, string> = dark
     ? {
-        primary: t(h, 90, 80), "on-primary": t(h, 70, 20), "primary-container": t(h, 48, 30), "on-primary-container": t(h, 95, 90),
-        secondary: t(h, 30, 80), "secondary-container": t(h, 24, 28), "on-secondary-container": t(h, 40, 90),
-        tertiary: t(h + 70, 70, 80), "tertiary-container": t(h + 70, 36, 28), "on-tertiary-container": t(h + 70, 80, 90),
-        surface: t(h, 14, 9), "surface-dim": t(h, 14, 6), "surface-lowest": t(h, 14, 5), "surface-low": t(h, 14, 11),
-        "surface-container": t(h, 13, 13), "surface-high": t(h, 12, 17), "surface-highest": t(h, 11, 21),
-        "on-surface": t(h, 14, 91), "on-surface-variant": t(h, 12, 74), outline: t(h, 8, 55), "outline-variant": t(h, 10, 28),
-        error: t(5, 100, 80), "error-container": t(2, 70, 28), "on-error-container": t(5, 100, 90),
-        "inverse-surface": t(h, 14, 90), "inverse-on-surface": t(h, 14, 18),
+        primary: t(h, 62, 63), "on-primary": t(h, 55, 11), "primary-container": t(h, 36, 25), "on-primary-container": t(h, 85, 90),
+        secondary: t(h, 10, 78), "secondary-container": t(h, 5, 24), "on-secondary-container": t(h, 12, 91),
+        tertiary: t(h + 95, 32, 72), "tertiary-container": t(h + 95, 20, 26), "on-tertiary-container": t(h + 95, 40, 90),
+        surface: t(h, 3, 10), "surface-dim": t(h, 3, 8), "surface-lowest": t(h, 3, 6), "surface-low": t(h, 3, 12),
+        "surface-container": t(h, 3, 17), "surface-high": t(h, 3, 20), "surface-highest": t(h, 3, 24),
+        "on-surface": t(h, 8, 93), "on-surface-variant": t(h, 5, 68), outline: t(h, 3, 48), "outline-variant": t(h, 3, 24),
+        error: t(5, 90, 74), "error-container": t(2, 55, 25), "on-error-container": t(5, 100, 90),
+        "inverse-surface": t(h, 8, 90), "inverse-on-surface": t(h, 6, 16),
       }
     : {
-        primary: t(h, 58, 47), "on-primary": "#fff", "primary-container": t(h, 92, 90), "on-primary-container": t(h, 75, 17),
-        secondary: t(h, 24, 40), "secondary-container": t(h, 42, 89), "on-secondary-container": t(h, 40, 15),
-        tertiary: t(h + 70, 50, 40), "tertiary-container": t(h + 70, 80, 88), "on-tertiary-container": t(h + 70, 70, 15),
-        surface: t(h, 40, 98), "surface-dim": t(h, 22, 91), "surface-lowest": "#fff", "surface-low": t(h, 38, 96),
-        "surface-container": t(h, 32, 94), "surface-high": t(h, 28, 92), "surface-highest": t(h, 24, 90),
-        "on-surface": t(h, 18, 11), "on-surface-variant": t(h, 12, 31), outline: t(h, 8, 47), "outline-variant": t(h, 18, 80),
+        primary: t(h, 55, 48), "on-primary": "#fff", "primary-container": t(h, 75, 91), "on-primary-container": t(h, 70, 16),
+        secondary: t(h, 10, 38), "secondary-container": t(h, 14, 91), "on-secondary-container": t(h, 20, 14),
+        tertiary: t(h + 95, 30, 36), "tertiary-container": t(h + 95, 35, 88), "on-tertiary-container": t(h + 95, 50, 14),
+        surface: t(h, 25, 98), "surface-dim": t(h, 14, 94), "surface-lowest": "#fff", "surface-low": t(h, 22, 96),
+        "surface-container": t(h, 18, 94), "surface-high": t(h, 14, 91), "surface-highest": t(h, 12, 88),
+        "on-surface": t(h, 14, 11), "on-surface-variant": t(h, 6, 36), outline: t(h, 5, 50), "outline-variant": t(h, 10, 85),
         error: t(2, 70, 42), "error-container": t(5, 100, 92), "on-error-container": t(2, 90, 15),
-        "inverse-surface": t(h, 14, 19), "inverse-on-surface": t(h, 30, 95),
+        "inverse-surface": t(h, 8, 17), "inverse-on-surface": t(h, 20, 95),
       };
   const root = document.documentElement;
   for (const k in v) root.style.setProperty(`--m-${k}`, v[k]);

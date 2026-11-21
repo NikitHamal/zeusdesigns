@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Download, GitCompare, Grid3x3, Layers, Maximize, Minus, PanelLeftOpen, Plus, RectangleHorizontal, Trash2, X } from "lucide-react";
 import { useStore } from "../store";
 import { canvasApi } from "../lib/canvasApi";
 import { download } from "../lib/bridge";
@@ -8,6 +7,18 @@ import { Dropdown, IconBtn, MenuItem, MenuLabel, Segmented } from "./ui";
 import { InfiniteCanvas } from "./Canvas";
 import { BottomToolbar } from "./BottomToolbar";
 import { CompareDialog, GridView, SingleView } from "./Views";
+import { Icon } from "./Icon";
+
+function ProjectName() {
+  const name = useStore((s) => s.projectName);
+  const setName = useStore((s) => s.setProjectName);
+  return (
+    <input
+      value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} aria-label="Project name"
+      className="h-10 w-40 rounded-full bg-surface-container px-4 text-sm font-medium text-on-surface outline-none focus:ring-2 focus:ring-primary/40 max-xl:hidden"
+    />
+  );
+}
 
 function PageTabs() {
   const pages = useStore((s) => s.pages);
@@ -15,7 +26,7 @@ function PageTabs() {
   const { setActivePage, addPage, renamePage, deletePage } = useStore.getState();
   const [editing, setEditing] = useState<string | null>(null);
   return (
-    <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-full bg-surface-container/90 p-1 shadow-lg shadow-black/10 backdrop-blur">
+    <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-full bg-surface-container/90 p-1   backdrop-blur">
       {pages.map((p) => (
         <div key={p.id} className="group relative flex shrink-0 items-center">
           {editing === p.id ? (
@@ -33,11 +44,11 @@ function PageTabs() {
             </button>
           )}
           {pages.length > 1 && active === p.id && editing !== p.id && (
-            <button onClick={() => deletePage(p.id)} title="Delete page" className="ml-0.5 grid size-5 place-items-center rounded-full text-on-surface-variant hover:bg-surface-highest"><X size={12} /></button>
+            <button onClick={() => deletePage(p.id)} title="Delete page" className="ml-0.5 grid size-5 place-items-center rounded-full text-on-surface-variant hover:bg-surface-highest"><Icon name="close" size={12} /></button>
           )}
         </div>
       ))}
-      <IconBtn label="New page" size={32} onClick={addPage}><Plus size={16} /></IconBtn>
+      <IconBtn label="New page" size={32} onClick={addPage}><Icon name="add" size={16} /></IconBtn>
     </div>
   );
 }
@@ -47,11 +58,11 @@ function ZoomControls() {
   const z = useStore((s) => s.viewport[pageId]?.z ?? 0.7);
   const sel = useStore((s) => s.sel);
   return (
-    <div className="absolute bottom-5 right-5 z-30 flex items-center gap-0.5 rounded-full bg-surface-container p-1 shadow-xl shadow-black/15 ring-1 ring-outline-variant/50" onPointerDown={(e) => e.stopPropagation()}>
-      <IconBtn label="Zoom out" size={34} onClick={() => canvasApi.zoomBy(1 / 1.25)}><Minus size={16} /></IconBtn>
+    <div className="absolute bottom-5 right-5 z-30 flex items-center gap-0.5 rounded-full bg-surface-container p-1   ring-1 ring-outline-variant/50" onPointerDown={(e) => e.stopPropagation()}>
+      <IconBtn label="Zoom out" size={34} onClick={() => canvasApi.zoomBy(1 / 1.25)}><Icon name="remove" size={16} /></IconBtn>
       <button onClick={() => canvasApi.reset()} title="Reset zoom" className="state w-12 rounded-full py-1.5 text-center text-xs font-semibold tabular-nums text-on-surface">{Math.round(z * 100)}%</button>
-      <IconBtn label="Zoom in" size={34} onClick={() => canvasApi.zoomBy(1.25)}><Plus size={16} /></IconBtn>
-      <IconBtn label={sel.length ? "Zoom to selection (2)" : "Fit all (1)"} size={34} onClick={() => canvasApi.fit(sel.length ? sel : undefined)}><Maximize size={16} /></IconBtn>
+      <IconBtn label="Zoom in" size={34} onClick={() => canvasApi.zoomBy(1.25)}><Icon name="add" size={16} /></IconBtn>
+      <IconBtn label={sel.length ? "Zoom to selection (2)" : "Fit all (1)"} size={34} onClick={() => canvasApi.fit(sel.length ? sel : undefined)}><Icon name="fit_screen" size={16} /></IconBtn>
     </div>
   );
 }
@@ -83,41 +94,42 @@ export function CanvasPane() {
   };
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[32px] bg-surface-lowest">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface-lowest">
       {view === "canvas" ? <InfiniteCanvas /> : view === "grid" ? <GridView /> : <SingleView />}
 
       {/* header overlay */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 p-3.5" onPointerDown={(e) => e.stopPropagation()}>
         <div className="pointer-events-auto flex min-w-0 items-center gap-2">
-          {chatCollapsed && <IconBtn label="Show chat" tonal onClick={() => patchUI({ chatCollapsed: false })}><PanelLeftOpen size={18} /></IconBtn>}
+          <ProjectName />
+          {chatCollapsed && <IconBtn label="Show chat" tonal onClick={() => patchUI({ chatCollapsed: false })}><Icon name="left_panel_open" size={18} /></IconBtn>}
           <PageTabs />
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           <Segmented
             value={view} onChange={setView}
             options={[
-              { id: "canvas", icon: <Layers size={15} />, label: "Canvas", title: "Infinite canvas" },
-              { id: "grid", icon: <Grid3x3 size={15} />, label: "Grid" },
-              { id: "single", icon: <RectangleHorizontal size={15} />, label: "Single" },
+              { id: "canvas", icon: <Icon name="layers" size={15} />, label: "Canvas", title: "Infinite canvas" },
+              { id: "grid", icon: <Icon name="grid_view" size={15} />, label: "Grid" },
+              { id: "single", icon: <Icon name="crop_landscape" size={15} />, label: "Single" },
             ]}
           />
           <Dropdown align="right" width={250} trigger={({ toggle }) => (
-            <button onClick={toggle} className="state morph flex h-10 items-center gap-2 rounded-full bg-surface-container px-4 text-sm font-semibold text-on-surface shadow-lg shadow-black/10">
-              <GitCompare size={16} /> Compare
+            <button onClick={toggle} className="state morph flex h-10 items-center gap-2 rounded-full bg-surface-container px-4 text-sm font-semibold text-on-surface  ">
+              <Icon name="compare" size={16} /> Compare
             </button>
           )}>
             {(close) => (
               <>
                 <MenuLabel>Variants</MenuLabel>
-                <MenuItem icon={<GitCompare size={16} />} label="Compare two screens" desc={pickedBoards.length >= 2 ? "Selected screens" : "First two on this page"} onClick={() => {
+                <MenuItem icon={<Icon name="compare" size={16} />} label="Compare two screens" desc={pickedBoards.length >= 2 ? "Selected screens" : "First two on this page"} onClick={() => {
                   const l = pickedBoards.length >= 2 ? pickedBoards : boards;
                   if (l.length < 2) useStore.getState().notify("Need at least two screens to compare"); else patchUI({ compare: [l[0].id, l[1].id] });
                   close();
                 }} />
-                <MenuItem icon={<Layers size={16} />} label="Line up side by side" desc="Arrange in a row on the canvas" onClick={() => { arrange(); setView("canvas"); close(); }} />
+                <MenuItem icon={<Icon name="layers" size={16} />} label="Line up side by side" desc="Arrange in a row on the canvas" onClick={() => { arrange(); setView("canvas"); close(); }} />
                 <MenuLabel>Page</MenuLabel>
-                <MenuItem icon={<Download size={16} />} label="Export all screens (HTML)" onClick={() => { exportAll(); close(); }} />
-                <MenuItem icon={<Trash2 size={16} />} danger label="Clear page" onClick={() => {
+                <MenuItem icon={<Icon name="download" size={16} />} label="Export all screens (HTML)" onClick={() => { exportAll(); close(); }} />
+                <MenuItem icon={<Icon name="delete" size={16} />} danger label="Clear page" onClick={() => {
                   const st = useStore.getState();
                   st.removeArtboards(boards.map((b) => b.id));
                   useStore.setState({ elements: st.elements.filter((e) => e.pageId !== pageId), pins: st.pins.filter((p) => p.pageId !== pageId) });

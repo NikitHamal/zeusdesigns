@@ -9,6 +9,7 @@ import { DESIGN_SYSTEMS, getDS } from "./lib/designSystems";
 import { SKILLS } from "./lib/skills";
 import { blankFrame } from "./lib/templates";
 import type { Workspace } from "./lib/bridge";
+import type { UpdateInfo } from "./lib/updater";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
 
@@ -40,6 +41,10 @@ interface UI {
   workspace: Workspace | null;
   nativeReady: boolean;
   chatCollapsed: boolean;
+  sidebarOpen: boolean;
+  showCanvas: boolean;
+  update: UpdateInfo | null;
+  version: string;
 }
 
 interface State {
@@ -129,13 +134,14 @@ export const useStore = create<State>()(
       sel: [],
       busy: false,
       settings: {
-        theme: "system", hue: 258, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
+        theme: "dark", hue: 17, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
         designSystemId: "m3e", skills: SKILLS.filter((s) => s.default).map((s) => s.id),
         customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false,
       },
       ui: {
         settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, openPinId: null,
         focusArtboard: null, toast: null, workspace: null, nativeReady: false, chatCollapsed: false,
+        sidebarOpen: true, showCanvas: false, update: null, version: "",
       },
 
       patchSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
@@ -274,7 +280,9 @@ export const useStore = create<State>()(
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
-        return { ...current, ...p, settings: { ...current.settings, ...(p.settings ?? {}) } };
+        const settings = { ...current.settings, ...(p.settings ?? {}) };
+        if (settings.hue === 258 || settings.hue === 216) settings.hue = 17; // retired blue/violet seeds
+        return { ...current, ...p, settings };
       },
     },
   ),

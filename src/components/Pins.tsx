@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { Check, MessageSquarePlus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useStore } from "../store";
 import type { Pin } from "../types";
 import { sendMessage } from "../lib/engine";
 import { cn } from "../utils/cn";
 import { IconBtn } from "./ui";
+import { Icon } from "./Icon";
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
       onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}
-      className={cn("anim-pop absolute left-11 -top-2 w-[320px] rounded-[26px] bg-surface-container border border-outline-variant/60 shadow-2xl shadow-black/25 text-on-surface cursor-default", className)}
+      className={cn("anim-pop absolute left-11 -top-2 w-[320px] rounded-[26px] bg-surface-container border border-outline-variant/60   text-on-surface cursor-default", className)}
     >
       {children}
     </div>
@@ -45,13 +45,13 @@ export function PinView({ pin, z }: { pin: Pin; z: number }) {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => patchUI({ openPinId: open ? null : pin.id })}
         className={cn(
-          "absolute -translate-x-1/2 -translate-y-full grid place-items-center size-9 rounded-full rounded-bl-[6px] font-bold text-sm shadow-lg transition-transform ease-spring duration-300 hover:scale-110",
+          "absolute -translate-x-1/2 -translate-y-full grid place-items-center size-9 rounded-full rounded-bl-[6px] font-bold text-sm  transition-transform ease-spring duration-300 hover:scale-110",
           pin.resolved ? "bg-surface-highest text-on-surface-variant" : "bg-primary text-on-primary",
           open && "scale-110 ring-4 ring-primary/25",
         )}
         style={{ left: 0, top: 0 }}
       >
-        {pin.resolved ? <Check size={16} /> : pin.n}
+        {pin.resolved ? <Icon name="check" size={16} /> : pin.n}
       </button>
       {open && (
         <Card className="-translate-y-full -mt-0" >
@@ -59,14 +59,14 @@ export function PinView({ pin, z }: { pin: Pin; z: number }) {
             <span className="text-sm font-semibold">Comment {pin.n}</span>
             <span className="truncate rounded-full bg-secondary-container px-2.5 py-0.5 text-xs text-on-secondary-container">{ab?.name ?? "Canvas"}</span>
             <span className="flex-1" />
-            <IconBtn label={pin.resolved ? "Reopen" : "Resolve"} size={30} onClick={() => updatePin(pin.id, { resolved: !pin.resolved })} active={pin.resolved}><Check size={15} /></IconBtn>
-            <IconBtn label="Delete" size={30} onClick={() => removePin(pin.id)}><Trash2 size={15} /></IconBtn>
-            <IconBtn label="Close" size={30} onClick={() => patchUI({ openPinId: null })}><X size={15} /></IconBtn>
+            <IconBtn label={pin.resolved ? "Reopen" : "Resolve"} size={30} onClick={() => updatePin(pin.id, { resolved: !pin.resolved })} active={pin.resolved}><Icon name="check" size={15} /></IconBtn>
+            <IconBtn label="Delete" size={30} onClick={() => removePin(pin.id)}><Icon name="delete" size={15} /></IconBtn>
+            <IconBtn label="Close" size={30} onClick={() => patchUI({ openPinId: null })}><Icon name="close" size={15} /></IconBtn>
           </div>
           <div className="max-h-52 space-y-2 overflow-auto px-4 py-3">
             {pin.comments.map((c) => (
               <div key={c.id} className={cn("rounded-[18px] px-3 py-2 text-[13.5px] select-text", c.author === "user" ? "bg-primary-container text-on-primary-container" : "bg-surface-high text-on-surface-variant")}>
-                <div className="mb-0.5 text-[11px] font-semibold opacity-70">{c.author === "user" ? "You" : "⚡ Zeus"}</div>
+                <div className="mb-0.5 text-[11px] font-semibold opacity-70">{c.author === "user" ? "You" : "Zeus"}</div>
                 {c.text}
               </div>
             ))}
@@ -77,11 +77,11 @@ export function PinView({ pin, z }: { pin: Pin; z: number }) {
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               className="min-h-10 flex-1 resize-none rounded-[18px] bg-surface-high px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
             />
-            <IconBtn label="Reply" size={40} onClick={send}><Send size={16} /></IconBtn>
+            <IconBtn label="Reply" size={40} onClick={send}><Icon name="send" size={16} /></IconBtn>
           </div>
           <div className="px-3 pb-3">
             <button onClick={ask} disabled={busy} className="state morph flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-on-primary">
-              <Sparkles size={15} /> Ask Zeus to apply this
+              <Icon name="auto_awesome" size={15} /> Ask Zeus to apply this
             </button>
           </div>
         </Card>
@@ -102,8 +102,8 @@ export function PinDraft({ x, y, artboardId, z, onDone }: { x: number; y: number
   };
   return (
     <div className="absolute" style={{ left: (ab?.x ?? 0) + x, top: (ab?.y ?? 0) + y, transform: `scale(${1 / z})`, transformOrigin: "0 0", zIndex: 50 }}>
-      <div className="absolute -translate-x-1/2 -translate-y-full grid place-items-center size-9 rounded-full rounded-bl-[6px] bg-primary text-on-primary shadow-lg animate-[pulse-ring_1.2s_ease-out_infinite]">
-        <MessageSquarePlus size={16} />
+      <div className="absolute -translate-x-1/2 -translate-y-full grid place-items-center size-9 rounded-full rounded-bl-[6px] bg-primary text-on-primary  animate-[pulse-ring_1.2s_ease-out_infinite]">
+        <Icon name="edit_square" size={16} />
       </div>
       <Card className="-translate-y-full">
         <div className="p-3">
