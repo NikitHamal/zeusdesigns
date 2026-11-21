@@ -17,7 +17,7 @@ Shipped:
 - Desktop icon: `build.rs` tracks generated icons, rust-cache key includes the icon hash, NSIS installer icon set.
 
 In flight / next:
-- Run 26 failed at "create a release" (Resource not accessible by integration) after a clean Rust compile; watch whether it repeats.
+- Run 26 failed once at "create a release" (Resource not accessible by integration) after a clean Rust compile; run 28 on the next commit was green. Treat as a flake unless it repeats.
 - Visual QA on Windows of the inspector and kit overrides for each design system.
 - Per-chat canvases.
 
@@ -40,6 +40,8 @@ In flight / next:
 - Verify the updater end to end by installing an older release and updating to the next one.
 - Visual QA of the canvas toolbar, comments panel and compare views against the Claude Design references.
 - Canvas is still one project shared across chats; per-chat canvases would match Claude Design more closely.
+
+Verification habit: headless Chromium (Playwright) screenshots of dist/index.html caught blank icons and a squeezed artboard header; do this after UI changes.
 
 Known risks:
 - The updater runs the unsigned NSIS installer from the latest GitHub release; SmartScreen may prompt.
