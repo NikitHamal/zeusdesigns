@@ -16,7 +16,7 @@ function ProjectName() {
   return (
     <input
       value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} aria-label="Project name"
-      className="h-10 w-40 rounded-full bg-surface-container px-4 text-sm font-medium text-on-surface outline-none focus:ring-2 focus:ring-primary/40 max-xl:hidden"
+      className="h-10 w-40 rounded-xl border border-outline-variant bg-surface-container px-3 text-sm font-medium text-on-surface outline-none focus:border-primary max-xl:hidden"
     />
   );
 }
@@ -25,32 +25,33 @@ function PageTabs() {
   const pages = useStore((s) => s.pages);
   const active = useStore((s) => s.activePageId);
   const { setActivePage, addPage, renamePage, deletePage } = useStore.getState();
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const cur = pages.find((p) => p.id === active) ?? pages[0];
+  if (editing) {
+    return (
+      <input
+        autoFocus defaultValue={cur.name} onBlur={(e) => { renamePage(cur.id, e.target.value.trim() || cur.name); setEditing(false); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
+        className="h-10 w-36 rounded-xl border border-primary bg-surface-container px-3 text-sm font-medium outline-none"
+      />
+    );
+  }
   return (
-    <div className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-full bg-surface-container/90 p-1   backdrop-blur">
-      {pages.map((p) => (
-        <div key={p.id} className="group relative flex shrink-0 items-center">
-          {editing === p.id ? (
-            <input
-              autoFocus defaultValue={p.name} onBlur={(e) => { renamePage(p.id, e.target.value || p.name); setEditing(null); }}
-              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-              className="h-8 w-28 rounded-full bg-surface-high px-3 text-[13px] font-medium outline-none ring-2 ring-primary"
-            />
-          ) : (
-            <button
-              onClick={() => setActivePage(p.id)} onDoubleClick={() => setEditing(p.id)}
-              className={cn("state h-8 rounded-full px-3.5 text-[13px] font-semibold transition-all", active === p.id ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant")}
-            >
-              {p.name}
-            </button>
-          )}
-          {pages.length > 1 && active === p.id && editing !== p.id && (
-            <button onClick={() => deletePage(p.id)} title="Delete page" className="ml-0.5 grid size-5 place-items-center rounded-full text-on-surface-variant hover:bg-surface-highest"><Icon name="close" size={12} /></button>
-          )}
-        </div>
-      ))}
-      <IconBtn label="New page" size={32} onClick={addPage}><Icon name="add" size={16} /></IconBtn>
-    </div>
+    <Dropdown width={230} trigger={({ toggle, open }) => (
+      <button onClick={toggle} className={cn("state flex h-10 max-w-[200px] items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container px-3 text-sm font-medium text-on-surface", open && "bg-surface-high")}>
+        <span className="truncate">{cur.name}</span><Icon name="expand_more" size={15} className="shrink-0 text-on-surface-variant" />
+      </button>
+    )}>
+      {(close) => (
+        <>
+          {pages.map((p) => <MenuItem key={p.id} label={p.name} active={p.id === active} onClick={() => { setActivePage(p.id); close(); }} />)}
+          <div className="my-1.5 border-t border-outline-variant/70" />
+          <MenuItem icon={<Icon name="add" size={16} />} label="New page" onClick={() => { addPage(); close(); }} />
+          <MenuItem icon={<Icon name="edit" size={16} />} label="Rename page" onClick={() => { close(); setEditing(true); }} />
+          {pages.length > 1 && <MenuItem danger icon={<Icon name="delete" size={16} />} label="Delete page" onClick={() => { deletePage(cur.id); close(); }} />}
+        </>
+      )}
+    </Dropdown>
   );
 }
 
@@ -109,14 +110,14 @@ export function CanvasPane() {
           <Segmented
             value={view} onChange={setView}
             options={[
-              { id: "canvas", icon: <Icon name="layers" size={15} />, label: "Canvas", title: "Infinite canvas" },
-              { id: "grid", icon: <Icon name="grid_view" size={15} />, label: "Grid" },
-              { id: "single", icon: <Icon name="crop_landscape" size={15} />, label: "Single" },
+              { id: "canvas", icon: <Icon name="layers" size={16} />, title: "Infinite canvas" },
+              { id: "grid", icon: <Icon name="grid_view" size={16} />, title: "Grid" },
+              { id: "single", icon: <Icon name="crop_landscape" size={16} />, title: "Single screen" },
             ]}
           />
           <Dropdown align="right" width={250} trigger={({ toggle }) => (
-            <button onClick={toggle} className="state morph flex h-10 items-center gap-2 rounded-full bg-surface-container px-4 text-sm font-semibold text-on-surface  ">
-              <Icon name="compare" size={16} /> Compare
+            <button onClick={toggle} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
+              <Icon name="compare" size={16} /><span className="max-xl:hidden">Compare</span>
             </button>
           )}>
             {(close) => (

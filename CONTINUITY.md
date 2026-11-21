@@ -49,3 +49,13 @@ Known risks:
 
 ## Session 1
 Built the Tauri shell, M3 Expressive theme, canvas, chat, design systems, skills, keyless providers, workspace tools, memory, MCP.
+
+## Session: Claude-parity UI, memory, connectors, harness v2
+
+- Scroll indicators: invisible until hover in the app (`index.css`); hidden entirely inside every design iframe via `quiet()` (`harness.ts`), applied in `ui.tsx` Thumb, `Canvas.tsx`, `Views.tsx`, and baked into `kitCss`.
+- Sidebar (`Sidebar.tsx`): New design, Search, Project folder, Library, Connectors, date-grouped chats with rename/delete menu, account menu (settings, memory, connectors, theme, updates, help, source).
+- Settings (`Settings.tsx`): grouped nav. Memory (`MemoryPanel.tsx`) has four buckets (preferences, profile, topics, areas), inline edit, and a "Tell Zeus what to change" bar that asks the active model for add/remove operations (`lib/memory.ts`). Models can also write `<remember category="...">` tags; the engine strips and stores them.
+- Connectors (`Connectors.tsx`, `lib/mcpCatalog.ts`): installed list with enable, test connection, remove; store of 10 real keyless MCP servers; custom command. Desktop only. Rust `mcp.rs` now does a proper initialize/initialized/request session with timeouts, wraps commands in `cmd /C` on Windows, caches tool lists, and returns real errors instead of fake success.
+- Agent loop (`engine.ts`): tools are advertised via `lib/tools.ts`; after a round that called tools, results are sent back and the model continues (max 3 rounds). Unknown tools now fail instead of pretending.
+- Harness v2: `lib/blueprints.ts` (anatomy per archetype), new craft rules (fill the screen, no overlap, equal rows), `lib/audit.ts` renders each screen off-screen and measures overflow, overlap, contrast, clipping, tiny text, tap targets, dead bands; severe findings trigger one repair call (`design_repair` chip) that is kept only if it reduces defects. Toggle: Settings > Appearance.
+- Composer: single model+effort picker; design-system label collapses by container width so nothing clips.

@@ -127,7 +127,10 @@ fn execute_inline_workspace_tools(
                     .and_then(|c| c.get(target_url).send())
                     .and_then(|r| r.text())
                 {
-                    Ok(txt) => (true, txt.chars().take(4000).collect::<String>()),
+                    Ok(txt) => {
+                        let readable = if txt.contains('<') { html_to_text(&txt) } else { txt };
+                        (true, readable.chars().take(8000).collect::<String>())
+                    }
                     Err(e) => (false, format!("web_fetch failed: {}", e)),
                 }
             }
@@ -153,6 +156,49 @@ fn execute_inline_workspace_tools(
             }),
         );
     }
+}
+
+/// Strips tags, scripts and styles from fetched HTML so the model reads text instead of markup.
+fn html_to_text(html: &str) -> String {
+    let mut out = String::new();
+    let mut in_tag = false;
+    let mut tag = String::new();
+    let mut skip = false;
+    for ch in html.chars() {
+        if in_tag {
+            if ch == '>' {
+                in_tag = false;
+                let t = tag.trim().to_lowercase();
+                let name = t.split_whitespace().next().unwrap_or("").to_string();
+                if name == "script" || name == "style" {
+                    skip = true;
+                } else if name == "/script" || name == "/style" {
+                    skip = false;
+                } else if matches!(
+                    name.as_str(),
+                    "p" | "/p" | "br" | "br/" | "div" | "/div" | "li" | "h1" | "h2" | "h3" | "tr" | "/tr"
+                ) {
+                    out.push('\n');
+                }
+                tag.clear();
+            } else {
+                tag.push(ch);
+            }
+        } else if ch == '<' {
+            in_tag = true;
+        } else if !skip {
+            out.push(ch);
+        }
+    }
+    let mut res = String::new();
+    for line in out.lines() {
+        let l = line.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !l.is_empty() {
+            res.push_str(&l);
+            res.push('\n');
+        }
+    }
+    res
 }
 
 fn extract_attr(header: &str, key: &str) -> Option<String> {
