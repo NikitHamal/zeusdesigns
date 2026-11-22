@@ -303,7 +303,7 @@ pub fn catalog() -> Vec<ProviderInfo> {
     ]
 }
 
-/// Strip `<|stats|>...<|/stats|>` and `<|think|>...<|/think|>` from ChatJimmy output.
+/// Strip `<|stats|>...<|/stats|>` and `<|think|>...<|/think|>` from ChatJimmy micro-task output.
 pub fn clean_chatjimmy_output(raw: &str) -> String {
     let mut s = raw.to_string();
     while let Some(start) = s.find("<|stats|>") {
@@ -322,6 +322,23 @@ pub fn clean_chatjimmy_output(raw: &str) -> String {
         }
     }
     s.trim().to_string()
+}
+
+/// Convert `<|think|>...<|/think|>` to `<think>...</think>` and strip `<|stats|>` for ChatJimmy chat turns.
+pub fn format_chatjimmy_chat(raw: &str) -> String {
+    let mut s = raw.to_string();
+    while let Some(start) = s.find("<|stats|>") {
+        if let Some(end) = s[start..].find("<|/stats|>") {
+            s.replace_range(start..start + end + 10, "");
+        } else {
+            s.truncate(start);
+            break;
+        }
+    }
+    s.replace("<|think|>", "<think>")
+        .replace("<|/think|>", "</think>")
+        .trim()
+        .to_string()
 }
 
 /// Call ChatJimmy (20,000+ tok/s Llama 3.1 8B) for instant title generation & micro-tasks.

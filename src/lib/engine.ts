@@ -168,10 +168,10 @@ async function demoRun(opts: {
 /* ------------------------------------------------------------------ */
 /* Custom OpenAI / Anthropic streaming (browser fallback)              */
 /* ------------------------------------------------------------------ */
-async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, signal: AbortSignal) {
+async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onReasoning: (t: string) => void, signal: AbortSignal) {
   const c = req.custom!;
   const base = c.baseUrl.replace(/\/+$/, "");
-  const sse = async (res: Response, pick: (j: any) => string) => {
+  const sse = async (res: Response, pick: (j: any) => { text?: string; think?: string }) => {
     if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}: ${(await res.text()).slice(0, 300)}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -186,7 +186,11 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, sign
         if (!l.startsWith("data:")) continue;
         const d = l.slice(5).trim();
         if (!d || d === "[DONE]") continue;
-        try { const t = pick(JSON.parse(d)); if (t) onDelta(t); } catch { /* ignore partial */ }
+        try {
+          const out = pick(JSON.parse(d));
+          if (out.think) onReasoning(out.think);
+          if (out.text) onDelta(out.text);
+        } catch { /* ignore partial */ }
       }
     }
   };
@@ -206,14 +210,17 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, sign
       headers: { "content-type": "application/json", "x-api-key": c.apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
       body: JSON.stringify({ model: req.model, max_tokens: 16000, stream: true, system: req.system, messages: msgs }),
     });
-    await sse(res, (j) => (j.type === "content_block_delta" ? j.delta?.text ?? "" : ""));
+    await sse(res, (j) => (j.type === "content_block_delta" ? { text: j.delta?.text ?? "", think: j.delta?.thinking ?? "" } : {}));
   } else {
     const res = await fetch(`${base}/chat/completions`, {
       method: "POST", signal,
       headers: { "content-type": "application/json", authorization: `Bearer ${c.apiKey}` },
       body: JSON.stringify({ model: req.model, stream: true, messages: [{ role: "system", content: req.system }, ...msgs], ...(req.effort !== "medium" ? { reasoning_effort: req.effort === "max" ? "high" : req.effort } : {}) }),
     });
-    await sse(res, (j) => j.choices?.[0]?.delta?.content ?? "");
+    await sse(res, (j) => {
+      const d = j.choices?.[0]?.delta;
+      return { text: d?.content ?? "", think: d?.reasoning_content ?? d?.reasoning ?? "" };
+    });
   }
 }
 
@@ -479,7 +486,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         full += "\n\n";
       }
     } else if (custom) {
-      await streamCustom(req, onDelta, signal);
+      await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
     } else {
       if (prov && prov.id !== "demo") onDelta(`> Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
