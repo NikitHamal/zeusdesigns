@@ -425,37 +425,44 @@ pub fn stream_mercury3<F>(
     engine: &ProviderEngine,
     system: &str,
     messages: &[ChatMessage],
-     cancel: &AtomicBool,
+    effort: &str,
+    cancel: &AtomicBool,
     on_delta: &mut F,
 ) -> Result<(), String>
 where
     F: FnMut(&str),
 {
+    let inc_effort = match effort {
+        "low" => "low",
+        "medium" => "medium",
+        _ => "high",
+    };
     for attempt in 0..2 {
         let token = ensure_inception_token(engine, attempt > 0)?;
         let mut inc_msgs = Vec::new();
         if !system.trim().is_empty() {
+            let sys_full: String = system.chars().take(24000).collect();
             inc_msgs.push(json!({
                 "id": random_hex(16),
-                "role": "system",
-                "parts": [{ "type": "text", "text": system }]
+                "role": "user",
+                "parts": [{ "type": "text", "text": format!("[Zeus Desktop Harness & Design System Specification]\n{}", sys_full) }]
+            }));
+            inc_msgs.push(json!({
+                "id": random_hex(16),
+                "role": "assistant",
+                "parts": [{ "type": "text", "text": "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML." }]
             }));
         }
-        for (idx, m) in messages.iter().enumerate() {
-            let text = if idx == 0 && m.role == "user" && messages.len() > 1 && !system.trim().is_empty() {
-                format!("[Zeus System Harness]\n{}\n\n[User Request]\n{}", system.chars().take(12000).collect::<String>(), m.content)
-            } else {
-                m.content.clone()
-            };
+        for m in messages.iter() {
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": m.role,
-                "parts": [{ "type": "text", "text": text }]
+                "parts": [{ "type": "text", "text": m.content }]
             }));
         }
 
         let payload = json!({
-            "reasoningEffort": "high",
+            "reasoningEffort": inc_effort,
             "webSearchEnabled": false,
             "voiceMode": false,
             "timezone": "UTC",
@@ -708,14 +715,19 @@ where
         _ => "high",
     };
 
-    let mut transcript = String::new();
+    let mut sections = Vec::new();
     if !system.trim().is_empty() {
-        transcript.push_str(&format!("System: {}\n\n", system));
+        let sys_safe: String = system.chars().take(20000).collect();
+        sections.push(format!("[Zeus Desktop Harness Instructions]\n{}", sys_safe));
     }
-    for (idx, m) in messages.iter().enumerate() {
-        if idx + 1 < messages.len() {
-            transcript.push_str(&format!("{}: {}\n\n", m.role, m.content));
+    if messages.len() > 1 {
+        let mut hist = String::new();
+        for m in &messages[..messages.len() - 1] {
+            let role_lbl = if m.role == "assistant" { "Assistant" } else { "User" };
+            let snippet: String = m.content.chars().take(8000).collect();
+            hist.push_str(&format!("{}: {}\n\n", role_lbl, snippet));
         }
+        sections.push(format!("[Conversation History]\n{}", hist.trim()));
     }
     let last_user = messages
         .iter()
@@ -723,11 +735,8 @@ where
         .find(|m| m.role == "user")
         .map(|m| m.content.clone())
         .unwrap_or_default();
-    let query = if transcript.is_empty() {
-        last_user
-    } else {
-        format!("Previous conversation:\n{}\nCurrent message: {}", transcript, last_user)
-    };
+    sections.push(format!("[Current User Request]\n{}", last_user));
+    let query = sections.join("\n\n");
 
     let payload = json!({
         "query": query,
@@ -841,9 +850,14 @@ where
 
     let mut history = Vec::new();
     if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(20000).collect();
         history.push(json!({
             "role": "user",
-            "content": format!("[System Instructions]\n{}", system)
+            "content": format!("[Zeus Desktop Harness & Design System Specification]\n{}", sys_safe)
+        }));
+        history.push(json!({
+            "role": "assistant",
+            "content": "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
         }));
     }
     for m in messages {
@@ -1322,14 +1336,13 @@ where
         .last()
         .map(|m| m.content.as_str())
         .unwrap_or("");
-    let sys_prefix: String = system.chars().take(14000).collect();
+    let user_len = last_user.chars().count();
+    let max_sys = 26000usize.saturating_sub(user_len).max(6000);
+    let sys_prefix: String = system.chars().take(max_sys).collect();
     let content = if sys_prefix.trim().is_empty() {
-        last_user.chars().take(24000).collect::<String>()
+        last_user.chars().take(26000).collect::<String>()
     } else {
         format!("{}\n\n{}", sys_prefix, last_user)
-            .chars()
-            .take(24000)
-            .collect::<String>()
     };
 
     let mut lc_msgs = Vec::new();
@@ -1808,7 +1821,7 @@ where
 
     let primary = req.provider.as_str();
     let res = match primary {
-        "mercury3" => stream_mercury3(engine, &req.system, &req.messages, cancel, &mut on_delta),
+        "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
         "k2horizon" => stream_k2horizon(&req.system, &req.messages, &req.effort, cancel, &mut on_delta),
         "motif" => stream_motif(
             engine,
@@ -1822,7 +1835,7 @@ where
         "deepai" => stream_deepai(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "qwen" => stream_qwen_app(engine, &req.model, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
             .or_else(|_| stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta))
-            .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, cancel, &mut on_delta)),
+            .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)),
         "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
         "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),
         "chatjimmy" => {
@@ -1836,7 +1849,7 @@ where
             on_delta(&text);
             Ok(())
         }
-        _ => stream_mercury3(engine, &req.system, &req.messages, cancel, &mut on_delta),
+        _ => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
     };
 
     if res.is_ok() || cancel.load(Ordering::Relaxed) {
@@ -1850,7 +1863,7 @@ where
             continue;
         }
         let ok = match fb {
-            "mercury3" => stream_mercury3(engine, &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
             "k2horizon" => stream_k2horizon(&req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
             "motif" => stream_motif(
                 engine,
