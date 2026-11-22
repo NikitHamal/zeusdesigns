@@ -153,11 +153,46 @@ export function detectDomain(intent: string): Domain | null {
 const iconsAvailable = (names: string[]) => names.filter((n) => UI_ICON_NAMES.includes(n));
 const NATIVE_FONT_SYSTEMS = new Set(["m3e", "m3", "hig", "fluent", "shadcn", "carbon", "antd", "polaris", "atlassian"]);
 
+export function buildSvgChart(kind = "area", rawValues = "28,42,36,58,52,74,88", rawLabels = "Mon,Tue,Wed,Thu,Fri,Sat,Sun"): string {
+  const nums = rawValues.split(/[,\s]+/).map((n) => parseFloat(n)).filter((n) => !Number.isNaN(n));
+  const vals = nums.length >= 2 ? nums.slice(0, 12) : [28, 42, 36, 58, 52, 74, 88];
+  const labels = rawLabels.split(",").map((s) => s.trim()).filter(Boolean);
+  const w = 320, h = 128, padX = 12, padTop = 14, padBot = 24;
+  const plotW = w - padX * 2, plotH = h - padTop - padBot;
+  const min = Math.min(...vals, 0), max = Math.max(...vals, min + 1);
+  const pts = vals.map((v, i) => {
+    const x = Math.round(padX + (i / (vals.length - 1)) * plotW);
+    const y = Math.round(padTop + plotH - ((v - min) / (max - min)) * plotH);
+    return [x, y] as const;
+  });
+  const labelNodes = vals.map((_, i) => {
+    const lbl = labels[i] ?? `${i + 1}`;
+    const x = pts[i][0];
+    return `<text x="${x}" y="${h - 6}" text-anchor="middle" fill="var(--muted)" font-size="10" font-family="var(--font)">${lbl}</text>`;
+  }).join("");
+
+  if (kind === "bar") {
+    const bw = Math.max(10, Math.floor(plotW / vals.length) - 8);
+    const bars = pts.map(([x, y], i) => {
+      const bh = Math.max(6, padTop + plotH - y);
+      const fill = i === vals.length - 1 ? "var(--primary)" : "var(--container)";
+      return `<rect x="${Math.round(x - bw / 2)}" y="${y}" width="${bw}" height="${bh}" rx="6" fill="${fill}"/>`;
+    }).join("");
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="display:block;overflow:visible">${bars}${labelNodes}</svg>`;
+  }
+
+  const dLine = pts.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  const dArea = `${dLine} L${pts[pts.length - 1][0]} ${padTop + plotH} L${pts[0][0]} ${padTop + plotH} Z`;
+  const last = pts[pts.length - 1];
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="display:block;overflow:visible"><path d="${dArea}" fill="var(--container)" opacity="0.7"/><path d="${dLine}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="4.5" fill="var(--primary)"/>${labelNodes}</svg>`;
+}
+
 export function studioBrief(intent: string, ds: DesignSystem, device?: Device): string {
   if (!useStore.getState().settings.studioOn) return "";
   const d = detectDomain(intent);
   const [display] = PAIRINGS[d?.font ?? "neutral"];
   const f1 = FONT_STACKS.find((f) => f.id === display);
+  const needsChart = (d && ["fitness", "finance", "productivity", "developer", "health"].includes(d.id)) || /(dash|analytic|chart|metric|revenue|stats|finance|fitness|health)/i.test(intent);
   const lines = [
     "## Studio brief (computed for this request; follow it, do not restate it)",
     d ? `- Product: ${d.id}. Audience: ${d.audience}. The one primary action: "${d.action}".` : "- Product: infer it from the request. Name the audience and the ONE primary action before writing.",
@@ -165,6 +200,7 @@ export function studioBrief(intent: string, ds: DesignSystem, device?: Device): 
     d ? `- Icons for this product (all bundled, use via <i data-i>): ${iconsAvailable(d.icons).join(", ")}.` : "",
     d ? `- Real content to adapt (use numbers, names and units like these, never lorem):\n${d.content.map((c) => `  * ${c}`).join("\n")}` : "",
     f1 && !NATIVE_FONT_SYSTEMS.has(ds.id) ? `- Optional display face for the hero headline only: font-family:${f1.stack} (${f1.feel}). Body stays var(--font).` : "- Type: use var(--font) and var(--heading) only; hierarchy through size and weight.",
+    needsChart ? `- Ready-to-use inline SVG chart (drop inside a .z-card and adjust numbers/labels):\n  ${buildSvgChart(d?.id === "fitness" ? "bar" : "area")}` : "",
     device ? `- Target: ${device}. Fill the full frame height.` : "",
     "- Quality bar: one primary button, aligned edges, equal gutters, 4 to 7 rows in any list, a selected state on tabs and nav, nothing overlapping, text contrast at least 4.5:1.",
   ].filter(Boolean);
@@ -284,6 +320,35 @@ export const STUDIO_TOOLS: StudioTool[] = [
       let issues: string[] = [];
       try { issues = (await auditHtml(b.html, b.w, b.h)).map((i) => `${i.severe ? "severe" : "minor"}: ${i.msg}`); } catch { issues = ["audit unavailable"]; }
       return [`Laws: ${fixed.fixes.length ? fixed.fixes.join("; ") : "clean"}`, `Layout: ${issues.length ? issues.join("; ") : "no defects"}`].join("\n");
+    },
+  },
+  {
+    name: "studio_svg_chart", icon: "bar_chart", desc: "Generate a clean token-colored inline SVG chart (area or bar) from data values and labels",
+    params: { kind: "area | bar", values: "comma-separated numbers", labels: "comma-separated axis labels" },
+    run: (a) => buildSvgChart(str(a.kind, "area"), str(a.values ?? a.query, "28,42,36,58,52,74,88"), str(a.labels, "Mon,Tue,Wed,Thu,Fri,Sat,Sun")),
+  },
+  {
+    name: "studio_blueprint", icon: "layers", desc: "Get a complete structural blueprint and starter skeleton for a request and device",
+    params: { query: "screen type or product", device: "mobile | web" },
+    run: (a) => {
+      const dev: Device = str(a.device) === "web" ? "web" : "mobile";
+      const ds = activeDS(a);
+      return `${studioBrief(str(a.query, "dashboard"), ds, dev)}\n\nStarter HTML:\n${kitExample(dev)}`;
+    },
+  },
+  {
+    name: "studio_export_react", icon: "terminal", desc: "Convert a canvas screen into a self-contained React TSX component",
+    params: { id: "screen id or name" },
+    run: (a) => {
+      const b = board(a);
+      if (!b) return "No such screen. Call studio_screens first.";
+      const body = (/<body[^>]*>([\s\S]*?)<\/body>/i.exec(stripKit(b.html))?.[1] ?? stripKit(b.html))
+        .replace(/\bclass=/g, "className=")
+        .replace(/\bfor=/g, "htmlFor=")
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .trim();
+      const compName = b.name.replace(/[^a-zA-Z0-9]/g, "") || "ZeusScreen";
+      return `export default function ${compName}() {\n  return (\n    <div className="zeus-screen">\n${body.slice(0, 10000)}\n    </div>\n  );\n}`;
     },
   },
 ];

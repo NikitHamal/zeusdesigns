@@ -34,7 +34,7 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
 
 const TOOL_LABEL: Record<string, string> = {
   design_lint: "Cleaned up", design_audit: "Checked layout", design_repair: "Repairing layout", read_file: "Read file", write_file: "Wrote file",
-  list_dir: "Listed folder", studio_brief: "Read the brief", studio_palette: "Built a palette", studio_contrast: "Checked contrast", studio_fonts: "Picked fonts", studio_icons: "Searched icons", studio_components: "Read the component kit", studio_tokens: "Read design tokens", studio_systems: "Listed design systems", studio_screens: "Listed screens", studio_read_screen: "Read a screen", studio_lint: "Linted a screen", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
+  list_dir: "Listed folder", studio_brief: "Read the brief", studio_palette: "Built a palette", studio_contrast: "Checked contrast", studio_fonts: "Picked fonts", studio_icons: "Searched icons", studio_components: "Read the component kit", studio_tokens: "Read design tokens", studio_systems: "Listed design systems", studio_screens: "Listed screens", studio_read_screen: "Read a screen", studio_lint: "Linted a screen", studio_svg_chart: "Built SVG chart", studio_blueprint: "Loaded blueprint", studio_export_react: "Exported React TSX", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
 };
 function toolTitle(name: string): { label: string; sub?: string } {
   if (name.startsWith("mcp:")) { const [, server, ...tool] = name.split(":"); return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, "") }; }

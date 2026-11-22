@@ -45,6 +45,21 @@ const BP: Blueprint[] = [
     mobile: "Top media block (flat-shape illustration, 40% of the height) with back and bookmark icon buttons floating on it. A z-card sheet overlapping upward with title (z-h1), meta row (rating, duration, price) with icons, 2 short paragraphs, a z-chips row for attributes, and a sticky bottom bar with the price and one primary z-btn.",
     web: "Breadcrumb row, 60/40 split: large media block left; right column with title, meta, price, selection controls, primary and secondary actions. Below: tab row with content, then a related items grid of 4.",
   },
+  {
+    id: "kanban", match: /(kanban|board|sprint|roadmap|backlog|issue|jira|linear|task board)/i,
+    mobile: "Appbar with project name, filter icon and add button. z-segs or z-Tabs for status columns (Planned, In progress, Review, Done). Summary z-banner with sprint progress bar. Stack of 4 task z-card items with priority z-badge, title, assignee z-avatar, due date and subtask count. Bottom z-nav.",
+    web: "z-shell with left z-side project navigation and z-main. Top z-top with sprint title, member avatars, filter z-chips, and New issue z-btn. 3-column grid (z-grid-3) for Planned, In Progress, Done; each column has a header with count badge and 3 task z-card blocks with ID, title, tag z-badge, and assignee z-avatar.",
+  },
+  {
+    id: "chat", match: /(messenger|direct message|inbox|support chat|assistant|conversation|dm|slack|discord)/i,
+    mobile: "Appbar with back button, contact z-avatar, name, and call/more icon buttons. Date divider pill. 4 message bubbles alternating left (z-card tonal) and right (z-card accent) with timestamps and one attachment or action card. Pinned bottom composer row with add icon button, z-input field, and filled send z-icon-btn.",
+    web: "z-shell with left conversation list (search z-input + 6 contact z-item rows with unread badges) and right chat pane: header bar with contact details, message stream of 5 rich turns, and bottom z-card composer with attachment and send controls.",
+  },
+  {
+    id: "calendar", match: /(calendar|schedule|planner|booking|appointment|timetable|agenda)/i,
+    mobile: "Appbar with month title, today chip, and add button. 7-column week strip (z-days > z-day) with one selected day. Time-blocked agenda z-list of 5 events, each showing start-end time, title, location or room, and participant z-avatar. Bottom z-nav.",
+    web: "z-shell with left z-side (mini month grid, calendar filters, upcoming list) and z-main: top toolbar with view z-segs (Day, Week, Month) and New event z-btn, followed by a 5-day schedule grid with time slots and tonal event blocks.",
+  },
 ];
 
 export function blueprintFor(prompt: string, device: Device | undefined): string {

@@ -2,6 +2,7 @@ import { Dropdown, IconBtn, MenuItem, MenuLabel } from "./ui";
 import { useStore } from "../store";
 import { download, htmlToPng, writeWorkspaceFile, refreshTree } from "../lib/bridge";
 import { sendMessage } from "../lib/engine";
+import { runStudioTool } from "../lib/studio";
 import type { Artboard } from "../types";
 import { Icon } from "./Icon";
 
@@ -28,6 +29,7 @@ export function ExportMenu({ a, size = 32 }: { a: Artboard; size?: number }) {
             try { download(`${slug(a.name)}.png`, await htmlToPng(a.html, a.w, a.h)); } catch { notify("PNG export failed for this design"); }
           }} />
           <MenuItem icon={<Icon name="content_copy" size={16} />} label="Copy HTML" onClick={() => { navigator.clipboard.writeText(a.html); notify("HTML copied"); close(); }} />
+          <MenuItem icon={<Icon name="terminal" size={16} />} label="Copy React TSX" onClick={async () => { const r = await runStudioTool("studio_export_react", a.id); navigator.clipboard.writeText(r.output); notify("React TSX copied"); close(); }} />
           <MenuLabel>Code</MenuLabel>
           <MenuItem icon={<Icon name="code" size={16} />} label="Convert to React + Tailwind" desc="Ask Zeus to generate components" onClick={() => { close(); ask("Convert this screen into clean, componentized React + TypeScript + Tailwind code. Show the file structure and the main components as code blocks."); }} />
           <MenuItem icon={<Icon name="smartphone" size={16} />} label="Convert to Jetpack Compose" desc="Material 3 Expressive, Kotlin" onClick={() => { close(); ask("Convert this screen into Jetpack Compose (Material 3 Expressive) Kotlin code with a @Preview. Provide it in code blocks."); }} />
