@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
 import { nativeAvailable, nativeMcp, nativeMemory } from "./lib/bridge";
-import { enabledMcpTools } from "./lib/tools";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { CanvasPane } from "./components/CanvasPane";
@@ -42,10 +41,9 @@ export default function App() {
       if (!native) return;
       const st = useStore.getState();
       const mine = st.settings.mcp;
-      const add = native.filter((n) => n.transport === "stdio" && !mine.some((m) => m.id === n.id)).map((n) => ({ id: n.id, name: n.name, transport: "stdio" as const, command: n.command, args: n.args ?? [], enabled: true }));
+      const add = native.filter((n) => n.transport === "stdio" && !mine.some((m) => m.id === n.id)).map((n) => ({ id: n.id, name: n.name, transport: "stdio" as const, command: n.command, args: n.args ?? [], enabled: false }));
       if (add.length) st.patchSettings({ mcp: [...mine, ...add] });
-      for (const m of mine) if (!native.some((n) => n.id === m.id)) nativeMcp.add({ id: m.id, name: m.name, command: m.command, args: m.args, transport: "stdio" });
-      void enabledMcpTools(true, 0);
+      for (const m of mine) if (m.enabled && !native.some((n) => n.id === m.id)) void nativeMcp.add({ id: m.id, name: m.name, command: m.command, args: m.args, transport: "stdio" });
     });
     const check = () => checkForUpdate().then((update) => {
       patchUI({ update });

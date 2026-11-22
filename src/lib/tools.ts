@@ -8,9 +8,20 @@ let cache: { key: string; at: number; tools: McpToolInfo[] } | null = null;
 let inflight: Promise<McpToolInfo[]> | null = null;
 
 /** Tools of enabled servers. Discovery can take a while the first time (npx downloads), so callers get what is ready within `wait` ms. */
+const BUILTIN_TOOLS: McpToolInfo[] = [
+  {
+    server_id: "mcp-design-tokens",
+    server_name: "Zeus Material 3 Design Tokens MCP",
+    name: "get_design_tokens",
+    description: "Retrieve Material 3 Expressive, Apple HIG, Fluent 2, or shadcn CSS custom property tokens.",
+    input_schema: { type: "object", properties: { system: { type: "string" } } },
+  },
+];
+
 export async function enabledMcpTools(force = false, wait = 2500): Promise<McpToolInfo[]> {
   const { mcp } = useStore.getState().settings;
   const ids = mcp.filter((m) => m.enabled).map((m) => m.id).sort();
+  if (!force && ids.length === 0) return BUILTIN_TOOLS;
   const key = ids.join(",");
   if (!force && cache && cache.key === key && Date.now() - cache.at < 5 * 60_000) return cache.tools;
   if (!inflight) {
@@ -21,7 +32,7 @@ export async function enabledMcpTools(force = false, wait = 2500): Promise<McpTo
       return tools;
     })().finally(() => { inflight = null; });
   }
-  const stale = cache?.tools ?? [];
+  const stale = cache?.tools ?? BUILTIN_TOOLS;
   return Promise.race([inflight, new Promise<McpToolInfo[]>((r) => setTimeout(() => r(stale), wait))]);
 }
 export const resetToolCache = () => { cache = null; };

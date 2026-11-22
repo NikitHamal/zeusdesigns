@@ -465,6 +465,7 @@ where
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
         let mut saw_text = false;
+        let mut in_think = false;
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -475,9 +476,24 @@ where
                     break;
                 }
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
-                    if ev.get("type").and_then(|t| t.as_str()) == Some("text-delta") {
+                    let etype = ev.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    if etype == "reasoning-delta" || etype == "reasoning" {
+                        if let Some(delta) = ev.get("delta").or_else(|| ev.get("text")).and_then(|d| d.as_str()) {
+                            if !delta.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(delta);
+                            }
+                        }
+                    } else if etype == "text-delta" {
                         if let Some(delta) = ev.get("delta").and_then(|d| d.as_str()) {
                             if !delta.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
                                 saw_text = true;
                                 on_delta(delta);
                             }
@@ -486,6 +502,9 @@ where
                 }
             }
             line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
         }
         if saw_text {
             return Ok(());
@@ -569,7 +588,9 @@ where
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
+    let mut prev_reason = String::new();
     let mut prev_answer = String::new();
+    let mut in_think = false;
     let mut saw_any = false;
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
@@ -581,8 +602,36 @@ where
             let raw = raw.trim();
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                 if let Some(content) = ev.get("content").and_then(|c| c.as_str()) {
+                    if let Some(d_start) = content.find("<details") {
+                        if let Some(gt) = content[d_start..].find('>') {
+                            let body_start = d_start + gt + 1;
+                            let body_end = content.rfind("</details>").unwrap_or(content.len());
+                            if body_end > body_start {
+                                let reason_raw = &content[body_start..body_end];
+                                let reason_clean = reason_raw
+                                    .lines()
+                                    .map(|l| l.strip_prefix("> ").unwrap_or(l))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                                    .trim()
+                                    .to_string();
+                                if reason_clean.len() > prev_reason.len() && reason_clean.starts_with(&prev_reason) {
+                                    if !in_think {
+                                        in_think = true;
+                                        on_delta("<think>");
+                                    }
+                                    on_delta(&reason_clean[prev_reason.len()..]);
+                                    prev_reason = reason_clean;
+                                }
+                            }
+                        }
+                    }
                     let answer = split_k2_details(content);
                     if !answer.is_empty() {
+                        if in_think {
+                            in_think = false;
+                            on_delta("</think>");
+                        }
                         let delta = if answer.starts_with(&prev_answer) {
                             &answer[prev_answer.len()..]
                         } else {
@@ -601,6 +650,9 @@ where
             }
         }
         line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
     }
 
     if saw_any {

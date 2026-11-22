@@ -99,21 +99,21 @@ impl MemoryStore {
     }
 }
 
-#[tauri::command]
-pub fn memory_list(store: tauri::State<'_, MemoryStore>) -> Vec<MemoryItem> {
-    store.list()
+#[tauri::command(async)]
+pub fn memory_list(store: tauri::State<'_, MemoryStore>) -> Result<Vec<MemoryItem>, String> {
+    Ok(store.list())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn memory_add(
     text: String,
     category: Option<String>,
     store: tauri::State<'_, MemoryStore>,
-) -> Vec<MemoryItem> {
-    store.add(text, category)
+) -> Result<Vec<MemoryItem>, String> {
+    Ok(store.add(text, category))
 }
 
-#[tauri::command]
-pub fn memory_delete(id: String, store: tauri::State<'_, MemoryStore>) -> Vec<MemoryItem> {
-    store.remove(&id)
+#[tauri::command(async)]
+pub fn memory_delete(id: String, store: tauri::State<'_, MemoryStore>) -> Result<Vec<MemoryItem>, String> {
+    Ok(store.remove(&id))
 }

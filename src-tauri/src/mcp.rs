@@ -187,13 +187,18 @@ impl McpRegistry {
                     tools.extend(c);
                     continue;
                 }
-                if let Ok(discovered) = query_stdio_mcp_tools(&s) {
-                    if !discovered.is_empty() {
+                match query_stdio_mcp_tools(&s) {
+                    Ok(discovered) => {
                         if let Ok(mut g) = tool_cache().lock() {
                             g.insert(key, discovered.clone());
                         }
+                        tools.extend(discovered);
                     }
-                    tools.extend(discovered);
+                    Err(_) => {
+                        if let Ok(mut g) = tool_cache().lock() {
+                            g.insert(key, Vec::new());
+                        }
+                    }
                 }
             }
         }
@@ -298,7 +303,7 @@ fn mcp_rpc(server: &McpServer, method: &str, params: Value, secs: u64) -> Result
 }
 
 fn query_stdio_mcp_tools(server: &McpServer) -> Result<Vec<McpTool>, String> {
-    let res = mcp_rpc(server, "tools/list", json!({}), 90)?;
+    let res = mcp_rpc(server, "tools/list", json!({}), 12)?;
     let mut out = Vec::new();
     if let Some(arr) = res.get("tools").and_then(|t| t.as_array()) {
         for item in arr {

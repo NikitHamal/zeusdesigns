@@ -151,7 +151,7 @@ pub fn walk_workspace(base_root: &Path, current: &Path, depth: usize) -> Vec<Fil
     nodes
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn workspace_open(
     path: String,
     state: tauri::State<'_, WorkspaceState>,
@@ -173,7 +173,7 @@ pub fn workspace_open(
     }))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn workspace_tree(root: String, depth: Option<usize>) -> Result<Vec<FileNode>, String> {
     let root_path = Path::new(&root);
     if !root_path.exists() {
@@ -183,14 +183,14 @@ pub fn workspace_tree(root: String, depth: Option<usize>) -> Result<Vec<FileNode
     Ok(walk_workspace(root_path, root_path, max_depth))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_read(root: String, path: String) -> Result<String, String> {
     let target = safe_join(&root, &path)?;
     fs::read_to_string(&target)
         .map_err(|e| format!("Failed to read '{}': {}", target.display(), e))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fs_write(root: String, path: String, content: String) -> Result<(), String> {
     let target = safe_join(&root, &path)?;
     if let Some(parent) = target.parent() {
@@ -201,7 +201,7 @@ pub fn fs_write(root: String, path: String, content: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to write '{}': {}", target.display(), e))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
     let workdir = if root.trim().is_empty() {
         std::env::current_dir().map_err(|e| e.to_string())?
@@ -282,9 +282,9 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
     matches
 }
 
-#[tauri::command]
-pub fn workspace_search(root: String, query: String, limit: Option<usize>) -> Vec<Value> {
-    search_workspace_code(&root, &query, limit.unwrap_or(25).min(100))
+#[tauri::command(async)]
+pub fn workspace_search(root: String, query: String, limit: Option<usize>) -> Result<Vec<Value>, String> {
+    Ok(search_workspace_code(&root, &query, limit.unwrap_or(25).min(100)))
 }
 
 #[cfg(test)]
