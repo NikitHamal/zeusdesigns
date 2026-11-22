@@ -31,6 +31,18 @@ export function quiet(html: string): string {
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + tag) : tag + html;
 }
 
+/** Re-themes an existing screen's design-system tokens and component kit in-place when switching Design Systems. */
+export function rethemeHtml(html: string, ds: DesignSystem): string {
+  if (!html) return html;
+  const usedFonts = fontsUsedIn(html + " " + ds.tokens.font + " " + ds.tokens.heading);
+  const fontCss = usedFonts.length ? fontFaceCss(usedFonts) : "";
+  const kit = `<style data-zeus-kit>${fontCss}${tokensCss(ds)}${kitCss(ds.id)}</style>`;
+  if (/<style data-zeus-kit>[\s\S]*?<\/style>/i.test(html)) {
+    return html.replace(/<style data-zeus-kit>[\s\S]*?<\/style>/i, kit);
+  }
+  return harden(html, ds, { partial: true }).html;
+}
+
 export const UI_ICON_NAMES = Object.keys(MATERIAL_ICONS).sort();
 
 /* ------------------------------------------------------------------ */

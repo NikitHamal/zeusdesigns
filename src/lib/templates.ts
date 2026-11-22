@@ -200,5 +200,5 @@ export function renderScreen(ds: DesignSystem, archetype: Archetype, variant: nu
 }
 
 export function blankFrame(ds: DesignSystem): string {
-  return iconize(`<!doctype html><html><head><meta charset="utf-8"><style>${tokensCss(ds)}${MI_CSS}*{box-sizing:border-box}body{margin:0;height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--muted);font-family:var(--font);text-align:center}div{max-width:240px;line-height:1.5}b{display:block;font-size:34px;margin-bottom:8px}</style></head><body><div><b>@@add@@</b></div></body></html>`);
+  return iconize(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${tokensCss(ds)}${BASE_CSS}${MI_CSS}</style></head><body><div class="z-screen"><div class="z-page" style="justify-content:center;align-items:center;text-align:center;min-height:100vh" data-zeus-empty-frame="1"><div style="display:grid;place-items:center;width:56px;height:56px;border-radius:18px;background:var(--container);color:var(--on-container);font-size:24px;margin-bottom:8px">@@add@@</div><div style="font-weight:600;color:var(--text);font-size:16px">Empty frame</div><div style="color:var(--muted);font-size:13px;max-width:220px">Drop components from the Insert panel or ask Zeus to design</div></div></div></body></html>`);
 }

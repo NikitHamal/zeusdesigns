@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { DEVICE_SIZE } from "./types";
 import { DESIGN_SYSTEMS, getDS } from "./lib/designSystems";
+import { rethemeHtml } from "./lib/harness";
 import { SKILLS } from "./lib/skills";
 import { blankFrame } from "./lib/templates";
 import type { Workspace } from "./lib/bridge";
@@ -150,7 +151,19 @@ export const useStore = create<State>()(
         sidebarOpen: true, showCanvas: false, update: null, version: "",
       },
 
-      patchSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
+      patchSettings: (p) => set((s) => {
+        const nextSettings = { ...s.settings, ...p };
+        if (p.designSystemId && p.designSystemId !== s.settings.designSystemId) {
+          const ds = getDS(p.designSystemId);
+          return {
+            settings: nextSettings,
+            artboards: s.artboards.map((a) =>
+              a.pageId === s.activePageId ? { ...a, html: rethemeHtml(a.html, ds) } : a
+            ),
+          };
+        }
+        return { settings: nextSettings };
+      }),
       patchUI: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
       notify: (m) => {
         set((s) => ({ ui: { ...s.ui, toast: m } }));
@@ -220,8 +233,9 @@ export const useStore = create<State>()(
       },
       addBlankFrame: (x, y, w, h) => {
         const st = get();
-        const device = w > 700 ? "web" : "mobile";
-        return st.addArtboard({ name: "Frame", x, y, w, h, device, html: blankFrame(getDS(st.settings.designSystemId)) });
+        const device = w > 700 ? "web" : w > 540 ? "tablet" : "mobile";
+        const ds = getDS(st.settings.designSystemId);
+        return st.addArtboard({ name: "Frame", x, y, w, h, device, html: rethemeHtml(blankFrame(ds), ds) });
       },
       updateArtboard: (id, p) => set((s) => ({ artboards: s.artboards.map((a) => (a.id === id ? { ...a, ...p } : a)) })),
       reviseArtboard: (id, html) => set((s) => ({
