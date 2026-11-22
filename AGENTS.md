@@ -19,11 +19,15 @@ These apply to the app UI and to every design-system prompt, skill, template and
 - Icons are the official Material Symbols Rounded paths, rendered by `<Icon name="..." />` (`src/components/Icon.tsx`) as inline SVG. There is no icon font and no ligature fallback, so an icon can never render as a letter.
 - `node scripts/icons.mjs` regenerates `src/lib/materialIcons.ts` and `src/lib/iconPaths.ts`. It bundles every quoted token in `src/` that is a real Material Symbol name, plus names listed in a `/* icons: a, b */` comment. Run it after adding an icon name. Icons missing from the npm package are cached in `scripts/extra-icons/`.
 - Generated screens use `<i data-i="name"></i>`; the harness swaps it for the same paths.
-- Fonts are bundled through npm (no CDN): Google Sans Flex / Roboto Flex for UI, Roboto Mono for code.
+- App fonts are bundled (no CDN): Google Sans Flex for UI, Roboto Mono for code.
+- Design fonts are bundled latin variable subsets in `src/assets/fonts/design/` and listed in `src/lib/fonts.ts` (Inter, Plus Jakarta Sans, DM Sans, Manrope, Space Grotesk, Fraunces, Instrument Serif, JetBrains Mono). Shadow DOM artboards inherit them from the host document (`installDesignFonts`); iframes get `@font-face` through `quiet()`, exports through `embedFonts()`. To add a font: drop the woff2 in that folder and add one line to `DESIGN_FONTS`; the prompt, `studio_fonts` and pairings follow.
 - Colors come from the M3 tokens in `src/index.css` and `src/lib/theme.ts`. Do not hard-code hex values in components.
 
 ## Design harness (`src/lib/harness.ts`)
 Every artboard goes through `harden()` before it reaches the canvas: structure repair, offline-safe output, shadow/emoji/LIVE/blue-purple-gradient removal, icon resolution, and injection of the active design system's token + component kit (`z-*` classes, per-system overrides in `DS_KIT`). `harnessPrompt()` is the generation prompt: protocol, laws, kit reference, craft rules, skeletons. Change a design rule in one place and it applies to prompt and enforcement together. `engine.ts` also recovers bare HTML documents that skip the `<artboard>` wrapper.
+
+## Chat activity UI (`src/components/Activity.tsx`)
+`ZeusOrb` is the only working indicator (chat status line, work log, tool rows, canvas pill). `WorkLog` groups reasoning and tool steps in one collapsible card: open while streaming, collapsed to "Worked for Ns" after. Reasoning comes from `<think>` blocks in the stream or a `reasoning` chat event; the harness asks models for a short `<think>` plan first, so every model shows real reasoning. On the canvas, `DesigningFx` (`Canvas.tsx`) draws a wireframe skeleton, a scan sweep and a travelling ring while an artboard streams, then a one-time sweep on completion.
 
 ## Zeus Studio (built-in MCP)
 `src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.

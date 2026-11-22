@@ -7,6 +7,21 @@ Running log across agent sessions. Newest session first. Rules live in `AGENTS.m
 - UI & Canvas: Shadow DOM zero-iframe artboard and thumbnail renderer (`src/lib/shadowRenderer.tsx`), viewport frustum culling, per-chat isolated canvases.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
 
+## Session 6
+Goal: stop the weak-looking generations (no fonts, clipped nav, flat component use), replace the 3-dot thinking indicator, show reasoning, and rebuild the canvas designing animation.
+
+Shipped:
+- Bundled design fonts (`src/lib/fonts.ts`): 8 latin variable families inlined at build time; design systems now resolve to them instead of system fallbacks (Fraunces for editorial/claude headings, Plus Jakarta Sans for glass, Inter for shadcn/polaris/antd, Space Grotesk for neo). Exports embed the faces they use.
+- Harness prompt: think-first plan, Typography section with pairings, Anti-slop section (banned patterns, one signature move, size contrast, color ratio). Studio `studio_fonts` and the brief use the bundled families.
+- Kit: mobile `z-screen` with a `z-nav` pins the nav and scrolls `z-page` inside it (fixes the clipped bottom nav); row icons capped at 22px; `z-item` radius reset (fixes curved underlines).
+- Chat: `ZeusOrb`, `WorkLog`, `ThinkingBlock`, `LiveStatus`; `Message.reasoning` and `thinkMs`; `reasoning` ChatEvent supported in `engine.ts`.
+- Canvas: `DesigningFx` skeleton, scan sweep, travelling ring, completion sweep.
+
+Not done / next:
+- Rust providers still drop provider-side reasoning (K2 `<details>`, ChatJimmy `<|think|>`); emit `reasoning` events from `providers.rs` to surface it. Needs a Windows CI cycle.
+- Memory target: the WebView2 floor is still above 30 MB. A true fix means replacing the webview with a native renderer (large rewrite, not started).
+- No visual QA of the new animations on Windows yet.
+
 ## Session 5
 Goal: keep Windows RAM working set under 20-30 MB without losing any features or visual quality, isolate canvases per chat, and elevate the agent harness and Zeus Studio MCP.
 
