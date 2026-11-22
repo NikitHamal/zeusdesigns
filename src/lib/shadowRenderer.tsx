@@ -92,6 +92,8 @@ export const ShadowFrame = memo(function ShadowFrame({
   --z-vw: ${vw}px;
   overflow: hidden;
   position: relative;
+  contain: layout paint;
+  isolation: isolate;
   background: var(--bg, #fff);
   color: var(--text, #111);
   font-family: var(--font, system-ui, sans-serif);

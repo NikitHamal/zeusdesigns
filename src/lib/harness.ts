@@ -362,6 +362,15 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
   html = mapText(html, (s) => s.replace(EMOJI, () => { emojis++; return ""; }));
   if (emojis) fixes.push(`removed ${emojis} emoji`);
 
+  // --- type floor: nothing under 11px, so no screen ships with unreadable captions ---
+  let tinyType = 0;
+  html = html.replace(/(font-size\s*:\s*)(\d+(?:\.\d+)?)px/gi, (m, pre: string, v: string) => {
+    if (parseFloat(v) >= 11) return m;
+    tinyType++;
+    return `${pre}11px`;
+  });
+  if (tinyType) fixes.push(`raised ${tinyType} tiny font size${tinyType > 1 ? "s" : ""} to 11px`);
+
   let live = 0;
   html = html.replace(/<(span|div|small|b|i|em|strong|p|a|button|label)\b[^>]*>\s*(?:[\u25CF\u2022]\s*)?LIVE\s*<\/\1>/g, () => { live++; return ""; });
   if (live) fixes.push(`removed ${live} LIVE badge${live > 1 ? "s" : ""}`);
