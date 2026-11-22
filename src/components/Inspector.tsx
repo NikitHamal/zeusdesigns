@@ -4,6 +4,7 @@ import { editor, useEditor, type InspectorTab, type LayerNode } from "../lib/edi
 import { BLOCK_CATEGORIES, insertBlockIntoHtml, UI_BLOCKS, type BlockCategory } from "../lib/blocks";
 import { getDS } from "../lib/designSystems";
 import { DESIGN_FONTS } from "../lib/fonts";
+import { UI_ICON_NAMES } from "../lib/harness";
 import { canvasApi } from "../lib/canvasApi";
 import type { Quote } from "../types";
 import { cn } from "../utils/cn";
@@ -95,20 +96,50 @@ function LayerTreeView({ nodes, activePath, depth = 0 }: { nodes: LayerNode[]; a
               onClick={() => editor.selectPath(n.path)}
               style={{ paddingLeft: 8 + depth * 13 }}
               className={cn(
-                "group flex h-7 cursor-pointer items-center gap-1.5 rounded-lg pr-1.5 text-[12px] transition-colors",
+                "group flex h-7 cursor-pointer items-center gap-1 rounded-lg pr-1 text-[12px] transition-colors",
                 isSel ? "bg-primary-container font-semibold text-on-primary-container" : "text-on-surface hover:bg-surface-high"
               )}
             >
               <Icon name={iconName} size={13} className={isSel ? "text-on-primary-container" : "text-on-surface-variant"} />
               <span className={cn("min-w-0 flex-1 truncate", n.hidden && "line-through opacity-50")}>{n.label}</span>
-              <span className="font-mono text-[10px] opacity-60">{n.tag}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); editor.toggleHide(n.path); }}
-                title={n.hidden ? "Show layer" : "Hide layer"}
-                className={cn("grid size-5 place-items-center rounded opacity-0 group-hover:opacity-100", n.hidden && "opacity-100")}
-              >
-                <Icon name={n.hidden ? "visibility_off" : "visibility"} size={12} />
-              </button>
+              <span className="font-mono text-[10px] opacity-60 group-hover:hidden">{n.tag}</span>
+              <div className={cn("hidden items-center gap-0.5 group-hover:flex", n.hidden && "flex")}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); editor.movePath(n.path, -1); }}
+                  title="Move up"
+                  className="grid size-4 place-items-center rounded hover:bg-surface-highest"
+                >
+                  <Icon name="keyboard_arrow_up" size={12} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); editor.movePath(n.path, 1); }}
+                  title="Move down"
+                  className="grid size-4 place-items-center rounded hover:bg-surface-highest"
+                >
+                  <Icon name="keyboard_arrow_down" size={12} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); editor.duplicatePath(n.path); }}
+                  title="Duplicate layer"
+                  className="grid size-4 place-items-center rounded hover:bg-surface-highest"
+                >
+                  <Icon name="content_copy" size={11} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); editor.toggleHide(n.path); }}
+                  title={n.hidden ? "Show layer" : "Hide layer"}
+                  className="grid size-4 place-items-center rounded hover:bg-surface-highest"
+                >
+                  <Icon name={n.hidden ? "visibility_off" : "visibility"} size={11} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); editor.deletePath(n.path); }}
+                  title="Delete layer"
+                  className="grid size-4 place-items-center rounded text-error hover:bg-error-container"
+                >
+                  <Icon name="delete" size={11} />
+                </button>
+              </div>
             </div>
             {n.children.length > 0 && <LayerTreeView nodes={n.children} activePath={activePath} depth={depth + 1} />}
           </div>
@@ -138,6 +169,7 @@ export function Inspector() {
   const [codeText, setCodeText] = useState("");
   const [cat, setCat] = useState<BlockCategory | "all">("all");
   const [query, setQuery] = useState("");
+  const [iconQuery, setIconQuery] = useState("");
   const [insertWhere, setInsertWhere] = useState<"after" | "inside" | "append">("after");
 
   const key = sel ? sel.path.join(".") + sel.tag : "";
@@ -339,7 +371,9 @@ export function Inspector() {
                 onDragStart={(e) => {
                   e.dataTransfer.setData("application/x-zeus-block", b.id);
                   e.dataTransfer.effectAllowed = "copy";
+                  useEditor.getState().setDraggingBlockId(b.id);
                 }}
+                onDragEnd={() => useEditor.getState().setDraggingBlockId(null)}
                 onClick={() => handleInsertBlock(b.id)}
                 className="state group flex w-full items-center gap-2.5 rounded-2xl border border-outline-variant/50 bg-surface-low p-2.5 text-left transition-colors hover:border-primary/60 hover:bg-surface-high"
               >
@@ -445,6 +479,107 @@ export function Inspector() {
               <IconBtn label="Ask Zeus about this element" size={32} active onClick={askZeus}><Icon name="chat_bubble" size={15} fill /></IconBtn>
             </div>
 
+            {/* Component Variant & Interactive State Switcher */}
+            {/\bz-(btn|card|chip|seg|tab|nav-item|day|icon-btn)\b/.test(sel.cls) && (
+              <Section title="Component Variant">
+                {/\bz-btn\b/.test(sel.cls) && (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                      {([
+                        ["", "Filled"],
+                        ["tonal", "Tonal"],
+                        ["outline", "Outline"],
+                        ["text", "Text"],
+                      ] as const).map(([v, lbl]) => {
+                        const on = v === "" ? !/\b(tonal|outline|text)\b/.test(sel.cls) : sel.cls.split(/\s+/).includes(v);
+                        return (
+                          <button
+                            key={lbl}
+                            onClick={() => editor.toggleClass(v, ["tonal", "outline", "text"])}
+                            className={cn("state h-6 rounded-lg", on ? "bg-primary text-on-primary" : "text-on-surface-variant")}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                      {([
+                        ["sm", "Small"],
+                        ["", "Default"],
+                        ["lg", "Large"],
+                        ["block", "Full W"],
+                      ] as const).map(([v, lbl]) => {
+                        const on = v === "" ? !/\b(sm|lg)\b/.test(sel.cls) : sel.cls.split(/\s+/).includes(v);
+                        return (
+                          <button
+                            key={lbl}
+                            onClick={() => v === "block" ? editor.toggleClass("block") : editor.toggleClass(v, ["sm", "lg"])}
+                            className={cn("state h-6 rounded-lg", on ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant")}
+                          >
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/\bz-card\b/.test(sel.cls) && (
+                  <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                    {([
+                      ["", "Surface"],
+                      ["tonal", "Tonal"],
+                      ["accent", "Accent"],
+                      ["flat", "Flat"],
+                    ] as const).map(([v, lbl]) => {
+                      const on = v === "" ? !/\b(tonal|accent|flat)\b/.test(sel.cls) : sel.cls.split(/\s+/).includes(v);
+                      return (
+                        <button
+                          key={lbl}
+                          onClick={() => editor.toggleClass(v, ["tonal", "accent", "flat"])}
+                          className={cn("state h-6 rounded-lg", on ? "bg-primary text-on-primary" : "text-on-surface-variant")}
+                        >
+                          {lbl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {/\bz-icon-btn\b/.test(sel.cls) && (
+                  <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                    {([
+                      ["", "Outlined"],
+                      ["tonal", "Tonal"],
+                      ["filled", "Filled"],
+                    ] as const).map(([v, lbl]) => {
+                      const on = v === "" ? !/\b(tonal|filled)\b/.test(sel.cls) : sel.cls.split(/\s+/).includes(v);
+                      return (
+                        <button
+                          key={lbl}
+                          onClick={() => editor.toggleClass(v, ["tonal", "filled"])}
+                          className={cn("state h-6 rounded-lg", on ? "bg-primary text-on-primary" : "text-on-surface-variant")}
+                        >
+                          {lbl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {/\bz-(chip|seg|tab|nav-item|day)\b/.test(sel.cls) && (
+                  <button
+                    onClick={() => editor.toggleClass("on")}
+                    className={cn(
+                      "state flex h-8 w-full items-center justify-between rounded-xl px-3 text-xs font-semibold",
+                      /\bon\b/.test(sel.cls) ? "bg-primary-container text-on-primary-container" : "bg-surface-high text-on-surface-variant"
+                    )}
+                  >
+                    <span>Active / Selected state (.on)</span>
+                    <span>{/\bon\b/.test(sel.cls) ? "ON" : "OFF"}</span>
+                  </button>
+                )}
+              </Section>
+            )}
+
             {sel.text !== null && (
               <Section title="Content">
                 <textarea
@@ -452,6 +587,33 @@ export function Inspector() {
                   onChange={(e) => { setText(e.target.value); editor.text(e.target.value); }}
                   className="w-full resize-none rounded-xl bg-surface-high px-3 py-2 text-[12.5px] text-on-surface outline-none focus:ring-2 focus:ring-primary/50"
                 />
+              </Section>
+            )}
+
+            {/* Interactive Material Symbol Icon Swapper */}
+            {sel.hasIcon && (
+              <Section title="Swap Icon">
+                <label className="mb-2 flex h-7 items-center gap-1.5 rounded-xl bg-surface-high px-2.5 text-[11.5px] text-on-surface-variant">
+                  <Icon name="search" size={13} />
+                  <input
+                    value={iconQuery}
+                    onChange={(e) => setIconQuery(e.target.value)}
+                    placeholder="Filter 150+ bundled icons…"
+                    className="w-full bg-transparent text-on-surface outline-none placeholder:text-on-surface-variant/60"
+                  />
+                </label>
+                <div className="grid max-h-28 grid-cols-7 gap-1 overflow-y-auto rounded-xl bg-surface-low p-1.5">
+                  {UI_ICON_NAMES.filter((ic) => !iconQuery.trim() || ic.includes(iconQuery.toLowerCase().trim())).slice(0, 42).map((ic) => (
+                    <button
+                      key={ic}
+                      onClick={() => editor.swapIcon(ic)}
+                      title={ic}
+                      className="state grid size-8 place-items-center rounded-lg text-on-surface hover:bg-primary hover:text-on-primary"
+                    >
+                      <Icon name={ic} size={16} />
+                    </button>
+                  ))}
+                </div>
               </Section>
             )}
 

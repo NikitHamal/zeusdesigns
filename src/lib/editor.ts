@@ -21,6 +21,7 @@ export interface ElInfo {
   tag: string;
   cls: string;
   text: string | null;
+  hasIcon: boolean;
   html: string;
   outerHtml: string;
   s: ElStyles;
@@ -43,6 +44,7 @@ interface EditorState {
   artboardId: string | null;
   tab: InspectorTab;
   insertOpen: boolean;
+  draggingBlockId: string | null;
   startHtml: string;
   stack: string[];
   redoStack: string[];
@@ -53,6 +55,7 @@ interface EditorState {
   setTree: (t: LayerNode[]) => void;
   setTab: (t: InspectorTab) => void;
   setInsertOpen: (open: boolean) => void;
+  setDraggingBlockId: (id: string | null) => void;
   record: (prev: string) => void;
 }
 
@@ -62,17 +65,19 @@ export const useEditor = create<EditorState>((set, get) => ({
   artboardId: null,
   tab: "design",
   insertOpen: false,
+  draggingBlockId: null,
   startHtml: "",
   stack: [],
   redoStack: [],
   lastPush: 0,
   begin: (id, html, tab = "design") =>
     set({ artboardId: id, startHtml: html, stack: [], redoStack: [], sel: null, tree: [], lastPush: 0, tab }),
-  end: () => set({ artboardId: null, sel: null, tree: [], stack: [], redoStack: [], startHtml: "" }),
+  end: () => set({ artboardId: null, sel: null, tree: [], stack: [], redoStack: [], startHtml: "", draggingBlockId: null }),
   setSel: (sel) => set({ sel }),
   setTree: (tree) => set({ tree }),
   setTab: (tab) => set({ tab }),
   setInsertOpen: (insertOpen) => set({ insertOpen }),
+  setDraggingBlockId: (draggingBlockId) => set({ draggingBlockId }),
   record: (prev) => {
     const now = Date.now();
     if (now - get().lastPush < 450) return;
@@ -96,6 +101,16 @@ export const editor = {
   move: (dir: -1 | 1) => editorBridge.post({ op: "move", dir }),
   selectPath: (path: number[]) => editorBridge.post({ op: "selectPath", path }),
   toggleHide: (path: number[]) => editorBridge.post({ op: "toggleHide", path }),
+  deletePath: (path: number[]) => editorBridge.post({ op: "deletePath", path }),
+  duplicatePath: (path: number[]) => editorBridge.post({ op: "duplicatePath", path }),
+  movePath: (path: number[], dir: -1 | 1) => editorBridge.post({ op: "movePath", path, dir }),
+  toggleClass: (cls: string, exclusiveGroup?: string[]) => editorBridge.post({ op: "toggleClass", cls, exclusiveGroup }),
+  swapIcon: (iconName: string) => {
+    const ds = getDS(useStore.getState().settings.designSystemId);
+    const wrapped = harden(`<body><i data-i="${iconName}"></i></body>`, ds, { partial: true }).html;
+    const svg = /<svg[\s\S]*?<\/svg>/i.exec(wrapped)?.[0];
+    if (svg) editorBridge.post({ op: "swapIcon", svg });
+  },
   wrap: (dir: "row" | "column") => editorBridge.post({ op: "wrap", dir }),
   replaceHtml: (html: string) => editorBridge.post({ op: "replaceHtml", html }),
   insertHtml: (html: string, where: "after" | "inside" | "append" = "after") => {
@@ -185,8 +200,9 @@ function simpleText(el){if(!el.childNodes.length)return false;return Array.proto
 function cleanOuter(el){var c=el.cloneNode(true);c.removeAttribute("data-zsel");c.removeAttribute("data-zhov");c.removeAttribute("contenteditable");if(c.querySelectorAll){c.querySelectorAll("[data-zsel],[data-zhov],[contenteditable]").forEach(function(n){n.removeAttribute("data-zsel");n.removeAttribute("data-zhov");n.removeAttribute("contenteditable")})}return c.outerHTML}
 function info(el){var cs=getComputedStyle(el),r=el.getBoundingClientRect(),sw=el.style.width||"",sh=el.style.height||"";
 var clean=cleanOuter(el);
+var hasIc=el.tagName.toLowerCase()==="svg"||!!(el.querySelector&&el.querySelector("svg.z-i,svg"));
 return{path:pathOf(el)||[],tag:el.tagName.toLowerCase(),cls:(el.getAttribute("class")||"").replace(/\s+/g," ").trim().slice(0,80),
-text:simpleText(el)?el.textContent.slice(0,600):null,html:clean.slice(0,700),outerHtml:clean.slice(0,8000),
+text:simpleText(el)?el.textContent.slice(0,600):null,hasIcon:hasIc,html:clean.slice(0,700),outerHtml:clean.slice(0,8000),
 s:{color:cs.color,bg:cs.backgroundColor,fs:px(cs.fontSize),fw:cs.fontWeight,ff:cs.fontFamily,ta:cs.textAlign,
 br:px(cs.borderTopLeftRadius),bw:px(cs.borderTopWidth),bc:cs.borderTopColor,op:cs.opacity===""?1:parseFloat(cs.opacity),
 pt:px(cs.paddingTop),pr:px(cs.paddingRight),pb:px(cs.paddingBottom),pl:px(cs.paddingLeft),
@@ -227,7 +243,7 @@ c.querySelectorAll('[style=""]').forEach(function(n){n.removeAttribute("style")}
 return"<!doctype html>"+c.outerHTML}
 function emit(){clearTimeout(timer);timer=setTimeout(function(){P.postMessage({zeus:"edit",type:"html",html:ser()},"*");sendTree()},120)}
 function touched(){emit();place();if(sel&&sel!==document.body)P.postMessage({zeus:"edit",type:"select",info:info(sel)},"*")}
-function target(e){var t=e.target;if(t===document.documentElement)t=document.body;if(t&&t.closest&&t.closest("[data-zeus-edit]"))return null;return t&&t.nodeType===1?t:null}
+function target(e){var t=e.target;if(t===document.documentElement)t=document.body;if(t&&t.closest&&t.closest("[data-zeus-edit]"))return null;if(t&&t.closest){var sv=t.closest("svg");if(sv)return sv}return t&&t.nodeType===1?t:null}
 document.addEventListener("mouseover",function(e){var t=target(e);if(hov)hov.removeAttribute("data-zhov");hov=t;if(t&&t!==sel&&t!==document.body)t.setAttribute("data-zhov","")},true);
 document.addEventListener("mouseout",function(e){if(hov){hov.removeAttribute("data-zhov");hov=null}},true);
 document.addEventListener("click",function(e){if(editing&&e.target===editing)return;var t=target(e);if(!t)return;e.preventDefault();e.stopPropagation();if(editing)endEdit();if(hov)hov.removeAttribute("data-zhov");pick(t)},true);
@@ -253,6 +269,9 @@ window.addEventListener("scroll",place,true);window.addEventListener("resize",pl
 function run(d){
   if(d.op==="selectPath"){var n=byPath(d.path||[]);if(n){pick(n);n.scrollIntoView({block:"nearest",behavior:"smooth"})}return}
   if(d.op==="toggleHide"){var h=byPath(d.path||[]);if(h){h.style.display=h.style.display==="none"?"":"none";touched()}return}
+  if(d.op==="deletePath"){var dp=byPath(d.path||[]);if(dp&&dp!==document.body){var par0=dp.parentElement;dp.remove();if(sel===dp){sel=null;lab.style.display="none";box.style.display="none";P.postMessage({zeus:"edit",type:"select",info:null},"*")}emit();if(par0&&par0!==document.body)pick(par0)}return}
+  if(d.op==="duplicatePath"){var dup=byPath(d.path||[]);if(dup&&dup!==document.body){var cl=dup.cloneNode(true);cl.removeAttribute("data-zsel");cl.removeAttribute("data-zhov");dup.after(cl);pick(cl);emit()}return}
+  if(d.op==="movePath"){var mp=byPath(d.path||[]);if(mp&&mp!==document.body){var sb=d.dir<0?mp.previousElementSibling:mp.nextElementSibling;if(sb&&!sb.hasAttribute("data-zeus-edit")&&sb.tagName!=="SCRIPT"&&sb.tagName!=="STYLE"){if(d.dir<0)sb.before(mp);else sb.after(mp);pick(mp);emit()}}return}
   if(d.op==="insertHtml"){
     document.querySelectorAll("[data-zeus-empty-frame]").forEach(function(x){x.remove()});
     var tmp=document.createElement("div");tmp.innerHTML=d.html||"";
@@ -269,6 +288,24 @@ function run(d){
   var el=sel;if(!el||!document.body.contains(el))return;
   if(d.op==="style"){for(var k in d.style){var v=d.style[k];if(v===""||v==null)el.style.removeProperty(k);else el.style.setProperty(k,v)}touched()}
   else if(d.op==="text"){el.textContent=d.text;touched()}
+  else if(d.op==="toggleClass"){
+    if(Array.isArray(d.exclusiveGroup))d.exclusiveGroup.forEach(function(c){if(c)el.classList.remove(c)});
+    if(d.cls){if(Array.isArray(d.exclusiveGroup))el.classList.add(d.cls);else el.classList.toggle(d.cls)}
+    touched();
+  }
+  else if(d.op==="swapIcon"){
+    var targetSvg=el.tagName.toLowerCase()==="svg"?el:(el.querySelector&&el.querySelector("svg.z-i,svg"));
+    if(targetSvg&&d.svg){
+      var t3=document.createElement("div");t3.innerHTML=d.svg;
+      var newSvg=t3.firstElementChild;
+      if(newSvg){
+        var oldCls=targetSvg.getAttribute("class");
+        if(oldCls)newSvg.setAttribute("class",oldCls);
+        targetSvg.replaceWith(newSvg);
+        if(el===targetSvg)pick(newSvg);else touched();
+      }
+    }
+  }
   else if(d.op==="replaceHtml"){
     if(el===document.body)return;
     var t2=document.createElement("div");t2.innerHTML=d.html||"";

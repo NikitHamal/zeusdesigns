@@ -214,6 +214,7 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
   onMoveStart: (e: React.PointerEvent, id: string) => void; onResizeStart: (e: React.PointerEvent, id: string) => void;
 }) {
   const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
+  const draggingBlockId = useEditor((st) => st.draggingBlockId);
   const [renaming, setRenaming] = useState(false);
   const [dropOver, setDropOver] = useState(false);
   const s = clamp(0.8 / z, 1, 4);
@@ -346,6 +347,28 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
             onPointerDown={(e) => { e.stopPropagation(); onMoveStart(e, a.id); }}
             onDoubleClick={() => patchUI({ interactId: a.id })}
           />
+        )}
+        {draggingBlockId && (
+          <div
+            className={cn(
+              "absolute inset-0 z-10 grid place-items-center transition-colors",
+              dropOver ? "bg-primary/15" : "bg-transparent"
+            )}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDropOver(true);
+            }}
+            onDragLeave={() => setDropOver(false)}
+            onDrop={onDropBlock}
+          >
+            {dropOver && (
+              <div className="pointer-events-none flex items-center gap-2 rounded-full border border-primary bg-surface-container px-4 py-2 text-xs font-semibold text-primary">
+                <Icon name="add" size={16} />
+                <span>Drop component into {a.name}</span>
+              </div>
+            )}
+          </div>
         )}
         <DesigningFx a={a} radius={radius} />
       </div>
