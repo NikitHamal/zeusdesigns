@@ -32,15 +32,28 @@ export function fontsUsedIn(html: string): string[] {
   return DESIGN_FONTS.filter((f) => html.includes(f.family) || html.includes(f.family.replace(/\s+/g, "+"))).map((f) => f.family);
 }
 
-let installed = false;
-/** Registers the faces on the host document once (Shadow DOM artboards inherit them). */
-export function installDesignFonts() {
-  if (installed || typeof document === "undefined") return;
-  installed = true;
-  const el = document.createElement("style");
-  el.setAttribute("data-zeus-fonts", "");
-  el.textContent = fontFaceCss();
-  document.head.appendChild(el);
+const installedFamilies = new Set<string>();
+let fontStyleEl: HTMLStyleElement | null = null;
+
+/** Incrementally registers bundled variable font faces on the host document as artboards use them (Shadow DOM artboards inherit them without startup memory bloat). */
+export function installDesignFonts(only?: string[]) {
+  if (typeof document === "undefined") return;
+  const targets = only ?? DESIGN_FONTS.map((f) => f.family);
+  const missing = targets.filter((f) => !installedFamilies.has(f));
+  if (!missing.length) return;
+  if (!fontStyleEl) {
+    fontStyleEl = document.querySelector("style[data-zeus-fonts]") as HTMLStyleElement | null;
+    if (!fontStyleEl) {
+      fontStyleEl = document.createElement("style");
+      fontStyleEl.setAttribute("data-zeus-fonts", "");
+      document.head.appendChild(fontStyleEl);
+    }
+  }
+  const rules = fontFaceCss(missing);
+  if (rules) {
+    fontStyleEl.textContent = (fontStyleEl.textContent ?? "") + rules;
+  }
+  for (const f of missing) installedFamilies.add(f);
 }
 
 /** Standalone copy of a design with its fonts embedded, for export. */

@@ -4,6 +4,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { cn } from "../utils/cn";
+import { fontsUsedIn, installDesignFonts } from "./fonts";
 
 const InteractiveSelector = ".z-tab,.z-chip,.z-nav-item,.z-side-item,.z-seg";
 
@@ -94,6 +95,9 @@ export const ShadowFrame = memo(function ShadowFrame({
     if (!host) return;
     const root = shadowRef.current ?? host.attachShadow({ mode: "open" });
     shadowRef.current = root;
+
+    const usedFonts = fontsUsedIn(html);
+    if (usedFonts.length > 0) installDesignFonts(usedFonts);
 
     const { styles, bodyClass, bodyStyle, bodyHtml } = parseArtboardDocument(html);
     const vh = (h / 100).toFixed(3);
