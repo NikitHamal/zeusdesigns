@@ -489,6 +489,7 @@ export function InfiniteCanvas() {
   const [draftPin, setDraftPin] = useState<{ x: number; y: number; artboardId?: string } | null>(null);
   const [panning, setPanning] = useState(false);
   const [guides, setGuides] = useState<{ x?: number; y?: number }>({});
+  const [ctxMenu, setCtxMenu] = useState<{ cx: number; cy: number; wx: number; wy: number; boardId?: string } | null>(null);
 
   const setVp = useCallback((v: { x: number; y: number; z: number }) => useStore.getState().setViewport(pageId, v), [pageId]);
   const toWorld = useCallback((cx: number, cy: number) => {
@@ -566,7 +567,16 @@ export function InfiniteCanvas() {
         v: () => st.setTool("select"), h: () => st.setTool("hand"), t: () => st.setTool("text"), f: () => st.setTool("frame"),
         n: () => st.setTool("note"), p: () => st.setTool("pen"), s: () => st.setTool("shape"), c: () => st.setTool("pin"),
         i: () => { useEditor.getState().setTab("insert"); useEditor.getState().setInsertOpen(!useEditor.getState().insertOpen); },
-        Escape: () => { if (st.ui.editId) editor.finish(); useEditor.getState().setInsertOpen(false); st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
+        Enter: () => {
+          if (st.ui.editId || st.sel.length !== 1) return;
+          const b = st.artboards.find((a) => a.id === st.sel[0] && a.pageId === st.activePageId);
+          if (!b || b.loading) return;
+          useEditor.getState().begin(b.id, b.html, "design");
+          useEditor.getState().setInsertOpen(true);
+          st.patchUI({ editId: b.id, interactId: null });
+          setTimeout(() => canvasApi.fit([b.id], { right: 310 }), 40);
+        },
+        Escape: () => { if (st.ui.editId) editor.finish(); useEditor.getState().setInsertOpen(false); st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); setCtxMenu(null); },
         Delete: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         Backspace: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         "1": () => canvasApi.fit(), "2": () => st.sel.length && canvasApi.fit(st.sel),
@@ -764,11 +774,28 @@ export function InfiniteCanvas() {
     st.notify("Created frame with dropped component");
   };
 
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const r = rootRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const w = toWorld(e.clientX, e.clientY);
+    const st = useStore.getState();
+    const hit = [...st.artboards].reverse().find((a) => a.pageId === st.activePageId && w.x >= a.x && w.x <= a.x + a.w && w.y >= a.y && w.y <= a.y + a.h);
+    if (hit) st.setSel([hit.id]);
+    setCtxMenu({
+      cx: Math.min(r.width - 230, Math.max(12, e.clientX - r.left)),
+      cy: Math.min(r.height - 240, Math.max(12, e.clientY - r.top)),
+      wx: Math.round(w.x),
+      wy: Math.round(w.y),
+      boardId: hit?.id,
+    });
+  };
+
   return (
     <div
       ref={rootRef}
-      onPointerDown={onPointerDown}
-      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => { setCtxMenu(null); onPointerDown(e); }}
+      onContextMenu={onContextMenu}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("application/x-zeus-block")) e.preventDefault(); }}
       onDrop={onCanvasDrop}
       className="dots relative h-full w-full overflow-hidden bg-surface-lowest touch-none"
@@ -803,6 +830,84 @@ export function InfiniteCanvas() {
         {marquee && <div className="pointer-events-none absolute border border-primary bg-primary/10" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       </div>
       {empty && <EmptyCanvas />}
+      {ctxMenu && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ left: ctxMenu.cx, top: ctxMenu.cy }}
+          className="anim-pop pointer-events-auto absolute z-40 w-[224px] rounded-2xl border border-outline-variant bg-surface-container p-1.5"
+        >
+          {ctxMenu.boardId ? (
+            <>
+              <MenuItem icon={<Icon name="ads_click" size={15} />} label="Edit elements & layers" desc="Enter" onClick={() => {
+                const st = useStore.getState();
+                const b = st.artboards.find((a) => a.id === ctxMenu.boardId);
+                if (b && !b.loading) {
+                  useEditor.getState().begin(b.id, b.html, "design");
+                  useEditor.getState().setInsertOpen(true);
+                  st.patchUI({ editId: b.id, interactId: null });
+                  setTimeout(() => canvasApi.fit([b.id], { right: 310 }), 40);
+                }
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="add" size={15} />} label="Insert UI component" desc="I" onClick={() => {
+                const st = useStore.getState();
+                const b = st.artboards.find((a) => a.id === ctxMenu.boardId);
+                if (b && !b.loading) {
+                  useEditor.getState().begin(b.id, b.html, "insert");
+                  useEditor.getState().setInsertOpen(true);
+                  st.patchUI({ editId: b.id, interactId: null });
+                }
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="touch_app" size={15} />} label="Interact live preview" onClick={() => {
+                useStore.getState().patchUI({ interactId: ctxMenu.boardId, editId: null });
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="content_copy" size={15} />} label="Duplicate as variant" desc="Ctrl+D" onClick={() => {
+                useStore.getState().duplicateArtboard(ctxMenu.boardId!);
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="delete" size={15} />} danger label="Delete screen" desc="Del" onClick={() => {
+                useStore.getState().removeArtboards([ctxMenu.boardId!]);
+                setCtxMenu(null);
+              }} />
+            </>
+          ) : (
+            <>
+              <MenuLabel>Canvas</MenuLabel>
+              <MenuItem icon={<Icon name="smartphone" size={15} />} label="New Mobile Frame" desc="390×844" onClick={() => {
+                const st = useStore.getState();
+                const ab = st.addBlankFrame(ctxMenu.wx - 195, ctxMenu.wy - 100, 390, 844);
+                st.updateArtboard(ab.id, { device: "mobile", name: "Mobile Frame" });
+                st.setSel([ab.id]);
+                useEditor.getState().begin(ab.id, ab.html, "insert");
+                useEditor.getState().setInsertOpen(true);
+                st.patchUI({ editId: ab.id, interactId: null });
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="desktop_windows" size={15} />} label="New Web Frame" desc="1280×800" onClick={() => {
+                const st = useStore.getState();
+                const ab = st.addBlankFrame(ctxMenu.wx - 640, ctxMenu.wy - 100, 1280, 800);
+                st.updateArtboard(ab.id, { device: "web", name: "Web Frame" });
+                st.setSel([ab.id]);
+                useEditor.getState().begin(ab.id, ab.html, "insert");
+                useEditor.getState().setInsertOpen(true);
+                st.patchUI({ editId: ab.id, interactId: null });
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="widgets" size={15} />} label="Open Component Studio" desc="I" onClick={() => {
+                useEditor.getState().setTab("insert");
+                useEditor.getState().setInsertOpen(true);
+                setCtxMenu(null);
+              }} />
+              <MenuItem icon={<Icon name="fit_screen" size={15} />} label="Fit all screens" desc="1" onClick={() => {
+                canvasApi.fit();
+                setCtxMenu(null);
+              }} />
+            </>
+          )}
+        </div>
+      )}
       <SelectionAlignBar />
       <InkPalette />
     </div>
