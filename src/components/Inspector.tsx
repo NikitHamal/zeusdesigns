@@ -195,14 +195,18 @@ export function Inspector() {
   const handleInsertBlock = (blockId: string) => {
     const st = useStore.getState();
     const ds = getDS(dsId);
+    const b = UI_BLOCKS.find((x) => x.id === blockId);
+    if (!b) return;
     // If we are in live edit mode on an artboard, insert directly via editor postMessage
     if (editId && targetBoard && targetBoard.id === editId) {
-      const b = UI_BLOCKS.find((x) => x.id === blockId);
-      if (!b) return;
-      if (b.slot === "top" || b.slot === "bottom" || targetBoard.html.includes("data-zeus-empty-frame")) {
-        const updated = insertBlockIntoHtml(targetBoard.html, blockId, ds, targetBoard.device);
+      if (b.slot === "screen" || b.slot === "top" || b.slot === "bottom" || targetBoard.html.includes("data-zeus-empty-frame")) {
+        const dev = b.device ?? targetBoard.device;
+        const updated = insertBlockIntoHtml(targetBoard.html, blockId, ds, dev);
         useEditor.getState().record(targetBoard.html);
-        st.updateArtboard(targetBoard.id, { html: updated });
+        st.updateArtboard(targetBoard.id, {
+          html: updated,
+          ...(b.slot === "screen" ? { name: b.name, device: dev, w: dev === "web" ? 1280 : 390, h: dev === "web" ? 800 : 844 } : {}),
+        });
       } else {
         editor.insertHtml(b.html(), sel ? insertWhere : "append");
       }
@@ -210,23 +214,30 @@ export function Inspector() {
       return;
     }
 
-    // If an artboard exists on the page (selected or first on page), insert into it and enter edit mode
+    // If an artboard exists on the page (selected or first on page), insert into it
     if (targetBoard) {
-      const updated = insertBlockIntoHtml(targetBoard.html, blockId, ds, targetBoard.device);
+      const dev = b.device ?? targetBoard.device;
+      const updated = insertBlockIntoHtml(targetBoard.html, blockId, ds, dev);
       st.reviseArtboard(targetBoard.id, updated);
+      if (b.slot === "screen") {
+        st.updateArtboard(targetBoard.id, { name: b.name, device: dev, w: dev === "web" ? 1280 : 390, h: dev === "web" ? 800 : 844 });
+      }
       st.setSel([targetBoard.id]);
       st.notify(`Added to ${targetBoard.name}`);
       return;
     }
 
-    // Otherwise create a brand-new mobile frame on the canvas and insert the block into it!
+    // Otherwise create a brand-new frame on the canvas and insert the block into it!
+    const dev = b.device ?? "mobile";
+    const fw = dev === "web" ? 1280 : 390;
+    const fh = dev === "web" ? 800 : 844;
     const center = canvasApi.viewCenter();
-    const ab = st.addBlankFrame(Math.round(center.x - 195), Math.round(center.y - 422), 390, 844);
-    const updated = insertBlockIntoHtml(ab.html, blockId, ds, ab.device);
-    st.updateArtboard(ab.id, { name: "Custom Screen", html: updated });
+    const ab = st.addBlankFrame(Math.round(center.x - fw / 2), Math.round(center.y - fh / 2), fw, fh);
+    const updated = insertBlockIntoHtml(ab.html, blockId, ds, dev);
+    st.updateArtboard(ab.id, { name: b.slot === "screen" ? b.name : "Custom Screen", device: dev, html: updated });
     st.setSel([ab.id]);
     setTimeout(() => canvasApi.fit([ab.id], { right: 310 }), 40);
-    st.notify("Created frame and inserted component");
+    st.notify(`Created ${b.name}`);
   };
 
   const enterEditOnTarget = (nextTab: InspectorTab) => {

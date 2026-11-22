@@ -6,7 +6,7 @@ import { harden } from "./harness";
 import { buildSvgChart } from "./studio";
 import type { Device } from "../types";
 
-export type BlockCategory = "navigation" | "hero" | "cards" | "lists" | "forms" | "primitives";
+export type BlockCategory = "starters" | "navigation" | "hero" | "cards" | "lists" | "forms" | "primitives";
 
 export interface UIBlock {
   id: string;
@@ -14,11 +14,13 @@ export interface UIBlock {
   category: BlockCategory;
   icon: string;
   desc: string;
-  slot?: "top" | "bottom" | "page";
+  slot?: "top" | "bottom" | "page" | "screen";
+  device?: Device;
   html: () => string;
 }
 
 export const BLOCK_CATEGORIES: { id: BlockCategory; label: string; icon: string }[] = [
+  { id: "starters", label: "Full Layouts", icon: "dashboard_customize" },
   { id: "primitives", label: "Layout & Basics", icon: "layers" },
   { id: "navigation", label: "Navigation", icon: "menu" },
   { id: "hero", label: "Hero & Banners", icon: "web_asset" },
@@ -28,6 +30,68 @@ export const BLOCK_CATEGORIES: { id: BlockCategory; label: string; icon: string 
 ];
 
 export const UI_BLOCKS: UIBlock[] = [
+  // Full Screen Starters (1-click or drag-and-drop complete layouts)
+  {
+    id: "starter_mobile_notes",
+    name: "Notes & Knowledge Base",
+    category: "starters",
+    icon: "description",
+    desc: "Complete mobile notes screen with quota hero, pinned Bento grid, and notes list",
+    slot: "screen",
+    device: "mobile",
+    html: () => `<div class="z-screen"><header class="z-appbar"><h1>Notes</h1><button class="z-icon-btn"><i data-i="search"></i></button><button class="z-icon-btn tonal"><i data-i="add"></i></button></header><div class="z-page"><section class="z-hero"><div class="z-row z-between"><span class="z-small">Weekly capture</span><span class="z-badge">6 pinned</span></div><h2 class="z-display">24 notes</h2><div class="z-bar"><i style="width:78%"></i></div><div class="z-row z-between"><span class="z-small">5 of 6 focus docs reviewed</span><button class="z-btn sm">New note</button></div></section><div class="z-chips"><span class="z-chip on">All notes</span><span class="z-chip">Pinned</span><span class="z-chip">Product</span><span class="z-chip">Journal</span></div><div class="z-grid-2"><div class="z-card tonal"><div class="z-row z-between"><i data-i="push_pin" class="sm z-primary"></i><span class="z-small z-muted">14m ago</span></div><div class="z-title">Q4 Strategy</div><div class="z-small z-muted">6 action items · Roadmap</div></div><div class="z-card"><div class="z-row z-between"><i data-i="bookmark" class="sm z-muted"></i><span class="z-small z-muted">Yesterday</span></div><div class="z-title">Design Tokens</div><div class="z-small z-muted">M3E surface scale</div></div></div><div class="z-list"><div class="z-item"><span class="z-lead"><i data-i="description"></i></span><div class="z-grow"><div class="z-title">Architecture Review</div><div class="z-muted z-small">Shadow DOM renderer · 4 decisions</div></div><span class="z-badge">Today</span></div><div class="z-item"><span class="z-lead"><i data-i="checklist"></i></span><div class="z-grow"><div class="z-title">Release Checklist v2.4</div><div class="z-muted z-small">7 of 9 tasks completed</div></div><span class="z-small z-muted">11:20</span></div><div class="z-item"><span class="z-lead"><i data-i="article"></i></span><div class="z-grow"><div class="z-title">Reading: Dieter Rams</div><div class="z-muted z-small">10 principles for good design</div></div><span class="z-small z-muted">Thu</span></div><div class="z-item"><span class="z-lead"><i data-i="shopping_bag"></i></span><div class="z-grow"><div class="z-title">Saturday Farmers Market</div><div class="z-muted z-small">Sourdough, olive oil, figs</div></div><span class="z-small z-muted">Tue</span></div></div></div><nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="description" data-fill></i></span>Notes</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="push_pin"></i></span>Pinned</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="folder"></i></span>Folders</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav></div>`,
+  },
+  {
+    id: "starter_mobile_finance",
+    name: "Fintech Wallet & Spend",
+    category: "starters",
+    icon: "account_balance",
+    desc: "Complete mobile banking screen with balance hero, vaults, and transactions",
+    slot: "screen",
+    device: "mobile",
+    html: () => `<div class="z-screen"><header class="z-appbar"><h1>Wallet</h1><button class="z-icon-btn"><i data-i="qr_code_scanner"></i></button><button class="z-icon-btn tonal"><i data-i="notifications"></i></button></header><div class="z-page"><section class="z-hero"><div class="z-row z-between"><span class="z-small">Total balance</span><span class="z-badge">+7.2% this mo</span></div><h2 class="z-display">$18,420</h2><div class="z-bar"><i style="width:72%"></i></div><div class="z-row z-between"><span class="z-small">Card ••4417 active</span><button class="z-btn sm">Send money</button></div></section><div class="z-chips"><span class="z-chip on">All activity</span><span class="z-chip">Cards</span><span class="z-chip">Vaults</span><span class="z-chip">Transfers</span></div><div class="z-grid-2"><div class="z-card tonal"><div class="z-row z-between"><i data-i="savings" class="sm z-primary"></i><span class="z-small z-muted">4.85% APY</span></div><div class="z-title">$6,400.00</div><div class="z-small z-muted">Treasury vault</div></div><div class="z-card"><div class="z-row z-between"><i data-i="credit_card" class="sm z-muted"></i><span class="z-small z-muted">October</span></div><div class="z-title">$1,184.20</div><div class="z-small z-muted">18% under budget</div></div></div><div class="z-list"><div class="z-item"><span class="z-lead"><i data-i="storefront"></i></span><div class="z-grow"><div class="z-title">Whole Foods Market</div><div class="z-muted z-small">Groceries · Apple Pay</div></div><span class="z-title">-$84.17</span></div><div class="z-item"><span class="z-lead"><i data-i="account_balance"></i></span><div class="z-grow"><div class="z-title">Northwind Labs Payroll</div><div class="z-muted z-small">Direct deposit · Cleared</div></div><span class="z-badge">+$4,250</span></div><div class="z-item"><span class="z-lead"><i data-i="local_cafe"></i></span><div class="z-grow"><div class="z-title">Blue Bottle Coffee</div><div class="z-muted z-small">Food & drink · 09:14</div></div><span class="z-title">-$6.50</span></div><div class="z-item"><span class="z-lead"><i data-i="flight"></i></span><div class="z-grow"><div class="z-title">Lufthansa Airlines</div><div class="z-muted z-small">Lisbon return · LH 1175</div></div><span class="z-title">-$342.00</span></div></div></div><nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="account_balance" data-fill></i></span>Home</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="credit_card"></i></span>Cards</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="pie_chart"></i></span>Insights</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav></div>`,
+  },
+  {
+    id: "starter_mobile_fitness",
+    name: "Fitness & Workout Tracker",
+    category: "starters",
+    icon: "fitness_center",
+    desc: "Complete mobile training log with weekly volume, 7-day strip, and workouts",
+    slot: "screen",
+    device: "mobile",
+    html: () => `<div class="z-screen"><header class="z-appbar"><h1>Training</h1><button class="z-icon-btn"><i data-i="calendar_today"></i></button><button class="z-icon-btn tonal"><i data-i="bolt"></i></button></header><div class="z-page"><section class="z-hero"><div class="z-row z-between"><span class="z-small">Weekly volume</span><span class="z-badge">12-day streak</span></div><h2 class="z-display">14.8 km</h2><div class="z-bar"><i style="width:74%"></i></div><div class="z-row z-between"><span class="z-small">74% of 20 km goal</span><button class="z-btn sm">Start workout</button></div></section><div class="z-days"><div class="z-day"><span class="z-muted">M</span><span>12</span></div><div class="z-day"><span class="z-muted">T</span><span>13</span></div><div class="z-day on"><span>W</span><span>14</span></div><div class="z-day"><span class="z-muted">T</span><span>15</span></div><div class="z-day"><span class="z-muted">F</span><span>16</span></div><div class="z-day"><span class="z-muted">S</span><span>17</span></div><div class="z-day"><span class="z-muted">S</span><span>18</span></div></div><div class="z-grid-2"><div class="z-card tonal"><div class="z-row z-between"><i data-i="local_fire_department" class="sm z-primary"></i><span class="z-small z-muted">Active</span></div><div class="z-title">1,840 kcal</div><div class="z-small z-muted">+12% vs last week</div></div><div class="z-card"><div class="z-row z-between"><i data-i="favorite" class="sm z-muted"></i><span class="z-small z-muted">Recovery</span></div><div class="z-title">58 bpm</div><div class="z-small z-muted">Optimal readiness</div></div></div><div class="z-list"><div class="z-item"><span class="z-lead"><i data-i="directions_run"></i></span><div class="z-grow"><div class="z-title">Morning Tempo Run</div><div class="z-muted z-small">6.2 km · 5:08 /km pace</div></div><span class="z-badge">31m</span></div><div class="z-item"><span class="z-lead"><i data-i="fitness_center"></i></span><div class="z-grow"><div class="z-title">Upper Body Strength</div><div class="z-muted z-small">Bench press, pull-ups, OHP</div></div><span class="z-small z-muted">45m</span></div><div class="z-item"><span class="z-lead"><i data-i="timer"></i></span><div class="z-grow"><div class="z-title">Mobility & Core Flow</div><div class="z-muted z-small">Thoracic rotation & planks</div></div><span class="z-small z-muted">18m</span></div></div></div><nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="home" data-fill></i></span>Today</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="fitness_center"></i></span>Plans</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="trending_up"></i></span>Progress</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav></div>`,
+  },
+  {
+    id: "starter_mobile_shop",
+    name: "E-Commerce Storefront",
+    category: "starters",
+    icon: "shopping_bag",
+    desc: "Complete mobile store with featured product hero, 2-up catalog, and cart summary",
+    slot: "screen",
+    device: "mobile",
+    html: () => `<div class="z-screen"><header class="z-appbar"><h1>Atelier</h1><button class="z-icon-btn"><i data-i="search"></i></button><button class="z-icon-btn tonal"><i data-i="shopping_bag"></i></button></header><div class="z-page"><section class="z-hero"><div class="z-row z-between"><span class="z-small">Autumn Release</span><span class="z-badge">In Stock</span></div><h2 class="z-display">Trail V4</h2><div class="z-row z-between"><span class="z-small">Stone Grey · Vibram Sole · $148</span><button class="z-btn sm">Add to bag</button></div></section><div class="z-chips"><span class="z-chip on">All Footwear</span><span class="z-chip">Trail</span><span class="z-chip">Apparel</span><span class="z-chip">Packs</span></div><div class="z-grid-2"><div class="z-card"><div class="z-row z-between"><span class="z-badge">4.9 ★</span><i data-i="favorite" class="sm z-muted"></i></div><div class="z-title">Merino Overshirt</div><div class="z-small z-muted">Charcoal · $165.00</div></div><div class="z-card tonal"><div class="z-row z-between"><span class="z-badge">New</span><i data-i="favorite" class="sm z-primary"></i></div><div class="z-title">Ultralight Pack 22L</div><div class="z-small z-muted">Ripstop · $120.00</div></div></div><div class="z-list"><div class="z-item"><span class="z-lead"><i data-i="local_shipping"></i></span><div class="z-grow"><div class="z-title">Order #20931 Shipped</div><div class="z-muted z-small">Arrives Thursday via Express</div></div><span class="z-badge">Track</span></div><div class="z-item"><span class="z-lead"><i data-i="storefront"></i></span><div class="z-grow"><div class="z-title">Berlin Flagship Pickup</div><div class="z-muted z-small">Mitte · Ready in 2 hours</div></div><span class="z-small z-muted">Free</span></div></div></div><nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="storefront" data-fill></i></span>Shop</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="search"></i></span>Search</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="shopping_bag"></i></span>Bag</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Account</a></nav></div>`,
+  },
+  {
+    id: "starter_web_dashboard",
+    name: "Web Analytics Dashboard",
+    category: "starters",
+    icon: "desktop_windows",
+    desc: "Complete desktop SaaS shell with sidebar, KPI row, SVG chart, and orders table",
+    slot: "screen",
+    device: "web",
+    html: () => `<div class="z-shell"><aside class="z-side"><h3 class="z-h2" style="padding:4px 14px 16px">Northwind</h3><a class="z-side-item on"><i data-i="dashboard" data-fill></i>Overview</a><a class="z-side-item"><i data-i="receipt_long"></i>Orders</a><a class="z-side-item"><i data-i="inventory_2"></i>Products</a><a class="z-side-item"><i data-i="group"></i>Customers</a><a class="z-side-item"><i data-i="settings"></i>Settings</a></aside><main class="z-main"><div class="z-row z-between"><h1 class="z-h1">Revenue overview</h1><div class="z-row"><div class="z-segs"><span class="z-seg on">7d</span><span class="z-seg">30d</span><span class="z-seg">12m</span></div><button class="z-btn"><i data-i="add" class="sm"></i>New order</button></div></div><div class="z-grid-3"><div class="z-card"><div class="z-stat"><span class="z-muted z-small">Net volume</span><div class="z-kpi"><span class="v">$48,210</span><span class="delta">+14.2%</span></div></div><div class="z-bar"><i style="width:74%"></i></div></div><div class="z-card"><div class="z-stat"><span class="z-muted z-small">Active orders</span><div class="z-kpi"><span class="v">1,284</span><span class="delta">+6.8%</span></div></div><div class="z-bar"><i style="width:62%"></i></div></div><div class="z-card accent"><div class="z-stat"><span class="z-small">Settlement rate</span><span class="v">99.4%</span></div><span class="z-small">Next payout $12,480</span></div></div><div class="z-card"><div class="z-row z-between"><div><div class="z-small z-muted">Weekly throughput</div><div class="z-h2">$48,210</div></div><span class="z-badge">+14.2% vs last wk</span></div>${buildSvgChart("area", "32,48,44,62,58,78,94", "Mon,Tue,Wed,Thu,Fri,Sat,Sun")}</div><div class="z-card bleed"><table class="z-table"><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th></tr><tr><td>#4821</td><td>Maya Chen</td><td><span class="z-badge">Paid</span></td><td>$212.00</td></tr><tr><td>#4820</td><td>Lucas Vance</td><td><span class="z-badge">Shipped</span></td><td>$640.00</td></tr><tr><td>#4819</td><td>Elena Rostova</td><td><span class="z-badge">Paid</span></td><td>$128.50</td></tr></table></div></main></div>`,
+  },
+  {
+    id: "starter_web_kanban",
+    name: "Web Sprint Kanban Board",
+    category: "starters",
+    icon: "view_column_2",
+    desc: "Complete desktop sprint workspace with sidebar and 3-column Kanban board",
+    slot: "screen",
+    device: "web",
+    html: () => `<div class="z-shell"><aside class="z-side"><h3 class="z-h2" style="padding:4px 14px 16px">Linearity</h3><a class="z-side-item"><i data-i="mail"></i>Inbox</a><a class="z-side-item on"><i data-i="dashboard" data-fill></i>Active Sprint</a><a class="z-side-item"><i data-i="folder"></i>Projects</a><a class="z-side-item"><i data-i="analytics"></i>Velocity</a><a class="z-side-item"><i data-i="group"></i>Team</a></aside><main class="z-main"><div class="z-row z-between"><div><h1 class="z-h1">Sprint 24 · Core Canvas</h1><div class="z-small z-muted">Oct 14 – Oct 28 · 18 of 24 points completed</div></div><div class="z-row"><button class="z-btn tonal"><i data-i="filter_list" class="sm"></i>Filter</button><button class="z-btn"><i data-i="add" class="sm"></i>New issue</button></div></div><div class="z-grid-3"><div class="z-col"><div class="z-row z-between"><span class="z-h3">Todo</span><span class="z-badge">2</span></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-142</span><span class="z-badge">High</span></div><div class="z-title">Auto-layout resize handles</div><div class="z-small z-muted">Assigned to Maya Chen</div></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-148</span><span class="z-badge">Med</span></div><div class="z-title">Token contrast verifier</div><div class="z-small z-muted">Assigned to Lucas Vance</div></div></div><div class="z-col"><div class="z-row z-between"><span class="z-h3">In Progress</span><span class="z-badge">2</span></div><div class="z-card tonal"><div class="z-row z-between"><span class="z-small z-primary">ZEU-139</span><span class="z-badge">Active</span></div><div class="z-title">Shadow DOM renderer v2</div><div class="z-bar"><i style="width:70%"></i></div><div class="z-small z-muted">Ravi Menon · PR #84</div></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-141</span><span class="z-badge">Review</span></div><div class="z-title">Bundled variable font subset</div><div class="z-small z-muted">Elena Rostova</div></div></div><div class="z-col"><div class="z-row z-between"><span class="z-h3">Completed</span><span class="z-badge">2</span></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-131</span><i data-i="check_circle" class="sm z-primary"></i></div><div class="z-title">Async Tauri IPC commands</div><div class="z-small z-muted">Merged 2h ago</div></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-135</span><i data-i="check_circle" class="sm z-primary"></i></div><div class="z-title">M3E Effort split control</div><div class="z-small z-muted">Merged yesterday</div></div></div></div></main></div>`,
+  },
+
   // Primitives & Auto-Layout
   {
     id: "auto_row",
@@ -266,6 +330,54 @@ export const UI_BLOCKS: UIBlock[] = [
     desc: "Complete authentication card with email, password, and CTA",
     html: () => `<div class="z-card" style="gap:14px"><h2 class="z-h2">Sign in to Workspace</h2><label class="z-field">Email<div class="z-input"><i data-i="mail" class="sm z-muted"></i><input value="alex@zeus.app" /></div></label><label class="z-field">Password<div class="z-input"><i data-i="lock" class="sm z-muted"></i><input type="password" value="••••••••" /></div></label><button class="z-btn block">Continue</button></div>`,
   },
+  {
+    id: "profile_header",
+    name: "Profile Header Card",
+    category: "hero",
+    icon: "person",
+    desc: "User avatar, bio, and 3-column follower/project metrics",
+    html: () => `<div class="z-card tonal"><div class="z-row"><span class="z-avatar lg">MC</span><div class="z-grow"><div class="z-h2">Maya Chen</div><div class="z-small z-muted">Principal Product Designer · Berlin</div></div><button class="z-btn sm">Follow</button></div><div class="z-grid-3" style="padding-top:6px"><div class="z-stat"><span class="v" style="font-size:20px">48</span><span class="z-small z-muted">Systems</span></div><div class="z-stat"><span class="v" style="font-size:20px">2.4k</span><span class="z-small z-muted">Followers</span></div><div class="z-stat"><span class="v" style="font-size:20px">99%</span><span class="z-small z-muted">Rating</span></div></div></div>`,
+  },
+  {
+    id: "audio_player",
+    name: "Now Playing Transport",
+    category: "cards",
+    icon: "music_note",
+    desc: "Media player card with track info, progress scrubber, and transport controls",
+    html: () => `<div class="z-card accent"><div class="z-row"><span class="z-lead" style="background:var(--primary);color:var(--on-primary)"><i data-i="music_note"></i></span><div class="z-grow"><div class="z-title">Night Drive — Kovac</div><div class="z-small">Slow Light LP · 02:14 / 03:42</div></div><i data-i="favorite" data-fill class="sm"></i></div><div class="z-bar"><i style="width:64%"></i></div><div class="z-row z-between" style="padding:0 12px"><i data-i="shuffle" class="sm"></i><i data-i="skip_previous"></i><button class="z-icon-btn filled"><i data-i="pause" data-fill></i></button><i data-i="skip_next"></i><i data-i="repeat" class="sm"></i></div></div>`,
+  },
+  {
+    id: "pricing_card",
+    name: "Pricing Tier Card",
+    category: "cards",
+    icon: "sell",
+    desc: "Subscription plan card with price, feature checklist, and primary CTA",
+    html: () => `<div class="z-card" style="gap:12px"><div class="z-row z-between"><span class="z-h3">Studio Pro</span><span class="z-badge">Popular</span></div><div class="z-row" style="align-items:baseline;gap:4px"><span class="z-display" style="font-size:36px">$24</span><span class="z-small z-muted">/ month</span></div><div class="z-col" style="gap:8px"><div class="z-row"><i data-i="check_circle" class="sm z-primary"></i><span class="z-small">Unlimited artboards & pages</span></div><div class="z-row"><i data-i="check_circle" class="sm z-primary"></i><span class="z-small">All 13 built-in design systems</span></div><div class="z-row"><i data-i="check_circle" class="sm z-primary"></i><span class="z-small">React TSX & HTML export</span></div></div><button class="z-btn block">Start free trial</button></div>`,
+  },
+  {
+    id: "kanban_col",
+    name: "Kanban Task Column",
+    category: "cards",
+    icon: "checklist",
+    desc: "Sprint column with header count badge and two task cards",
+    html: () => `<div class="z-col"><div class="z-row z-between"><span class="z-h3">In Progress</span><span class="z-badge">2</span></div><div class="z-card tonal"><div class="z-row z-between"><span class="z-small z-primary">ZEU-139</span><span class="z-badge">Active</span></div><div class="z-title">Shadow DOM renderer v2</div><div class="z-bar"><i style="width:70%"></i></div><div class="z-small z-muted">Assigned to Ravi Menon</div></div><div class="z-card"><div class="z-row z-between"><span class="z-small z-muted">ZEU-142</span><span class="z-badge">Review</span></div><div class="z-title">Auto-layout resize handles</div><div class="z-small z-muted">Assigned to Maya Chen</div></div></div>`,
+  },
+  {
+    id: "chat_thread",
+    name: "Message Thread + Composer",
+    category: "lists",
+    icon: "chat",
+    desc: "Direct message conversation bubbles with inline reply bar",
+    html: () => `<div class="z-card" style="gap:12px"><div class="z-row"><span class="z-avatar">MC</span><div class="z-card tonal" style="flex:1;padding:10px 14px"><div class="z-small">Are we ready to ship the new M3E tokens for Friday's release?</div></div></div><div class="z-row" style="justify-content:flex-end"><div class="z-card accent" style="max-width:82%;padding:10px 14px"><div class="z-small">All 13 design systems passed contrast and layout audit.</div></div></div><div class="z-input"><input placeholder="Write a reply…" /><i data-i="send" class="sm z-primary"></i></div></div>`,
+  },
+  {
+    id: "empty_state",
+    name: "Empty State Callout",
+    category: "primitives",
+    icon: "inbox",
+    desc: "Centered tonal empty state with icon, title, and action button",
+    html: () => `<div class="z-card tonal z-center" style="align-items:center;padding:28px 20px;gap:10px"><span class="z-lead" style="width:48px;height:48px;border-radius:50%"><i data-i="folder"></i></span><div class="z-h3">No archived items</div><div class="z-small z-muted">Items you archive will appear safely here</div><button class="z-btn sm" style="margin-top:4px"><i data-i="add" class="sm"></i>Create first item</button></div>`,
+  },
 ];
 
 export function findBlock(id: string): UIBlock | undefined {
@@ -294,7 +406,9 @@ export function insertBlockIntoHtml(
 
   let nextHtml = currentHtml;
 
-  if (isBlank) {
+  if (block.slot === "screen") {
+    nextHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"></head><body>${snippet}</body></html>`;
+  } else if (isBlank) {
     const inner =
       block.slot === "top"
         ? `${snippet}<div class="z-page"></div>`
