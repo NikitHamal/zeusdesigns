@@ -7,6 +7,18 @@ Running log across agent sessions. Newest session first. Rules live in `AGENTS.m
 - UI & Canvas: Shadow DOM zero-iframe artboard and thumbnail renderer (`src/lib/shadowRenderer.tsx`), viewport frustum culling, per-chat isolated canvases.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
 
+## Session 7
+Goal: fix generations that still look broken on the canvas (stray FAB at the world origin, unreadable captions, no anatomy for notes-style apps).
+
+Shipped:
+- `ShadowFrame` host now uses `contain: layout paint` + `isolation: isolate`, so a model-written `position:fixed` button or bar stays inside its artboard instead of landing at the canvas origin.
+- `harden()` raises any `font-size` under 11px to 11px (prompt and enforcement stay aligned).
+- `blueprints.ts`: new `notes` archetype (notes, todo, habits, journal, reminders) and a fallback anatomy for requests that match nothing, with a rule that the 3 variants differ in structure.
+
+Not done / next:
+- Rust providers still drop provider-side reasoning (K2 `<details>`, ChatJimmy `<|think|>`); needs a Windows CI cycle (no Rust toolchain in the authoring sandbox).
+- Memory floor: WebView2 stays above 30 MB. Replacing the webview with a native renderer is a separate multi-session rewrite and was not started; features and UI cannot be kept identical without it.
+
 ## Session 6
 Goal: stop the weak-looking generations (no fonts, clipped nav, flat component use), replace the 3-dot thinking indicator, show reasoning, and rebuild the canvas designing animation.
 

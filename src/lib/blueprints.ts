@@ -11,6 +11,11 @@ const BP: Blueprint[] = [
     web: "Two columns 50/50. Left: brand, headline, 3 proof points with check icons. Right: a z-card form 400px wide, centered, with fields, primary button, alternate link. No decorative gradients.",
   },
   {
+    id: "notes", match: /(\bnotes?\b|to-?do|task list|habit|reminder|productiv|journal|checklist|read.?later|bookmark)/i,
+    mobile: "Appbar: a z-h1 title at 28px, one search z-icon-btn. A z-chips row of 4 filters (All, Pinned, Shared, Archived), first on. A single featured z-card accent holding the one number that matters at z-display size and a one-line status. Then a z-list of 6 z-item rows: title in z-title, one real detail line, trailing date or state in z-small; no decorative circle icon on every row, use a z-badge only on the 1 or 2 rows that need a state. A z-fab above the pinned bottom z-nav (4 destinations, first on). The list scrolls inside z-page.",
+    web: "z-shell: left z-side with workspace name, 5 folders with counts, a New note z-btn at the bottom. Middle column 360px z-list of 8 notes with title, excerpt line and date, one selected. Right column: the open note with a z-h1 title, a z-chips row of tags, 3 paragraphs of real content and a checklist block.",
+  },
+  {
     id: "dashboard", match: /(dash|analytic|finance|bank|wallet|fitness|admin|stats|crm|report|portfolio|invest|budget|health|track)/i,
     mobile: "Appbar with greeting and avatar. One summary hero (z-hero) with the key number at z-display size and a delta badge. Row of 3 to 4 quick actions (z-icon-btn with label). A section titled by what it shows with 5 z-item rows, each with a lead icon, title, subtitle, trailing value. One chart card with inline SVG. Bottom z-nav with 4 destinations, first selected.",
     web: "z-shell with left z-side (logo, 6 nav items, active state, user at the bottom) and z-main. Top z-top with page title, search z-input, primary action. Row of 4 z-stat cards with delta. Then a 2:1 grid: large chart card (inline SVG with axes and 6+ data points) and a recent activity z-list of 5 rows. Then a z-table of 6 rows with status z-badge.",
@@ -64,7 +69,12 @@ const BP: Blueprint[] = [
 
 export function blueprintFor(prompt: string, device: Device | undefined): string {
   const hit = BP.find((b) => b.match.test(prompt));
-  if (!hit) return "";
+  if (!hit) {
+    const w = device === "web" || (!device && /(web|site|desktop)/i.test(prompt));
+    return `## Anatomy (no archetype matched, so use this)\n${w
+      ? "Sticky z-top with logo, 4 links and one primary z-btn. A hero with a z-display headline for the product's real job, one sentence and one action, next to a UI fragment built from kit parts. A row of 3 proof numbers. 2 feature blocks that each show a real UI fragment. A closing band with one action."
+      : "Appbar with a z-h1 title and one icon button. One summary z-card accent with the key number at z-display size. A z-chips row of filters. A z-list of 5 or 6 z-item rows with title, one real detail and a trailing value. A pinned bottom z-nav with 4 labelled destinations, first on."}\nUse real names, numbers and dates from the user's domain. Each of the 3 variants must change the structure (list-first, card-grid, hero-first), not only the colors.`;
+  }
   const web = device === "web" || (!device && /(web|site|desktop|dashboard|landing)/i.test(prompt));
   return `## Blueprint for this request (${hit.id}, ${web ? "web" : "mobile"})\nFollow this anatomy, replacing every label with specific content for the user's product:\n${web ? hit.web : hit.mobile}`;
 }
