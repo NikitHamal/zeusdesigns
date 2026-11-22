@@ -3,7 +3,7 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor.
+- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor. Stable (verified green on Windows CI run 45015682068).
 - UI & Canvas: Shimmer-only activity & collapsible reasoning UI (no orb/sparkle icons), Material 3 Expressive connected Model + Reasoning Effort split selector, architectural blueprint wireframe + diagonal shimmer canvas designing animation, Shadow DOM zero-iframe renderer.
 - Harness: Token reset protection, model class promotion, dedicated `notes` domain brief, and deterministic screen completeness synthesizer (`ensureCompleteScreen`).
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
