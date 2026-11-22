@@ -7,7 +7,7 @@ import { MATERIAL_ICONS } from "./materialIcons";
 import { DesignSystem, tokensCss } from "./designSystems";
 import type { Device } from "../types";
 import { blueprintFor } from "./blueprints";
-import { fontFaceCss, fontsUsedIn } from "./fonts";
+import { DESIGN_FONTS, fontFaceCss, fontsUsedIn } from "./fonts";
 
 /* icons: home, search, settings, person, notifications, favorite, star, bookmark, share, mail, chat, call, calendar_today, schedule,
    location_on, shopping_cart, shopping_bag, payments, credit_card, wallet, bar_chart, trending_up, trending_down, pie_chart, insights,
@@ -109,6 +109,8 @@ body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-r
 .z-list{display:flex;flex-direction:column}
 .z-item{display:flex;align-items:center;gap:14px;min-height:60px;padding:10px 4px;border-bottom:1px solid var(--outline)}
 .z-item:last-child{border-bottom:0}
+.z-item{border-radius:0}.z-item .z-i{width:22px;height:22px}.z-item .z-lead .z-i{width:22px;height:22px;color:inherit}.z-item .z-i.sm{width:18px;height:18px}
+.z-screen:has(>.z-nav){height:100vh;min-height:0;overflow:hidden}.z-screen:has(>.z-nav)>.z-page{overflow-y:auto;min-height:0}.z-nav{flex:none}.z-nav-item{line-height:1.2;white-space:nowrap}
 .z-item .z-lead{display:grid;place-items:center;width:44px;height:44px;border-radius:var(--r-md);background:var(--container);color:var(--on-container);flex:none}
 .z-divider{height:1px;background:var(--outline);border:0}
 .z-switch{position:relative;width:48px;height:28px;flex:none;appearance:none;-webkit-appearance:none;border-radius:99px;background:var(--surface-2);border:2px solid var(--outline);cursor:pointer;transition:background-color .2s}
@@ -412,7 +414,7 @@ Reply with at most 3 short sentences or bullets of markdown (design intent, no c
 - mobile = 390x844, tablet = 820x1100, web = 1280x800. Pick the device that matches the request; default to mobile for apps and web for sites and dashboards.
 - Unspecified direction on a fresh request: 3 artboards with genuinely different layout structure, not recolors. A revise or a variant of one selected screen: exactly 1 artboard.
 - Every document must be complete and closed (</html>). Keep each screen under about 220 lines of HTML. A truncated screen is a failed screen, so cut sections before you cut the ending.
-- Self-contained only: no CDNs, web fonts, external images or libraries. Vanilla JS is optional and only for real interactions.
+- Self-contained only: no CDNs, <link>, @import, external images or libraries. Fonts are bundled (see Typography): write the font-family and nothing else. Vanilla JS is optional and only for real interactions.
 - After the last </artboard> write nothing.`,
 
     `## Design laws (the harness strips violations automatically, so never spend effort on them)
@@ -441,6 +443,29 @@ Tabs, chips, nav items and side items switch their "on" state on click automatic
 
 ## Icons
 Write <i data-i="name"></i> (add data-fill for the filled form, add class sm, lg or xl to resize). The harness swaps it for the official Material Symbols Rounded glyph. Never draw icons by hand, never use emoji, never use letters as icons. Safe names: ${ICON_HINT}.`,
+
+    `## Think first (this is how weak models make strong screens)
+Open the reply with a plan inside <think>...</think>, 6 lines at most, plain text:
+audience and the ONE action / font pairing from Typography / the single signature move (see Anti-slop) / section order per screen / the 4 to 6 real data points you will show.
+Then write the reply and the artboards. Never repeat the plan afterwards.`,
+
+    `## Typography (fonts are bundled, so use them by name)
+Body text uses var(--font) from the design system. For personality, set headlines and big numerals in a bundled face by writing font-family directly:
+${DESIGN_FONTS.map((f) => `- "${f.family}" (${f.kind}, ${f.weights}): ${f.feel}. Use for ${f.use}.`).join("\n")}
+Pairings that work: editorial = Fraunces + DM Sans; technical = Space Grotesk + Inter; friendly = Plus Jakarta Sans alone; calm = DM Sans alone; bold = Manrope + Inter; elegant = Instrument Serif (weight 400 only) + Inter; data and codes = JetBrains Mono.
+Rules: at most 2 families per screen. Display sizes use weight 600 to 700 (serif 400 to 500) with letter-spacing -0.02em and line-height 1.05 to 1.15. Body line-height 1.5. Use tabular-nums (font-variant-numeric:tabular-nums) for every price, metric and time. Eyebrow labels: 12px, weight 600, letter-spacing .06em, uppercase, used at most once per section.`,
+
+    `## Anti-slop (what makes a design look machine made, and what to do instead)
+Banned: three identical icon-title-sentence feature cards; every list row with a round icon on the left; a gradient blob behind the hero; centering everything; a purple or blue accent; a greeting like "Welcome back"; stat cards that are all the same size; grey text on grey surfaces; ALL CAPS everywhere; 4 different corner radii; icons used as decoration with no meaning; placeholder avatars with no initials; sections that exist only to fill space.
+Required instead:
+- ONE signature move per screen that a human designer would sketch: an oversized numeral, an asymmetric split, a full-bleed color block with a cropped graphic, an editorial headline with an inline chip, a chart that is the hero, a timeline spine. Everything else stays quiet so the move reads.
+- Size contrast: the biggest element is at least 3x the body size; the smallest meaningful text is 12px. Skip the middle sizes.
+- Rows carry information, not decoration: a title, one real detail, and a trailing value or state. Use an icon only when it names the thing (a file type, a payment brand, a status).
+- Vary rhythm: tall card next to short cards, a wide card spanning the grid, a divider-only list next to a card grid. Equal heights only inside one row.
+- Color discipline: 60 percent bg and surfaces, 30 percent text and outlines, 10 percent primary. A second accent only for status (error, success).
+- Whitespace is spacing between groups (24 to 32px), not padding inflation inside them.
+- Details that signal craft: 1px hairlines in var(--outline), tabular numerals, consistent icon stroke and size (22px in rows, 24px in bars), a real selected state, truncation instead of wrap in dense rows, avatars with two-letter initials.
+- Mobile: app bar 56px, bottom nav pinned with 3 to 5 labelled items, content scrolls under it, nothing cut at the bottom edge. Web: one 12-column feel, max width 1120px, 96px between landing sections.`,
 
     `## Craft rules
 1. Decide silently before writing: who uses this, the ONE primary action, the 3 to 5 sections, the real content. Then build.

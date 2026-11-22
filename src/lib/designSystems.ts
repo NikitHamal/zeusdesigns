@@ -133,7 +133,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
       bg: "#faf7f2", surface: "#ffffff", surface2: "#f3eee6", text: "#1a1a1a", muted: "#6b6459", outline: "#ddd5c7", error: "#b42318",
       rSm: 2, rMd: 4, rLg: 6, rXl: 10, rBtn: 999, rCard: 4, font: `"DM Sans",${sans}`, heading: serif, weight: 500, shadow: "none", border: 1,
     },
-    guidelines: `Editorial minimal. Warm paper #FAF7F2, ink #1A1A1A, one terracotta accent. Serif display (Georgia/Iowan) at large sizes with tight leading, sans body 15–16px at 1.6. Hairline rules, generous 80–120px section spacing, asymmetric grids, small caps eyebrows, pill outlined buttons, imagery full-bleed, no shadows, restrained motion (fade + 12px rise).`,
+    guidelines: `Editorial minimal. Warm paper #FAF7F2, ink #1A1A1A, one terracotta accent. Serif display (Fraunces, or Instrument Serif at 400 for the hero line) at large sizes with tight leading, sans body 15–16px at 1.6. Hairline rules, generous 80–120px section spacing, asymmetric grids, small caps eyebrows, pill outlined buttons, imagery full-bleed, no shadows, restrained motion (fade + 12px rise).`,
   },
   {
     id: "claude", name: "Claude Warm", vendor: "Anthropic-inspired", tagline: "Warm cream, coral accent, calm and human.", tags: ["Chat", "Web"],
@@ -142,7 +142,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
       bg: "#faf9f5", surface: "#ffffff", surface2: "#f0eee6", text: "#141413", muted: "#6e6a60", outline: "#e3dfd2", error: "#b53333",
       rSm: 8, rMd: 12, rLg: 16, rXl: 24, rBtn: 12, rCard: 16, font: `"DM Sans",${sans}`, heading: serif, weight: 500, shadow: "none", border: 1,
     },
-    guidelines: `Warm conversational UI: cream #FAF9F5 canvas, coral/clay #C96442 accent, serif headings, rounded 12–16px surfaces with hairline #E3DFD2 borders, input composer as a large rounded card with controls row beneath, gentle shadows, text-first layouts.`,
+    guidelines: `Warm conversational UI: cream #FAF9F5 canvas, coral/clay #C96442 accent, Fraunces serif headings, DM Sans body, rounded 12–16px surfaces with hairline #E3DFD2 borders, input composer as a large rounded card with controls row beneath, gentle shadows, text-first layouts.`,
   },
 ];
 

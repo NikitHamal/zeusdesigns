@@ -5,6 +5,7 @@
 import { useStore } from "../store";
 import { DESIGN_SYSTEMS, getDS, tokensCss, type DesignSystem } from "./designSystems";
 import { DS_KIT, UI_ICON_NAMES, harden, kitExample } from "./harness";
+import { DESIGN_FONTS } from "./fonts";
 import { blueprintFor } from "./blueprints";
 import { auditHtml } from "./audit";
 import type { Device } from "../types";
@@ -87,24 +88,16 @@ export function makePalette(seed: string, name = "Seed"): Palette | null {
 }
 
 /* ------------------------------------------------------------------ */
-/* Fonts that exist on a stock Windows install (the app is Windows-first) */
+/* Fonts bundled with the app. Designs can name them directly; nothing is downloaded. */
 /* ------------------------------------------------------------------ */
-export const FONT_STACKS: { id: string; stack: string; feel: string; use: string }[] = [
-  { id: "Segoe UI Variable", stack: `"Segoe UI Variable Display","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif`, feel: "neutral, modern, native", use: "apps, dashboards, settings" },
-  { id: "Bahnschrift", stack: `Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif`, feel: "industrial, technical, DIN-like", use: "fitness, automotive, data, headlines" },
-  { id: "Georgia", stack: `Georgia,"Iowan Old Style","Times New Roman",serif`, feel: "editorial, trustworthy, warm", use: "news, reading, finance headlines" },
-  { id: "Constantia", stack: `Constantia,Georgia,"Palatino Linotype",serif`, feel: "soft humanist serif", use: "food, wellness, boutique brands" },
-  { id: "Cambria", stack: `Cambria,Georgia,serif`, feel: "sturdy screen serif", use: "documents, long form" },
-  { id: "Corbel", stack: `Corbel,"Segoe UI",system-ui,sans-serif`, feel: "friendly humanist sans", use: "consumer apps, education" },
-  { id: "Candara", stack: `Candara,"Segoe UI",system-ui,sans-serif`, feel: "calm, rounded humanist", use: "health, meditation, lifestyle" },
-  { id: "Franklin Gothic", stack: `"Franklin Gothic Medium","Arial Narrow",Arial,sans-serif`, feel: "confident newsroom grotesque", use: "bold headlines, sports, media" },
-  { id: "Trebuchet MS", stack: `"Trebuchet MS","Segoe UI",sans-serif`, feel: "playful, open", use: "kids, games, community" },
-  { id: "Cascadia", stack: `"Cascadia Code","Cascadia Mono",Consolas,"Roboto Mono",monospace`, feel: "developer mono", use: "code, terminals, numbers, tags" },
-];
+const FALLBACK = { sans: `system-ui,"Segoe UI",sans-serif`, serif: `Georgia,"Times New Roman",serif`, mono: `ui-monospace,Consolas,monospace` };
+export const FONT_STACKS: { id: string; stack: string; feel: string; use: string }[] = DESIGN_FONTS.map((f) => ({
+  id: f.family, stack: `"${f.family}",${FALLBACK[f.kind]}`, feel: f.feel, use: f.use,
+}));
 const PAIRINGS: Record<string, [string, string]> = {
-  editorial: ["Georgia", "Segoe UI Variable"], technical: ["Bahnschrift", "Segoe UI Variable"], warm: ["Constantia", "Corbel"],
-  calm: ["Candara", "Segoe UI Variable"], friendly: ["Corbel", "Segoe UI Variable"], bold: ["Franklin Gothic", "Segoe UI Variable"],
-  neutral: ["Segoe UI Variable", "Segoe UI Variable"], developer: ["Segoe UI Variable", "Cascadia"], playful: ["Trebuchet MS", "Corbel"],
+  editorial: ["Fraunces", "DM Sans"], technical: ["Space Grotesk", "Inter"], warm: ["Fraunces", "Plus Jakarta Sans"],
+  calm: ["DM Sans", "DM Sans"], friendly: ["Plus Jakarta Sans", "Plus Jakarta Sans"], bold: ["Manrope", "Inter"],
+  neutral: ["Inter", "Inter"], developer: ["Inter", "JetBrains Mono"], playful: ["Space Grotesk", "DM Sans"], elegant: ["Instrument Serif", "Inter"],
 };
 
 /* ------------------------------------------------------------------ */
@@ -199,7 +192,7 @@ export function studioBrief(intent: string, ds: DesignSystem, device?: Device): 
     d ? `- Navigation labels: ${d.nav.join(", ")} (3 to 5 items, one is selected).` : "",
     d ? `- Icons for this product (all bundled, use via <i data-i>): ${iconsAvailable(d.icons).join(", ")}.` : "",
     d ? `- Real content to adapt (use numbers, names and units like these, never lorem):\n${d.content.map((c) => `  * ${c}`).join("\n")}` : "",
-    f1 && !NATIVE_FONT_SYSTEMS.has(ds.id) ? `- Optional display face for the hero headline only: font-family:${f1.stack} (${f1.feel}). Body stays var(--font).` : "- Type: use var(--font) and var(--heading) only; hierarchy through size and weight.",
+    f1 && !NATIVE_FONT_SYSTEMS.has(ds.id) ? `- Type: set the hero headline and screen titles in font-family:${f1.stack} (${f1.feel}); body stays var(--font). Numbers, codes and small labels may use "JetBrains Mono". Fonts are bundled, never link them.` : "- Type: use var(--font) and var(--heading); hierarchy through size and weight. \"JetBrains Mono\" is bundled for numbers and labels when it fits.",
     needsChart ? `- Ready-to-use inline SVG chart (drop inside a .z-card and adjust numbers/labels):\n  ${buildSvgChart(d?.id === "fitness" ? "bar" : "area")}` : "",
     device ? `- Target: ${device}. Fill the full frame height.` : "",
     "- Quality bar: one primary button, aligned edges, equal gutters, 4 to 7 rows in any list, a selected state on tabs and nav, nothing overlapping, text contrast at least 4.5:1.",
@@ -257,13 +250,13 @@ export const STUDIO_TOOLS: StudioTool[] = [
     },
   },
   {
-    name: "studio_fonts", icon: "text_fields", desc: "Fonts on a stock Windows install, fallback stacks and pairings",
-    params: { mood: "editorial | technical | warm | calm | friendly | bold | neutral | developer | playful" },
+    name: "studio_fonts", icon: "text_fields", desc: "Bundled design fonts, pairings and ready font-family stacks",
+    params: { mood: "editorial | technical | warm | calm | friendly | bold | neutral | developer | playful | elegant" },
     run: (a) => {
       const mood = str(a.mood ?? a.query).toLowerCase().trim();
       const pair = PAIRINGS[mood];
       const list = FONT_STACKS.map((f) => `- ${f.id}: ${f.feel}. Use for ${f.use}. font-family:${f.stack}`).join("\n");
-      return (pair ? `Pairing for ${mood}: headings ${pair[0]}, body ${pair[1]}.\n\n` : "") + list + "\nNo web fonts or CDNs: designs are offline.";
+      return (pair ? `Pairing for ${mood}: headings ${pair[0]}, body ${pair[1]}.\n\n` : "") + list + "\nAll fonts above are bundled with the app: write the font-family, never link or @import anything.";
     },
   },
   {
