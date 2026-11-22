@@ -21,6 +21,10 @@ int zeus_title_generate(const char* user_text, char* out_buf, size_t out_len);
 int zeus_providers_catalog_json(char* out_buf, size_t out_len);
 int zeus_workspace_index_count(const char* folder_path);
 
+// Native Win32 process-tree working-set & low-memory telemetry/trimming
+int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long long* out_private_bytes, unsigned int* out_proc_count);
+int zeus_memory_trim(unsigned long long* out_before_bytes, unsigned long long* out_after_bytes, unsigned int* out_proc_count);
+
 #ifdef __cplusplus
 }
 #endif

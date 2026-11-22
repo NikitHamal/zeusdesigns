@@ -8,6 +8,7 @@ pub mod agent;
 pub mod crypto;
 pub mod mcp;
 pub mod memory;
+pub mod perf;
 pub mod providers;
 pub mod updater;
 pub mod workspace;
@@ -46,8 +47,12 @@ pub fn run() {
         .manage(workspace::WorkspaceState::default())
         .manage(memory::MemoryStore::default())
         .manage(mcp::McpRegistry::default())
+        .manage(perf::PerfGovernor::default())
         .invoke_handler(tauri::generate_handler![
             app_info,
+            perf::perf_stats,
+            perf::perf_trim,
+            perf::perf_set_auto,
             updater::update_check,
             updater::update_install,
             agent::providers_list,
