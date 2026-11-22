@@ -5,16 +5,10 @@ import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
 
 /* ------------------------------------------------------------------ */
-/* Orb: the single "Zeus is working" mark (chat, canvas, buttons)       */
+/* Shimmer-only activity & collapsible reasoning (no orb / no logo)    */
 /* ------------------------------------------------------------------ */
-export function ZeusOrb({ size = 16, live = true, className }: { size?: number; live?: boolean; className?: string }) {
-  return (
-    <span className={cn("zorb", live && "live", className)} style={{ width: size, height: size }} aria-hidden>
-      <i className="zorb-ring" /><i className="zorb-ring b" />
-      <i className="zorb-core" />
-      <i className="zorb-spark" />
-    </span>
-  );
+export function ZeusOrb(_props?: { size?: number; live?: boolean; className?: string }) {
+  return null;
 }
 
 /** Height-animated disclosure. Content stays mounted so it can measure and scroll. */
@@ -36,12 +30,12 @@ function secs(ms?: number) {
 /* Tools                                                               */
 /* ------------------------------------------------------------------ */
 const TOOL_LABEL: Record<string, string> = {
-  design_lint: "Cleaned up", design_audit: "Checked layout", design_repair: "Repairing layout", read_file: "Read file", write_file: "Wrote file",
-  list_dir: "Listed folder", studio_brief: "Read the brief", studio_palette: "Built a palette", studio_contrast: "Checked contrast", studio_fonts: "Picked fonts", studio_icons: "Searched icons", studio_components: "Read the component kit", studio_tokens: "Read design tokens", studio_systems: "Listed design systems", studio_screens: "Listed screens", studio_read_screen: "Read a screen", studio_lint: "Linted a screen", studio_svg_chart: "Built SVG chart", studio_blueprint: "Loaded blueprint", studio_export_react: "Exported React TSX", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
+  design_lint: "Enforced design system & tokens", design_audit: "Audited layout geometry", design_repair: "Refined screen layout", read_file: "Read file", write_file: "Wrote file",
+  list_dir: "Listed folder", studio_brief: "Prepared design brief", studio_palette: "Built tonal palette", studio_contrast: "Verified WCAG contrast", studio_fonts: "Selected font pairing", studio_icons: "Resolved Material Symbols", studio_components: "Loaded component kit", studio_tokens: "Loaded design tokens", studio_systems: "Listed design systems", studio_screens: "Inspected canvas screens", studio_read_screen: "Read screen markup", studio_lint: "Linted screen markup", studio_svg_chart: "Generated SVG chart", studio_blueprint: "Loaded screen blueprint", studio_export_react: "Exported React TSX", search_code: "Searched codebase", shell: "Executed command", web_fetch: "Fetched reference page", memory: "Saved to memory",
 };
 const TOOL_RUNNING: Record<string, string> = {
-  design_lint: "Cleaning up", design_audit: "Checking layout", read_file: "Reading file", write_file: "Writing file", list_dir: "Listing folder",
-  studio_brief: "Reading the brief", studio_palette: "Building a palette", studio_contrast: "Checking contrast", studio_fonts: "Picking fonts", studio_icons: "Searching icons", studio_components: "Reading the component kit", studio_tokens: "Reading design tokens", studio_lint: "Linting a screen", studio_blueprint: "Loading blueprint", search_code: "Searching code", shell: "Running command", web_fetch: "Fetching page",
+  design_lint: "Enforcing design system & tokens…", design_audit: "Auditing layout geometry…", design_repair: "Refining screen layout…", read_file: "Reading file…", write_file: "Writing file…", list_dir: "Listing folder…",
+  studio_brief: "Preparing design brief…", studio_palette: "Building tonal palette…", studio_contrast: "Checking contrast…", studio_fonts: "Selecting font pairing…", studio_icons: "Resolving Material Symbols…", studio_components: "Loading component kit…", studio_tokens: "Loading design tokens…", studio_lint: "Linting screen…", studio_blueprint: "Loading blueprint…", search_code: "Searching codebase…", shell: "Running command…", web_fetch: "Fetching page…",
 };
 export function toolTitle(name: string, running = false): { label: string; sub?: string } {
   if (name.startsWith("mcp:")) { const [, server, ...tool] = name.split(":"); return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, "") }; }
@@ -55,41 +49,55 @@ function ToolRow({ t }: { t: ToolCall }) {
   const { label, sub } = toolTitle(t.name, running);
   const arg = toolArg(t).replace(/\s+/g, " ");
   return (
-    <div>
-      <button onClick={() => t.output && setOpen(!open)} className={cn("flex w-full items-center gap-2.5 rounded-lg py-1 pr-1 text-left text-[13px]", t.output && "hover:text-on-surface")}>
-        <span className="grid size-4 shrink-0 place-items-center">
-          {running ? <ZeusOrb size={12} /> : t.status === "ok" ? <Icon name="check" size={14} className="text-on-surface-variant" /> : <Icon name="error" size={14} className="text-error" />}
-        </span>
-        <span className={cn("shrink-0 font-medium", running ? "text-on-surface" : "text-on-surface-variant")}>{label}</span>
-        {sub && <span className="shrink-0 text-on-surface-variant/70">{sub}</span>}
-        <span className="min-w-0 flex-1 truncate text-on-surface-variant/70">{arg}</span>
+    <div className="rounded-xl transition-colors">
+      <button onClick={() => t.output && setOpen(!open)} className={cn("flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-[12.5px]", t.output && "hover:bg-surface-high/50 hover:text-on-surface")}>
+        {!running && (
+          <span className="grid size-4 shrink-0 place-items-center">
+            {t.status === "ok" ? <Icon name="check" size={13} className="text-on-surface-variant" /> : <Icon name="error" size={13} className="text-error" />}
+          </span>
+        )}
+        <span className={cn("shrink-0 font-medium", running ? "zshine" : "text-on-surface-variant")}>{label}</span>
+        {sub && <span className="shrink-0 rounded-md bg-surface-high px-1.5 py-0.5 text-[11px] text-on-surface-variant/80">{sub}</span>}
+        {arg && <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-on-surface-variant/70">{arg}</span>}
+        {!arg && <span className="flex-1" />}
         {t.output && <Icon name="expand_more" size={14} className={cn("shrink-0 text-on-surface-variant/70 transition-transform", open && "rotate-180")} />}
       </button>
       <Collapse open={open}>
-        <pre className="ml-6 mb-1 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-low px-3 py-2 font-mono text-[11.5px] leading-relaxed text-on-surface-variant select-text">{t.output}</pre>
+        <pre className="ml-5 mb-1.5 mt-0.5 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-outline-variant/40 bg-surface-low px-3 py-2 font-mono text-[11.5px] leading-relaxed text-on-surface-variant select-text">{t.output}</pre>
       </Collapse>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Reasoning                                                           */
+/* Reasoning (collapsible thought trace with shimmer header)           */
 /* ------------------------------------------------------------------ */
 function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
-  const [open, setOpen] = useState<boolean | null>(null); // null = follow the live state
+  const [open, setOpen] = useState<boolean | null>(null);
   const shown = open ?? live;
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => { if (live && shown && body.current) body.current.scrollTop = body.current.scrollHeight; }, [text, live, shown]);
+  const lines = text.trim().split(/\n+/).filter(Boolean);
   return (
-    <div>
-      <button onClick={() => setOpen(!shown)} className="flex w-full items-center gap-2.5 py-1 text-left text-[13px]">
-        <span className="grid size-4 shrink-0 place-items-center">{live ? <ZeusOrb size={12} /> : <Icon name="check" size={14} className="text-on-surface-variant" />}</span>
-        <span className={cn("font-medium", live ? "zshine" : "text-on-surface-variant")}>{live ? "Thinking" : `Thought${ms ? ` for ${secs(ms)}` : ""}`}</span>
-        <span className="flex-1" />
-        <Icon name="expand_more" size={14} className={cn("text-on-surface-variant/70 transition-transform", shown && "rotate-180")} />
+    <div className="rounded-xl">
+      <button onClick={() => setOpen(!shown)} className="flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-[12.5px] hover:bg-surface-high/50">
+        {!live && <Icon name="check" size={13} className="shrink-0 text-on-surface-variant" />}
+        <span className={cn("font-medium", live ? "zshine" : "text-on-surface-variant")}>
+          {live ? "Thinking through architecture & typography…" : `Thought process${ms ? ` · ${secs(ms)}` : ""}`}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[11.5px] text-on-surface-variant/60">
+          {!shown && lines[0] ? lines[0].replace(/^[-*•]\s*/, "") : ""}
+        </span>
+        <Icon name="expand_more" size={14} className={cn("shrink-0 text-on-surface-variant/70 transition-transform", shown && "rotate-180")} />
       </button>
       <Collapse open={shown}>
-        <div ref={body} className={cn("zthink ml-[7px] max-h-52 overflow-y-auto border-l-2 border-outline-variant/70 pl-4 text-[13px] leading-relaxed text-on-surface-variant select-text whitespace-pre-wrap", live && "zthink-live")}>
+        <div
+          ref={body}
+          className={cn(
+            "zthink ml-2.5 mt-1 mb-1.5 max-h-56 overflow-y-auto border-l-2 border-outline-variant/60 pl-3.5 text-[12.5px] leading-relaxed text-on-surface-variant select-text whitespace-pre-wrap",
+            live && "zthink-live"
+          )}
+        >
           {text}
         </div>
       </Collapse>
@@ -102,6 +110,7 @@ function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: n
 /* ------------------------------------------------------------------ */
 export function WorkLog({ m }: { m: Message }) {
   const tools = m.tools ?? [];
+  const boards = useStore((s) => s.artboards);
   const live = !!m.streaming;
   const [open, setOpen] = useState<boolean | null>(null);
   const hasBody = !!m.reasoning || tools.length > 0;
@@ -109,17 +118,33 @@ export function WorkLog({ m }: { m: Message }) {
   if (!hasBody) return null;
   const failed = tools.filter((t) => t.status === "error").length;
   const thinkLive = live && !!m.reasoning && !m.thinkMs;
-  const parts = [m.reasoning ? "Thought" : "", tools.length ? `${tools.length} step${tools.length > 1 ? "s" : ""}` : "", failed ? `${failed} failed` : ""].filter(Boolean);
+  const runningTool = tools.find((t) => t.status === "running");
+  const loadingBoard = boards.find((a) => m.artboardIds?.includes(a.id) && a.loading);
+
+  let liveHeader = "Thinking…";
+  if (runningTool) liveHeader = toolTitle(runningTool.name, true).label;
+  else if (loadingBoard) liveHeader = `Designing ${loadingBoard.name}…`;
+  else if (thinkLive) liveHeader = "Reasoning…";
+  else if (live) liveHeader = "Composing screens…";
+
+  const parts = [
+    m.reasoning ? "Reasoning" : "",
+    tools.length ? `${tools.length} step${tools.length > 1 ? "s" : ""}` : "",
+    failed ? `${failed} failed` : "",
+  ].filter(Boolean);
+
   return (
-    <div className="rounded-2xl border border-outline-variant/60">
-      <button onClick={() => setOpen(!shown)} className="state flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left text-[13px]">
-        {live ? <ZeusOrb size={14} /> : <Icon name="check" size={15} className="text-on-surface-variant" />}
-        <span className={cn("font-medium", live ? "zshine" : "text-on-surface")}>{live ? "Working" : m.stats?.ms ? `Worked for ${secs(m.stats.ms)}` : "Worked"}</span>
-        <span className="min-w-0 flex-1 truncate text-on-surface-variant">{parts.join(" · ")}</span>
+    <div className="rounded-2xl border border-outline-variant/55 bg-surface-low/50">
+      <button onClick={() => setOpen(!shown)} className="state flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2 text-left text-[13px]">
+        {!live && <Icon name="check" size={15} className="shrink-0 text-on-surface-variant" />}
+        <span className={cn("font-medium", live ? "zshine" : "text-on-surface")}>
+          {live ? liveHeader : m.stats?.ms ? `Worked for ${secs(m.stats.ms)}` : "Worked"}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant/80">{parts.join(" · ")}</span>
         <Icon name="expand_more" size={16} className={cn("shrink-0 text-on-surface-variant transition-transform", shown && "rotate-180")} />
       </button>
       <Collapse open={shown}>
-        <div className="space-y-0.5 px-3.5 pb-3 pt-0.5">
+        <div className="space-y-1 border-t border-outline-variant/35 px-2.5 pb-2.5 pt-1.5">
           {m.reasoning && <ThinkingBlock text={m.reasoning} live={thinkLive} ms={m.thinkMs} />}
           {tools.map((t) => <ToolRow key={t.id} t={t} />)}
         </div>
@@ -129,21 +154,22 @@ export function WorkLog({ m }: { m: Message }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Live status line (what Zeus is doing right now)                      */
+/* Live status line (shimmer text only, no orb)                        */
 /* ------------------------------------------------------------------ */
 export function LiveStatus({ m }: { m: Message }) {
   const boards = useStore((s) => s.artboards);
   if (!m.streaming) return null;
+  const hasWorkLog = !!m.reasoning || (m.tools && m.tools.length > 0);
   const running = (m.tools ?? []).find((t) => t.status === "running");
   const loading = boards.find((a) => m.artboardIds?.includes(a.id) && a.loading);
-  let label = "Thinking";
+  if (hasWorkLog && !loading && !m.text) return null;
+  let label = "Thinking…";
   if (running) { const { label: l } = toolTitle(running.name, true); label = l; }
-  else if (loading) label = `Designing ${loading.name}`;
-  else if (m.reasoning && !m.thinkMs) label = "Reasoning";
-  else if (m.text) label = "Writing";
+  else if (loading) label = `Designing ${loading.name}…`;
+  else if (m.reasoning && !m.thinkMs) label = "Reasoning…";
+  else if (m.text) label = "Writing…";
   return (
-    <div className="flex items-center gap-2.5 py-1 text-[13px]">
-      <ZeusOrb size={18} />
+    <div className="flex items-center py-0.5 text-[13px]">
       <span className="zshine font-medium">{label}</span>
     </div>
   );

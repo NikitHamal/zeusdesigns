@@ -9,7 +9,7 @@ import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
-import { LiveStatus, WorkLog, ZeusOrb } from "./Activity";
+import { LiveStatus, WorkLog } from "./Activity";
 
 /* ------------------------------------------------------------------ */
 /* Message bits                                                        */
@@ -45,7 +45,7 @@ function ArtboardCards({ ids }: { ids: string[] }) {
             <Thumb html={a.html} w={a.w} h={a.h} width={118} className={a.loading ? "opacity-60" : ""} />
           </div>
           <div className="mt-1.5 truncate px-1 text-xs font-semibold text-on-surface">{a.name}</div>
-          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? <span className="inline-flex items-center gap-1.5"><ZeusOrb size={10} />Designing</span> : `v${a.version}`}</div>
+          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? <span className="zshine font-medium">Designing…</span> : `v${a.version}`}</div>
         </button>
       ))}
     </div>
@@ -84,31 +84,48 @@ function MessageView({ m }: { m: Message }) {
     );
   }
   return (
-    <div className="anim-pop group flex gap-3">
-      <Icon name="auto_awesome" size={20} fill className="mt-0.5 text-primary" />
-      <div className="min-w-0 flex-1 space-y-2.5">
-        <WorkLog m={m} />
-        {m.text && <div className={cn(m.streaming && "caret")}><Markdown text={m.text} /></div>}
-        {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
-        <LiveStatus m={m} />
-        {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
-        {!m.streaming && (
-          <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
-            <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
-            <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
-            <IconBtn label="Remember this" size={28} onClick={async () => { const v = m.text.slice(0, 240); const l = await nativeMemory.add(v); if (l) useStore.getState().patchSettings({ memory: l.reverse() }); else addMemory(v); notify("Saved to Memory"); }}><Icon name="bookmark_add" size={13} /></IconBtn>
-            {m.model && <span className="ml-1">{m.model}</span>}
-            {m.stats?.tps ? <span className="rounded-full bg-surface-high px-2 py-0.5 font-medium text-on-surface-variant">{m.stats.tps.toLocaleString()} tok/s</span> : null}
-          </div>
-        )}
-      </div>
+    <div className="anim-pop group min-w-0 space-y-2.5">
+      <WorkLog m={m} />
+      {m.text && <div className={cn(m.streaming && "caret")}><Markdown text={m.text} /></div>}
+      {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
+      <LiveStatus m={m} />
+      {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
+      {!m.streaming && (
+        <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
+          <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
+          <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
+          <IconBtn label="Remember this" size={28} onClick={async () => { const v = m.text.slice(0, 240); const l = await nativeMemory.add(v); if (l) useStore.getState().patchSettings({ memory: l.reverse() }); else addMemory(v); notify("Saved to Memory"); }}><Icon name="bookmark_add" size={13} /></IconBtn>
+          {m.model && <span className="ml-1">{m.model}</span>}
+          {m.stats?.tps ? <span className="rounded-full bg-surface-high px-2 py-0.5 font-medium text-on-surface-variant">{m.stats.tps.toLocaleString()} tok/s</span> : null}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Composer                                                            */
+/* Composer: M3 Expressive Connected Model + Effort Split Control      */
 /* ------------------------------------------------------------------ */
+const EFFORT_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3, max: 4 };
+const EFFORT_SHORT: Record<string, string> = { low: "Low", medium: "Med", high: "High", max: "Max" };
+
+function EffortBars({ level }: { level: number }) {
+  return (
+    <span className="inline-flex items-end gap-[2px] h-3" aria-hidden>
+      {[1, 2, 3, 4].map((b) => (
+        <i
+          key={b}
+          style={{ height: `${3 + b * 2.2}px` }}
+          className={cn(
+            "w-[2.5px] rounded-full transition-all duration-200",
+            b <= level ? "bg-primary" : "bg-on-surface-variant/30"
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
 function ModelPicker() {
   const settings = useStore((s) => s.settings);
   const patch = useStore((s) => s.patchSettings);
@@ -116,36 +133,121 @@ function ModelPicker() {
   const custom = settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId);
   const prov = findProvider(settings.providerId);
   const label = custom ? custom.model : prov.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
-  const effort = EFFORTS.find((e) => e.id === settings.effort);
+  const effort = EFFORTS.find((e) => e.id === settings.effort) ?? EFFORTS[1];
+  const level = EFFORT_LEVEL[effort.id] ?? 2;
+
+  const cycleEffort = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const idx = EFFORTS.findIndex((x) => x.id === settings.effort);
+    const next = EFFORTS[(idx + 1) % EFFORTS.length];
+    patch({ effort: next.id });
+  };
+
   return (
-    <Dropdown up align="right" width={330} className="min-w-0" trigger={({ toggle, open }) => (
-      <button onClick={toggle} title="Model and effort" className={cn("state flex h-9 max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-on-surface", open && "bg-surface-high")}>
-        <span className="truncate">{label}</span>
-        <span className="hidden shrink-0 text-on-surface-variant @[400px]:inline">{effort?.label}</span>
-        <Icon name="expand_more" size={14} className="shrink-0 text-on-surface-variant" />
-      </button>
-    )}>
-      {(close) => (
-        <>
-          <MenuLabel>Model</MenuLabel>
-          {PROVIDERS.map((p) => p.models.map((m) => (
-            <MenuItem
-              key={p.id + m.id} active={settings.providerId === p.id && settings.modelId === m.id}
-              label={m.label} desc={`${p.name} · ${p.speed}`}
-              onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
-            />
-          )))}
-          {settings.customProviders.length > 0 && <MenuLabel>Your API keys</MenuLabel>}
-          {settings.customProviders.map((c) => (
-            <MenuItem key={c.id} label={c.model} desc={`${c.name} · ${c.format}`} active={settings.providerId === `custom:${c.id}`} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} />
-          ))}
-          <MenuItem icon={<Icon name="add" size={16} />} label="Add your own endpoint" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} />
-          <div className="my-1.5 border-t border-outline-variant/70" />
-          <MenuLabel>Effort</MenuLabel>
-          {EFFORTS.map((e) => <MenuItem key={e.id} label={e.label} desc={e.desc} active={settings.effort === e.id} onClick={() => { patch({ effort: e.id }); close(); }} />)}
-        </>
-      )}
-    </Dropdown>
+    <div className="flex min-w-0 items-center gap-[2px] rounded-full bg-surface-high/65 p-0.5">
+      {/* Left segment: Model selector */}
+      <Dropdown up align="right" width={330} className="min-w-0" trigger={({ toggle, open }) => (
+        <button
+          onClick={toggle}
+          title="Select AI model"
+          className={cn(
+            "state morph flex h-8 max-w-full min-w-0 items-center gap-1 rounded-l-full rounded-r-[8px] bg-surface-container/80 pl-3 pr-2 text-[12.5px] font-medium text-on-surface",
+            open && "bg-surface-highest"
+          )}
+        >
+          <span className="truncate">{label}</span>
+          <Icon name="expand_more" size={14} className="shrink-0 text-on-surface-variant" />
+        </button>
+      )}>
+        {(close) => (
+          <>
+            <div className="px-2.5 pt-2 pb-1.5">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                <span>Reasoning effort</span>
+                <span className="normal-case tracking-normal text-primary">{effort.desc}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-surface-low p-1">
+                {EFFORTS.map((e) => {
+                  const active = settings.effort === e.id;
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => patch({ effort: e.id })}
+                      className={cn(
+                        "state morph flex h-7 items-center justify-center gap-1 rounded-xl text-xs font-semibold transition-all",
+                        active ? "bg-primary-container text-on-primary-container" : "text-on-surface-variant hover:text-on-surface"
+                      )}
+                    >
+                      {e.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="my-1 border-t border-outline-variant/60" />
+            <MenuLabel>Model</MenuLabel>
+            {PROVIDERS.map((p) => p.models.map((m) => (
+              <MenuItem
+                key={p.id + m.id} active={settings.providerId === p.id && settings.modelId === m.id}
+                label={m.label} desc={`${p.name} · ${p.speed}`}
+                onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
+              />
+            )))}
+            {settings.customProviders.length > 0 && <MenuLabel>Your API keys</MenuLabel>}
+            {settings.customProviders.map((c) => (
+              <MenuItem key={c.id} label={c.model} desc={`${c.name} · ${c.format}`} active={settings.providerId === `custom:${c.id}`} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} />
+            ))}
+            <MenuItem icon={<Icon name="add" size={16} />} label="Add your own endpoint" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} />
+          </>
+        )}
+      </Dropdown>
+
+      {/* Right segment: Instant M3 Expressive Effort selector (Popover + Shift-click cycle) */}
+      <Dropdown up align="right" width={264} trigger={({ toggle, open }) => (
+        <button
+          onClick={(e) => (e.shiftKey ? cycleEffort(e) : toggle())}
+          onContextMenu={(e) => { e.preventDefault(); cycleEffort(e); }}
+          title={`Reasoning effort: ${effort.label} (${effort.desc}) — click to pick, right-click to cycle`}
+          className={cn(
+            "state morph flex h-8 shrink-0 items-center gap-1.5 rounded-l-[8px] rounded-r-full bg-surface-container/80 pl-2 pr-2.5 text-[12px] font-semibold text-on-surface",
+            open && "bg-surface-highest"
+          )}
+        >
+          <EffortBars level={level} />
+          <span className="hidden @[360px]:inline">{EFFORT_SHORT[effort.id] ?? effort.label}</span>
+        </button>
+      )}>
+        {(close) => (
+          <div className="p-2">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Reasoning effort</span>
+              <span className="text-[11px] font-medium text-primary">{effort.label}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1 rounded-2xl bg-surface-low p-1">
+              {EFFORTS.map((e) => {
+                const active = settings.effort === e.id;
+                return (
+                  <button
+                    key={e.id}
+                    onClick={() => { patch({ effort: e.id }); close(); }}
+                    className={cn(
+                      "state morph flex h-8 flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all",
+                      active ? "bg-primary text-on-primary" : "text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
+                    )}
+                  >
+                    {EFFORT_SHORT[e.id] ?? e.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center justify-between px-1 text-[11.5px] text-on-surface-variant">
+              <span>{effort.desc}</span>
+              <button onClick={(e) => { cycleEffort(e); }} className="font-medium text-primary hover:underline">Cycle</button>
+            </div>
+          </div>
+        )}
+      </Dropdown>
+    </div>
   );
 }
 

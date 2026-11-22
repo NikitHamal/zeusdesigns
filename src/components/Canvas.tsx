@@ -11,7 +11,6 @@ import { ExportMenu } from "./ExportMenu";
 import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
-import { ZeusOrb } from "./Activity";
 import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
 import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
 
@@ -73,25 +72,107 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
 
 
 /* ------------------------------------------------------------------ */
-/* Zeus designing: wireframe skeleton, scan sweep, travelling ring       */
+/* Architectural blueprint wireframe & tonal shimmer while designing   */
 /* ------------------------------------------------------------------ */
-function Skeleton({ w, h, device }: { w: number; h: number; device: Device }) {
-  const bars: { x: number; y: number; w: number; h: number; r: number; d: number }[] = [];
-  const add = (x: number, y: number, bw: number, bh: number, r = 12) => bars.push({ x, y, w: bw, h: bh, r, d: bars.length * 90 });
+function BlueprintWireframe({ w, h, device }: { w: number; h: number; device: Device }) {
   if (device === "web") {
-    const m = w * 0.06;
-    add(m, 28, 110, 22, 8); add(w - m - 280, 28, 280, 22, 8);
-    add(m, h * 0.2, w * 0.46, 54, 14); add(m, h * 0.2 + 74, w * 0.38, 54, 14); add(m, h * 0.2 + 150, w * 0.3, 18, 8); add(m, h * 0.2 + 190, 150, 46, 23);
-    add(w * 0.56, h * 0.18, w * 0.38, h * 0.42, 24);
-    const cw = (w - m * 2 - 32) / 3; for (let i = 0; i < 3; i++) add(m + i * (cw + 16), h * 0.7, cw, h * 0.2, 20);
-  } else {
-    const m = 20, cw = w - m * 2;
-    add(m, 52, cw * 0.4, 26, 10); add(w - m - 40, 48, 40, 40, 20);
-    add(m, 112, cw, h * 0.2, 28);
-    for (let i = 0; i < 4; i++) { const y = 112 + h * 0.2 + 26 + i * 76; if (y + 60 > h - 90) break; add(m, y, 52, 52, 16); add(m + 68, y + 8, cw * 0.5, 16, 8); add(m + 68, y + 32, cw * 0.32, 12, 6); }
-    for (let i = 0; i < 4; i++) add(m + (cw / 4) * i + cw / 8 - 18, h - 62, 36, 36, 18);
+    return (
+      <div className="flex h-full w-full flex-col justify-between p-8" style={{ gap: 24 }}>
+        <div className="flex items-center justify-between border-b border-outline-variant/30 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="zc-bone h-7 w-7 rounded-lg" />
+            <div className="zc-bone h-5 w-28 rounded-md" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="zc-bone h-4 w-16 rounded-md" />
+            <div className="zc-bone h-4 w-16 rounded-md" />
+            <div className="zc-bone h-9 w-28 rounded-full" />
+          </div>
+        </div>
+        <div className="grid flex-1 grid-cols-12 gap-6">
+          <div className="col-span-7 flex flex-col justify-center gap-4 rounded-3xl border border-outline-variant/30 bg-surface-high/35 p-7">
+            <div className="zc-bone h-4 w-24 rounded-full" />
+            <div className="zc-bone h-11 w-4/5 rounded-xl" />
+            <div className="zc-bone h-11 w-3/5 rounded-xl" />
+            <div className="zc-bone mt-2 h-4 w-2/3 rounded-md" />
+            <div className="mt-3 flex gap-3">
+              <div className="zc-bone h-11 w-36 rounded-full" />
+              <div className="zc-bone h-11 w-28 rounded-full" />
+            </div>
+          </div>
+          <div className="col-span-5 flex flex-col gap-4 rounded-3xl border border-outline-variant/30 bg-surface-high/25 p-6">
+            <div className="flex items-center justify-between">
+              <div className="zc-bone h-4 w-24 rounded-md" />
+              <div className="zc-bone h-6 w-16 rounded-full" />
+            </div>
+            <div className="zc-bone h-9 w-36 rounded-lg" />
+            <div className="zc-bone flex-1 rounded-2xl" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-3 rounded-2xl border border-outline-variant/30 bg-surface-high/25 p-5" style={{ width: "100%", height: Math.max(110, Math.round(h * 0.18)) }}>
+              <div className="zc-bone h-4 w-24 rounded-md" />
+              <div className="zc-bone h-7 w-32 rounded-lg" />
+              <div className="zc-bone mt-auto h-3 w-full rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
-  return <>{bars.map((b, i) => <i key={i} style={{ left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: b.r, animationDelay: `${b.d}ms` }} />)}</>;
+  void w;
+  return (
+    <div className="flex h-full w-full flex-col justify-between p-5">
+      {/* Appbar */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="zc-bone h-7 w-36 rounded-lg" />
+        <div className="flex gap-2">
+          <div className="zc-bone h-9 w-9 rounded-full" />
+          <div className="zc-bone h-9 w-9 rounded-full" />
+        </div>
+      </div>
+      {/* Hero card */}
+      <div className="mt-4 flex flex-col gap-3 rounded-[26px] border border-outline-variant/35 bg-surface-high/40 p-5">
+        <div className="zc-bone h-3.5 w-24 rounded-full" />
+        <div className="zc-bone h-10 w-44 rounded-xl" />
+        <div className="zc-bone h-2.5 w-full rounded-full" />
+        <div className="mt-1 flex items-center justify-between">
+          <div className="zc-bone h-4 w-28 rounded-md" />
+          <div className="zc-bone h-9 w-28 rounded-full" />
+        </div>
+      </div>
+      {/* Filter chips */}
+      <div className="mt-4 flex gap-2">
+        <div className="zc-bone h-8 w-16 rounded-full" />
+        <div className="zc-bone h-8 w-20 rounded-full" />
+        <div className="zc-bone h-8 w-20 rounded-full" />
+        <div className="zc-bone h-8 w-16 rounded-full" />
+      </div>
+      {/* List rows */}
+      <div className="mt-4 flex flex-1 flex-col gap-2.5 overflow-hidden">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center gap-3.5 rounded-2xl border border-outline-variant/25 bg-surface-high/25 p-3.5">
+            <div className="zc-bone h-11 w-11 shrink-0 rounded-xl" />
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="zc-bone h-4 w-3/5 rounded-md" />
+              <div className="zc-bone h-3 w-2/5 rounded-md" />
+            </div>
+            <div className="zc-bone h-5 w-12 rounded-full" />
+          </div>
+        ))}
+      </div>
+      {/* Bottom nav */}
+      <div className="mt-4 flex items-center justify-around rounded-2xl border-t border-outline-variant/30 pt-3 pb-1">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-1.5">
+            <div className="zc-bone h-7 w-14 rounded-full" />
+            <div className="zc-bone h-2.5 w-10 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function DesigningFx({ a, radius }: { a: Artboard; radius: number }) {
@@ -99,26 +180,28 @@ function DesigningFx({ a, radius }: { a: Artboard; radius: number }) {
   const prev = useRef(loading);
   const [done, setDone] = useState(false);
   useEffect(() => {
-    if (prev.current && !loading) { setDone(true); const t = setTimeout(() => setDone(false), 1000); prev.current = loading; return () => clearTimeout(t); }
+    if (prev.current && !loading) { setDone(true); const t = setTimeout(() => setDone(false), 700); prev.current = loading; return () => clearTimeout(t); }
     prev.current = loading;
   }, [loading]);
   const empty = a.html.length < 500;
-  const d = Math.ceil(Math.hypot(a.w, a.h) * 1.1);
   if (!loading && !done) return null;
   return (
-    <>
-      {loading && <div className="zc-skel" style={{ opacity: empty ? 1 : 0 }}><Skeleton w={a.w} h={a.h} device={a.device} /></div>}
-      {loading && <div className="zc-scan"><i /></div>}
-      {done && <div className="zc-scan once"><i /></div>}
-      <div className={cn("zc-ring", done && "done")} style={{ ["--d" as string]: `${d}px`, borderRadius: radius }} />
+    <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden" style={{ borderRadius: radius }}>
       {loading && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[4] grid place-items-center">
-          <div className="zc-pill flex items-center gap-2.5 rounded-full bg-inverse-surface py-2 pl-3 pr-4 text-[13px] font-medium text-inverse-on-surface" style={{ transform: `scale(${Math.min(2.4, Math.max(1, a.w / 520))})`, transformOrigin: "center bottom" }}>
-            <ZeusOrb size={16} /> Designing
+        <div className="zc-skel" style={{ opacity: empty ? 1 : 0.18 }}>
+          <BlueprintWireframe w={a.w} h={a.h} device={a.device} />
+        </div>
+      )}
+      {loading && <div className="zc-sheen" />}
+      <div className={cn("zc-border", done && "done")} style={{ borderRadius: radius }} />
+      {loading && (
+        <div className=" absolute inset-x-0 bottom-5 z-[4] flex justify-center">
+          <div className="zc-pill rounded-full border border-outline-variant/60 bg-surface-container/95 px-4 py-1.5 text-[12.5px] font-medium">
+            <span className="zshine">Designing {a.name}…</span>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

@@ -143,26 +143,12 @@ button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 @keyframes zshine { from { background-position: 130% 0; } to { background-position: -130% 0; } }
 .zthink-live { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
 
-/* canvas: Zeus designing a screen */
-.zc-ring { position: absolute; inset: 0; border-radius: inherit; padding: 3px; overflow: hidden; pointer-events: none; z-index: 3;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
-.zc-ring::before { content: ""; position: absolute; left: 50%; top: 50%; width: var(--d); height: var(--d); margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
-  background: conic-gradient(from 0deg, transparent 0 50%, color-mix(in srgb, var(--m-primary) 35%, transparent) 72%, var(--m-primary) 100%);
-  animation: zorb-orbit 2.6s linear infinite; will-change: transform; }
-.zc-ring.done::before { animation: none; background: var(--m-primary); }
-.zc-ring.done { animation: zc-flash .9s ease-out forwards; }
-@keyframes zc-flash { from { opacity: 1; } to { opacity: 0; } }
-.zc-scan { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
-.zc-scan > i { position: absolute; inset: 0; display: block; transform: translateY(-100%);
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--m-primary) 20%, transparent));
-  border-bottom: 2px solid var(--m-primary); animation: zc-scan 2.4s cubic-bezier(.5,0,.3,1) infinite; }
-.zc-scan.once > i { animation: zc-scan-once .9s cubic-bezier(.4,0,.2,1) forwards; }
-@keyframes zc-scan { 0% { transform: translateY(-100%); opacity: 0; } 12% { opacity: 1; } 78% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
-@keyframes zc-scan-once { 0% { transform: translateY(-100%); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
-.zc-skel { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #fff; transition: opacity .5s var(--ease-emph); }
-.zc-skel i { position: absolute; display: block; background: color-mix(in srgb, #000 6.5%, transparent); animation: zc-pulse 1.7s ease-in-out infinite; }
-@keyframes zc-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+/* canvas: architectural blueprint wireframe + diagonal shimmer */
+.zc-skel { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--m-surface-container); transition: opacity .45s var(--ease-emph); }
+.zc-bone { background: linear-gradient(100deg, color-mix(in srgb, var(--m-on-surface) 7%, transparent) 30%, color-mix(in srgb, var(--m-primary) 16%, transparent) 50%, color-mix(in srgb, var(--m-on-surface) 7%, transparent) 70%); background-size: 240% 100%; animation: zshine 2s linear infinite; }
+.zc-sheen { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(115deg, transparent 35%, color-mix(in srgb, var(--m-primary) 9%, transparent) 50%, transparent 65%); background-size: 240% 100%; animation: zshine 2.4s linear infinite; }
+.zc-border { position: absolute; inset: 0; z-index: 3; pointer-events: none; border: 2px solid color-mix(in srgb, var(--m-primary) 65%, transparent); transition: opacity .5s ease-out; }
+.zc-border.done { opacity: 0; }
 .zc-pill { animation: pop-in .35s var(--ease-spring) both; }
 @keyframes zc-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 .zc-rise { animation: zc-rise .5s var(--ease-emph-decel) both; }
