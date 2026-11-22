@@ -51,23 +51,21 @@ impl Default for PerfGovernor {
         let auto_trim = Arc::new(AtomicBool::new(true));
         let flag = auto_trim.clone();
         std::thread::spawn(move || {
-            // Trim cold startup DLL pages right after initial window paint (2.5s and 6s)
-            std::thread::sleep(Duration::from_millis(2500));
-            if flag.load(Ordering::Relaxed) {
-                let _ = trim_now();
+            // Multi-stage startup trim (900ms, 1800ms, 3000ms) so Task Manager drops under ~20-24 MB immediately after launch
+            for delay_ms in [900u64, 900, 1200] {
+                std::thread::sleep(Duration::from_millis(delay_ms));
+                if flag.load(Ordering::Relaxed) {
+                    let _ = trim_now();
+                }
             }
-            std::thread::sleep(Duration::from_millis(3500));
-            if flag.load(Ordering::Relaxed) {
-                let _ = trim_now();
-            }
-            // Continuous low-overhead governor every 4s whenever working set exceeds 22 MB
+            // Continuous low-overhead governor every 1.2s whenever working set exceeds 20 MB
             loop {
-                std::thread::sleep(Duration::from_secs(4));
+                std::thread::sleep(Duration::from_millis(1200));
                 if !flag.load(Ordering::Relaxed) {
                     continue;
                 }
                 let s = current_stats(true);
-                if s.working_set_bytes > 22 * 1024 * 1024 {
+                if s.working_set_bytes > 20 * 1024 * 1024 {
                     let _ = trim_now();
                 }
             }

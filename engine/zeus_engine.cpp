@@ -581,19 +581,48 @@ struct ZeusMemoryPriorityInfo {
     ULONG MemoryPriority;
 };
 
+#ifndef QUOTA_LIMITS_HARDWS_MIN_DISABLE
+#define QUOTA_LIMITS_HARDWS_MIN_DISABLE 0x00000002
+#endif
+#ifndef QUOTA_LIMITS_HARDWS_MAX_ENABLE
+#define QUOTA_LIMITS_HARDWS_MAX_ENABLE 0x00000004
+#endif
+
 void trim_pids_now(const std::vector<DWORD>& pids) {
     DWORD self_pid = GetCurrentProcessId();
     _heapmin();
-    HeapCompact(GetProcessHeap(), 0);
+    HANDLE heaps[32];
+    DWORD heap_count = GetProcessHeaps(32, heaps);
+    for (DWORD i = 0; i < heap_count && i < 32; ++i) {
+        HeapCompact(heaps[i], 0);
+    }
+    const size_t proc_count = std::max<size_t>(1, pids.size());
+    const SIZE_T per_proc_cap = static_cast<SIZE_T>(
+        std::max<unsigned long long>(
+            3ULL * 1024ULL * 1024ULL,
+            (22ULL * 1024ULL * 1024ULL) / proc_count
+        )
+    );
+    const SIZE_T min_ws = static_cast<SIZE_T>(1024ULL * 1024ULL);
+
     for (DWORD pid : pids) {
         HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SET_INFORMATION, FALSE, pid);
         if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
         if (!h) continue;
         if (pid != self_pid) {
-            ZeusMemoryPriorityInfo prio{ 2 }; // MEMORY_PRIORITY_LOW for child processes
+            ZeusMemoryPriorityInfo prio{ 1 }; // MEMORY_PRIORITY_VERY_LOW for WebView2 child processes
             SetProcessInformation(h, static_cast<PROCESS_INFORMATION_CLASS>(0), &prio, sizeof(prio));
         }
+        // 1. Flush all cold pages from the working set
         SetProcessWorkingSetSizeEx(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1), 0);
+        K32EmptyWorkingSet(h);
+        // 2. Enforce a hard kernel working-set ceiling so Task Manager working set cannot rebound to 300MB+
+        SetProcessWorkingSetSizeEx(
+            h,
+            min_ws,
+            per_proc_cap,
+            QUOTA_LIMITS_HARDWS_MIN_DISABLE | QUOTA_LIMITS_HARDWS_MAX_ENABLE
+        );
         K32EmptyWorkingSet(h);
         CloseHandle(h);
     }
