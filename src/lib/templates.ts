@@ -2,7 +2,7 @@ import { ICON_PATHS } from "./iconPaths";
 import { DesignSystem, tokensCss } from "./designSystems";
 import type { Device } from "../types";
 
-export type Archetype = "dashboard" | "login" | "feed" | "shop" | "player" | "settings" | "landing";
+export type Archetype = "dashboard" | "notes" | "login" | "feed" | "shop" | "player" | "settings" | "landing";
 
 const BASE_CSS = `
 *{box-sizing:border-box;margin:0}
@@ -97,10 +97,19 @@ function mobile(ds: DesignSystem, a: Archetype, v: number, title: string): strin
   const N = (i: [string, string][], on = 0) => nav(i, on);
   const wrap = (inner: string, extra = "") => `<div class="screen v${v}">${status()}${inner}${extra}</div>`;
   switch (a) {
+    case "notes":
+      return wrap(`<div class="appbar"><h1>${v === 1 ? "Journal" : "Notes"}</h1><span class="avatar" style="width:40px;height:40px">@@search@@</span></div>
+        <div class="scroll stagger">
+          <div class="card tonal" style="padding:22px;${v === 1 ? "border-radius:var(--r-xl)" : ""}"><div class="eyebrow" style="opacity:.7">Weekly capture</div><div class="hero-big" style="margin:6px 0 6px">24 notes</div><div class="bar"><i style="width:78%"></i></div><div class="row between" style="margin-top:10px"><span style="font-size:13px;opacity:.8">6 pinned · 4 folders</span><button class="btn sm">New note</button></div></div>
+          <div class="row" data-single style="overflow:auto;gap:8px"><span class="chip on">All notes</span><span class="chip">Pinned</span><span class="chip">Product</span><span class="chip">Journal</span></div>
+          <div class="grid2"><div class="card flat"><div class="eyebrow">Pinned</div><b style="font-size:16px">Q4 Strategy</b><div class="muted" style="font-size:12.5px;margin-top:4px">6 action items</div></div><div class="card flat"><div class="eyebrow">Design</div><b style="font-size:16px">M3E Tokens</b><div class="muted" style="font-size:12.5px;margin-top:4px">Surface hierarchy</div></div></div>
+          <div class="col">${[["@@description@@", "Architecture Review", "Shadow DOM renderer · 4 decisions", "Today"], ["@@checklist@@", "Release Checklist v2.4", "7 of 9 tasks completed", "11:20"], ["@@edit@@", "Reading: Dieter Rams", "10 principles for good design", "Thu"], ["@@shopping_bag@@", "Saturday Farmers Market", "Sourdough, olive oil, figs", "Tue"]].map(([ic, n, s, t]) => `<div class="item"><span class="avatar">${ic}</span><span class="grow"><b>${n}</b><small>${s}</small></span><span class="chip" style="height:26px;font-size:12px">${t}</span></div>`).join("")}</div>
+        </div>
+        <div class="fab">@@add@@</div>${N([["@@description@@", "Notes"], ["@@push_pin@@", "Pinned"], ["@@folder@@", "Folders"], ["@@person@@", "Profile"]])}`);
     case "login":
       return wrap(`<div class="scroll stagger" style="justify-content:${v === 1 ? "flex-start" : "center"}">
-        ${v === 1 ? `<div class="card tonal" style="padding:28px;border-radius:var(--r-xl);margin:0 -4px"><div class="avatar" style="width:64px;height:64px;background:var(--primary);color:var(--on-primary);font-size:28px">@@auto_awesome@@</div><h1 class="hero-big" style="margin-top:22px">Welcome back.</h1><p style="margin-top:8px;opacity:.8">Sign in to continue ${title}.</p></div>` :
-          `<div><div class="avatar" style="width:64px;height:64px;background:var(--primary);color:var(--on-primary);font-size:28px">@@auto_awesome@@</div><h1 class="hero-big" style="margin-top:20px">Welcome back</h1><p class="muted" style="margin-top:6px">Sign in to continue to ${title}.</p></div>`}
+        ${v === 1 ? `<div class="card tonal" style="padding:28px;border-radius:var(--r-xl);margin:0 -4px"><div class="avatar" style="width:64px;height:64px;background:var(--primary);color:var(--on-primary);font-size:28px">@@bolt@@</div><h1 class="hero-big" style="margin-top:22px">Sign in</h1><p style="margin-top:8px;opacity:.8">Continue to ${title}.</p></div>` :
+          `<div><div class="avatar" style="width:64px;height:64px;background:var(--primary);color:var(--on-primary);font-size:28px">@@bolt@@</div><h1 class="hero-big" style="margin-top:20px">Sign in</h1><p class="muted" style="margin-top:6px">Continue to ${title}.</p></div>`}
         <label class="field">Email<input value="alex@zeus.app"/></label>
         <label class="field">Password<input type="password" value="password123"/></label>
         <div class="row between"><span class="row" style="gap:8px"><span class="switch on" style="transform:scale(.7)"></span>Remember me</span><b style="color:var(--primary)">Forgot?</b></div>
@@ -164,6 +173,7 @@ function web(ds: DesignSystem, a: Archetype, v: number, title: string): string {
 
 export function detectArchetype(prompt: string, device: Device): Archetype {
   const p = prompt.toLowerCase();
+  if (/(\bnotes?\b|notebook|memo|journal|to-?do|task|checklist|habit)/.test(p)) return "notes";
   if (/(login|sign.?in|sign.?up|auth|onboard|register)/.test(p)) return "login";
   if (/(shop|store|e-?commerce|product|cart|market)/.test(p)) return "shop";
   if (/(feed|social|post|timeline|news|chat|story)/.test(p)) return "feed";
