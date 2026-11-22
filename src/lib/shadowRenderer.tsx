@@ -2,7 +2,7 @@
 // Replaces heavy <iframe> sub-documents for thumbnails and canvas artboards so WebView2 stays under ~20-30 MB RAM
 // while preserving 100% of CSS variables, layout fidelity, and interactive kit states (.z-tab, .z-chip, .z-nav-item, .z-side-item).
 
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "../utils/cn";
 import { fontsUsedIn, installDesignFonts } from "./fonts";
 
@@ -10,6 +10,9 @@ const InteractiveSelector = ".z-tab,.z-chip,.z-nav-item,.z-side-item,.z-seg";
 
 function scopeCssToShadow(css: string): string {
   return css
+    .replace(/@import\s+(?:url\(\s*(?:'[^']*'|"[^"]*"|[^)]*)\s*\)|'[^']*'|"[^"]*")[^;\n]*;?/gi, "")
+    .replace(/@import\b[^\n;]*;?/gi, "")
+    .replace(/(?:^|[\n])\s*[\d;.,@a-zA-Z_+-]*display=(?:swap|auto|block|fallback|optional)\s*['"]?\s*\)?\s*;?/gi, "\n")
     .replace(/:root\b/g, ":host, .z-shadow-body")
     .replace(/\bhtml\s*,\s*body\b/gi, ":host, .z-shadow-body")
     .replace(/(^|[},;\s])body(?=[{\s.,:#>~+\[])/gi, "$1.z-shadow-body")
@@ -61,13 +64,17 @@ function getSharedSheet(cssText: string): CSSStyleSheet | null {
   if (typeof CSSStyleSheet === "undefined" || !("replaceSync" in CSSStyleSheet.prototype)) return null;
   let sheet = sheetCache.get(cssText);
   if (!sheet) {
-    if (sheetCache.size > 48) {
-      const oldest = sheetCache.keys().next().value;
-      if (oldest !== undefined) sheetCache.delete(oldest);
+    try {
+      if (sheetCache.size > 48) {
+        const oldest = sheetCache.keys().next().value;
+        if (oldest !== undefined) sheetCache.delete(oldest);
+      }
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(cssText);
+      sheetCache.set(cssText, sheet);
+    } catch {
+      return null;
     }
-    sheet = new CSSStyleSheet();
-    sheet.replaceSync(cssText);
-    sheetCache.set(cssText, sheet);
   }
   return sheet;
 }
@@ -90,19 +97,20 @@ export const ShadowFrame = memo(function ShadowFrame({
   const hostRef = useRef<HTMLDivElement>(null);
   const shadowRef = useRef<ShadowRoot | null>(null);
 
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const root = shadowRef.current ?? host.attachShadow({ mode: "open" });
-    shadowRef.current = root;
+  useLayoutEffect(() => {
+    try {
+      const host = hostRef.current;
+      if (!host) return;
+      const root = shadowRef.current ?? host.shadowRoot ?? host.attachShadow({ mode: "open" });
+      shadowRef.current = root;
 
-    const usedFonts = fontsUsedIn(html);
-    if (usedFonts.length > 0) installDesignFonts(usedFonts);
+      const usedFonts = fontsUsedIn(html);
+      if (usedFonts.length > 0) installDesignFonts(usedFonts);
 
-    const { styles, bodyClass, bodyStyle, bodyHtml } = parseArtboardDocument(html);
-    const vh = (h / 100).toFixed(3);
-    const vw = (w / 100).toFixed(3);
-    const fullCss = `:host {
+      const { styles, bodyClass, bodyStyle, bodyHtml } = parseArtboardDocument(html);
+      const vh = (h / 100).toFixed(3);
+      const vw = (w / 100).toFixed(3);
+      const fullCss = `:host {
   display: block;
   width: ${w}px;
   height: ${h}px;
@@ -136,12 +144,22 @@ export const ShadowFrame = memo(function ShadowFrame({
 .z-shadow-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 ${styles}`;
 
-    const shared = getSharedSheet(fullCss);
-    if (shared && "adoptedStyleSheets" in root) {
-      root.adoptedStyleSheets = [shared];
-      root.innerHTML = `<div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
-    } else {
+      const shared = getSharedSheet(fullCss);
+      if (shared && "adoptedStyleSheets" in root) {
+        try {
+          root.adoptedStyleSheets = [shared];
+          root.innerHTML = `<div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+          return;
+        } catch {
+          // Fall back to inline <style> if adoptedStyleSheets is rejected
+        }
+      }
+      if ("adoptedStyleSheets" in root) {
+        try { root.adoptedStyleSheets = []; } catch { /* ignore */ }
+      }
       root.innerHTML = `<style>${fullCss}</style><div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+    } catch {
+      // Never allow malformed artboard HTML/CSS to interrupt React's effect loop
     }
   }, [html, w, h, interactive]);
 

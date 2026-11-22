@@ -50,6 +50,36 @@
   --ease-emph-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
+:root {
+  color-scheme: dark;
+  --m-primary: hsl(17 62% 63%);
+  --m-on-primary: hsl(17 55% 11%);
+  --m-primary-container: hsl(17 36% 25%);
+  --m-on-primary-container: hsl(17 85% 90%);
+  --m-secondary: hsl(17 10% 78%);
+  --m-secondary-container: hsl(17 5% 24%);
+  --m-on-secondary-container: hsl(17 12% 91%);
+  --m-tertiary: hsl(112 32% 72%);
+  --m-tertiary-container: hsl(112 20% 26%);
+  --m-on-tertiary-container: hsl(112 40% 90%);
+  --m-surface: hsl(17 3% 10%);
+  --m-surface-dim: hsl(17 3% 8%);
+  --m-surface-lowest: hsl(17 3% 6%);
+  --m-surface-low: hsl(17 3% 12%);
+  --m-surface-container: hsl(17 3% 17%);
+  --m-surface-high: hsl(17 3% 20%);
+  --m-surface-highest: hsl(17 3% 24%);
+  --m-on-surface: hsl(17 8% 93%);
+  --m-on-surface-variant: hsl(17 5% 68%);
+  --m-outline: hsl(17 3% 48%);
+  --m-outline-variant: hsl(17 3% 24%);
+  --m-error: hsl(5 90% 74%);
+  --m-error-container: hsl(2 55% 25%);
+  --m-on-error-container: hsl(5 100% 90%);
+  --m-inverse-surface: hsl(17 8% 90%);
+  --m-inverse-on-surface: hsl(17 6% 16%);
+}
+
 html, body, #root { height: 100%; }
 body {
   margin: 0;

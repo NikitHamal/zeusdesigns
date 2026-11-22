@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
 import { nativeAvailable, nativeMcp, nativeMemory } from "./lib/bridge";
@@ -24,7 +24,7 @@ export default function App() {
   const dragging = useRef(false);
   const split = hasMessages || showCanvas;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyTheme(theme, hue);
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

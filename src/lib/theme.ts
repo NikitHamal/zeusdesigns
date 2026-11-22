@@ -11,8 +11,8 @@ export const ACCENTS: { id: string; name: string; hue: number }[] = [
 ];
 
 export function applyTheme(mode: "light" | "dark" | "system", hue: number) {
-  const dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const h = hue;
+  const dark = mode !== "light" && (mode === "dark" || !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const h = Number.isFinite(hue) ? hue : 17;
   const v: Record<string, string> = dark
     ? {
         primary: t(h, 62, 63), "on-primary": t(h, 55, 11), "primary-container": t(h, 36, 25), "on-primary-container": t(h, 85, 90),

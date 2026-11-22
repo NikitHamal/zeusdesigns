@@ -9,6 +9,7 @@ import { DESIGN_SYSTEMS, getDS } from "./lib/designSystems";
 import { rethemeHtml } from "./lib/harness";
 import { SKILLS } from "./lib/skills";
 import { blankFrame } from "./lib/templates";
+import { applyTheme } from "./lib/theme";
 import type { Workspace } from "./lib/bridge";
 import type { UpdateInfo } from "./lib/updater";
 
@@ -153,6 +154,9 @@ export const useStore = create<State>()(
 
       patchSettings: (p) => set((s) => {
         const nextSettings = { ...s.settings, ...p };
+        if (p.theme !== undefined || p.hue !== undefined) {
+          try { applyTheme(nextSettings.theme, nextSettings.hue); } catch { /* ignore */ }
+        }
         if (p.designSystemId && p.designSystemId !== s.settings.designSystemId) {
           const ds = getDS(p.designSystemId);
           return {
@@ -380,13 +384,20 @@ export const useStore = create<State>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const settings = { ...current.settings, ...(p.settings ?? {}) };
-        if (settings.hue === 258 || settings.hue === 216) settings.hue = 17; // retired blue/violet seeds
-        const stripFontBlobs = (h: string) => h ? h.replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "") : h;
+        if (settings.hue === 258 || settings.hue === 216 || !Number.isFinite(settings.hue)) settings.hue = 17; // retired blue/violet seeds
+        try { applyTheme(settings.theme, settings.hue); } catch { /* ignore */ }
+        const cleanSavedHtml = (h: string) =>
+          h
+            ? h
+                .replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "")
+                .replace(/@import\s+(?:url\(\s*(?:'[^']*'|"[^"]*"|[^)]*)\s*\)|'[^']*'|"[^"]*")[^;\n]*;?/gi, "")
+                .replace(/(?:^|[\n])\s*[\d;.,@a-zA-Z_+-]*display=(?:swap|auto|block|fallback|optional)\s*['"]?\s*\)?\s*;?/gi, "\n")
+            : h;
         const artboards = Array.isArray(p.artboards)
           ? p.artboards.map((a) => ({
               ...a,
-              html: stripFontBlobs(a.html),
-              history: Array.isArray(a.history) ? a.history.slice(-6).map(stripFontBlobs) : [],
+              html: cleanSavedHtml(a.html),
+              history: Array.isArray(a.history) ? a.history.slice(-6).map(cleanSavedHtml) : [],
             }))
           : current.artboards;
         return { ...current, ...p, artboards, settings };

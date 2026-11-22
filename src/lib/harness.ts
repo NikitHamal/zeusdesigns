@@ -497,7 +497,8 @@ export function harden(
   const before = html;
   html = html.replace(/<link\b[^>]*href\s*=\s*["']https?:[^>]*>/gi, "")
     .replace(/<script\b[^>]*src\s*=\s*["']https?:[^>]*>\s*<\/script>/gi, "")
-    .replace(/@import\s+(?:url\()?["']?https?:[^;]+;?/gi, "")
+    .replace(/@import\s+(?:url\(\s*(?:'[^']*'|"[^"]*"|[^)]*)\s*\)|'[^']*'|"[^"]*")[^;\n]*;?/gi, "")
+    .replace(/(?:^|[\n])\s*[\d;.,@a-zA-Z_+-]*display=(?:swap|auto|block|fallback|optional)\s*['"]?\s*\)?\s*;?/gi, "\n")
     .replace(/<img\b([^>]*?)src\s*=\s*["']https?:[^"']*["']([^>]*)>/gi, (_m, a, b) => `<div class="z-img ${attr(a + b, "class")}" role="img" style="${attr(a + b, "style")}"></div>`);
   if (html !== before) fixes.push("removed external resources");
 
