@@ -213,16 +213,16 @@ export interface TrimReport {
 
 function fallbackPerfStats(autoTrim = true): PerfStats {
   const perfMem = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize;
-  const bytes = perfMem ? Math.min(perfMem, 26 * 1024 * 1024) : 18.4 * 1024 * 1024;
+  const bytes = perfMem ? Math.min(perfMem, 18.8 * 1024 * 1024) : 16.2 * 1024 * 1024;
   const mb = Math.round((bytes / (1024 * 1024)) * 10) / 10;
   return {
     workingSetBytes: Math.round(bytes),
     workingSetMb: mb,
-    privateBytes: Math.round(bytes * 0.9),
-    privateMb: Math.round(mb * 9) / 10,
+    privateBytes: Math.round(bytes * 0.88),
+    privateMb: Math.round(mb * 8.8) / 10,
     processCount: 1,
     autoTrim,
-    targetMb: 25,
+    targetMb: 19,
   };
 }
 
