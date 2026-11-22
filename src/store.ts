@@ -391,7 +391,7 @@ export const useStore = create<State>()(
             ? h
                 .replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "")
                 .replace(/@import\s+(?:url\(\s*(?:'[^']*'|"[^"]*"|[^)]*)\s*\)|'[^']*'|"[^"]*")[^;\n]*;?/gi, "")
-                .replace(/(?:^|[\n])\s*[\d;.,@a-zA-Z_+-]*display=(?:swap|auto|block|fallback|optional)\s*['"]?\s*\)?\s*;?/gi, "\n")
+                .replace(/(?:^|[\n>])\s*[^\n{}<>]*(?:display=(?:swap|auto|block|fallback|optional)|wght@[\d;]+)[^\n{}<>]*['"]?\s*\)?\s*;?/gi, (m) => (m.startsWith(">") ? ">" : "\n"))
             : h;
         const artboards = Array.isArray(p.artboards)
           ? p.artboards.map((a) => ({

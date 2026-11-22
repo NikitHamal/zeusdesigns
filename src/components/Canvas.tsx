@@ -337,7 +337,7 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
 
       {/* body */}
       <div
-        className={cn("relative overflow-hidden bg-white transition-all", dropOver ? "ring-[4px] ring-primary" : selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
+        className={cn("relative overflow-hidden bg-surface-container transition-all", dropOver ? "ring-[4px] ring-primary" : selected ? "ring-[3px] ring-primary" : "ring-1 ring-outline-variant/60")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
         <Frame id={a.id} w={a.w} h={a.h} html={a.html} interactive={interacting} editing={editing} culled={culled} />

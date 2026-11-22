@@ -3,8 +3,11 @@
 // while preserving 100% of CSS variables, layout fidelity, and interactive kit states (.z-tab, .z-chip, .z-nav-item, .z-side-item).
 
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import { useStore } from "../store";
 import { cn } from "../utils/cn";
+import { getDS, tokensCss } from "./designSystems";
 import { fontsUsedIn, installDesignFonts } from "./fonts";
+import { kitCss } from "./harness";
 
 const InteractiveSelector = ".z-tab,.z-chip,.z-nav-item,.z-side-item,.z-seg";
 
@@ -12,17 +15,18 @@ function scopeCssToShadow(css: string): string {
   return css
     .replace(/@import\s+(?:url\(\s*(?:'[^']*'|"[^"]*"|[^)]*)\s*\)|'[^']*'|"[^"]*")[^;\n]*;?/gi, "")
     .replace(/@import\b[^\n;]*;?/gi, "")
-    .replace(/(?:^|[\n])\s*[\d;.,@a-zA-Z_+-]*display=(?:swap|auto|block|fallback|optional)\s*['"]?\s*\)?\s*;?/gi, "\n")
-    .replace(/:root\b/g, ":host, .z-shadow-body")
-    .replace(/\bhtml\s*,\s*body\b/gi, ":host, .z-shadow-body")
+    .replace(/(?:^|[\n])\s*[^\n{}<>]*(?:display=(?:swap|auto|block|fallback|optional)|wght@[\d;]+)[^\n{}<>]*['"]?\s*\)?\s*;?/gi, "\n")
+    .replace(/:root(?=\s*[,{])/g, ":host, .z-shadow-body")
+    .replace(/:root\b/g, ".z-shadow-body")
+    .replace(/\bhtml\s*,\s*body(?=\s*[,{])/gi, ":host, .z-shadow-body")
     .replace(/(^|[},;\s])body(?=[{\s.,:#>~+\[])/gi, "$1.z-shadow-body")
-    .replace(/(^|[},;\s])html(?=[{\s.,:#>~+\[])/gi, "$1:host")
+    .replace(/(^|[},;\s])html(?=[{\s.,:#>~+\[])/gi, "$1.z-shadow-body")
     .replace(/(\d+(?:\.\d+)?)vh\b/g, "calc($1 * var(--z-vh, 1vh))")
     .replace(/(\d+(?:\.\d+)?)vw\b/g, "calc($1 * var(--z-vw, 1vw))");
 }
 
-function parseArtboardDocument(html: string): { styles: string; bodyClass: string; bodyStyle: string; bodyHtml: string } {
-  if (!html) return { styles: "", bodyClass: "", bodyStyle: "", bodyHtml: "" };
+function parseArtboardDocument(html: string): { styles: string; bodyClass: string; bodyStyle: string; dataTheme: string; bodyHtml: string } {
+  if (!html) return { styles: "", bodyClass: "", bodyStyle: "", dataTheme: "", bodyHtml: "" };
   const styleBlocks: string[] = [];
   const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, "");
   const withoutStyles = withoutScripts.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_m, css: string) => {
@@ -30,7 +34,8 @@ function parseArtboardDocument(html: string): { styles: string; bodyClass: strin
     return "";
   });
 
-  const bodyMatch = /<body\b([^>]*)>([\s\S]*?)<\/body>/i.exec(withoutStyles);
+  const htmlAttrs = /<html\b([^>]*)>/i.exec(withoutStyles)?.[1] ?? "";
+  const bodyMatch = /<body\b([^>]*)>([\s\S]*?)(?:<\/body>|$)/i.exec(withoutStyles);
   let bodyAttrs = "";
   let bodyHtml = withoutStyles;
   if (bodyMatch) {
@@ -44,12 +49,22 @@ function parseArtboardDocument(html: string): { styles: string; bodyClass: strin
       .replace(/<meta[^>]*>/gi, "");
   }
 
-  const bodyClass = /\bclass\s*=\s*"([^"]*)"/i.exec(bodyAttrs)?.[1] ?? "";
-  const bodyStyle = /\bstyle\s*=\s*"([^"]*)"/i.exec(bodyAttrs)?.[1] ?? "";
+  const htmlClass = /\bclass\s*=\s*"([^"]*)"/i.exec(htmlAttrs)?.[1] ?? "";
+  const bClass = /\bclass\s*=\s*"([^"]*)"/i.exec(bodyAttrs)?.[1] ?? "";
+  const bodyClass = [htmlClass, bClass].filter(Boolean).join(" ").trim();
+  const htmlStyle = /\bstyle\s*=\s*"([^"]*)"/i.exec(htmlAttrs)?.[1] ?? "";
+  const bStyle = /\bstyle\s*=\s*"([^"]*)"/i.exec(bodyAttrs)?.[1] ?? "";
+  const bodyStyle = [htmlStyle, bStyle].filter(Boolean).join(";").trim();
+  const dataTheme =
+    /\bdata-theme\s*=\s*"([^"]*)"/i.exec(bodyAttrs)?.[1] ??
+    /\bdata-theme\s*=\s*"([^"]*)"/i.exec(htmlAttrs)?.[1] ??
+    "";
+
   return {
     styles: styleBlocks.join("\n"),
     bodyClass,
     bodyStyle,
+    dataTheme,
     bodyHtml,
   };
 }
@@ -58,26 +73,6 @@ export const hasCustomScript = (html: string): boolean => {
   const scripts = html.match(/<script\b[^>]*>[\s\S]*?<\/script>/gi) ?? [];
   return scripts.some((s) => !s.includes("data-zeus-kit-js") && !s.includes("data-zeus-edit"));
 };
-
-const sheetCache = new Map<string, CSSStyleSheet>();
-function getSharedSheet(cssText: string): CSSStyleSheet | null {
-  if (typeof CSSStyleSheet === "undefined" || !("replaceSync" in CSSStyleSheet.prototype)) return null;
-  let sheet = sheetCache.get(cssText);
-  if (!sheet) {
-    try {
-      if (sheetCache.size > 48) {
-        const oldest = sheetCache.keys().next().value;
-        if (oldest !== undefined) sheetCache.delete(oldest);
-      }
-      sheet = new CSSStyleSheet();
-      sheet.replaceSync(cssText);
-      sheetCache.set(cssText, sheet);
-    } catch {
-      return null;
-    }
-  }
-  return sheet;
-}
 
 export const ShadowFrame = memo(function ShadowFrame({
   html,
@@ -107,7 +102,11 @@ export const ShadowFrame = memo(function ShadowFrame({
       const usedFonts = fontsUsedIn(html);
       if (usedFonts.length > 0) installDesignFonts(usedFonts);
 
-      const { styles, bodyClass, bodyStyle, bodyHtml } = parseArtboardDocument(html);
+      const { styles, bodyClass, bodyStyle, dataTheme, bodyHtml } = parseArtboardDocument(html);
+      const needsKitFallback = html.trim().length > 0 && !html.includes("data-zeus-kit");
+      const fallbackKit = needsKitFallback
+        ? scopeCssToShadow(tokensCss(getDS(useStore.getState().settings.designSystemId)) + kitCss(useStore.getState().settings.designSystemId))
+        : "";
       const vh = (h / 100).toFixed(3);
       const vw = (w / 100).toFixed(3);
       const fullCss = `:host {
@@ -120,8 +119,8 @@ export const ShadowFrame = memo(function ShadowFrame({
   position: relative;
   contain: layout paint;
   isolation: isolate;
-  background: var(--bg, #fff);
-  color: var(--text, #111);
+  background: var(--bg, var(--m-surface-container, #2d2b2a));
+  color: var(--text, var(--m-on-surface, #efedec));
   font-family: var(--font, system-ui, sans-serif);
   box-sizing: border-box;
 }
@@ -134,30 +133,19 @@ export const ShadowFrame = memo(function ShadowFrame({
   scrollbar-width: none;
   -ms-overflow-style: none;
   box-sizing: border-box;
-  background: var(--bg, #fff);
-  color: var(--text, #111);
+  background: var(--bg, var(--m-surface-container, #2d2b2a));
+  color: var(--text, var(--m-on-surface, #efedec));
   font-family: var(--font, system-ui, sans-serif);
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 .z-shadow-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+${fallbackKit}
 ${styles}`;
 
-      const shared = getSharedSheet(fullCss);
-      if (shared && "adoptedStyleSheets" in root) {
-        try {
-          root.adoptedStyleSheets = [shared];
-          root.innerHTML = `<div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
-          return;
-        } catch {
-          // Fall back to inline <style> if adoptedStyleSheets is rejected
-        }
-      }
-      if ("adoptedStyleSheets" in root) {
-        try { root.adoptedStyleSheets = []; } catch { /* ignore */ }
-      }
-      root.innerHTML = `<style>${fullCss}</style><div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+      const themeAttr = dataTheme ? ` data-theme="${dataTheme}"` : "";
+      root.innerHTML = `<style>${fullCss}</style><div class="z-shadow-body ${bodyClass}" style="${bodyStyle}"${themeAttr}>${bodyHtml}</div>`;
     } catch {
       // Never allow malformed artboard HTML/CSS to interrupt React's effect loop
     }

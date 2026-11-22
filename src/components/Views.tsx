@@ -61,7 +61,7 @@ export function SingleView() {
     <div className="flex h-full flex-col items-center pt-20">
       <div className="flex flex-1 items-center gap-4 overflow-auto px-6">
         <IconBtn label="Previous" tonal onClick={() => go(-1)} size={48}><Icon name="chevron_left"  /></IconBtn>
-        <div key={a.id} className="anim-pop overflow-hidden bg-white ring-1 ring-black/10" style={{ width: a.w * sc, height: a.h * sc, borderRadius: a.device === "mobile" ? 38 * sc : 14 }}>
+        <div key={a.id} className="anim-pop overflow-hidden bg-surface-container ring-1 ring-outline-variant/60" style={{ width: a.w * sc, height: a.h * sc, borderRadius: a.device === "mobile" ? 38 * sc : 14 }}>
           {hasCustomScript(a.html) ? (
             <iframe title={a.name} srcDoc={quiet(a.html)} sandbox="allow-scripts allow-forms allow-popups" style={{ width: a.w, height: a.h, border: 0, transform: `scale(${sc})`, transformOrigin: "0 0" }} />
           ) : (
@@ -82,7 +82,7 @@ export function SingleView() {
 /* ---------------- Compare ---------------- */
 function Pane({ a, scale, bare }: { a: Artboard; scale: number; bare?: boolean }) {
   return (
-    <div className={cn("overflow-hidden bg-white", !bare && " ring-1 ring-black/10")} style={{ width: a.w * scale, height: a.h * scale, borderRadius: bare ? 0 : a.device === "mobile" ? 30 : 10 }}>
+    <div className={cn("overflow-hidden bg-surface-container", !bare && " ring-1 ring-outline-variant/60")} style={{ width: a.w * scale, height: a.h * scale, borderRadius: bare ? 0 : a.device === "mobile" ? 30 : 10 }}>
       <ShadowFrame html={a.html} w={a.w} h={a.h} scale={scale} interactive />
     </div>
   );
