@@ -51,21 +51,19 @@ impl Default for PerfGovernor {
         let auto_trim = Arc::new(AtomicBool::new(true));
         let flag = auto_trim.clone();
         std::thread::spawn(move || {
-            // Initial post-launch trims once WebView2 finishes loading cold startup DLLs
-            for delay_ms in [1400_u64, 3800_u64] {
-                std::thread::sleep(Duration::from_millis(delay_ms));
-                if flag.load(Ordering::Relaxed) {
-                    let _ = trim_now();
-                }
+            // Wait until startup and initial UI hydration have completely settled before trimming cold pages
+            std::thread::sleep(Duration::from_secs(12));
+            if flag.load(Ordering::Relaxed) {
+                let _ = trim_now();
             }
-            // Periodic gentle trim when working set exceeds 24 MB
+            // Periodic gentle trim when working set exceeds 28 MB
             loop {
-                std::thread::sleep(Duration::from_secs(7));
+                std::thread::sleep(Duration::from_secs(15));
                 if !flag.load(Ordering::Relaxed) {
                     continue;
                 }
                 let s = current_stats(true);
-                if s.working_set_bytes > 24 * 1024 * 1024 {
+                if s.working_set_bytes > 28 * 1024 * 1024 {
                     let _ = trim_now();
                 }
             }
@@ -116,21 +114,21 @@ pub fn trim_now() -> TrimReport {
     }
 }
 
-#[tauri::command]
-pub fn perf_stats(gov: tauri::State<'_, PerfGovernor>) -> PerfStats {
-    current_stats(gov.auto_trim.load(Ordering::Relaxed))
+#[tauri::command(async)]
+pub fn perf_stats(gov: tauri::State<'_, PerfGovernor>) -> Result<PerfStats, String> {
+    Ok(current_stats(gov.auto_trim.load(Ordering::Relaxed)))
 }
 
-#[tauri::command]
-pub fn perf_trim() -> TrimReport {
-    trim_now()
+#[tauri::command(async)]
+pub fn perf_trim() -> Result<TrimReport, String> {
+    Ok(trim_now())
 }
 
-#[tauri::command]
-pub fn perf_set_auto(gov: tauri::State<'_, PerfGovernor>, enabled: bool) -> PerfStats {
+#[tauri::command(async)]
+pub fn perf_set_auto(gov: tauri::State<'_, PerfGovernor>, enabled: bool) -> Result<PerfStats, String> {
     gov.auto_trim.store(enabled, Ordering::Relaxed);
     if enabled {
         let _ = trim_now();
     }
-    current_stats(enabled)
+    Ok(current_stats(enabled))
 }

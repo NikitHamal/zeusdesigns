@@ -16,8 +16,8 @@ pub fn providers_list() -> Vec<ProviderInfo> {
     catalog()
 }
 
-#[tauri::command]
-pub fn title_generate(text: String) -> String {
+#[tauri::command(async)]
+pub fn title_generate(text: String) -> Result<String, String> {
     let sys = "Generate a concise 3 to 5 word design conversation title summarizing the user request. Output ONLY the title words with no quotes or punctuation.";
     if let Ok(title) = chatjimmy_complete(sys, &text) {
         let cleaned = title
@@ -28,7 +28,7 @@ pub fn title_generate(text: String) -> String {
             .trim_matches(['"', '\'', '.', '#'])
             .to_string();
         if !cleaned.is_empty() {
-            return cleaned.chars().take(60).collect();
+            return Ok(cleaned.chars().take(60).collect());
         }
     }
     let words: Vec<&str> = text
@@ -37,9 +37,9 @@ pub fn title_generate(text: String) -> String {
         .take(5)
         .collect();
     if words.is_empty() {
-        "New Design Session".to_string()
+        Ok("New Design Session".to_string())
     } else {
-        words.join(" ")
+        Ok(words.join(" "))
     }
 }
 

@@ -382,19 +382,19 @@ impl McpRegistry {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mcp_call(
     tool: String,
     args: Option<String>,
     registry: tauri::State<'_, McpRegistry>,
-) -> Value {
+) -> Result<Value, String> {
     let (ok, output) = registry.invoke_tool(&tool, args.as_deref().unwrap_or("{}"));
-    json!({ "ok": ok, "output": output })
+    Ok(json!({ "ok": ok, "output": output }))
 }
 
-#[tauri::command]
-pub fn mcp_list(registry: tauri::State<'_, McpRegistry>) -> Vec<McpServer> {
-    registry.list()
+#[tauri::command(async)]
+pub fn mcp_list(registry: tauri::State<'_, McpRegistry>) -> Result<Vec<McpServer>, String> {
+    Ok(registry.list())
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -408,7 +408,7 @@ pub struct McpServerInput {
     pub transport: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mcp_add(
     server: Option<McpServerInput>,
     name: Option<String>,
@@ -416,26 +416,26 @@ pub fn mcp_add(
     args: Option<Vec<String>>,
     transport: Option<String>,
     registry: tauri::State<'_, McpRegistry>,
-) -> Vec<McpServer> {
+) -> Result<Vec<McpServer>, String> {
     if let Some(s) = server {
-        registry.add_with_id(s.id, s.name, s.command, s.args, s.transport)
+        Ok(registry.add_with_id(s.id, s.name, s.command, s.args, s.transport))
     } else {
-        registry.add_with_id(
+        Ok(registry.add_with_id(
             None,
             name.unwrap_or_else(|| "Custom MCP".to_string()),
             command.unwrap_or_default(),
             args,
             transport,
-        )
+        ))
     }
 }
 
-#[tauri::command]
-pub fn mcp_remove(id: String, registry: tauri::State<'_, McpRegistry>) -> Vec<McpServer> {
-    registry.remove(&id)
+#[tauri::command(async)]
+pub fn mcp_remove(id: String, registry: tauri::State<'_, McpRegistry>) -> Result<Vec<McpServer>, String> {
+    Ok(registry.remove(&id))
 }
 
-#[tauri::command]
-pub fn mcp_tools(registry: tauri::State<'_, McpRegistry>) -> Vec<McpTool> {
-    registry.discover_tools()
+#[tauri::command(async)]
+pub fn mcp_tools(registry: tauri::State<'_, McpRegistry>) -> Result<Vec<McpTool>, String> {
+    Ok(registry.discover_tools())
 }
