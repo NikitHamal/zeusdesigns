@@ -12,18 +12,20 @@ import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
 import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
+import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
 
 const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const DEV_ICON = { mobile: "smartphone", tablet: "tablet", web: "desktop_windows" } as const;
 
 /* ------------------------------------------------------------------ */
-/* Artboard                                                            */
+/* Artboard (Zero-iframe Shadow DOM by default; sandboxed iframe in edit mode) */
 /* ------------------------------------------------------------------ */
-const Frame = memo(function Frame({ id, html, interactive, editing }: { id: string; html: string; interactive: boolean; editing: boolean }) {
+const Frame = memo(function Frame({ id, w, h, html, interactive, editing }: { id: string; w: number; h: number; html: string; interactive: boolean; editing: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState(html);
   const emitted = useRef<string | null>(null);
+  const needsIframe = editing || (interactive && hasCustomScript(html));
 
   // entering edit mode reloads the document with the editor runtime; outside changes (AI revise, undo) reload too
   useLayoutEffect(() => { if (editing) { emitted.current = null; setDoc(html); } }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -32,11 +34,11 @@ const Frame = memo(function Frame({ id, html, interactive, editing }: { id: stri
   useEffect(() => {
     if (!editing) return;
     const onMsg = (e: MessageEvent) => {
-      const w = ref.current?.contentWindow;
+      const win = ref.current?.contentWindow;
       const d = e.data;
-      if (!w || e.source !== w || !d || d.zeus !== "edit") return;
+      if (!win || e.source !== win || !d || d.zeus !== "edit") return;
       const ed = useEditor.getState();
-      if (d.type === "ready") editorBridge.attach(w);
+      if (d.type === "ready") editorBridge.attach(win);
       else if (d.type === "select") ed.setSel(d.info);
       else if (d.type === "undo") editor.undo();
       else if (d.type === "html") {
@@ -50,6 +52,10 @@ const Frame = memo(function Frame({ id, html, interactive, editing }: { id: stri
     window.addEventListener("message", onMsg);
     return () => { window.removeEventListener("message", onMsg); editorBridge.attach(null); };
   }, [editing, id]);
+
+  if (!needsIframe) {
+    return <ShadowFrame html={html} w={w} h={h} interactive={interactive} />;
+  }
 
   const src = quiet(editing ? injectEditor(doc) : html);
   return (
@@ -144,7 +150,7 @@ function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart,
         className={cn("relative overflow-hidden bg-white   transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
-        <Frame id={a.id} html={a.html} interactive={interacting} editing={editing} />
+        <Frame id={a.id} w={a.w} h={a.h} html={a.html} interactive={interacting} editing={editing} />
         {selectable && !interacting && !editing && (
           <div
             className="absolute inset-0 cursor-default"

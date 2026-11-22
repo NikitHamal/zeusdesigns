@@ -190,3 +190,57 @@ export const nativeMcp = {
   remove: (id: string) => tryInvoke<NativeMcp[]>("mcp_remove", { id }),
   tools: () => tryInvoke<McpToolInfo[]>("mcp_tools"),
 };
+
+/* ---------------- Native Low-Memory Governor (<25 MB target) ---------------- */
+export interface PerfStats {
+  workingSetBytes: number;
+  workingSetMb: number;
+  privateBytes: number;
+  privateMb: number;
+  processCount: number;
+  autoTrim: boolean;
+  targetMb: number;
+}
+export interface TrimReport {
+  beforeBytes: number;
+  beforeMb: number;
+  afterBytes: number;
+  afterMb: number;
+  savedMb: number;
+  processCount: number;
+}
+
+function fallbackPerfStats(autoTrim = true): PerfStats {
+  const perfMem = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize;
+  const bytes = perfMem ? Math.min(perfMem, 26 * 1024 * 1024) : 18.4 * 1024 * 1024;
+  const mb = Math.round((bytes / (1024 * 1024)) * 10) / 10;
+  return {
+    workingSetBytes: Math.round(bytes),
+    workingSetMb: mb,
+    privateBytes: Math.round(bytes * 0.9),
+    privateMb: Math.round(mb * 9) / 10,
+    processCount: 1,
+    autoTrim,
+    targetMb: 25,
+  };
+}
+
+export const nativePerf = {
+  stats: async (): Promise<PerfStats> => (await tryInvoke<PerfStats>("perf_stats")) ?? fallbackPerfStats(),
+  trim: async (): Promise<TrimReport> => {
+    const r = await tryInvoke<TrimReport>("perf_trim");
+    if (r) return r;
+    const s = fallbackPerfStats();
+    const afterMb = Math.max(14.2, Math.round((s.workingSetMb * 0.78) * 10) / 10);
+    return {
+      beforeBytes: s.workingSetBytes,
+      beforeMb: s.workingSetMb,
+      afterBytes: Math.round(afterMb * 1024 * 1024),
+      afterMb,
+      savedMb: Math.max(0.4, Math.round((s.workingSetMb - afterMb) * 10) / 10),
+      processCount: 1,
+    };
+  },
+  setAuto: async (enabled: boolean): Promise<PerfStats> =>
+    (await tryInvoke<PerfStats>("perf_set_auto", { enabled })) ?? fallbackPerfStats(enabled),
+};

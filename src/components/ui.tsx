@@ -2,7 +2,7 @@ import { cloneElement, isValidElement, memo, ReactNode, useCallback, useEffect, 
 import { createPortal } from "react-dom";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
-import { quiet } from "../lib/harness";
+import { ShadowFrame } from "../lib/shadowRenderer";
 
 /* ---------- IconBtn ---------- */
 export function IconBtn({ children, label, onClick, active, className, size = 40, disabled, tonal }: {
@@ -165,17 +165,10 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
   );
 }
 
-/* ---------- Thumb: scaled static preview of an artboard ---------- */
+/* ---------- Thumb: zero-iframe Shadow DOM scaled preview of an artboard ---------- */
 export const Thumb = memo(function Thumb({ html, w, h, width, className }: { html: string; w: number; h: number; width: number; className?: string }) {
   const sc = width / w;
-  return (
-    <div style={{ width, height: h * sc }} className={cn("overflow-hidden relative bg-white", className)}>
-      <iframe
-        title="preview" srcDoc={quiet(html)} sandbox="" tabIndex={-1}
-        style={{ width: w, height: h, transform: `scale(${sc})`, transformOrigin: "0 0", border: 0, pointerEvents: "none" }}
-      />
-    </div>
-  );
+  return <ShadowFrame html={html} w={w} h={h} scale={sc} interactive={false} className={className} />;
 });
 
 /* ---------- Markdown (small, dependency-free) ---------- */

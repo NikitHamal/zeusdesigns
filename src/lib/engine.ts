@@ -4,7 +4,7 @@ import { DEVICE_SIZE } from "../types";
 import { getDS } from "./designSystems";
 import { SKILLS } from "./skills";
 import { detectArchetype, renderScreen, VARIANT_NAMES } from "./templates";
-import { generateTitle, isNative, nativeChat, ChatEvent, ChatRequest } from "./bridge";
+import { generateTitle, isNative, nativeChat, nativePerf, ChatEvent, ChatRequest } from "./bridge";
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
@@ -317,6 +317,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     S.setBusy(false);
     if (created.length) setTimeout(() => canvasApi.fit(created), 80);
     controller = null; nativeCancel = null;
+    void nativePerf.trim();
   };
 
   const designTokensAnswer = (args?: string) => {

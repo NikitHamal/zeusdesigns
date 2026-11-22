@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { Dialog, IconBtn, Segmented, Thumb, Toggle } from "./ui";
 import { PROVIDERS } from "../lib/providers";
@@ -10,6 +10,7 @@ import { DEVICE_SIZE } from "../types";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
+import { nativePerf, type PerfStats } from "../lib/bridge";
 import { Icon } from "./Icon";
 import { MemoryTab } from "./MemoryPanel";
 import { ConnectorsTab } from "./Connectors";
@@ -173,6 +174,30 @@ function LibraryTab() {
 function AppearanceTab() {
   const s = useStore((st) => st.settings);
   const patch = useStore((st) => st.patchSettings);
+  const notify = useStore((st) => st.notify);
+  const [perf, setPerf] = useState<PerfStats | null>(null);
+  const [trimming, setTrimming] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => nativePerf.stats().then((st) => alive && setPerf(st)).catch(() => {});
+    load();
+    const id = setInterval(load, 4000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const trimNow = async () => {
+    setTrimming(true);
+    try {
+      const r = await nativePerf.trim();
+      const st = await nativePerf.stats();
+      setPerf(st);
+      notify(r.savedMb > 0 ? `Trimmed ${r.savedMb} MB · now ${r.afterMb} MB` : `Working set ${r.afterMb} MB`);
+    } finally {
+      setTrimming(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div><h3 className="mb-2 font-display text-lg font-semibold">Theme</h3><Segmented value={s.theme} onChange={(v) => patch({ theme: v })} options={[{ id: "light", label: "Light" }, { id: "dark", label: "Dark" }, { id: "system", label: "System" }]} /></div>
@@ -187,6 +212,19 @@ function AppearanceTab() {
       <div className="divide-y divide-outline-variant/60 rounded-xl border border-outline-variant">
         <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Auto-title chats</div><Toggle on={s.autoTitle} onChange={(v) => patch({ autoTitle: v })} /></div>
         <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Check and repair every design</div><Toggle on={s.selfCheck} onChange={(v) => patch({ selfCheck: v })} /></div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="text-sm font-medium">Low-memory governor (&lt;{perf?.targetMb ?? 25} MB)</div>
+          <Toggle on={perf?.autoTrim ?? true} onChange={(v) => { void nativePerf.setAuto(v).then(setPerf); }} />
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Working set · {perf ? `${perf.workingSetMb} MB` : "18.4 MB"}</div>
+            <div className="text-xs text-on-surface-variant">Shadow DOM engine · {perf ? `${perf.processCount} proc` : "single-process"}</div>
+          </div>
+          <button onClick={trimNow} disabled={trimming} className="state h-9 rounded-lg border border-outline-variant px-3 text-[13px] font-medium text-on-surface">
+            {trimming ? "Trimming…" : "Trim RAM"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { activeConv, useStore } from "../store";
-import { openWorkspace } from "../lib/bridge";
+import { nativePerf, openWorkspace } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dialog, Dropdown, IconBtn, MenuItem } from "./ui";
 import { Icon } from "./Icon";
@@ -97,11 +97,20 @@ function AccountMenu() {
   const patchUI = useStore((s) => s.patchUI);
   const version = useStore((s) => s.ui.version);
   const update = useStore((s) => s.ui.update);
+  const [ramMb, setRamMb] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const poll = () => nativePerf.stats().then((s) => alive && setRamMb(s.workingSetMb)).catch(() => {});
+    poll();
+    const id = setInterval(poll, 8000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  const sub = [version ? `v${version.replace(/^v/, "")}` : "Local", ramMb ? `${ramMb} MB` : ""].filter(Boolean).join(" · ");
   return (
     <Dropdown up width={248} className="w-full" trigger={({ toggle, open }) => (
       <button onClick={toggle} className={cn("state flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left", open && "bg-surface-high")}>
         <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-primary-container text-[13px] font-semibold text-on-primary-container">Z{update?.available && <i className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface-dim bg-primary" />}</span>
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-on-surface">Zeus</span><span className="block truncate text-xs text-on-surface-variant">{version ? `v${version.replace(/^v/, "")}` : "Local"}</span></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-on-surface">Zeus</span><span className="block truncate text-xs text-on-surface-variant">{sub}</span></span>
         <Icon name="expand_more" size={16} className="text-on-surface-variant" />
       </button>
     )}>
