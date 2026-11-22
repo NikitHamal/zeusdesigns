@@ -31,12 +31,20 @@ export function quiet(html: string): string {
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + tag) : tag + html;
 }
 
+/** Strips injected kit CSS/JS and font blobs from an artboard so prompts, code editors, and multi-turn context stay compact (~2 KB instead of 80 KB). */
+export function stripKitBoilerplate(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<style\b[^>]*data-zeus-(?:kit|quiet|fonts)[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script\b[^>]*data-zeus-(?:kit-js|edit)[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "")
+    .trim();
+}
+
 /** Re-themes an existing screen's design-system tokens and component kit in-place when switching Design Systems. */
 export function rethemeHtml(html: string, ds: DesignSystem): string {
   if (!html) return html;
-  const usedFonts = fontsUsedIn(html + " " + ds.tokens.font + " " + ds.tokens.heading);
-  const fontCss = usedFonts.length ? fontFaceCss(usedFonts) : "";
-  const kit = `<style data-zeus-kit>${fontCss}${tokensCss(ds)}${kitCss(ds.id)}</style>`;
+  const kit = `<style data-zeus-kit>${tokensCss(ds)}${kitCss(ds.id)}</style>`;
   if (/<style data-zeus-kit>[\s\S]*?<\/style>/i.test(html)) {
     return html.replace(/<style data-zeus-kit>[\s\S]*?<\/style>/i, kit);
   }
@@ -496,7 +504,7 @@ export function harden(
   // --- protect design-system tokens from model-written :root / white-bg resets ---
   html = html.replace(/<style\b(?![^>]*data-zeus)[^>]*>([\s\S]*?)<\/style>/gi, (full, css: string) => {
     const cleaned = css
-      .replace(/--(?:primary|on-primary|container|on-container|bg|surface|surface-2|text|muted|outline|font|heading)\s*:\s*[^;}\n]+;?/gi, "")
+      .replace(/--(?:font|heading)\s*:\s*[^;}\n]+;?/gi, "")
       .replace(/(body|html|\.z-screen|\.screen)\s*\{([^}]*?)background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white)\b/gi, "$1{$2background:var(--bg)");
     return full.replace(css, cleaned);
   });
@@ -581,11 +589,10 @@ export function harden(
     return full;
   });
 
-  // --- kit injection ---
+  // --- kit injection (fonts live on document.head for ShadowFrame and are injected on-demand by quiet()/embedFonts()) ---
+  html = html.replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "");
   if (!html.includes("data-zeus-kit")) {
-    const usedFonts = fontsUsedIn(html + " " + ds.tokens.font + " " + ds.tokens.heading);
-    const fontCss = usedFonts.length ? fontFaceCss(usedFonts) : "";
-    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${fontCss}${tokensCss(ds)}${kitCss(ds.id)}</style>`);
+    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${tokensCss(ds)}${kitCss(ds.id)}</style>`);
     if (!opts.partial) html = html.replace(/<\/body>/i, `<script data-zeus-kit-js>${KIT_JS}</script></body>`);
   }
   // metas go first so the charset declaration stays within the first 1024 bytes
@@ -608,9 +615,11 @@ Reply with at most 3 short sentences or bullets of markdown (design intent, no c
 <artboard name="Short screen name" device="mobile|tablet|web" mode="new">
 <!doctype html>...one complete HTML document...
 </artboard>
-- Revise an existing screen with mode="revise" id="<existing id>" and output the FULL updated document. Change only what was asked; keep everything else byte-identical in spirit.
+- You HAVE direct read/write access to the user's live canvas. Existing screens on the current canvas page are injected into the conversation inside <canvas_state> or <current_artboard>. NEVER claim you cannot access, inspect, or edit the canvas or ask the user to paste HTML.
+- Revise an existing screen with <artboard id="<existing id>" name="<screen name>" device="mobile|tablet|web" mode="revise">...full updated HTML...</artboard>. When the user asks to update all screens on the canvas (e.g. "change the theme to green", "switch to dark mode", "make the cards more compact"), emit a mode="revise" <artboard> block for each existing screen id (or invoke <zeus_tool name="studio_patch_screen"> / <zeus_tool name="studio_retheme_page">).
+- For theme or color changes requested by the user (e.g. "change theme to green", "make it warm terracotta", "switch to dark mode"), inject a <style data-zeus-theme>:root{--primary:...;--on-primary:...;--container:...;--on-container:...;--bg:...;--surface:...;--surface-2:...}</style> block inside <head> while preserving 100% of the screen's layout and content.
 - mobile = 390x844, tablet = 820x1100, web = 1280x800. Pick the device that matches the request; default to mobile for apps and web for sites and dashboards.
-- Unspecified direction on a fresh request: 3 artboards with genuinely different layout structure, not recolors. A revise or a variant of one selected screen: exactly 1 artboard.
+- Unspecified direction on a fresh request: 3 artboards with genuinely different layout structure, not recolors. A revise of one selected screen: 1 artboard with mode="revise" and its id. A global canvas revision: revise each existing screen in place using its id and mode="revise".
 - Every document must be complete and closed (</html>). Keep each screen under about 220 lines of HTML. A truncated screen is a failed screen, so cut sections before you cut the ending.
 - Self-contained only: no CDNs, <link>, @import, external images or libraries. Fonts are bundled (see Typography): write the font-family and nothing else. Vanilla JS is optional and only for real interactions.
 - After the last </artboard> write nothing.`,
