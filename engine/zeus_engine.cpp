@@ -528,6 +528,56 @@ void copy_to_c_buf(const std::string& src, char* out_buf, size_t out_len) {
     }
     out_buf[n] = '\0';
 }
+
+#ifdef _WIN32
+std::vector<DWORD> collect_zeus_process_tree() {
+    DWORD root_pid = GetCurrentProcessId();
+    std::vector<DWORD> tree = { root_pid };
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) return tree;
+
+    struct ProcPair { DWORD pid; DWORD ppid; };
+    std::vector<ProcPair> all;
+    PROCESSENTRY32 pe{};
+    pe.dwSize = sizeof(pe);
+    if (Process32First(snap, &pe)) {
+        do {
+            all.push_back({ pe.th32ProcessID, pe.th32ParentProcessID });
+        } while (Process32Next(snap, &pe));
+    }
+    CloseHandle(snap);
+
+    for (int depth = 0; depth < 5; ++depth) {
+        bool added = false;
+        for (const auto& p : all) {
+            if (std::find(tree.begin(), tree.end(), p.pid) != tree.end()) continue;
+            if (std::find(tree.begin(), tree.end(), p.ppid) != tree.end()) {
+                tree.push_back(p.pid);
+                added = true;
+            }
+        }
+        if (!added) break;
+    }
+    return tree;
+}
+
+void measure_tree(const std::vector<DWORD>& pids, unsigned long long& ws_bytes, unsigned long long& priv_bytes) {
+    ws_bytes = 0;
+    priv_bytes = 0;
+    for (DWORD pid : pids) {
+        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+        if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+        if (!h) continue;
+        PROCESS_MEMORY_COUNTERS_EX pmc{};
+        pmc.cb = sizeof(pmc);
+        if (K32GetProcessMemoryInfo(h, reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc))) {
+            ws_bytes += static_cast<unsigned long long>(pmc.WorkingSetSize);
+            priv_bytes += static_cast<unsigned long long>(pmc.PrivateUsage);
+        }
+        CloseHandle(h);
+    }
+}
+#endif
 } // namespace
 
 extern "C" {
@@ -602,58 +652,6 @@ int zeus_workspace_index_count(const char* folder_path) {
     if (!ws.open_workspace(folder_path)) return -1;
     return static_cast<int>(ws.indexed_files().size());
 }
-
-#ifdef _WIN32
-namespace {
-std::vector<DWORD> collect_zeus_process_tree() {
-    DWORD root_pid = GetCurrentProcessId();
-    std::vector<DWORD> tree = { root_pid };
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snap == INVALID_HANDLE_VALUE) return tree;
-
-    struct ProcPair { DWORD pid; DWORD ppid; };
-    std::vector<ProcPair> all;
-    PROCESSENTRY32 pe{};
-    pe.dwSize = sizeof(pe);
-    if (Process32First(snap, &pe)) {
-        do {
-            all.push_back({ pe.th32ProcessID, pe.th32ParentProcessID });
-        } while (Process32Next(snap, &pe));
-    }
-    CloseHandle(snap);
-
-    for (int depth = 0; depth < 5; ++depth) {
-        bool added = false;
-        for (const auto& p : all) {
-            if (std::find(tree.begin(), tree.end(), p.pid) != tree.end()) continue;
-            if (std::find(tree.begin(), tree.end(), p.ppid) != tree.end()) {
-                tree.push_back(p.pid);
-                added = true;
-            }
-        }
-        if (!added) break;
-    }
-    return tree;
-}
-
-void measure_tree(const std::vector<DWORD>& pids, unsigned long long& ws_bytes, unsigned long long& priv_bytes) {
-    ws_bytes = 0;
-    priv_bytes = 0;
-    for (DWORD pid : pids) {
-        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-        if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-        if (!h) continue;
-        PROCESS_MEMORY_COUNTERS_EX pmc{};
-        pmc.cb = sizeof(pmc);
-        if (K32GetProcessMemoryInfo(h, reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc))) {
-            ws_bytes += static_cast<unsigned long long>(pmc.WorkingSetSize);
-            priv_bytes += static_cast<unsigned long long>(pmc.PrivateUsage);
-        }
-        CloseHandle(h);
-    }
-}
-} // namespace
-#endif
 
 int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long long* out_private_bytes, unsigned int* out_proc_count) {
 #ifdef _WIN32
