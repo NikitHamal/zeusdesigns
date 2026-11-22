@@ -54,25 +54,54 @@ function ProvidersTab() {
         {ui.nativeReady ? "Native engine connected" : "Browser preview, demo engine"}
       </div>
       <div>
-        <h3 className="mb-3 font-display text-lg font-semibold">Free · keyless providers</h3>
+        <h3 className="mb-3 font-display text-lg font-semibold">Free · keyless providers ({PROVIDERS.length})</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           {PROVIDERS.map((p) => {
             const active = settings.providerId === p.id;
+            const hasVision = p.models.some((m) => m.vision);
             return (
-              <button
-                key={p.id} onClick={() => patch({ providerId: p.id, modelId: p.models[0].id })}
-                className={cn("state flex items-start gap-3 rounded-[26px] border p-4 text-left transition-all", active ? "border-primary bg-primary-container/60" : "border-outline-variant/60 bg-surface-container")}
+              <div
+                key={p.id}
+                onClick={() => patch({ providerId: p.id, modelId: p.models[0].id })}
+                className={cn("state flex cursor-pointer flex-col gap-2.5 rounded-[24px] border p-4 text-left transition-all", active ? "border-primary bg-primary-container/50" : "border-outline-variant/60 bg-surface-container")}
               >
-                <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-surface-high text-on-surface-variant"><Icon name={p.icon} size={22} /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2 font-semibold text-on-surface">{p.name}{active && <Icon name="check" size={15} className="text-primary" />}</span>
-                  <span className="block text-xs text-on-surface-variant">{p.tagline}</span>
-                  <span className="mt-1.5 flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-surface-highest px-2 py-0.5 text-[10.5px] font-semibold text-on-surface-variant">{p.speed}</span>
-                    {p.role === "title" && <span className="rounded-full bg-tertiary-container px-2 py-0.5 text-[10.5px] font-semibold text-on-tertiary-container">Auto-titles chats</span>}
+                <div className="flex items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-surface-high text-on-surface-variant"><Icon name={p.icon} size={20} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 font-semibold text-on-surface">{p.name}{active && <Icon name="check" size={15} className="text-primary" />}</span>
+                    <span className="block text-xs text-on-surface-variant">{p.tagline}</span>
+                    <span className="mt-1.5 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-surface-highest px-2 py-0.5 text-[10.5px] font-semibold text-on-surface-variant">{p.speed}</span>
+                      {hasVision && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary-container px-2 py-0.5 text-[10.5px] font-semibold text-on-primary-container">
+                          <Icon name="image" size={11} /> Vision & files
+                        </span>
+                      )}
+                      {p.role === "title" && <span className="rounded-full bg-tertiary-container px-2 py-0.5 text-[10.5px] font-semibold text-on-tertiary-container">Auto-titles chats</span>}
+                    </span>
                   </span>
-                </span>
-              </button>
+                </div>
+                {p.models.length > 1 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                    {p.models.map((m) => {
+                      const mOn = active && settings.modelId === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => patch({ providerId: p.id, modelId: m.id })}
+                          className={cn(
+                            "state inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                            mOn ? "bg-primary text-on-primary font-semibold" : "bg-surface-high text-on-surface-variant hover:text-on-surface"
+                          )}
+                        >
+                          {m.vision && <Icon name="image" size={11} />}
+                          <span>{m.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

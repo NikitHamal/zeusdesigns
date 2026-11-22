@@ -497,6 +497,82 @@ export const STUDIO_TOOLS: StudioTool[] = [
         : `No elements matched "${sel}" on the active page.`;
     },
   },
+  {
+    name: "studio_create_frame", icon: "add_box", desc: "Create a new mobile, tablet, or web screen frame on the canvas and optionally populate it with an ordered list of UI component blocks",
+    params: { name: "screen title", device: "mobile | tablet | web", blocks: "comma-separated block ids, e.g. top_appbar,hero_metric,list_transactions,bottom_nav" },
+    run: (a) => {
+      const st = useStore.getState();
+      const devRaw = str(a.device, "mobile").toLowerCase();
+      const dev: Device = devRaw === "web" ? "web" : devRaw === "tablet" ? "tablet" : "mobile";
+      const fw = dev === "web" ? 1280 : dev === "tablet" ? 820 : 390;
+      const fh = dev === "web" ? 800 : dev === "tablet" ? 1100 : 844;
+      const pos = st.slot(st.activePageId, fw, fh);
+      const ab = st.addBlankFrame(pos.x, pos.y, fw, fh);
+      const ds = activeDS(a);
+      let html = ab.html;
+      const blockIds = str(a.blocks ?? a.query).split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+      const inserted: string[] = [];
+      for (const bid of blockIds) {
+        if (UI_BLOCKS.some((x) => x.id === bid)) {
+          html = insertBlockIntoHtml(html, bid, ds, dev);
+          inserted.push(bid);
+        }
+      }
+      const name = str(a.name, inserted.length ? "Composed Screen" : `${dev[0].toUpperCase() + dev.slice(1)} Frame`);
+      st.updateArtboard(ab.id, { name, device: dev, html });
+      st.setSel([ab.id]);
+      setTimeout(() => canvasApi.fit([ab.id]), 40);
+      return `Created ${dev} screen "${name}" (id=${ab.id})${inserted.length ? ` with blocks: ${inserted.join(", ")}` : ""}.`;
+    },
+  },
+  {
+    name: "studio_clone_screen", icon: "content_copy", desc: "Duplicate an existing screen on the canvas as a new variant (optionally resizing to mobile, tablet, or web)",
+    params: { id: "source screen id or name", name: "optional new variant name", device: "optional mobile | tablet | web" },
+    run: (a) => {
+      const st = useStore.getState();
+      const src = board(a) ?? st.artboards.find((b) => b.pageId === st.activePageId);
+      if (!src) return "No source screen found on the active page.";
+      const dup = st.duplicateArtboard(src.id);
+      if (!dup) return "Could not duplicate screen.";
+      const devRaw = str(a.device).toLowerCase();
+      const nextDev: Device = devRaw === "web" ? "web" : devRaw === "tablet" ? "tablet" : devRaw === "mobile" ? "mobile" : dup.device;
+      const fw = nextDev === "web" ? 1280 : nextDev === "tablet" ? 820 : 390;
+      const fh = nextDev === "web" ? 800 : nextDev === "tablet" ? 1100 : 844;
+      const nextName = str(a.name).trim() || dup.name;
+      st.updateArtboard(dup.id, { name: nextName, device: nextDev, w: fw, h: fh });
+      st.setSel([dup.id]);
+      setTimeout(() => canvasApi.fit([src.id, dup.id]), 40);
+      return `Cloned "${src.name}" into "${nextName}" (id=${dup.id}, ${nextDev} ${fw}x${fh}).`;
+    },
+  },
+  {
+    name: "studio_inspect_dom", icon: "account_tree", desc: "Inspect the DOM layer hierarchy, selectors, and text of a screen so you can target exact selectors with studio_patch_screen",
+    params: { id: "screen id or name" },
+    run: (a) => {
+      const b = board(a) ?? useStore.getState().artboards.find((x) => x.pageId === useStore.getState().activePageId);
+      if (!b) return "No screen found on the active page.";
+      if (typeof DOMParser === "undefined") return "DOMParser unavailable";
+      const doc = new DOMParser().parseFromString(b.html, "text/html");
+      const lines: string[] = [`Screen "${b.name}" (id=${b.id}, ${b.device} ${b.w}x${b.h}):`];
+      const walk = (el: Element, depth: number) => {
+        if (depth > 5 || lines.length > 90) return;
+        const tag = el.tagName.toLowerCase();
+        if (tag === "script" || tag === "style") return;
+        const cls = (el.getAttribute("class") ?? "").trim().split(/\s+/).filter(Boolean);
+        const sel = tag + (cls.length ? "." + cls.slice(0, 2).join(".") : "");
+        const directText = Array.from(el.childNodes)
+          .filter((n) => n.nodeType === 3)
+          .map((n) => (n.textContent ?? "").trim())
+          .filter(Boolean)
+          .join(" ")
+          .slice(0, 48);
+        lines.push(`${"  ".repeat(depth)}- ${sel}${directText ? ` "${directText}"` : ""}`);
+        Array.from(el.children).forEach((c) => walk(c, depth + 1));
+      };
+      Array.from(doc.body.children).forEach((c) => walk(c, 0));
+      return lines.join("\n");
+    },
+  },
 ];
 
 const cleanStudioName = (name: string) => name.replace(/^(?:mcp:)?(?:mcp-zeus-studio:)?/, "");

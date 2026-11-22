@@ -611,6 +611,18 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
+    } else if (["kilo", "llm7", "pollinations"].includes(settings.providerId)) {
+      const browserCustom =
+        settings.providerId === "kilo"
+          ? { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "", format: "openai" as const }
+          : settings.providerId === "llm7"
+            ? { baseUrl: "https://api.llm7.io/v1", apiKey: "unused", format: "openai" as const }
+            : { baseUrl: "https://text.pollinations.ai/openai", apiKey: "", format: "openai" as const };
+      try {
+        await streamCustom({ ...req, custom: browserCustom }, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
+      } catch {
+        await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
+      }
     } else {
       if (prov && prov.id !== "demo") onDelta(`> Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
