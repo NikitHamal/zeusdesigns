@@ -51,19 +51,23 @@ impl Default for PerfGovernor {
         let auto_trim = Arc::new(AtomicBool::new(true));
         let flag = auto_trim.clone();
         std::thread::spawn(move || {
-            // Wait until startup and initial UI hydration have completely settled before trimming cold pages
-            std::thread::sleep(Duration::from_secs(12));
+            // Trim cold startup DLL pages right after initial window paint (2.5s and 6s)
+            std::thread::sleep(Duration::from_millis(2500));
             if flag.load(Ordering::Relaxed) {
                 let _ = trim_now();
             }
-            // Periodic gentle trim when working set exceeds 28 MB
+            std::thread::sleep(Duration::from_millis(3500));
+            if flag.load(Ordering::Relaxed) {
+                let _ = trim_now();
+            }
+            // Continuous low-overhead governor every 4s whenever working set exceeds 22 MB
             loop {
-                std::thread::sleep(Duration::from_secs(15));
+                std::thread::sleep(Duration::from_secs(4));
                 if !flag.load(Ordering::Relaxed) {
                     continue;
                 }
                 let s = current_stats(true);
-                if s.working_set_bytes > 28 * 1024 * 1024 {
+                if s.working_set_bytes > 22 * 1024 * 1024 {
                     let _ = trim_now();
                 }
             }

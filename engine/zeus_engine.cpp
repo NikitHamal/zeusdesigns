@@ -676,10 +676,12 @@ int zeus_memory_trim(unsigned long long* out_before_bytes, unsigned long long* o
     unsigned long long before_ws = 0, before_priv = 0;
     measure_tree(pids, before_ws, before_priv);
     _heapmin();
+    HeapCompact(GetProcessHeap(), 0);
     for (DWORD pid : pids) {
-        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
+        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SET_INFORMATION, FALSE, pid);
+        if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
         if (!h) continue;
-        SetProcessWorkingSetSize(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1));
+        SetProcessWorkingSetSizeEx(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1), 0);
         K32EmptyWorkingSet(h);
         CloseHandle(h);
     }
