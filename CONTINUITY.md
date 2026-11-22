@@ -3,10 +3,26 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor. Stable (verified green on Windows CI run 45015682068).
-- UI & Canvas: Shimmer-only activity & collapsible reasoning UI (no orb/sparkle icons), Material 3 Expressive connected Model + Reasoning Effort split selector, architectural blueprint wireframe + diagonal shimmer canvas designing animation, Shadow DOM zero-iframe renderer.
-- Harness: Token reset protection, model class promotion, dedicated `notes` domain brief, and deterministic screen completeness synthesizer (`ensureCompleteScreen`).
+- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor. Stable.
+- UI & Canvas: Figma/Onlook-style 4-tab Studio Dock (`Design`, `Insert`, `Layers`, `Code`), 24+ drag-and-drop UI component blocks (`src/lib/blocks.ts`), live DOM layer tree with visibility toggles and on-canvas resize handles, smart alignment snapping guides and multi-select alignment/distribution toolbar, live Design System re-theming (`rethemeHtml`), shimmer-only activity & collapsible reasoning UI, Material 3 Expressive connected Model + Reasoning Effort split selector, Shadow DOM zero-iframe renderer.
+- Harness & Zeus Studio: 18 built-in Zeus Studio MCP tools including agentic canvas/DOM mutation (`studio_insert_block`, `studio_patch_screen`, `studio_arrange_canvas`, `studio_retheme_page`), token reset protection, model class promotion, and deterministic screen completeness synthesizer (`ensureCompleteScreen`).
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
+
+## Session 9
+Goal: transform the canvas into a Figma/Onlook-grade visual-first workspace so users can build UI/UX either from scratch with drag-and-drop components, auto-layout, and layers OR with AI, while upgrading Zeus Studio with agentic canvas/DOM mutation tools.
+
+Shipped:
+- Drag-and-Drop UI Component Block Library (`src/lib/blocks.ts`, `src/components/EmptyCanvas.tsx`, `src/components/BottomToolbar.tsx`):
+  - Built 24+ design-system-aware UI blocks across 6 categories (`Layout & Basics`, `Navigation`, `Hero & Banners`, `Cards & Charts`, `Lists & Tables`, `Forms & Inputs`).
+  - Added drag-and-drop onto any existing artboard or empty canvas space (automatically spawning a frame), plus 1-click "Blank Mobile + UI Kit" and "Blank Web + UI Kit" starters on `EmptyCanvas` and preset frame menus on the `Frame (F)` tool.
+- 4-Tab Figma/Onlook Studio Dock & Visual DOM Editor (`src/components/Inspector.tsx`, `src/lib/editor.ts`, `src/components/CanvasPane.tsx`):
+  - Upgraded `Inspector.tsx` into a 4-tab Studio (`Design`, `Insert`, `Layers`, `Code`) accessible from the top Canvas header (`Studio`), bottom toolbar (`I`), or any artboard header (`+` / `ads_click`).
+  - Added live DOM `LayerTreeView` with click-to-select and visibility toggles, on-canvas element resize handles (`e`, `s`, `se`), `Shift+A` Auto-Layout wrapping, Figma sizing modes (`Hug`, `Fill`, `Fixed`), Design System token swatches, bundled font family picker, Undo/Redo (`Ctrl+Z` / `Ctrl+Shift+Z`), and live HTML code editing (`Code` tab).
+- Smart Alignment Snapping Guides, Multi-Select Alignment & Live Re-theming (`src/components/Canvas.tsx`, `src/lib/harness.ts`, `src/store.ts`):
+  - Added Figma-style smart alignment snapping guides (`guides.x`, `guides.y`) when dragging artboards or elements, plus a floating `SelectionAlignBar` (Align Left/Center/Right/Top/Middle/Bottom + Tidy Row) when 2+ items are selected.
+  - Added `rethemeHtml()` in `harness.ts` and wired `patchSettings` in `store.ts` so switching the active Design System immediately re-themes all screens on the active canvas page.
+- Agentic Zeus Studio MCP Tools (`src/lib/studio.ts`, `src/components/Activity.tsx`):
+  - Added `studio_insert_block`, `studio_patch_screen`, `studio_arrange_canvas`, and `studio_retheme_page` so the AI agent can surgically insert components, patch selectors, arrange the canvas, and switch design systems.
 
 ## Session 8
 Goal: eliminate startup window freeze ("Not Responding") and improper initial window sizing, remove the orb and `auto_awesome` chat/greeting icons in favor of clean shimmer text, innovate a Material 3 Expressive Reasoning Effort selector, replace the canvas designing animation, and guarantee complete, anti-slop screens even from weak/truncated model outputs.

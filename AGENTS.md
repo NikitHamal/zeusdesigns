@@ -32,8 +32,13 @@ All working states (`LiveStatus`, `WorkLog`, `ThinkingBlock`, `ToolRow`, `Bottom
 ## Zeus Studio (built-in MCP)
 `src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.
 
-## Canvas editing
-Edit mode (`ads_click` button on an artboard) injects `src/lib/editor.ts` into the sandboxed iframe: hover, select, inline text edit (double-click), delete, duplicate, reorder, undo, and the inspector (`src/components/Inspector.tsx`). A whole edit session becomes one version entry. "Ask Zeus" quotes the selected element into the chat.
+## Canvas editing & Figma/Onlook Studio (`src/components/Inspector.tsx`, `src/lib/editor.ts`, `src/lib/blocks.ts`)
+The Studio panel (`Studio` button in the canvas header, `I` in the bottom toolbar, or `+` / `ads_click` on an artboard) provides 4 tabs:
+- `Design`: Figma-style Auto-Layout controls (`Row`, `Col`, `Grid`, `Block`, pack/align, gap), Sizing (`Hug`, `Fill`, `Fixed`), Padding/Margin, Typography (bundled `DESIGN_FONTS`), Design System token fill swatches, and Corner Radius/Border.
+- `Insert`: 24+ draggable `.z-*` UI blocks (`src/lib/blocks.ts`) that can be clicked or dragged onto any artboard or empty canvas space.
+- `Layers`: Live DOM hierarchy tree with selection sync and visibility toggles.
+- `Code`: Live HTML inspector and editor for the selected element.
+Edit mode injects `src/lib/editor.ts` into the artboard with on-canvas resize handles (`e`, `s`, `se`), `Shift+A` Auto-Layout wrapping, inline text editing, Undo/Redo (`Ctrl+Z` / `Ctrl+Shift+Z`), and version history recording.
 
 ## Repo map
 - `src/App.tsx` shell: sidebar, home, workspace split.
