@@ -5,11 +5,11 @@ split-screen studio with an infinite multi-artboard canvas, free keyless AI prov
 
 | | |
 |---|---|
-| **Shell / engine** | Rust + C++20 + Tauri 2 (single-process WebView2 + Win32 working-set trimmer + Shadow DOM renderer, ~18–25 MB RAM, ~1.6 MB installer) |
+| **Shell / engine** | Rust + C++20 + Tauri 2 (single-process WebView2 + Win32 working-set trimmer + Shadow DOM renderer, <19 MB RAM, ~1.6 MB installer) |
 | **UI** | React + Material 3 Expressive (the app's own theme *and* a built-in design skill) |
-| **Canvas** | Infinite pan/zoom, multi-artboard, live interactive mobile/tablet/web previews, variants, compare (side-by-side + slider), canvas / grid / single views, pages |
-| **Tools** | Select, pan, text, frame, sticky notes, freehand pen, shapes, pin-comments with inline quoted threads, floating **Ask Zeus** bar (`Ctrl+K`) |
-| **AI** | Mercury 3, Gemini Web, Qwen, K2Horizon, Motif, DeepAI, LongCat (keyless) + any OpenAI/Anthropic-compatible endpoint. ChatJimmy (20k+ tok/s) auto-titles chats |
+| **Canvas** | Docked Figma/Penpot/Onlook Studio with Top Bar, Left Assets & Screens Rail, Right 4-Tab Inspector (`Design`, `Insert`, `Layers`, `Code`), infinite pan/zoom, live interactive mobile/tablet/web previews, variants, compare |
+| **Tools** | 8 Quick Primitives + 38+ draggable UI blocks + 6 Full Layouts, on-canvas element toolbar (`↑`, `↓`, `⧉`, `⊞`, `✕`) + 8-point resize handles, select, pan, text, frame, sticky notes, pen, shapes, pin-comments, **Ask Zeus** (`Ctrl+K`) |
+| **AI** | 14 free keyless providers: Mercury 3, Kilo Gateway, Qwen, Ptero Frontier, Unikey, LLM7, Pollinations, YQCloud, DeepAI, K2Horizon, Motif, LongCat, Gemini Web, ChatJimmy + any OpenAI/Anthropic endpoint, with real multimodal image upload |
 | **Workspace** | Open any local folder; the agent reads, designs, edits and syncs live screens into real files. Persistent Memory, shell tool, MCP client |
 | **Library** | Design systems: Material 3 Expressive, Material 3, Apple HIG, Fluent 2, shadcn/ui, IBM Carbon, Ant Design, Polaris, Atlassian, Neo-brutalism, Glassmorphism, Editorial, Claude Warm · 17 frontend skills |
 
