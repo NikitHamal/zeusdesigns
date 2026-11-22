@@ -26,8 +26,14 @@ export interface ProviderSpecialization {
 
 const SCRAPER_PROVIDERS = new Set([
   "mercury3",
-  "geminiweb",
+  "kilo",
   "qwen",
+  "ptero",
+  "unikey",
+  "llm7",
+  "pollinations",
+  "yqcloud",
+  "geminiweb",
   "k2horizon",
   "motif",
   "longcat",
@@ -505,6 +511,10 @@ export function buildMultiTurnContext(opts: {
     last.content += `\n\n<canvas_state count="${activeBoards.length}">\n${stateXml}\n</canvas_state>\n[Live Canvas Directive: The ${activeBoards.length} screen(s) above are currently live on the user's canvas. You have direct write access to edit them. Preserve their existing layouts and content while fulfilling the user's request.${themeDirective} Output <artboard id="<existing_id>" name="<existing_name>" device="<device>" mode="revise">...complete updated HTML...</artboard> for each screen you are updating (${activeBoards.map((b) => `id="${b.id}"`).join(", ")}). NEVER claim you cannot access or inspect the canvas.]`;
   } else if (spec.reinforceInUserTurn && convMessages.length > 0) {
     last.content += `\n\n[Zeus Protocol Reminder: Reply with 1-2 short sentences (no emojis, no leaked plan labels) followed immediately by complete <artboard name="..." device="mobile|tablet|web" mode="new|revise"><!doctype html>...</html></artboard> documents.]`;
+  }
+
+  if (last && last.attachments.length > 0) {
+    last.content += `\n\n[Multimodal Vision Directive: The user attached ${last.attachments.length} reference image(s) (${last.attachments.map((a) => a.name).join(", ")}). Inspect the visual layout, component hierarchy, typography, color palette, and content of the attached image(s) directly. If the user asks to recreate, clone, redesign, or draw inspiration from the image, output complete <artboard> HTML screens that faithfully capture its structure while obeying all Zeus design laws (no box-shadows, no emojis, no blue/purple gradients).]`;
   }
 
   return { messages: mapped, themeOverride, isCanvasFollowUp };

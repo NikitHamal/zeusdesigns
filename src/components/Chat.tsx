@@ -3,7 +3,7 @@ import { activeConv, useStore } from "../store";
 import type { Attachment, FileNode, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
-import { EFFORTS, findProvider, PROVIDERS } from "../lib/providers";
+import { EFFORTS, findProvider, PROVIDERS, supportsAttachments } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
 import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
@@ -328,7 +328,8 @@ function ModelPicker() {
             {PROVIDERS.map((p) => p.models.map((m) => (
               <MenuItem
                 key={p.id + m.id} active={settings.providerId === p.id && settings.modelId === m.id}
-                label={m.label} desc={`${p.name} · ${p.speed}`}
+                icon={m.vision ? <Icon name="image" size={15} className="text-primary" /> : <Icon name="chat_bubble" size={14} className="text-on-surface-variant/60" />}
+                label={m.label} desc={`${p.name} · ${p.speed}${m.vision ? " · Vision" : ""}`}
                 onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
               />
             )))}
@@ -400,6 +401,8 @@ const readFile = (f: File): Promise<Attachment> => new Promise((res) => {
 export function Composer({ hero }: { hero?: boolean }) {
   const busy = useStore((s) => s.busy);
   const dsId = useStore((s) => s.settings.designSystemId);
+  const providerId = useStore((s) => s.settings.providerId);
+  const modelId = useStore((s) => s.settings.modelId);
   const patch = useStore((s) => s.patchSettings);
   const patchUI = useStore((s) => s.patchUI);
   const ws = useStore((s) => s.ui.workspace);
@@ -413,6 +416,11 @@ export function Composer({ hero }: { hero?: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const ds = getDS(dsId);
   const selected = boards.find((b) => sel.includes(b.id));
+  const canAttach = supportsAttachments(providerId, modelId);
+
+  useEffect(() => {
+    if (!canAttach && atts.length > 0) setAtts([]);
+  }, [canAttach, atts.length]);
 
   useEffect(() => {
     if (!hero) return;
@@ -426,7 +434,14 @@ export function Composer({ hero }: { hero?: boolean }) {
     return () => window.removeEventListener("zeus:quote", h);
   }, []);
   useEffect(() => {
-    const h = (e: Event) => setAtts((a) => [...a, (e as CustomEvent<Attachment>).detail]);
+    const h = (e: Event) => {
+      const st = useStore.getState();
+      if (!supportsAttachments(st.settings.providerId, st.settings.modelId)) {
+        st.notify("Select a vision-capable model (Kilo, Qwen, Ptero, DeepAI) to attach files");
+        return;
+      }
+      setAtts((a) => [...a, (e as CustomEvent<Attachment>).detail]);
+    };
     window.addEventListener("zeus:attach", h);
     return () => window.removeEventListener("zeus:attach", h);
   }, []);
@@ -435,6 +450,10 @@ export function Composer({ hero }: { hero?: boolean }) {
   }, [text]);
 
   const addFiles = async (files: FileList | File[]) => {
+    if (!canAttach) {
+      useStore.getState().notify("Select a vision-capable model (Kilo, Qwen, Ptero, DeepAI) to attach images or files");
+      return;
+    }
     const list = await Promise.all(Array.from(files).slice(0, 8).map(readFile));
     setAtts((a) => [...a, ...list]);
   };
@@ -443,17 +462,17 @@ export function Composer({ hero }: { hero?: boolean }) {
     if (busy || !text.trim()) return;
     if (hero) useStore.getState().patchUI({ showCanvas: false });
     const q = quote ?? (selected ? ({ kind: "artboard", artboardId: selected.id, label: selected.name } as Quote) : undefined);
-    sendMessage({ text, attachments: atts, quote: q });
+    sendMessage({ text, attachments: canAttach ? atts : [], quote: q });
     setText(""); setAtts([]); setQuote(null);
   };
 
   return (
     <div
       className="@container relative px-3 pb-3 pt-1"
-      onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-      onDrop={(e) => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
+      onDragOver={(e) => { if (!canAttach) return; e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { if (!canAttach) return; e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
     >
-      <div className={cn("rounded-[28px] border bg-surface-container   transition-all focus-within:border-primary/60 ", drag ? "border-primary bg-primary-container/40" : "border-outline-variant/70")}>
+      <div className={cn("rounded-[28px] border bg-surface-container transition-all focus-within:border-primary/60", drag ? "border-primary bg-primary-container/40" : "border-outline-variant/70")}>
         {(quote || (selected && !quote)) && (
           <div className="px-2.5 pt-2.5">
             <div className="flex items-center gap-1">
@@ -464,7 +483,7 @@ export function Composer({ hero }: { hero?: boolean }) {
             </div>
           </div>
         )}
-        {atts.length > 0 && (
+        {canAttach && atts.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
             {atts.map((a) => (
               <span key={a.id} className="anim-pop flex items-center gap-1.5 rounded-full bg-surface-high py-1 pl-2.5 pr-1 text-xs font-medium">
@@ -483,17 +502,20 @@ export function Composer({ hero }: { hero?: boolean }) {
           className={hero ? "block max-h-[260px] min-h-[84px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-[16px] text-on-surface outline-none placeholder:text-on-surface-variant/60" : "block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60"}
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pb-2">
-          <input ref={fileRef} type="file" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
-          <Dropdown up width={270} trigger={({ toggle }) => <IconBtn label="Add" size={36} onClick={toggle}><Icon name="add" size={19} /></IconBtn>}>
-            {(close) => (
-              <>
-                <MenuItem icon={<Icon name="attach_file" size={16} />} label="Attach files" onClick={() => { fileRef.current?.click(); close(); }} />
-                <MenuItem icon={<Icon name="image" size={16} />} label="Add reference screenshot" onClick={() => { fileRef.current?.click(); close(); }} />
-                <MenuItem icon={<Icon name="folder_open" size={16} />} label={ws ? `Project: ${ws.name}` : "Open project folder…"} onClick={() => { patchUI({ leftTab: "files" }); close(); if (!ws) openWorkspace().then((w) => w && patchUI({ workspace: w })).catch((e) => useStore.getState().notify(e.message)); }} />
-                
-              </>
-            )}
-          </Dropdown>
+          {canAttach && (
+            <>
+              <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.tsx,.css" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+              <Dropdown up width={270} trigger={({ toggle }) => <IconBtn label="Add image or file" size={36} onClick={toggle}><Icon name="add" size={19} /></IconBtn>}>
+                {(close) => (
+                  <>
+                    <MenuItem icon={<Icon name="image" size={16} />} label="Add reference screenshot" onClick={() => { fileRef.current?.click(); close(); }} />
+                    <MenuItem icon={<Icon name="attach_file" size={16} />} label="Attach files" onClick={() => { fileRef.current?.click(); close(); }} />
+                    <MenuItem icon={<Icon name="folder_open" size={16} />} label={ws ? `Project: ${ws.name}` : "Open project folder…"} onClick={() => { patchUI({ leftTab: "files" }); close(); if (!ws) openWorkspace().then((w) => w && patchUI({ workspace: w })).catch((e) => useStore.getState().notify(e.message)); }} />
+                  </>
+                )}
+              </Dropdown>
+            </>
+          )}
           <Dropdown up width={290} trigger={({ toggle }) => (
             <button onClick={toggle} title="Design system" className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-on-surface-variant">
               <Icon name="palette" size={15} /><span className="hidden max-w-[110px] truncate @[520px]:inline">{ds.name}</span>

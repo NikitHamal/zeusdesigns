@@ -18,61 +18,123 @@ export const PROVIDERS: ProviderMeta[] = [
   {
     id: "mercury3", name: "Mercury 3", tagline: "Diffusion LLM · blazing fast", speed: "1,000–2,000+ tok/s", color: "#d96b43", icon: "waves",
     contextWindow: 128000,
-    models: [{ id: "mercury-3", label: "Mercury 3", note: "128k ctx · Diffusion UI architect", reasoning: true, contextWindow: 128000, maxOutput: 16384 }],
+    models: [{ id: "mercury-3", label: "Mercury 3", note: "128k ctx · Diffusion UI architect", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 }],
   },
   {
-    id: "geminiweb", name: "Gemini Web", tagline: "Anonymous Gemini · multimodal", speed: "~150 tok/s", color: "#2f9e66", icon: "diamond",
-    contextWindow: 128000,
-    models: [{ id: "gemini-flash-lite", label: "Gemini Flash-Lite", note: "128k ctx · Multimodal fast UI", vision: true, contextWindow: 128000, maxOutput: 8192 }],
+    id: "kilo", name: "Kilo Gateway", tagline: "Free frontier & VL pool · no key", speed: "~140 tok/s", color: "#2f9e66", icon: "bolt",
+    contextWindow: 262144,
+    models: [
+      { id: "nvidia/nemotron-3.5-super-vl:free", label: "Nemotron 3.5 Super VL", note: "262k ctx · 120B MoE vision & UI architect", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
+      { id: "nvidia/nemotron-3-ultra-550b-a55b:free", label: "Nemotron 3 Ultra 550B", note: "262k ctx · 550B MoE frontier reasoning", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "inclusionai/ling-3.2-flash:free", label: "Ling 3.2 Flash VL", note: "128k ctx · Fast multimodal UI coder", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 12288 },
+      { id: "baidu/ernie-5.5-flash-preview:free", label: "ERNIE 5.5 Flash", note: "128k ctx · Flagship reasoning & layout", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 12288 },
+      { id: "reflection/beam-free", label: "Reflection Beam 1.0", note: "262k ctx · 501B MoE software engineering", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 12288 },
+      { id: "particle-ai/particle-1:free", label: "Particle-1 VL", note: "128k ctx · Multimodal design & reasoning", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 12288 },
+      { id: "openrouter/free", label: "OpenRouter Free VL", note: "128k ctx · Auto-routed multimodal pool", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 12288 },
+      { id: "kilo-auto/free", label: "Kilo Auto Free", note: "128k ctx · Fastest available free model", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 12288 },
+    ],
   },
   {
-    id: "qwen", name: "Qwen", tagline: "Alibaba Qwen · strong coder", speed: "~90 tok/s", color: "#c26d2d", icon: "forum",
+    id: "qwen", name: "Qwen", tagline: "Alibaba Qwen · OSS vision & coder", speed: "~90 tok/s", color: "#c26d2d", icon: "forum",
     contextWindow: 128000,
     models: [
-      { id: "qwen4-max", label: "Qwen 4 Max", note: "128k ctx · Flagship coder & UI architect", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 8192 },
-      { id: "qwen3.8-max", label: "Qwen 3.8 Max", note: "128k ctx · Reasoning & frontend specialist", reasoning: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen4-max", label: "Qwen 4 Max", note: "128k ctx · Flagship coder & multimodal UI architect", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen3.8-max", label: "Qwen 3.8 Max", note: "128k ctx · Multimodal reasoning & frontend specialist", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen3.8-omni-flash", label: "Qwen 3.8 Omni Flash", note: "128k ctx · Fast native multimodal vision & UI", reasoning: false, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen3.5-omni-plus", label: "Qwen 3.5 Omni Plus", note: "128k ctx · Multimodal vision specialist", reasoning: false, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen3.7-plus", label: "Qwen 3.7 Plus", note: "128k ctx · Multimodal & thinking", reasoning: true, vision: true, contextWindow: 128000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "ptero", name: "Ptero Frontier", tagline: "GPT-6.1 Terra & GLM 5.3 · vision", speed: "~120 tok/s", color: "#0ca678", icon: "deployed_code",
+    contextWindow: 128000,
+    models: [
+      { id: "gpt-6.1-terra:voyage", label: "GPT-6.1 Terra", note: "128k ctx · Frontier multimodal UI & code architect", reasoning: false, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "glm-5.3-flash", label: "GLM 5.3 Flash (Ptero)", note: "128k ctx · Z.ai 320B MoE multimodal", reasoning: false, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "qwen3.7-flash:minirouter", label: "Qwen 3.7 Flash", note: "128k ctx · Fast multimodal coder", reasoning: false, vision: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "kimi-k3:apinex", label: "Kimi K3 (Ptero)", note: "128k ctx · Moonshot 2.8T MoE", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "unikey", name: "Unikey Anonymous", tagline: "Kimi K3 · K2.7 Code · Grok 4.3", speed: "~125 tok/s", color: "#e67700", icon: "key_off",
+    contextWindow: 128000,
+    models: [
+      { id: "moonshotai/kimi-k3", label: "Kimi K3 2.8T", note: "128k ctx · Moonshot 2.8T MoE flagship", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "moonshotai/kimi-k2.7-code", label: "Kimi K2.7 Code", note: "128k ctx · Frontend & UI architecture specialist", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "x-ai/grok-4.3", label: "Grok 4.3", note: "128k ctx · xAI frontier reasoning & code", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "llm7", name: "LLM7 Gateway", tagline: "Codestral & Gemma 3 · 400k ctx", speed: "~160 tok/s", color: "#d9480f", icon: "terminal",
+    contextWindow: 400000,
+    models: [
+      { id: "codestral-latest", label: "Codestral Latest", note: "400k ctx · Mistral flagship coding & UI engine", reasoning: false, vision: false, contextWindow: 400000, maxOutput: 8192 },
+      { id: "gemma-3-27b", label: "Gemma 3 27B", note: "128k ctx · Google 27B open instruction model", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "gpt-oss:20b", label: "GPT-OSS 20B", note: "128k ctx · OpenAI open-weights fast coder", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "default", label: "LLM7 Auto Router", note: "400k ctx · Anonymous router", reasoning: false, vision: false, contextWindow: 400000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "pollinations", name: "Pollinations AI", tagline: "Zero-key OpenAI reasoning", speed: "~150 tok/s", color: "#5c940d", icon: "eco",
+    contextWindow: 128000,
+    models: [
+      { id: "openai", label: "OpenAI Fast Reasoning", note: "128k ctx · Zero-key reasoning & UI generator", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "openai-fast", label: "OpenAI Turbo", note: "128k ctx · Low-latency UI & copy engine", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "yqcloud", name: "YQCloud Stream", tagline: "Zero-auth instant stream", speed: "~130 tok/s", color: "#b45309", icon: "cloud_done",
+    contextWindow: 64000,
+    models: [
+      { id: "yqcloud-default", label: "YQCloud GPT Stream", note: "64k ctx · Zero-auth high-availability stream", reasoning: false, vision: false, contextWindow: 64000, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "deepai", name: "DeepAI", tagline: "7 free models · real image upload", speed: "~60 tok/s", color: "#0d9488", icon: "hub",
+    contextWindow: 64000,
+    models: [
+      { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", note: "64k ctx · Clean UI layout & vision", vision: true, contextWindow: 64000, maxOutput: 8192 },
+      { id: "gpt-6-luna", label: "GPT-6 Luna", note: "64k ctx · Multimodal UI & vision", vision: true, contextWindow: 64000, maxOutput: 8192 },
+      { id: "glm-5.3-flash", label: "GLM 5.3 Flash", note: "64k ctx · 320B MoE vision & UI", reasoning: true, vision: true, contextWindow: 64000, maxOutput: 8192 },
+      { id: "gemma-4", label: "Gemma 4", note: "64k ctx · Compact multimodal", vision: true, contextWindow: 64000, maxOutput: 8192 },
+      { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", note: "64k ctx · Fast coding", vision: false, contextWindow: 64000, maxOutput: 8192 },
+      { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", note: "64k ctx · Fast code", vision: false, contextWindow: 64000, maxOutput: 8192 },
+      { id: "standard", label: "DeepAI Standard", note: "64k ctx · Balanced UI generator", vision: false, contextWindow: 64000, maxOutput: 8192 },
     ],
   },
   {
     id: "k2horizon", name: "K2Horizon", tagline: "IFM K2 · 375B MoE reasoning", speed: "~70 tok/s", color: "#e8590c", icon: "neurology",
     contextWindow: 128000,
-    models: [{ id: "k2-horizon", label: "K2-Horizon 375B", note: "128k ctx · 375B MoE deep reasoning", reasoning: true, contextWindow: 128000, maxOutput: 8192 }],
+    models: [{ id: "k2-horizon", label: "K2-Horizon 375B", note: "128k ctx · 375B MoE deep reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 }],
   },
   {
     id: "motif", name: "Motif", tagline: "Motif 3 · reasoning", speed: "~80 tok/s", color: "#0ca678", icon: "hexagon",
     contextWindow: 128000,
     models: [
-      { id: "motif-3-102b", label: "Motif 3 102B", note: "128k ctx · Enterprise 102B reasoning", reasoning: true, contextWindow: 128000, maxOutput: 8192 },
-      { id: "motif-3-12.7b", label: "Motif 3 12.7B", note: "128k ctx · Fast reasoning", reasoning: true, contextWindow: 128000, maxOutput: 8192 },
+      { id: "motif-3-102b", label: "Motif 3 102B", note: "128k ctx · Enterprise 102B reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "motif-3-12.7b", label: "Motif 3 12.7B", note: "128k ctx · Fast reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
     ],
   },
   {
     id: "longcat", name: "LongCat", tagline: "LongCat 2.5 · 1.6T MoE", speed: "~100 tok/s", color: "#f59f00", icon: "pets",
     contextWindow: 128000,
-    models: [{ id: "longcat-2.5", label: "LongCat 2.5", note: "128k ctx · 1.6T MoE oversea-V2", reasoning: true, contextWindow: 128000, maxOutput: 8192 }],
+    models: [{ id: "longcat-2.5", label: "LongCat 2.5", note: "128k ctx · 1.6T MoE oversea-V2", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 }],
   },
   {
-    id: "deepai", name: "DeepAI", tagline: "6 free models · no key", speed: "~60 tok/s", color: "#0d9488", icon: "hub",
-    contextWindow: 64000,
-    models: [
-      { id: "standard", label: "DeepAI Standard", note: "64k ctx · Balanced UI generator", vision: true, contextWindow: 64000, maxOutput: 8192 },
-      { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", note: "64k ctx · Fast coding", vision: true, contextWindow: 64000, maxOutput: 8192 },
-      { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", note: "64k ctx · Clean UI layout", vision: true, contextWindow: 64000, maxOutput: 8192 },
-      { id: "gpt-6-luna", label: "GPT-6 Luna", note: "64k ctx · Multimodal UI", vision: true, contextWindow: 64000, maxOutput: 8192 },
-      { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", note: "64k ctx · Fast code", contextWindow: 64000, maxOutput: 8192 },
-      { id: "gemma-4", label: "Gemma 4", note: "64k ctx · Compact open model", vision: true, contextWindow: 64000, maxOutput: 8192 },
-    ],
+    id: "geminiweb", name: "Gemini Web", tagline: "Anonymous Gemini Flash-Lite", speed: "~150 tok/s", color: "#2f9e66", icon: "diamond",
+    contextWindow: 128000,
+    models: [{ id: "gemini-flash-lite", label: "Gemini Flash-Lite", note: "128k ctx · Fast UI generation", vision: false, contextWindow: 128000, maxOutput: 8192 }],
   },
   {
     id: "chatjimmy", name: "ChatJimmy", tagline: "Llama 3.1 8B · instant micro-tasks", speed: "20,000+ tok/s", color: "#d6336c", icon: "rocket_launch", role: "title",
     contextWindow: 32000,
-    models: [{ id: "llama3.1-8b", label: "Llama 3.1 8B", note: "32k ctx · 20,000+ tok/s micro-task engine", contextWindow: 32000, maxOutput: 4096 }],
+    models: [{ id: "llama3.1-8b", label: "Llama 3.1 8B", note: "32k ctx · 20,000+ tok/s micro-task engine", vision: false, contextWindow: 32000, maxOutput: 4096 }],
   },
 ];
 
 export const DEMO_PROVIDER: ProviderMeta = {
   id: "demo", name: "Zeus Demo Engine", tagline: "Offline template designer", speed: "instant", color: "#868e96", icon: "draw",
-  models: [{ id: "zeus-templates", label: "Template designer", note: "Used when the native engine is unavailable" }],
+  models: [{ id: "zeus-templates", label: "Template designer", note: "Used when the native engine is unavailable", vision: false }],
 };
 
 export const EFFORTS: { id: "low" | "medium" | "high" | "max"; label: string; desc: string }[] = [
@@ -84,4 +146,12 @@ export const EFFORTS: { id: "low" | "medium" | "high" | "max"; label: string; de
 
 export function findProvider(id: string): ProviderMeta {
   return PROVIDERS.find((p) => p.id === id) ?? DEMO_PROVIDER;
+}
+
+/** Returns true ONLY when the active provider + model supports image/file attachments. */
+export function supportsAttachments(providerId: string, modelId: string): boolean {
+  if (providerId.startsWith("custom:")) return true;
+  const prov = findProvider(providerId);
+  const model = prov.models.find((m) => m.id === modelId) ?? prov.models[0];
+  return !!model?.vision;
 }

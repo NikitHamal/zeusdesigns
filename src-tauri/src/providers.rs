@@ -1,5 +1,7 @@
 use crate::crypto::{
-    fake_ipv4, generate_deepai_tryit_key, pseudo_random_u64, random_hex, sha256_hex, uuid_v4,
+    decode_data_url, fake_ipv4, generate_deepai_island_key, generate_deepai_tryit_key,
+    hmac_sha256_bytes, hmac_sha256_hex, iso8601_utc_compact, pseudo_random_u64, random_hex,
+    sha256_hex, uuid_v4,
 };
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -148,18 +150,69 @@ pub fn catalog() -> Vec<ProviderInfo> {
             }],
         },
         ProviderInfo {
-            id: "geminiweb".to_string(),
-            name: "Gemini Web".to_string(),
+            id: "kilo".to_string(),
+            name: "Kilo Gateway".to_string(),
             kind: "keyless".to_string(),
-            speed: "~150 tok/s".to_string(),
+            speed: "~140 tok/s".to_string(),
             status: "ready".to_string(),
-            models: vec![ModelSpec {
-                id: "gemini-flash-lite".to_string(),
-                label: "Gemini Flash-Lite".to_string(),
-                note: Some("Anonymous StreamGenerate session".to_string()),
-                reasoning: false,
-                vision: true,
-            }],
+            models: vec![
+                ModelSpec {
+                    id: "nvidia/nemotron-3.5-super-vl:free".to_string(),
+                    label: "Nemotron 3.5 Super VL".to_string(),
+                    note: Some("262k ctx · 120B MoE vision & UI architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3-ultra-550b-a55b:free".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("262k ctx · 550B MoE frontier reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "inclusionai/ling-3.2-flash:free".to_string(),
+                    label: "Ling 3.2 Flash VL".to_string(),
+                    note: Some("Fast multimodal UI coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "baidu/ernie-5.5-flash-preview:free".to_string(),
+                    label: "ERNIE 5.5 Flash".to_string(),
+                    note: Some("Baidu flagship reasoning & layout".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "reflection/beam-free".to_string(),
+                    label: "Reflection Beam 1.0".to_string(),
+                    note: Some("501B MoE software engineering".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "particle-ai/particle-1:free".to_string(),
+                    label: "Particle-1 VL".to_string(),
+                    note: Some("Multimodal design & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "openrouter/free".to_string(),
+                    label: "OpenRouter Free VL".to_string(),
+                    note: Some("Auto-routed multimodal pool".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "kilo-auto/free".to_string(),
+                    label: "Kilo Auto Free".to_string(),
+                    note: Some("Fastest available free model".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
         },
         ProviderInfo {
             id: "qwen".to_string(),
@@ -171,15 +224,235 @@ pub fn catalog() -> Vec<ProviderInfo> {
                 ModelSpec {
                     id: "qwen4-max".to_string(),
                     label: "Qwen 4 Max".to_string(),
-                    note: Some("Alibaba flagship coder & UI architect".to_string()),
+                    note: Some("Alibaba flagship coder & multimodal UI architect".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "qwen3.8-max".to_string(),
                     label: "Qwen 3.8 Max".to_string(),
-                    note: None,
+                    note: Some("Multimodal reasoning & frontend specialist".to_string()),
                     reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.8-omni-flash".to_string(),
+                    label: "Qwen 3.8 Omni Flash".to_string(),
+                    note: Some("Fast native multimodal vision & UI".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.5-omni-plus".to_string(),
+                    label: "Qwen 3.5 Omni Plus".to_string(),
+                    note: Some("Multimodal vision specialist".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.7-plus".to_string(),
+                    label: "Qwen 3.7 Plus".to_string(),
+                    note: Some("1M ctx · multimodal & thinking".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "ptero".to_string(),
+            name: "Ptero Frontier".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~120 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "gpt-6.1-terra:voyage".to_string(),
+                    label: "GPT-6.1 Terra".to_string(),
+                    note: Some("Frontier multimodal UI & code architect".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "glm-5.3-flash".to_string(),
+                    label: "GLM 5.3 Flash (Ptero)".to_string(),
+                    note: Some("Z.ai 320B MoE multimodal".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.7-flash:minirouter".to_string(),
+                    label: "Qwen 3.7 Flash".to_string(),
+                    note: Some("Fast multimodal coder".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "kimi-k3:apinex".to_string(),
+                    label: "Kimi K3 (Ptero)".to_string(),
+                    note: Some("Moonshot 2.8T MoE".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "unikey".to_string(),
+            name: "Unikey Anonymous".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~125 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "moonshotai/kimi-k3".to_string(),
+                    label: "Kimi K3 2.8T".to_string(),
+                    note: Some("Moonshot 2.8T MoE flagship".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "moonshotai/kimi-k2.7-code".to_string(),
+                    label: "Kimi K2.7 Code".to_string(),
+                    note: Some("Frontend & UI architecture specialist".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "x-ai/grok-4.3".to_string(),
+                    label: "Grok 4.3".to_string(),
+                    note: Some("xAI frontier reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "llm7".to_string(),
+            name: "LLM7 Gateway".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~160 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "codestral-latest".to_string(),
+                    label: "Codestral Latest".to_string(),
+                    note: Some("Mistral flagship coding & UI engine".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-3-27b".to_string(),
+                    label: "Gemma 3 27B".to_string(),
+                    note: Some("Google 27B open instruction model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss:20b".to_string(),
+                    label: "GPT-OSS 20B".to_string(),
+                    note: Some("OpenAI open-weights fast coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "default".to_string(),
+                    label: "LLM7 Auto Router".to_string(),
+                    note: Some("400k ctx anonymous router".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "pollinations".to_string(),
+            name: "Pollinations AI".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "openai".to_string(),
+                    label: "OpenAI Fast Reasoning".to_string(),
+                    note: Some("Zero-key reasoning & UI generator".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "openai-fast".to_string(),
+                    label: "OpenAI Turbo".to_string(),
+                    note: Some("Low-latency UI & copy engine".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "yqcloud".to_string(),
+            name: "YQCloud Stream".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~130 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "yqcloud-default".to_string(),
+                label: "YQCloud GPT Stream".to_string(),
+                note: Some("Zero-auth high-availability stream".to_string()),
+                reasoning: false,
+                vision: false,
+            }],
+        },
+        ProviderInfo {
+            id: "deepai".to_string(),
+            name: "DeepAI".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~60 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "claude-haiku-5-5".to_string(),
+                    label: "Claude Haiku 5.5 (DeepAI)".to_string(),
+                    note: Some("Anthropic multimodal UI & vision".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gpt-6-luna".to_string(),
+                    label: "GPT-6 Luna (DeepAI)".to_string(),
+                    note: Some("OpenAI multimodal fast UI generator".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "glm-5.3-flash".to_string(),
+                    label: "GLM 5.3 Flash (DeepAI)".to_string(),
+                    note: Some("Z.ai 320B MoE vision & UI".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemma-4".to_string(),
+                    label: "Gemma 4 (DeepAI)".to_string(),
+                    note: Some("Google compact multimodal".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.8-flash".to_string(),
+                    label: "Qwen 3.8 Flash (DeepAI)".to_string(),
+                    note: Some("Fast coding".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4.1-flash".to_string(),
+                    label: "DeepSeek V4.1 Flash".to_string(),
+                    note: Some("Fast code & layout".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "standard".to_string(),
+                    label: "DeepAI Standard".to_string(),
+                    note: Some("IslandKey rotation".to_string()),
+                    reasoning: false,
                     vision: false,
                 },
             ],
@@ -236,55 +509,18 @@ pub fn catalog() -> Vec<ProviderInfo> {
             }],
         },
         ProviderInfo {
-            id: "deepai".to_string(),
-            name: "DeepAI".to_string(),
+            id: "geminiweb".to_string(),
+            name: "Gemini Web".to_string(),
             kind: "keyless".to_string(),
-            speed: "~60 tok/s".to_string(),
+            speed: "~150 tok/s".to_string(),
             status: "ready".to_string(),
-            models: vec![
-                ModelSpec {
-                    id: "standard".to_string(),
-                    label: "DeepAI Standard".to_string(),
-                    note: Some("SHA-256 tryit key rotation".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "qwen3.8-flash".to_string(),
-                    label: "Qwen 3.8 Flash (DeepAI)".to_string(),
-                    note: None,
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "claude-haiku-5-5".to_string(),
-                    label: "Claude Haiku 5.5 (DeepAI)".to_string(),
-                    note: None,
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "gpt-6-luna".to_string(),
-                    label: "GPT-6 Luna (DeepAI)".to_string(),
-                    note: Some("Multimodal fast UI generator".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "deepseek-v4.1-flash".to_string(),
-                    label: "DeepSeek V4.1 Flash".to_string(),
-                    note: None,
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "gemma-4".to_string(),
-                    label: "Gemma 4 (DeepAI)".to_string(),
-                    note: None,
-                    reasoning: false,
-                    vision: true,
-                },
-            ],
+            models: vec![ModelSpec {
+                id: "gemini-flash-lite".to_string(),
+                label: "Gemini Flash-Lite".to_string(),
+                note: Some("Anonymous StreamGenerate session".to_string()),
+                reasoning: false,
+                vision: false,
+            }],
         },
         ProviderInfo {
             id: "chatjimmy".to_string(),
@@ -825,7 +1061,51 @@ where
     }
 }
 
-/// Stream from DeepAI (`https://api.deepai.org/hacking_is_a_serious_crime`) using SHA-256 tryit key rotation.
+fn upload_deepai_attachment(client: &Client, att: &AttachmentPayload) -> Option<String> {
+    let (mime_from_url, bytes) = decode_data_url(&att.data_url)?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let mime = if !att.mime.trim().is_empty() {
+        att.mime.clone()
+    } else {
+        mime_from_url
+    };
+    let filename = if att.name.trim().is_empty() {
+        "upload.png".to_string()
+    } else {
+        att.name.clone()
+    };
+    let part = reqwest::blocking::multipart::Part::bytes(bytes)
+        .file_name(filename)
+        .mime_str(&mime)
+        .ok()?;
+    let form = reqwest::blocking::multipart::Form::new().part("file", part);
+    let api_key = generate_deepai_island_key(CHROME_UA);
+    let resp = client
+        .post("https://api.deepai.org/chat_attachments/upload")
+        .header("api-key", &api_key)
+        .header("Origin", "https://deepai.org")
+        .header("Referer", "https://deepai.org/chat/")
+        .multipart(form)
+        .send()
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let data: Value = resp.json().ok()?;
+    if data.get("success").and_then(|v| v.as_bool()) == Some(true) {
+        data.get("attachment")
+            .and_then(|a| a.get("uuid"))
+            .and_then(|u| u.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+    } else {
+        None
+    }
+}
+
+/// Stream from DeepAI (`https://api.deepai.org/hacking_is_a_serious_crime`) using IslandKey rotation and `/chat_attachments/upload`.
 pub fn stream_deepai<F>(
     model: &str,
     system: &str,
@@ -836,17 +1116,36 @@ pub fn stream_deepai<F>(
 where
     F: FnMut(&str),
 {
+    let has_attachments = messages.iter().any(|m| !m.attachments.is_empty());
     let effective_model = match model {
-        "qwen4-max" | "qwen3-30b-a3b" | "qwen3.8-max" | "qwen3.8-flash" => "qwen3.8-flash",
+        "qwen4-max" | "qwen3-30b-a3b" | "qwen3.8-max" | "qwen3.8-flash" => {
+            if has_attachments { "gpt-6-luna" } else { "qwen3.8-flash" }
+        }
         "claude-haiku-5-5" | "gemini-2.5-flash-lite" => "claude-haiku-5-5",
-        "deepseek-v4.1-flash" | "deepseek-v3.2" => "deepseek-v4.1-flash",
+        "deepseek-v4.1-flash" | "deepseek-v3.2" => {
+            if has_attachments { "claude-haiku-5-5" } else { "deepseek-v4.1-flash" }
+        }
         "gpt-6-luna" | "gpt-4.1-nano" | "gpt-5-nano" | "gpt-4o-mini" => "gpt-6-luna",
         "glm-5.3-flash" => "glm-5.3-flash",
         "gemma-4" => "gemma-4",
         "llama-3.3-70b-instruct" => "llama-3.3-70b-instruct",
         "llama-3.1-8b-instant" => "llama-3.1-8b-instant",
-        _ => "standard",
+        _ => if has_attachments { "gpt-6-luna" } else { "standard" },
     };
+
+    let client = build_client(180)?;
+    let mut attachment_uuids = Vec::new();
+    for m in messages {
+        for att in &m.attachments {
+            if !att.data_url.trim().is_empty() {
+                if let Some(uuid) = upload_deepai_attachment(&client, att) {
+                    if !attachment_uuids.contains(&uuid) {
+                        attachment_uuids.push(uuid);
+                    }
+                }
+            }
+        }
+    }
 
     let mut history = Vec::new();
     if !system.trim().is_empty() {
@@ -868,16 +1167,23 @@ where
         }));
     }
 
-    let api_key = generate_deepai_tryit_key(CHROME_UA);
-    let form = reqwest::blocking::multipart::Form::new()
+    let api_key = generate_deepai_island_key(CHROME_UA);
+    let _legacy_fallback_key = generate_deepai_tryit_key(CHROME_UA);
+    let mut form = reqwest::blocking::multipart::Form::new()
         .text("chatHistory", serde_json::to_string(&history).unwrap_or_default())
         .text("model", effective_model.to_string())
         .text("session_uuid", uuid_v4())
-        .text("chat_style", "chat")
         .text("sensitivity_request_id", uuid_v4())
+        .text("tool_activity_support", "1")
+        .text("thinking_image_tool_support", "1")
         .text("hacker_is_stinky", "very_stinky");
+    if !attachment_uuids.is_empty() {
+        form = form.text(
+            "attachment_uuids",
+            serde_json::to_string(&attachment_uuids).unwrap_or_default(),
+        );
+    }
 
-    let client = build_client(180)?;
     let mut resp = client
         .post("https://api.deepai.org/hacking_is_a_serious_crime")
         .header("api-key", &api_key)
@@ -1148,7 +1454,153 @@ pub fn cool_qwen_account(engine: &ProviderEngine, email: &str, cooldown_secs: u6
     }
 }
 
-/// Stream from Qwen via the native Android App Gateway (`https://chat.qwen.ai/api/v2`, ported from `qwen_app.py`).
+fn upload_qwen_attachment(
+    client: &Client,
+    acct: &QwenAppAccount,
+    att: &AttachmentPayload,
+) -> Option<Value> {
+    let (mime_from_url, bytes) = decode_data_url(&att.data_url)?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let mime = if !att.mime.trim().is_empty() {
+        att.mime.clone()
+    } else {
+        mime_from_url
+    };
+    let filename = if att.name.trim().is_empty() {
+        "image.png".to_string()
+    } else {
+        att.name.clone()
+    };
+    let is_image = mime.starts_with("image/");
+    let filetype_short = if is_image { "image" } else { "file" };
+    let file_class = if is_image { "vision" } else { "document" };
+
+    let sts_resp = client
+        .post(format!("{}/files/getstsToken", QWEN_APP_BASE))
+        .header("User-Agent", QWEN_APP_UA)
+        .header("Accept", "application/json")
+        .header("X-Platform", "android")
+        .header("source", "app")
+        .header("app_waf", QWEN_APP_WAF)
+        .header("x-request-id", uuid_v4())
+        .header("x-device-id", &acct.device)
+        .header("Authorization", format!("Bearer {}", acct.token))
+        .json(&json!({
+            "filename": filename,
+            "filesize": bytes.len(),
+            "filetype": filetype_short
+        }))
+        .send()
+        .ok()?;
+    if !sts_resp.status().is_success() {
+        return None;
+    }
+    let sts_json: Value = sts_resp.json().ok()?;
+    if sts_json.get("success").and_then(|v| v.as_bool()) != Some(true) {
+        return None;
+    }
+    let data = sts_json.get("data")?;
+    let file_url = data.get("file_url").and_then(|v| v.as_str())?;
+    let file_id = data.get("file_id").and_then(|v| v.as_str())?;
+    let bucket_name = data
+        .get("bucketname")
+        .and_then(|v| v.as_str())
+        .unwrap_or("qwen-webui-prod");
+    let file_path = data.get("file_path").and_then(|v| v.as_str())?;
+    let access_key_id = data.get("access_key_id").and_then(|v| v.as_str())?;
+    let access_key_secret = data.get("access_key_secret").and_then(|v| v.as_str())?;
+    let security_token = data.get("security_token").and_then(|v| v.as_str())?;
+
+    let (date_str, date_part) = iso8601_utc_compact(now_secs());
+    let oss_ua = "aliyun-sdk-js/6.23.0 Chrome 132.0.0.0 on Windows 10 64-bit";
+    let canonical_headers = format!(
+        "content-type:{}\nx-oss-content-sha256:UNSIGNED-PAYLOAD\nx-oss-date:{}\nx-oss-security-token:{}\nx-oss-user-agent:{}\n",
+        mime, date_str, security_token, oss_ua
+    );
+    let encoded_path = file_path
+        .split('/')
+        .map(url_encode)
+        .collect::<Vec<_>>()
+        .join("/");
+    let canonical_uri = format!("/{}/{}", bucket_name, encoded_path);
+    let canonical_request = format!(
+        "PUT\n{}\n\n{}\n\nUNSIGNED-PAYLOAD",
+        canonical_uri, canonical_headers
+    );
+    let date_scope = format!("{}/ap-southeast-1/oss/aliyun_v4_request", date_part);
+    let string_to_sign = format!(
+        "OSS4-HMAC-SHA256\n{}\n{}\n{}",
+        date_str,
+        date_scope,
+        sha256_hex(canonical_request.as_bytes())
+    );
+
+    let k_date = hmac_sha256_bytes(
+        format!("aliyun_v4{}", access_key_secret).as_bytes(),
+        date_part.as_bytes(),
+    );
+    let k_region = hmac_sha256_bytes(&k_date, b"ap-southeast-1");
+    let k_service = hmac_sha256_bytes(&k_region, b"oss");
+    let k_signing = hmac_sha256_bytes(&k_service, b"aliyun_v4_request");
+    let signature = hmac_sha256_hex(&k_signing, string_to_sign.as_bytes());
+    let auth_header = format!(
+        "OSS4-HMAC-SHA256 Credential={}/{},Signature={}",
+        access_key_id, date_scope, signature
+    );
+
+    let put_url = file_url.split('?').next().unwrap_or(file_url);
+    let put_resp = client
+        .put(put_url)
+        .header("Content-Type", &mime)
+        .header("x-oss-content-sha256", "UNSIGNED-PAYLOAD")
+        .header("x-oss-date", &date_str)
+        .header("x-oss-security-token", security_token)
+        .header("x-oss-user-agent", oss_ua)
+        .header("authorization", auth_header)
+        .body(bytes.clone())
+        .send()
+        .ok()?;
+    if !put_resp.status().is_success() {
+        return None;
+    }
+
+    let now_ms = now_secs() * 1000;
+    Some(json!({
+        "type": filetype_short,
+        "file": {
+            "created_at": now_ms,
+            "data": {},
+            "filename": filename,
+            "hash": Value::Null,
+            "id": file_id,
+            "meta": {
+                "name": filename,
+                "size": bytes.len(),
+                "content_type": mime
+            },
+            "update_at": now_ms,
+            "type": filetype_short
+        },
+        "id": file_id,
+        "url": file_url,
+        "name": filename,
+        "collection_name": "",
+        "progress": 0,
+        "status": "uploaded",
+        "greenNet": "success",
+        "size": bytes.len(),
+        "error": "",
+        "itemId": uuid_v4(),
+        "file_type": mime,
+        "showType": filetype_short,
+        "file_class": file_class,
+        "uploadTaskId": uuid_v4()
+    }))
+}
+
+/// Stream from Qwen via the native Android App Gateway (`https://chat.qwen.ai/api/v2`, ported from `qwen_app.py`) with OSS multimodal upload.
 pub fn stream_qwen_app<F>(
     engine: &ProviderEngine,
     model: &str,
@@ -1162,12 +1614,12 @@ where
     F: FnMut(&str),
 {
     let acct = acquire_qwen_account(engine)?;
-    let qwen_model = if model.is_empty() || model == "qwen4-max" {
-        "qwen3.8-max"
-    } else {
-        model
+    let qwen_model = match model {
+        "qwen4-max" | "qwen3.8-max" | "qwen3.8-omni-flash" | "qwen3.5-omni-plus" | "qwen3.7-plus" => model,
+        _ => "qwen4-max",
     };
-    let thinking = effort == "high" || effort == "max";
+    let thinking = (effort == "high" || effort == "max")
+        && !qwen_model.contains("omni");
 
     let mut prompt = String::new();
     if !system.trim().is_empty() {
@@ -1186,6 +1638,17 @@ where
     }
 
     let client = build_client(120)?;
+    let mut uploaded_files = Vec::new();
+    for m in messages {
+        for att in &m.attachments {
+            if !att.data_url.trim().is_empty() {
+                if let Some(file_obj) = upload_qwen_attachment(&client, &acct, att) {
+                    uploaded_files.push(file_obj);
+                }
+            }
+        }
+    }
+
     let new_resp = client
         .post(format!("{}/chats/new", QWEN_APP_BASE))
         .header("User-Agent", QWEN_APP_UA)
@@ -1209,6 +1672,27 @@ where
         .to_string();
 
     let ts = now_secs();
+    let mut user_msg = json!({
+        "chat_type": "t2t",
+        "content": prompt,
+        "role": "user",
+        "timestamp": ts,
+        "sub_chat_type": "t2t",
+        "models": [qwen_model],
+        "user_action": "chat",
+        "extra": { "meta": { "subChatType": "t2t" } },
+        "feature_config": {
+            "output_schema": "phase",
+            "thinking_enabled": thinking,
+            "thinking_format": "summary",
+            "auto_thinking": false,
+            "auto_search": false
+        }
+    });
+    if !uploaded_files.is_empty() {
+        user_msg["files"] = Value::Array(uploaded_files);
+    }
+
     let payload = json!({
         "stream": true,
         "incremental_output": true,
@@ -1219,23 +1703,7 @@ where
         "timestamp": ts,
         "share_id": "",
         "origin_branch_message_id": "",
-        "messages": [{
-            "chat_type": "t2t",
-            "content": prompt,
-            "role": "user",
-            "timestamp": ts,
-            "sub_chat_type": "t2t",
-            "models": [qwen_model],
-            "user_action": "chat",
-            "extra": { "meta": { "subChatType": "t2t" } },
-            "feature_config": {
-                "output_schema": "phase",
-                "thinking_enabled": thinking,
-                "thinking_format": "summary",
-                "auto_thinking": false,
-                "auto_search": false
-            }
-        }]
+        "messages": [user_msg]
     });
 
     let comp_resp = client
@@ -1631,7 +2099,649 @@ where
     }
 }
 
-/// Stream from custom OpenAI-compatible or Anthropic endpoint.
+/// Stream from Kilo Gateway (`https://api.kilo.ai/api/gateway/chat/completions`, free frontier & multimodal models).
+pub fn stream_kilo<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+    let eff_model = if model.is_empty() {
+        "nvidia/nemotron-3.5-super-vl:free"
+    } else if has_images
+        && !matches!(
+            model,
+            "nvidia/nemotron-3.5-super-vl:free"
+                | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+                | "inclusionai/ling-3.2-flash:free"
+                | "particle-ai/particle-1:free"
+                | "openrouter/free"
+        )
+    {
+        "nvidia/nemotron-3.5-super-vl:free"
+    } else {
+        model
+    };
+
+    let mut kilo_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(24000).collect();
+        kilo_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            kilo_msgs.push(json!({ "role": m.role, "content": m.content }));
+        } else {
+            let mut parts = vec![json!({ "type": "text", "text": m.content })];
+            for img in imgs {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": { "url": img.data_url }
+                }));
+            }
+            kilo_msgs.push(json!({ "role": m.role, "content": parts }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 12000,
+        "messages": kilo_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://api.kilo.ai/api/gateway/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Kilo Gateway request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Kilo Gateway HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut fallback_reason = String::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                            fallback_reason.push_str(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() {
+        on_delta(fallback_reason.trim());
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("Kilo Gateway stream ended without output".to_string())
+    }
+}
+
+fn extract_ptero_nonce(html: &str) -> Option<String> {
+    for pat in ["var nonce = '", "var nonce = \"", "data-referral-nonce=\"", "data-referral-nonce='"] {
+        if let Some(idx) = html.find(pat) {
+            let rest = &html[idx + pat.len()..];
+            let end = rest.find(|c: char| !c.is_ascii_hexdigit()).unwrap_or(0);
+            if end >= 8 {
+                return Some(rest[..end].to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Stream from Ptero Frontier (`https://ptero.pro/wp-json/mlp/v1/chat`, GPT-6.1 Terra & GLM 5.3 Flash with vision attachments).
+pub fn stream_ptero<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "gpt-6.1-terra:voyage" | "glm-5.3-flash" | "qwen3.7-flash:minirouter" | "kimi-k3:apinex" => model,
+        _ => "gpt-6.1-terra:voyage",
+    };
+
+    let client = build_client(180)?;
+    let warm_html = client
+        .get("https://ptero.pro/")
+        .header("Accept", "text/html")
+        .send()
+        .and_then(|r| r.text())
+        .unwrap_or_default();
+    let nonce = extract_ptero_nonce(&warm_html).unwrap_or_default();
+
+    let mut history = Vec::new();
+    let hist_len = messages.len().saturating_sub(1);
+    for m in messages.iter().take(hist_len) {
+        if m.content.trim().is_empty() {
+            continue;
+        }
+        let role = if m.role == "assistant" { "assistant" } else { "user" };
+        history.push(json!({
+            "role": role,
+            "text": m.content.chars().take(12000).collect::<String>(),
+            "attachments": []
+        }));
+    }
+
+    let last_user = messages
+        .last()
+        .map(|m| m.content.as_str())
+        .unwrap_or("");
+    let message_text = if system.trim().is_empty() {
+        last_user.to_string()
+    } else {
+        let sys_safe: String = system.chars().take(18000).collect();
+        format!("[System instructions: {}]\n\n{}", sys_safe, last_user)
+    };
+
+    let mut attachments = Vec::new();
+    for m in messages {
+        for att in &m.attachments {
+            if !att.data_url.trim().is_empty() {
+                attachments.push(json!({
+                    "name": if att.name.is_empty() { "image.png" } else { att.name.as_str() },
+                    "type": if att.mime.is_empty() { "image/png" } else { att.mime.as_str() },
+                    "data": att.data_url,
+                    "url": att.data_url
+                }));
+            }
+        }
+    }
+
+    let payload = json!({
+        "message": message_text,
+        "model": eff_model,
+        "history": history,
+        "attachments": attachments,
+        "lang": "en",
+        "mode": "full"
+    });
+
+    let mut req = client
+        .post("https://ptero.pro/wp-json/mlp/v1/chat")
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Origin", "https://ptero.pro")
+        .header("Referer", "https://ptero.pro/")
+        .header("X-MLP-Guest-Token", random_hex(32))
+        .header("X-MLP-Guest-Username", "nebian");
+    if !nonce.is_empty() {
+        req = req.header("X-WP-Nonce", nonce);
+    }
+
+    let resp = req
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Ptero request failed: {}", e))?;
+
+    if cancel.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    if !resp.status().is_success() {
+        return Err(format!("Ptero HTTP {}", resp.status()));
+    }
+    let data: Value = resp.json().map_err(|e| format!("Ptero JSON error: {}", e))?;
+    let reply = data
+        .get("reply")
+        .and_then(|r| r.as_str())
+        .unwrap_or("")
+        .trim();
+    if reply.is_empty() {
+        return Err("Ptero returned empty reply".to_string());
+    }
+    on_delta(reply);
+    Ok(())
+}
+
+/// Stream from Unikey Anonymous (`https://www.getunikey.ai/api/anonymous/chat/completions`, Kimi K3 / K2.7 Code / Grok 4.3).
+pub fn stream_unikey<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "moonshotai/kimi-k3" | "moonshotai/kimi-k2.7-code" | "x-ai/grok-4.3" => model,
+        _ => "moonshotai/kimi-k3",
+    };
+
+    let mut convo = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(22000).collect();
+        convo.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            convo.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "messages": convo,
+        "stream": true
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://www.getunikey.ai/api/anonymous/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream")
+        .header("Origin", "https://www.getunikey.ai")
+        .header("Referer", "https://www.getunikey.ai/anonymous-chat")
+        .header("X-Anonymous-Fingerprint", format!("rnd{}", random_hex(32)))
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Unikey request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Unikey HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("Unikey stream ended without output".to_string())
+    }
+}
+
+/// Stream from LLM7 (`https://api.llm7.io/v1/chat/completions`, Codestral Latest / Gemma 3 27B / GPT-OSS 20B).
+pub fn stream_llm7<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "codestral-latest" | "gemma-3-27b" | "gpt-oss:20b" | "default" | "fast" => model,
+        _ => "codestral-latest",
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(24000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 8000,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://api.llm7.io/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer unused")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("LLM7 request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("LLM7 HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut saw_text = false;
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(text) = delta.and_then(|d| d.get("content")).and_then(|t| t.as_str()) {
+                        if !text.is_empty() {
+                            saw_text = true;
+                            on_delta(text);
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("LLM7 stream ended without output".to_string())
+    }
+}
+
+/// Stream from Pollinations AI (`https://text.pollinations.ai/openai`, zero-key OpenAI reasoning endpoint).
+pub fn stream_pollinations<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "openai" | "openai-fast" => model,
+        _ => "openai",
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(20000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://text.pollinations.ai/openai")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Pollinations request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Pollinations HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut raw_body = String::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let trimmed = line.trim();
+        if let Some(raw) = trimmed.strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if !trimmed.is_empty() {
+            raw_body.push_str(trimmed);
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if !saw_text && !raw_body.is_empty() {
+        if let Ok(ev) = serde_json::from_str::<Value>(&raw_body) {
+            if let Some(msg) = ev.get("choices").and_then(|c| c.get(0)).and_then(|c0| c0.get("message")) {
+                if let Some(r_text) = msg.get("reasoning").and_then(|t| t.as_str()).filter(|s| !s.is_empty()) {
+                    on_delta("<think>");
+                    on_delta(r_text);
+                    on_delta("</think>");
+                }
+                if let Some(text) = msg.get("content").and_then(|t| t.as_str()).filter(|s| !s.is_empty()) {
+                    saw_text = true;
+                    on_delta(text);
+                }
+            }
+        }
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("Pollinations stream ended without output".to_string())
+    }
+}
+
+/// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).
+pub fn stream_yqcloud<F>(
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let mut lines = Vec::new();
+    for m in messages {
+        if m.content.trim().is_empty() {
+            continue;
+        }
+        if lines.is_empty() {
+            lines.push(m.content.clone());
+        } else {
+            let lbl = if m.role == "assistant" { "Assistant" } else { "User" };
+            lines.push(format!("{}: {}", lbl, m.content));
+        }
+    }
+    let prompt = lines.join("\n\n");
+    let sys_safe: String = system.chars().take(18000).collect();
+
+    let payload = json!({
+        "prompt": prompt,
+        "userId": format!("#/chat/{}", now_secs() * 1000),
+        "network": false,
+        "system": sys_safe,
+        "withoutContext": false,
+        "stream": true
+    });
+
+    let client = build_client(180)?;
+    let mut resp = client
+        .post("https://api.binjie.fun/api/generateStream")
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json, text/plain, */*")
+        .header("Origin", "https://chat9.yqcloud.top")
+        .header("Referer", "https://chat9.yqcloud.top/")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("YQCloud request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("YQCloud HTTP {}", resp.status()));
+    }
+
+    let mut buf = [0u8; 2048];
+    let mut saw_text = false;
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        match resp.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                let chunk = String::from_utf8_lossy(&buf[..n]);
+                if !chunk.is_empty() {
+                    saw_text = true;
+                    on_delta(&chunk);
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("YQCloud stream ended without output".to_string())
+    }
+}
+
+/// Stream from custom OpenAI-compatible or Anthropic endpoint (including multimodal image attachments).
 pub fn stream_custom_endpoint<F>(
     custom: &CustomEndpoint,
     model: &str,
@@ -1650,10 +2760,39 @@ where
     if custom.format == "anthropic" {
         let mut anth_msgs = Vec::new();
         for m in messages {
-            anth_msgs.push(json!({
-                "role": m.role,
-                "content": m.content
-            }));
+            let imgs: Vec<&AttachmentPayload> = m
+                .attachments
+                .iter()
+                .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+                .collect();
+            if imgs.is_empty() {
+                anth_msgs.push(json!({
+                    "role": m.role,
+                    "content": m.content
+                }));
+            } else {
+                let mut content_blocks = Vec::new();
+                for img in imgs {
+                    let b64_data = img
+                        .data_url
+                        .split_once(',')
+                        .map(|(_, b)| b)
+                        .unwrap_or(img.data_url.as_str());
+                    content_blocks.push(json!({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img.mime,
+                            "data": b64_data
+                        }
+                    }));
+                }
+                content_blocks.push(json!({ "type": "text", "text": m.content }));
+                anth_msgs.push(json!({
+                    "role": m.role,
+                    "content": content_blocks
+                }));
+            }
         }
         let payload = json!({
             "model": model,
@@ -1719,7 +2858,23 @@ where
             oai_msgs.push(json!({ "role": "system", "content": system }));
         }
         for m in messages {
-            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            let imgs: Vec<&AttachmentPayload> = m
+                .attachments
+                .iter()
+                .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+                .collect();
+            if imgs.is_empty() {
+                oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            } else {
+                let mut parts = vec![json!({ "type": "text", "text": m.content })];
+                for img in imgs {
+                    parts.push(json!({
+                        "type": "image_url",
+                        "image_url": { "url": img.data_url }
+                    }));
+                }
+                oai_msgs.push(json!({ "role": m.role, "content": parts }));
+            }
         }
         let mut payload = json!({
             "model": model,
@@ -1819,9 +2974,26 @@ where
         );
     }
 
+    let has_attachments = req
+        .messages
+        .iter()
+        .any(|m| !m.attachments.is_empty());
     let primary = req.provider.as_str();
     let res = match primary {
-        "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
+        "mercury3" => {
+            if has_attachments {
+                stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
+                    .or_else(|_| stream_deepai("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta))
+            } else {
+                stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
+            }
+        }
+        "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "ptero" => stream_ptero(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "unikey" => stream_unikey(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "llm7" => stream_llm7(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "pollinations" => stream_pollinations(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "yqcloud" => stream_yqcloud(&req.system, &req.messages, cancel, &mut on_delta),
         "k2horizon" => stream_k2horizon(&req.system, &req.messages, &req.effort, cancel, &mut on_delta),
         "motif" => stream_motif(
             engine,
@@ -1834,8 +3006,15 @@ where
         ),
         "deepai" => stream_deepai(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "qwen" => stream_qwen_app(engine, &req.model, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
-            .or_else(|_| stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta))
-            .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)),
+            .or_else(|_| {
+                if has_attachments {
+                    stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_deepai("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta))
+                } else {
+                    stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
+                }
+            }),
         "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
         "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),
         "chatjimmy" => {
@@ -1856,14 +3035,30 @@ where
         return res;
     }
 
-    // Automatic resilient failover across our bundled keyless providers
-    let fallbacks = ["mercury3", "k2horizon", "motif", "deepai", "chatjimmy"];
-    for fb in fallbacks {
+    // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
+    let fallbacks: &[&str] = if has_attachments {
+        &["kilo", "deepai", "ptero", "qwen"]
+    } else {
+        &["mercury3", "kilo", "unikey", "llm7", "pollinations", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+    };
+    for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
             continue;
         }
         let ok = match fb {
             "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
+            "kilo" => stream_kilo(
+                if has_attachments { "nvidia/nemotron-3.5-super-vl:free" } else { "kilo-auto/free" },
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
+            "ptero" => stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "unikey" => stream_unikey("moonshotai/kimi-k3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "llm7" => stream_llm7("codestral-latest", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "pollinations" => stream_pollinations("openai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "yqcloud" => stream_yqcloud(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "k2horizon" => stream_k2horizon(&req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
             "motif" => stream_motif(
                 engine,
@@ -1875,7 +3070,14 @@ where
                 &mut on_delta,
             )
             .is_ok(),
-            "deepai" => stream_deepai("standard", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "deepai" => stream_deepai(
+                if has_attachments { "gpt-6-luna" } else { "claude-haiku-5-5" },
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
+            "qwen" => stream_qwen_app(engine, "qwen4-max", &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
             "chatjimmy" => {
                 let user_prompt = req
                     .messages
@@ -1904,16 +3106,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_catalog_contains_all_eight_keyless_providers() {
+    fn test_catalog_contains_all_fourteen_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"mercury3"));
-        assert!(ids.contains(&"geminiweb"));
+        assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"qwen"));
+        assert!(ids.contains(&"ptero"));
+        assert!(ids.contains(&"unikey"));
+        assert!(ids.contains(&"llm7"));
+        assert!(ids.contains(&"pollinations"));
+        assert!(ids.contains(&"yqcloud"));
+        assert!(ids.contains(&"deepai"));
         assert!(ids.contains(&"k2horizon"));
         assert!(ids.contains(&"motif"));
         assert!(ids.contains(&"longcat"));
-        assert!(ids.contains(&"deepai"));
+        assert!(ids.contains(&"geminiweb"));
         assert!(ids.contains(&"chatjimmy"));
     }
 

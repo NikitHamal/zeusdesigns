@@ -1,8 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Pure Rust SHA-256 implementation (FIPS 180-4) for zero-dependency cryptographic signing
-/// used by DeepAI tryit key generation and Qwen fingerprint hashing.
-pub fn sha256_hex(input: &[u8]) -> String {
+/// Pure Rust SHA-256 implementation (FIPS 180-4) returning raw 32-byte digest.
+pub fn sha256_bytes(input: &[u8]) -> [u8; 32] {
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -84,10 +83,217 @@ pub fn sha256_hex(input: &[u8]) -> String {
         h[7] = h[7].wrapping_add(hh);
     }
 
-    format!(
-        "{:08x}{:08x}{:08x}{:08x}{:08x}{:08x}{:08x}{:08x}",
-        h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]
-    )
+    let mut out = [0u8; 32];
+    for (i, word) in h.iter().enumerate() {
+        out[i * 4..(i + 1) * 4].copy_from_slice(&word.to_be_bytes());
+    }
+    out
+}
+
+/// Pure Rust SHA-256 hex digest (FIPS 180-4).
+pub fn sha256_hex(input: &[u8]) -> String {
+    let bytes = sha256_bytes(input);
+    let mut out = String::with_capacity(64);
+    for b in bytes {
+        out.push_str(&format!("{:02x}", b));
+    }
+    out
+}
+
+/// Pure Rust HMAC-SHA256 returning 32-byte MAC (used for Qwen OSS4-HMAC-SHA256 signing).
+pub fn hmac_sha256_bytes(key: &[u8], message: &[u8]) -> [u8; 32] {
+    let mut k_block = [0u8; 64];
+    if key.len() > 64 {
+        let hashed = sha256_bytes(key);
+        k_block[..32].copy_from_slice(&hashed);
+    } else {
+        k_block[..key.len()].copy_from_slice(key);
+    }
+
+    let mut ipad = [0x36u8; 64];
+    let mut opad = [0x5cu8; 64];
+    for i in 0..64 {
+        ipad[i] ^= k_block[i];
+        opad[i] ^= k_block[i];
+    }
+
+    let mut inner_input = Vec::with_capacity(64 + message.len());
+    inner_input.extend_from_slice(&ipad);
+    inner_input.extend_from_slice(message);
+    let inner_hash = sha256_bytes(&inner_input);
+
+    let mut outer_input = Vec::with_capacity(64 + 32);
+    outer_input.extend_from_slice(&opad);
+    outer_input.extend_from_slice(&inner_hash);
+    sha256_bytes(&outer_input)
+}
+
+/// Pure Rust HMAC-SHA256 returning lowercase hex string.
+pub fn hmac_sha256_hex(key: &[u8], message: &[u8]) -> String {
+    let mac = hmac_sha256_bytes(key, message);
+    let mut out = String::with_capacity(64);
+    for b in mac {
+        out.push_str(&format!("{:02x}", b));
+    }
+    out
+}
+
+/// Pure Rust RFC 1321 MD5 implementation with reversed hex output matching DeepAI's `generateIslandKey`.
+pub fn md5_reversed_hex(input: &[u8]) -> String {
+    const S: [u32; 64] = [
+        7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+        5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+        4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+        6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    ];
+    const K: [u32; 64] = [
+        0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+        0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+        0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+        0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+        0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+        0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+        0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+        0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+    ];
+
+    let mut a0: u32 = 0x67452301;
+    let mut b0: u32 = 0xefcdab89;
+    let mut c0: u32 = 0x98badcfe;
+    let mut d0: u32 = 0x10325476;
+
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut msg = input.to_vec();
+    msg.push(0x80);
+    while (msg.len() % 64) != 56 {
+        msg.push(0x00);
+    }
+    msg.extend_from_slice(&bit_len.to_le_bytes());
+
+    for chunk in msg.chunks_exact(64) {
+        let mut m = [0u32; 16];
+        for (i, word) in chunk.chunks_exact(4).enumerate() {
+            m[i] = u32::from_le_bytes([word[0], word[1], word[2], word[3]]);
+        }
+
+        let mut a = a0;
+        let mut b = b0;
+        let mut c = c0;
+        let mut d = d0;
+
+        for i in 0..64 {
+            let (f, g) = match i {
+                0..=15 => ((b & c) | ((!b) & d), i),
+                16..=31 => ((d & b) | ((!d) & c), (5 * i + 1) % 16),
+                32..=47 => (b ^ c ^ d, (3 * i + 5) % 16),
+                _ => (c ^ (b | (!d)), (7 * i) % 16),
+            };
+            let temp = d;
+            d = c;
+            c = b;
+            let sum = a.wrapping_add(f).wrapping_add(K[i]).wrapping_add(m[g]);
+            b = b.wrapping_add(sum.rotate_left(S[i]));
+            a = temp;
+        }
+
+        a0 = a0.wrapping_add(a);
+        b0 = b0.wrapping_add(b);
+        c0 = c0.wrapping_add(c);
+        d0 = d0.wrapping_add(d);
+    }
+
+    let mut raw = [0u8; 16];
+    raw[0..4].copy_from_slice(&a0.to_le_bytes());
+    raw[4..8].copy_from_slice(&b0.to_le_bytes());
+    raw[8..12].copy_from_slice(&c0.to_le_bytes());
+    raw[12..16].copy_from_slice(&d0.to_le_bytes());
+
+    let mut hex = String::with_capacity(32);
+    for b in raw {
+        hex.push_str(&format!("{:02x}", b));
+    }
+    hex.chars().rev().collect()
+}
+
+/// Generate DeepAI's current `generateIslandKey` (`tryit-{rand}-{reversed_md5}`) for chat & attachment uploads.
+pub fn generate_deepai_island_key(user_agent: &str) -> String {
+    const SALT: &str = "hackers_become_a_little_stinkier_every_time_they_hack";
+    let random_num = (pseudo_random_u64() % 100_000_000_000).to_string();
+    let h1 = md5_reversed_hex(format!("{}{}{}", user_agent, random_num, SALT).as_bytes());
+    let h2 = md5_reversed_hex(format!("{}{}", user_agent, h1).as_bytes());
+    let h3 = md5_reversed_hex(format!("{}{}", user_agent, h2).as_bytes());
+    format!("tryit-{}-{}", random_num, h3)
+}
+
+/// Decode standard or URL-safe Base64 into raw bytes.
+pub fn decode_base64(input: &str) -> Option<Vec<u8>> {
+    let mut out = Vec::with_capacity(input.len() * 3 / 4);
+    let mut buf: u32 = 0;
+    let mut bits: u8 = 0;
+
+    for b in input.bytes() {
+        let val = match b {
+            b'A'..=b'Z' => b - b'A',
+            b'a'..=b'z' => b - b'a' + 26,
+            b'0'..=b'9' => b - b'0' + 52,
+            b'+' | b'-' => 62,
+            b'/' | b'_' => 63,
+            b'=' => break,
+            b' ' | b'\r' | b'\n' | b'\t' => continue,
+            _ => return None,
+        };
+        buf = (buf << 6) | (val as u32);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push(((buf >> bits) & 0xff) as u8);
+        }
+    }
+    Some(out)
+}
+
+/// Parse a `data:<mime>;base64,<payload>` URL into `(mime_type, raw_bytes)`.
+pub fn decode_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
+    let trimmed = data_url.trim();
+    if let Some(rest) = trimmed.strip_prefix("data:") {
+        let (meta, b64_part) = rest.split_once(',')?;
+        let mime = meta
+            .split(';')
+            .next()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        let bytes = decode_base64(b64_part)?;
+        Some((mime, bytes))
+    } else {
+        let bytes = decode_base64(trimmed)?;
+        Some(("application/octet-stream".to_string(), bytes))
+    }
+}
+
+/// Convert UNIX epoch seconds into `("YYYYMMDDTHHMMSSZ", "YYYYMMDD")` for Alibaba Cloud OSS V4 signing.
+pub fn iso8601_utc_compact(unix_secs: u64) -> (String, String) {
+    let days = (unix_secs / 86400) as i64;
+    let secs_of_day = unix_secs % 86400;
+    let hour = secs_of_day / 3600;
+    let minute = (secs_of_day % 3600) / 60;
+    let second = secs_of_day % 60;
+
+    // Howard Hinnant civil_from_days algorithm
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if m <= 2 { y + 1 } else { y };
+
+    let date_part = format!("{:04}{:02}{:02}", year, m, d);
+    let full = format!("{}T{:02}{:02}{:02}Z", date_part, hour, minute, second);
+    (full, date_part)
 }
 
 static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -137,9 +343,6 @@ pub fn fake_ipv4() -> String {
     )
 }
 
-/// Ported directly from `/tmp/NEB/backend_python/api/deepai_proxy.py`:
-/// `_SALT = "hackers_become_a_little_stinkier_every_time_they_hack"`
-/// `inner = _h(USER_AGENT + _h(USER_AGENT + _h(USER_AGENT + random_num + _SALT)))`
 extern "C" {
     fn zeus_generate_deepai_tryit_key(
         user_agent: *const std::os::raw::c_char,
@@ -189,9 +392,6 @@ pub fn cpp_split_k2_details(raw: &str) -> Option<String> {
     }
 }
 
-/// Ported directly from `/tmp/NEB/backend_python/api/deepai_proxy.py`:
-/// `_SALT = "hackers_become_a_little_stinkier_every_time_they_hack"`
-/// `inner = _h(USER_AGENT + _h(USER_AGENT + _h(USER_AGENT + random_num + _SALT)))`
 pub fn generate_deepai_tryit_key(user_agent: &str) -> String {
     if let Ok(c_ua) = std::ffi::CString::new(user_agent) {
         let mut buf = [0u8; 160];
@@ -226,6 +426,22 @@ mod tests {
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
+    }
+
+    #[test]
+    fn test_md5_reversed_and_island_key() {
+        // MD5("abc") = "900150983cd24fb0d6963f7d28e17f72", reversed = "27f71e82d7f3696d0bf42dc389051009"
+        assert_eq!(md5_reversed_hex(b"abc"), "27f71e82d7f3696d0bf42dc389051009");
+        let k = generate_deepai_island_key("Mozilla/5.0");
+        assert!(k.starts_with("tryit-"));
+        assert!(k.len() > 40);
+    }
+
+    #[test]
+    fn test_decode_data_url() {
+        let (mime, bytes) = decode_data_url("data:image/png;base64,aGVsbG8=").unwrap();
+        assert_eq!(mime, "image/png");
+        assert_eq!(bytes, b"hello");
     }
 
     #[test]
