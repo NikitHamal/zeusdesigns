@@ -9,6 +9,7 @@ import { BottomToolbar } from "./BottomToolbar";
 import { CompareDialog, GridView, SingleView } from "./Views";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
+import { editor, useEditor } from "../lib/editor";
 
 function ProjectName() {
   const name = useStore((s) => s.projectName);
@@ -75,22 +76,37 @@ export function CanvasPane() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const chatCollapsed = useStore((s) => s.ui.chatCollapsed);
+  const editId = useStore((s) => s.ui.editId);
+  const insertOpen = useEditor((s) => s.insertOpen);
   const patchUI = useStore((s) => s.patchUI);
   const pageId = useStore((s) => s.activePageId);
   const allBoards = useStore((s) => s.artboards);
   const sel = useStore((s) => s.sel);
   const boards = allBoards.filter((a) => a.pageId === pageId);
   const pickedBoards = boards.filter((b) => sel.includes(b.id));
+  const studioActive = !!editId || insertOpen;
 
-  const arrange = () => {
+  const arrange = (grid = false) => {
     const st = useStore.getState();
     const list = (pickedBoards.length > 1 ? pickedBoards : boards).slice();
     if (list.length < 2) return;
-    let x = Math.min(...list.map((b) => b.x));
-    const y = Math.min(...list.map((b) => b.y));
-    const map = new Map<string, number>();
-    list.forEach((b) => { map.set(b.id, x); x += b.w + 100; });
-    useStore.setState({ artboards: st.artboards.map((b) => (map.has(b.id) ? { ...b, x: map.get(b.id)!, y } : b)) });
+    const x0 = Math.min(...list.map((b) => b.x));
+    const y0 = Math.min(...list.map((b) => b.y));
+    const pos = new Map<string, { x: number; y: number }>();
+    if (grid) {
+      const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(list.length))));
+      let x = x0, y = y0, rowH = 0;
+      list.forEach((b, i) => {
+        if (i > 0 && i % cols === 0) { x = x0; y += rowH + 100; rowH = 0; }
+        pos.set(b.id, { x, y });
+        x += b.w + 100;
+        rowH = Math.max(rowH, b.h);
+      });
+    } else {
+      let x = x0;
+      list.forEach((b) => { pos.set(b.id, { x, y: y0 }); x += b.w + 100; });
+    }
+    useStore.setState({ artboards: st.artboards.map((b) => (pos.has(b.id) ? { ...b, ...pos.get(b.id)! } : b)) });
     setTimeout(() => canvasApi.fit(list.map((b) => b.id)), 30);
   };
   const exportAll = () => {
@@ -117,6 +133,35 @@ export function CanvasPane() {
               { id: "single", icon: <Icon name="crop_landscape" size={16} />, title: "Single screen" },
             ]}
           />
+          <button
+            onClick={() => {
+              const ed = useEditor.getState();
+              if (studioActive) {
+                ed.setInsertOpen(false);
+                if (editId) editor.finish();
+              } else {
+                const target = pickedBoards[0] ?? boards[0];
+                if (target) {
+                  ed.begin(target.id, target.html, "insert");
+                  patchUI({ editId: target.id, interactId: null });
+                  useStore.getState().setSel([target.id]);
+                } else {
+                  ed.setTab("insert");
+                }
+                ed.setInsertOpen(true);
+              }
+            }}
+            title="Toggle Figma Studio Panel (Design · Insert · Layers · Code)"
+            className={cn(
+              "state flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition-colors",
+              studioActive
+                ? "border-primary bg-primary-container text-on-primary-container"
+                : "border-outline-variant bg-surface-container text-on-surface"
+            )}
+          >
+            <Icon name="widgets" size={16} />
+            <span className="@max-[900px]:hidden">Studio</span>
+          </button>
           <Dropdown align="right" width={260} trigger={({ toggle }) => (
             <button onClick={toggle} disabled={boards.length === 0} className="state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3.5 text-sm font-medium text-on-surface">
               <Icon name="download" size={16} /><span className="@max-[900px]:hidden">Export</span>
@@ -154,7 +199,8 @@ export function CanvasPane() {
                   if (l.length < 2) useStore.getState().notify("Need at least two screens to compare"); else patchUI({ compare: [l[0].id, l[1].id] });
                   close();
                 }} />
-                <MenuItem icon={<Icon name="layers" size={16} />} label="Line up side by side" desc="Arrange in a row on the canvas" onClick={() => { arrange(); setView("canvas"); close(); }} />
+                <MenuItem icon={<Icon name="layers" size={16} />} label="Line up side by side" desc="Arrange in a horizontal row" onClick={() => { arrange(false); setView("canvas"); close(); }} />
+                <MenuItem icon={<Icon name="grid_view" size={16} />} label="Arrange in grid" desc="Tidy into a multi-column grid" onClick={() => { arrange(true); setView("canvas"); close(); }} />
                 <MenuLabel>Page</MenuLabel>
                 <MenuItem icon={<Icon name="download" size={16} />} label="Export all screens (HTML)" onClick={() => { exportAll(); close(); }} />
                 <MenuItem icon={<Icon name="delete" size={16} />} danger label="Clear page" onClick={() => {

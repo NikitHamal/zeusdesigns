@@ -8,6 +8,8 @@ import { DS_KIT, UI_ICON_NAMES, harden, kitExample } from "./harness";
 import { DESIGN_FONTS } from "./fonts";
 import { blueprintFor } from "./blueprints";
 import { auditHtml } from "./audit";
+import { insertBlockIntoHtml, UI_BLOCKS } from "./blocks";
+import { canvasApi } from "./canvasApi";
 import type { Device } from "../types";
 
 export const STUDIO_ID = "mcp-zeus-studio";
@@ -344,6 +346,95 @@ export const STUDIO_TOOLS: StudioTool[] = [
         .trim();
       const compName = b.name.replace(/[^a-zA-Z0-9]/g, "") || "ZeusScreen";
       return `export default function ${compName}() {\n  return (\n    <div className="zeus-screen">\n${body.slice(0, 10000)}\n    </div>\n  );\n}`;
+    },
+  },
+  {
+    name: "studio_insert_block", icon: "widgets", desc: `Insert a pre-built UI block (${UI_BLOCKS.map((x) => x.id).slice(0, 14).join(", ")}, etc.) into an existing screen or create a new screen`,
+    params: { id: "target screen id or name (optional)", block: `block id: ${UI_BLOCKS.map((x) => x.id).join(" | ")}` },
+    run: (a) => {
+      const blockId = str(a.block ?? a.query ?? a.id).trim();
+      const found = UI_BLOCKS.find((x) => x.id === blockId);
+      if (!found) return `Unknown block "${blockId}". Available blocks: ${UI_BLOCKS.map((x) => `${x.id} (${x.name})`).join(", ")}`;
+      const st = useStore.getState();
+      const ds = activeDS(a);
+      const target = board(a) ?? st.artboards.find((b) => b.pageId === st.activePageId);
+      if (target) {
+        const updated = insertBlockIntoHtml(target.html, found.id, ds, target.device);
+        st.reviseArtboard(target.id, updated);
+        return `Inserted block "${found.name}" (${found.id}) into screen "${target.name}" (id=${target.id}, v${target.version + 1}).`;
+      }
+      const ab = st.addBlankFrame(140, 100, 390, 844);
+      const updated = insertBlockIntoHtml(ab.html, found.id, ds, ab.device);
+      st.updateArtboard(ab.id, { name: found.name, html: updated });
+      setTimeout(() => canvasApi.fit([ab.id]), 40);
+      return `Created screen "${found.name}" (id=${ab.id}) with block "${found.id}".`;
+    },
+  },
+  {
+    name: "studio_patch_screen", icon: "edit", desc: "Surgically modify an element inside a screen by CSS selector (text, style, addClass, removeClass, or delete) without rewriting the whole document",
+    params: { id: "screen id or name", selector: "CSS selector, e.g. .z-hero h2 or header h1", text: "optional new textContent", style: "optional inline CSS declarations", delete: "optional true to remove element" },
+    run: (a) => {
+      const b = board(a) ?? useStore.getState().artboards.find((x) => x.pageId === useStore.getState().activePageId);
+      if (!b) return "No screen found on the active page.";
+      const sel = str(a.selector).trim();
+      if (!sel) return "Provide a CSS selector in `selector`.";
+      if (typeof DOMParser === "undefined") return "DOMParser unavailable";
+      const doc = new DOMParser().parseFromString(b.html, "text/html");
+      let el: Element | null = null;
+      try { el = doc.querySelector(sel); } catch { return `Invalid CSS selector: ${sel}`; }
+      if (!el) return `No element matched selector "${sel}" in screen "${b.name}".`;
+      if (str(a.delete) === "true") {
+        el.remove();
+      } else {
+        if (a.text !== undefined) el.textContent = str(a.text);
+        if (a.style !== undefined) {
+          const prev = el.getAttribute("style") ?? "";
+          el.setAttribute("style", (prev ? prev.replace(/;?\s*$/, ";") : "") + str(a.style));
+        }
+        if (a.addClass) str(a.addClass).split(/\s+/).filter(Boolean).forEach((c) => el!.classList.add(c));
+        if (a.removeClass) str(a.removeClass).split(/\s+/).filter(Boolean).forEach((c) => el!.classList.remove(c));
+      }
+      const next = harden("<!doctype html>" + doc.documentElement.outerHTML, activeDS(a), { partial: true, device: b.device }).html;
+      useStore.getState().reviseArtboard(b.id, next);
+      return `Patched "${sel}" in screen "${b.name}" (id=${b.id}).`;
+    },
+  },
+  {
+    name: "studio_arrange_canvas", icon: "grid_view", desc: "Arrange all screens on the active canvas page into a clean horizontal row or multi-column grid and fit the camera",
+    params: { layout: "row | grid (default row)", gap: "pixel gap between screens (default 100)" },
+    run: (a) => {
+      const st = useStore.getState();
+      const list = st.artboards.filter((b) => b.pageId === st.activePageId);
+      if (list.length === 0) return "No screens on the active page to arrange.";
+      const gap = Math.max(40, Math.min(400, parseInt(str(a.gap, "100"), 10) || 100));
+      const layout = str(a.layout, "row").toLowerCase();
+      const pos = new Map<string, { x: number; y: number }>();
+      if (layout === "grid") {
+        const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(list.length))));
+        let x = 0, y = 0, rowH = 0;
+        list.forEach((b, idx) => {
+          if (idx > 0 && idx % cols === 0) { x = 0; y += rowH + gap; rowH = 0; }
+          pos.set(b.id, { x, y });
+          x += b.w + gap;
+          rowH = Math.max(rowH, b.h);
+        });
+      } else {
+        let x = 0;
+        list.forEach((b) => { pos.set(b.id, { x, y: 0 }); x += b.w + gap; });
+      }
+      useStore.setState({ artboards: st.artboards.map((b) => (pos.has(b.id) ? { ...b, ...pos.get(b.id)! } : b)) });
+      setTimeout(() => canvasApi.fit(list.map((b) => b.id)), 30);
+      return `Arranged ${list.length} screen${list.length > 1 ? "s" : ""} in ${layout} layout with ${gap}px gap.`;
+    },
+  },
+  {
+    name: "studio_retheme_page", icon: "palette", desc: "Switch the active design system and immediately re-theme all screens on the current canvas page",
+    params: { system: "design system id (m3e, m3, hig, fluent, shadcn, carbon, antd, polaris, atlassian, neo, glass, minimal, claude)" },
+    run: (a) => {
+      const ds = activeDS(a);
+      useStore.getState().patchSettings({ designSystemId: ds.id });
+      const count = useStore.getState().artboards.filter((b) => b.pageId === useStore.getState().activePageId).length;
+      return `Switched active design system to ${ds.name} (${ds.id}) and re-themed ${count} screen${count === 1 ? "" : "s"}.`;
     },
   },
 ];
