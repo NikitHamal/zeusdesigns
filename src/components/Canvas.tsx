@@ -12,6 +12,8 @@ import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
 import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
+import { insertBlockIntoHtml } from "../lib/blocks";
+import { getDS } from "../lib/designSystems";
 import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
 
 const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
@@ -40,7 +42,9 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
       const ed = useEditor.getState();
       if (d.type === "ready") editorBridge.attach(win);
       else if (d.type === "select") ed.setSel(d.info);
+      else if (d.type === "tree") ed.setTree(d.tree ?? []);
       else if (d.type === "undo") editor.undo();
+      else if (d.type === "redo") editor.redo();
       else if (d.type === "html") {
         const cur = useStore.getState().artboards.find((x) => x.id === id);
         if (!cur || cur.html === d.html) return;
@@ -211,12 +215,45 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
 }) {
   const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
   const [renaming, setRenaming] = useState(false);
+  const [dropOver, setDropOver] = useState(false);
   const s = clamp(0.8 / z, 1, 4);
   const radius = a.device === "mobile" ? 38 : a.device === "tablet" ? 26 : 12;
   const selectable = tool === "select";
   const setDevice = (d: Device) => updateArtboard(a.id, { device: d, w: DEVICE_SIZE[d].w, h: DEVICE_SIZE[d].h });
+
+  const onDropBlock = (e: React.DragEvent) => {
+    const blockId = e.dataTransfer.getData("application/x-zeus-block");
+    if (!blockId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropOver(false);
+    const st = useStore.getState();
+    const ds = getDS(st.settings.designSystemId);
+    const updated = insertBlockIntoHtml(a.html, blockId, ds, a.device);
+    if (editing) {
+      useEditor.getState().record(a.html);
+      st.updateArtboard(a.id, { html: updated });
+    } else {
+      st.reviseArtboard(a.id, updated);
+    }
+    st.setSel([a.id]);
+    st.notify(`Dropped component into ${a.name}`);
+  };
+
   return (
-    <div className="group absolute" style={{ left: a.x, top: a.y, width: a.w, pointerEvents: selectable ? "auto" : "none" }}>
+    <div
+      className="group absolute"
+      style={{ left: a.x, top: a.y, width: a.w, pointerEvents: selectable ? "auto" : "none" }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("application/x-zeus-block")) {
+          e.preventDefault();
+          e.stopPropagation();
+          setDropOver(true);
+        }
+      }}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={onDropBlock}
+    >
       {/* header */}
       <div
         className="absolute left-0 flex items-center gap-1.5 select-none"
@@ -251,14 +288,27 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
         )}
         {a.source && <span className="truncate rounded-full bg-tertiary-container px-2 py-0.5 text-[10px] font-semibold text-on-tertiary-container"><Icon name="sync_alt" size={12} className="mr-1" />{a.source}</span>}
         <div className={cn("shrink-0 items-center gap-0.5 rounded-full bg-surface-container p-0.5", selected || editing ? "flex" : "hidden group-hover:flex")}>
-          <IconBtn label={editing ? "Done editing" : "Edit elements"} size={28} active={editing} onClick={() => {
+          <IconBtn label="Insert components" size={28} active={editing && useEditor.getState().tab === "insert"} onClick={() => {
+            if (a.loading) return;
+            if (!editing) {
+              if (useEditor.getState().artboardId) editor.finish();
+              useEditor.getState().begin(a.id, a.html, "insert");
+              patchUI({ editId: a.id, interactId: null });
+            } else {
+              useEditor.getState().setTab("insert");
+            }
+            useEditor.getState().setInsertOpen(true);
+            useStore.getState().setSel([a.id]);
+            setTimeout(() => canvasApi.fit([a.id], { right: 310 }), 40);
+          }}><Icon name="add" size={15} /></IconBtn>
+          <IconBtn label={editing ? "Done editing" : "Edit elements & layers"} size={28} active={editing} onClick={() => {
             if (editing) { editor.finish(); return; }
             if (useEditor.getState().artboardId) editor.finish();
             if (a.loading) return;
-            useEditor.getState().begin(a.id, a.html);
+            useEditor.getState().begin(a.id, a.html, "design");
             patchUI({ editId: a.id, interactId: null });
             useStore.getState().setSel([a.id]);
-            setTimeout(() => canvasApi.fit([a.id], { right: 300 }), 40);
+            setTimeout(() => canvasApi.fit([a.id], { right: 310 }), 40);
           }}><Icon name="ads_click" size={14} /></IconBtn>
           <IconBtn label={interacting ? "Stop interacting" : "Interact (double-click)"} size={28} active={interacting} onClick={() => { if (editing) editor.finish(); patchUI({ interactId: interacting ? null : a.id }); }}><Icon name="touch_app" size={14} /></IconBtn>
           <IconBtn label="Duplicate as variant" size={28} onClick={() => duplicateArtboard(a.id)}><Icon name="content_copy" size={14} /></IconBtn>
@@ -286,7 +336,7 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
 
       {/* body */}
       <div
-        className={cn("relative overflow-hidden bg-white   transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
+        className={cn("relative overflow-hidden bg-white transition-all", dropOver ? "ring-[4px] ring-primary" : selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
         <Frame id={a.id} w={a.w} h={a.h} html={a.html} interactive={interacting} editing={editing} culled={culled} />
@@ -415,6 +465,7 @@ export function InfiniteCanvas() {
   const [editing, setEditing] = useState<string | null>(null);
   const [draftPin, setDraftPin] = useState<{ x: number; y: number; artboardId?: string } | null>(null);
   const [panning, setPanning] = useState(false);
+  const [guides, setGuides] = useState<{ x?: number; y?: number }>({});
 
   const setVp = useCallback((v: { x: number; y: number; z: number }) => useStore.getState().setViewport(pageId, v), [pageId]);
   const toWorld = useCallback((cx: number, cy: number) => {
@@ -491,7 +542,8 @@ export function InfiniteCanvas() {
       const map: Record<string, () => void> = {
         v: () => st.setTool("select"), h: () => st.setTool("hand"), t: () => st.setTool("text"), f: () => st.setTool("frame"),
         n: () => st.setTool("note"), p: () => st.setTool("pen"), s: () => st.setTool("shape"), c: () => st.setTool("pin"),
-        Escape: () => { if (st.ui.editId) editor.finish(); st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
+        i: () => { useEditor.getState().setTab("insert"); useEditor.getState().setInsertOpen(!useEditor.getState().insertOpen); },
+        Escape: () => { if (st.ui.editId) editor.finish(); useEditor.getState().setInsertOpen(false); st.setTool("select"); st.setSel([]); st.patchUI({ interactId: null, openPinId: null }); setDraftPin(null); },
         Delete: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         Backspace: () => { st.removeArtboards(st.sel); st.removeElements(st.sel); },
         "1": () => canvasApi.fit(), "2": () => st.sel.length && canvasApi.fit(st.sel),
@@ -504,7 +556,7 @@ export function InfiniteCanvas() {
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
   }, []);
 
-  /* move / resize */
+  /* move / resize with Figma-style smart alignment snapping */
   const onMoveStart = useCallback((e: React.PointerEvent, id: string) => {
     const st = useStore.getState();
     if (e.button !== 0) return;
@@ -514,20 +566,50 @@ export function InfiniteCanvas() {
     st.setSel(ids);
     if (st.ui.interactId && st.ui.interactId !== id) st.patchUI({ interactId: null });
     const start = { x: e.clientX, y: e.clientY };
-    const origA = new Map(st.artboards.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y }]));
-    const origE = new Map(st.elements.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y }]));
+    const origA = new Map(st.artboards.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y, w: a.w, h: a.h }]));
+    const origE = new Map(st.elements.filter((a) => ids.includes(a.id)).map((a) => [a.id, { x: a.x, y: a.y, w: a.w, h: a.h }]));
+    const others = [
+      ...st.artboards.filter((a) => a.pageId === st.activePageId && !ids.includes(a.id)),
+      ...st.elements.filter((a) => a.pageId === st.activePageId && !ids.includes(a.id)),
+    ];
+    const primaryOrig = origA.get(id) ?? origE.get(id);
     let moved = false;
     const mv = (ev: PointerEvent) => {
       const z = vpRef.current.z;
-      const dx = (ev.clientX - start.x) / z, dy = (ev.clientY - start.y) / z;
+      let dx = (ev.clientX - start.x) / z, dy = (ev.clientY - start.y) / z;
       if (!moved && Math.hypot(dx, dy) * z < 3) return;
       moved = true;
+      let gx: number | undefined;
+      let gy: number | undefined;
+      if (primaryOrig && !ev.altKey && others.length > 0) {
+        const thresh = 8 / z;
+        const nx = primaryOrig.x + dx, ny = primaryOrig.y + dy;
+        const xPts = [nx, nx + primaryOrig.w / 2, nx + primaryOrig.w];
+        const yPts = [ny, ny + primaryOrig.h / 2, ny + primaryOrig.h];
+        for (const o of others) {
+          const oxs = [o.x, o.x + o.w / 2, o.x + o.w];
+          const oys = [o.y, o.y + o.h / 2, o.y + o.h];
+          for (const xp of xPts) {
+            for (const ox of oxs) {
+              if (Math.abs(xp - ox) < thresh) { dx += ox - xp; gx = ox; break; }
+            }
+            if (gx !== undefined) break;
+          }
+          for (const yp of yPts) {
+            for (const oy of oys) {
+              if (Math.abs(yp - oy) < thresh) { dy += oy - yp; gy = oy; break; }
+            }
+            if (gy !== undefined) break;
+          }
+        }
+      }
+      setGuides({ x: gx, y: gy });
       useStore.setState((s) => ({
-        artboards: s.artboards.map((a) => (origA.has(a.id) ? { ...a, x: origA.get(a.id)!.x + dx, y: origA.get(a.id)!.y + dy } : a)),
-        elements: s.elements.map((a) => (origE.has(a.id) ? { ...a, x: origE.get(a.id)!.x + dx, y: origE.get(a.id)!.y + dy } : a)),
+        artboards: s.artboards.map((a) => (origA.has(a.id) ? { ...a, x: Math.round(origA.get(a.id)!.x + dx), y: Math.round(origA.get(a.id)!.y + dy) } : a)),
+        elements: s.elements.map((a) => (origE.has(a.id) ? { ...a, x: Math.round(origE.get(a.id)!.x + dx), y: Math.round(origE.get(a.id)!.y + dy) } : a)),
       }));
     };
-    const upH = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH); };
+    const upH = () => { setGuides({}); window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", upH); };
     window.addEventListener("pointermove", mv);
     window.addEventListener("pointerup", upH);
   }, []);
@@ -641,9 +723,27 @@ export function InfiniteCanvas() {
   const dx = draft ? { x: Math.min(draft.x0, draft.x1), y: Math.min(draft.y0, draft.y1), w: Math.abs(draft.x1 - draft.x0), h: Math.abs(draft.y1 - draft.y0) } : null;
   const empty = !boards.length && !els.length;
 
+  const onCanvasDrop = (e: React.DragEvent) => {
+    const blockId = e.dataTransfer.getData("application/x-zeus-block");
+    if (!blockId) return;
+    e.preventDefault();
+    const w = toWorld(e.clientX, e.clientY);
+    const st = useStore.getState();
+    const ds = getDS(st.settings.designSystemId);
+    const ab = st.addBlankFrame(Math.round(w.x - 195), Math.round(w.y - 120), 390, 844);
+    const updated = insertBlockIntoHtml(ab.html, blockId, ds, ab.device);
+    st.updateArtboard(ab.id, { name: "Custom Screen", html: updated });
+    st.setSel([ab.id]);
+    st.notify("Created frame with dropped component");
+  };
+
   return (
     <div
-      ref={rootRef} onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()}
+      ref={rootRef}
+      onPointerDown={onPointerDown}
+      onContextMenu={(e) => e.preventDefault()}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("application/x-zeus-block")) e.preventDefault(); }}
+      onDrop={onCanvasDrop}
       className="dots relative h-full w-full overflow-hidden bg-surface-lowest touch-none"
       style={{ cursor, backgroundSize: `${28 * vp.z}px ${28 * vp.z}px`, backgroundPosition: `${vp.x}px ${vp.y}px` }}
     >
@@ -662,6 +762,12 @@ export function InfiniteCanvas() {
         ))}
         {pins.map((p) => <PinView key={p.id} pin={p} z={vp.z} />)}
         {draftPin && <PinDraft {...draftPin} z={vp.z} onDone={() => { setDraftPin(null); useStore.getState().setTool("select"); }} />}
+        {guides.x !== undefined && (
+          <div className="pointer-events-none absolute top-[-10000px] h-[20000px] bg-primary" style={{ left: guides.x, width: Math.max(1, 1.5 / vp.z) }} />
+        )}
+        {guides.y !== undefined && (
+          <div className="pointer-events-none absolute left-[-10000px] w-[20000px] bg-primary" style={{ top: guides.y, height: Math.max(1, 1.5 / vp.z) }} />
+        )}
         {dx && draft?.kind === "frame" && <div className="pointer-events-none absolute rounded-[24px] border-2 border-dashed border-primary bg-primary/10" style={{ left: dx.x, top: dx.y, width: dx.w, height: dx.h }} />}
         {dx && draft?.kind === "shape" && <div className="pointer-events-none absolute border-2 border-primary/70 bg-primary/10" style={{ left: dx.x, top: dx.y, width: dx.w, height: dx.h, borderRadius: useStore.getState().shape === "ellipse" ? "50%" : 12 }} />}
         {draft?.kind === "pen" && (
@@ -670,7 +776,80 @@ export function InfiniteCanvas() {
         {marquee && <div className="pointer-events-none absolute border border-primary bg-primary/10" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       </div>
       {empty && <EmptyCanvas />}
+      <SelectionAlignBar />
       <InkPalette />
+    </div>
+  );
+}
+
+/* Figma-style alignment & distribution toolbar when 2+ items are selected on the canvas */
+function SelectionAlignBar() {
+  const sel = useStore((s) => s.sel);
+  const pageId = useStore((s) => s.activePageId);
+  const boards = useStore((s) => s.artboards);
+  const els = useStore((s) => s.elements);
+  const items = [
+    ...boards.filter((a) => a.pageId === pageId && sel.includes(a.id)),
+    ...els.filter((e) => e.pageId === pageId && sel.includes(e.id)),
+  ];
+  if (items.length < 2) return null;
+
+  const applyAlign = (mode: "left" | "center" | "right" | "top" | "middle" | "bottom" | "distribute") => {
+    const minX = Math.min(...items.map((i) => i.x));
+    const maxX = Math.max(...items.map((i) => i.x + i.w));
+    const minY = Math.min(...items.map((i) => i.y));
+    const maxY = Math.max(...items.map((i) => i.y + i.h));
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    const posMap = new Map<string, { x: number; y: number }>();
+    if (mode === "distribute") {
+      const sorted = [...items].sort((a, b) => a.x - b.x);
+      let cursor = minX;
+      for (const it of sorted) {
+        posMap.set(it.id, { x: Math.round(cursor), y: Math.round(minY) });
+        cursor += it.w + 80;
+      }
+    } else {
+      for (const it of items) {
+        const x =
+          mode === "left" ? minX
+            : mode === "center" ? Math.round(midX - it.w / 2)
+              : mode === "right" ? maxX - it.w
+                : it.x;
+        const y =
+          mode === "top" ? minY
+            : mode === "middle" ? Math.round(midY - it.h / 2)
+              : mode === "bottom" ? maxY - it.h
+                : it.y;
+        posMap.set(it.id, { x, y });
+      }
+    }
+
+    useStore.setState((s) => ({
+      artboards: s.artboards.map((a) => (posMap.has(a.id) ? { ...a, ...posMap.get(a.id)! } : a)),
+      elements: s.elements.map((e) => (posMap.has(e.id) ? { ...e, ...posMap.get(e.id)! } : e)),
+    }));
+  };
+
+  return (
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      className="anim-pop pointer-events-auto absolute left-1/2 top-16 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-outline-variant bg-surface-container px-2.5 py-1"
+    >
+      <span className="px-1.5 text-xs font-semibold text-on-surface-variant">{items.length} selected</span>
+      <span className="mx-0.5 h-4 w-px bg-outline-variant" />
+      <IconBtn label="Align left" size={28} onClick={() => applyAlign("left")}><Icon name="format_align_left" size={15} /></IconBtn>
+      <IconBtn label="Align horizontal center" size={28} onClick={() => applyAlign("center")}><Icon name="format_align_center" size={15} /></IconBtn>
+      <IconBtn label="Align right" size={28} onClick={() => applyAlign("right")}><Icon name="format_align_right" size={15} /></IconBtn>
+      <span className="mx-0.5 h-4 w-px bg-outline-variant" />
+      <IconBtn label="Align top" size={28} onClick={() => applyAlign("top")}><Icon name="vertical_align_top" size={15} /></IconBtn>
+      <IconBtn label="Align middle" size={28} onClick={() => applyAlign("middle")}><Icon name="vertical_align_center" size={15} /></IconBtn>
+      <IconBtn label="Align bottom" size={28} onClick={() => applyAlign("bottom")}><Icon name="vertical_align_bottom" size={15} /></IconBtn>
+      <span className="mx-0.5 h-4 w-px bg-outline-variant" />
+      <button onClick={() => applyAlign("distribute")} className="state rounded-full bg-surface-high px-2.5 py-1 text-[11px] font-semibold text-on-surface">
+        Tidy row
+      </button>
     </div>
   );
 }

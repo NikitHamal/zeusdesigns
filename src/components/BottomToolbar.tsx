@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
-import type { ShapeKind, Tool } from "../types";
+import { DEVICE_SIZE, type Device, type ShapeKind, type Tool } from "../types";
 import { sendMessage } from "../lib/engine";
+import { useEditor } from "../lib/editor";
+import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
-import { Dropdown, IconBtn } from "./ui";
+import { Dropdown, IconBtn, MenuItem, MenuLabel } from "./ui";
 import { Icon } from "./Icon";
 
 const SHAPES: { id: ShapeKind; icon: React.ReactNode; label: string }[] = [
@@ -70,7 +72,56 @@ export function BottomToolbar({ children }: { children?: React.ReactNode }) {
               <IconBtn key={t.id} label={`${t.label} (${t.key})`} active={tool === t.id} onClick={() => setTool(t.id)}>{t.icon}</IconBtn>
             ))}
             <span className="mx-0.5 h-6 w-px bg-outline-variant" />
-            {TOOLS.slice(2).map((t) => (
+            {/* Frame tool with instant device preset menu */}
+            <Dropdown up align="center" width={230} trigger={({ toggle }) => (
+              <IconBtn
+                label="Frame — draw or pick preset (F)"
+                active={tool === "frame"}
+                onClick={() => { if (tool === "frame") toggle(); else setTool("frame"); }}
+              >
+                <Icon name="tag" size={19} />
+              </IconBtn>
+            )}>
+              {(close) => {
+                const spawnFrame = (dev: Device, openInsert = false) => {
+                  const st = useStore.getState();
+                  const sz = DEVICE_SIZE[dev];
+                  const pos = st.slot(st.activePageId, sz.w, sz.h);
+                  const ab = st.addBlankFrame(pos.x, pos.y, sz.w, sz.h);
+                  st.updateArtboard(ab.id, { device: dev, name: `${sz.label} Frame` });
+                  st.setSel([ab.id]);
+                  st.setTool("select");
+                  if (openInsert) {
+                    useEditor.getState().begin(ab.id, ab.html, "insert");
+                    st.patchUI({ editId: ab.id, interactId: null });
+                    useEditor.getState().setInsertOpen(true);
+                  }
+                  setTimeout(() => canvasApi.fit([ab.id], openInsert ? { right: 310 } : undefined), 40);
+                  close();
+                };
+                return (
+                  <>
+                    <MenuLabel>Add blank frame</MenuLabel>
+                    <MenuItem icon={<Icon name="smartphone" size={15} />} label="Mobile Frame" desc="390×844 · with Insert library" onClick={() => spawnFrame("mobile", true)} />
+                    <MenuItem icon={<Icon name="tablet" size={15} />} label="Tablet Frame" desc="820×1100 · with Insert library" onClick={() => spawnFrame("tablet", true)} />
+                    <MenuItem icon={<Icon name="desktop_windows" size={15} />} label="Web Desktop Frame" desc="1280×800 · with Insert library" onClick={() => spawnFrame("web", true)} />
+                    <MenuItem icon={<Icon name="ads_click" size={15} />} label="Draw custom frame (F)" onClick={() => { setTool("frame"); close(); }} />
+                  </>
+                );
+              }}
+            </Dropdown>
+            <IconBtn
+              label="Insert UI Components (I)"
+              active={useEditor.getState().insertOpen}
+              onClick={() => {
+                const ed = useEditor.getState();
+                ed.setTab("insert");
+                ed.setInsertOpen(!ed.insertOpen);
+              }}
+            >
+              <Icon name="widgets" size={19} />
+            </IconBtn>
+            {TOOLS.slice(3).map((t) => (
               <IconBtn key={t.id} label={`${t.label} (${t.key})`} active={tool === t.id} onClick={() => setTool(t.id)}>{t.icon}</IconBtn>
             ))}
             <Dropdown up align="center" width={216} trigger={({ toggle }) => (
