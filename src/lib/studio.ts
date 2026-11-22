@@ -462,6 +462,41 @@ export const STUDIO_TOOLS: StudioTool[] = [
       return `Switched active design system to ${ds.name} (${ds.id}) and re-themed ${boards.length} screen${boards.length === 1 ? "" : "s"}.`;
     },
   },
+  {
+    name: "studio_batch_patch", icon: "auto_fix", desc: "Surgically patch a CSS selector (text, style, addClass, removeClass) across ALL screens on the current canvas page at once",
+    params: { selector: "CSS selector, e.g. .z-appbar h1 or .z-card", style: "optional inline CSS declarations", text: "optional textContent", addClass: "optional classes to add", removeClass: "optional classes to remove" },
+    run: (a) => {
+      const st = useStore.getState();
+      const boards = st.artboards.filter((b) => b.pageId === st.activePageId);
+      if (!boards.length) return "No screens on the active page.";
+      const sel = str(a.selector).trim();
+      if (!sel) return "Provide a CSS selector in `selector`.";
+      if (typeof DOMParser === "undefined") return "DOMParser unavailable";
+      const ds = activeDS(a);
+      let hitScreens = 0;
+      boards.forEach((b) => {
+        const doc = new DOMParser().parseFromString(b.html, "text/html");
+        let els: NodeListOf<Element>;
+        try { els = doc.querySelectorAll(sel); } catch { return; }
+        if (!els.length) return;
+        hitScreens++;
+        els.forEach((el) => {
+          if (a.text !== undefined) el.textContent = str(a.text);
+          if (a.style !== undefined) {
+            const prev = el.getAttribute("style") ?? "";
+            el.setAttribute("style", (prev ? prev.replace(/;?\s*$/, ";") : "") + str(a.style));
+          }
+          if (a.addClass) str(a.addClass).split(/\s+/).filter(Boolean).forEach((c) => el.classList.add(c));
+          if (a.removeClass) str(a.removeClass).split(/\s+/).filter(Boolean).forEach((c) => el.classList.remove(c));
+        });
+        const next = harden("<!doctype html>" + doc.documentElement.outerHTML, ds, { partial: true, device: b.device }).html;
+        st.reviseArtboard(b.id, next);
+      });
+      return hitScreens > 0
+        ? `Patched "${sel}" across ${hitScreens} screen${hitScreens === 1 ? "" : "s"} on the active page.`
+        : `No elements matched "${sel}" on the active page.`;
+    },
+  },
 ];
 
 const cleanStudioName = (name: string) => name.replace(/^(?:mcp:)?(?:mcp-zeus-studio:)?/, "");

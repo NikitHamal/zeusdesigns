@@ -242,8 +242,31 @@ const COLOR_SYNONYMS: [RegExp, string][] = [
   [/\b(mono|monochrome|black and white|grayscale|greyscale|graphite|charcoal|minimalist black)\b/i, "monochrome"],
 ];
 
+const FONT_OVERRIDES: [RegExp, string, string, string][] = [
+  [/\b(fraunces|editorial\s+serif|warm\s+serif)\b/i, "Editorial Fraunces + DM Sans", '"Fraunces",Georgia,serif', '"DM Sans",system-ui,sans-serif'],
+  [/\b(instrument\s+serif|condensed\s+serif|elegant\s+serif)\b/i, "Instrument Serif + Inter", '"Instrument Serif",Georgia,serif', '"Inter",system-ui,sans-serif'],
+  [/\b(space\s+grotesk|technical\s+sans|brutalist\s+font)\b/i, "Space Grotesk + Inter", '"Space Grotesk",system-ui,sans-serif', '"Inter",system-ui,sans-serif'],
+  [/\b(plus\s+jakarta|jakarta|friendly\s+sans)\b/i, "Plus Jakarta Sans", '"Plus Jakarta Sans",system-ui,sans-serif', '"Plus Jakarta Sans",system-ui,sans-serif'],
+  [/\b(jetbrains\s+mono|monospace\s+font|developer\s+mono)\b/i, "JetBrains Mono", '"JetBrains Mono",monospace', '"Inter",system-ui,sans-serif'],
+  [/\b(manrope)\b/i, "Manrope + Inter", '"Manrope",system-ui,sans-serif', '"Inter",system-ui,sans-serif'],
+  [/\b(dm\s+sans)\b/i, "DM Sans", '"DM Sans",system-ui,sans-serif', '"DM Sans",system-ui,sans-serif'],
+];
+
 export function detectThemeOverride(prompt: string, existingHtml = ""): ThemePaletteOverride | null {
   const t = prompt.toLowerCase();
+  for (const [re, label, heading, body] of FONT_OVERRIDES) {
+    if (re.test(t) && /\b(font|type|typography|heading|serif|sans|mono|use|switch|change|make)\b/i.test(t)) {
+      const vars: Record<string, string> = { "--heading": heading, "--font": body };
+      const cssVars = Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(";");
+      return {
+        name: `${label} Typography`,
+        mode: "preserve",
+        vars,
+        cssBlock: `<style data-zeus-fonts-override>:root,body,.z-shadow-body,.z-screen,.z-shell{${cssVars}}</style>`,
+      };
+    }
+  }
+
   const isThemeRequest =
     /\b(theme|color|colour|palette|recolor|re-color|tint|shade|mode|make it|change .* to|switch .* to|apply .* theme|in green|in teal|in red|in orange|in pink|in yellow|in dark|in light)\b/i.test(t) ||
     /^(green|emerald|teal|orange|terracotta|red|crimson|pink|yellow|gold|dark mode|light mode)\b/i.test(t.trim());

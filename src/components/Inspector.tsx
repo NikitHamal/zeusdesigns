@@ -4,7 +4,7 @@ import { editor, useEditor, type InspectorTab, type LayerNode } from "../lib/edi
 import { BLOCK_CATEGORIES, insertBlockIntoHtml, UI_BLOCKS, type BlockCategory } from "../lib/blocks";
 import { applyThemeOverrideToHtml, detectThemeOverride } from "../lib/context";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
-import { DESIGN_FONTS } from "../lib/fonts";
+import { DESIGN_FONTS, installDesignFonts } from "../lib/fonts";
 import { harden, rethemeHtml, stripKitBoilerplate, UI_ICON_NAMES } from "../lib/harness";
 import { canvasApi } from "../lib/canvasApi";
 import { DEVICE_SIZE, type Device, type Quote } from "../types";
@@ -565,6 +565,35 @@ export function Inspector() {
               </div>
             </Section>
 
+            <Section title="Typography Pairing">
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ["use fraunces font", "Fraunces + DM Sans", "Editorial", ["Fraunces", "DM Sans"]],
+                  ["use space grotesk font", "Space Grotesk + Inter", "Technical", ["Space Grotesk", "Inter"]],
+                  ["use plus jakarta font", "Plus Jakarta Sans", "Friendly", ["Plus Jakarta Sans"]],
+                  ["use jetbrains mono font", "JetBrains Mono + Inter", "Developer", ["JetBrains Mono", "Inter"]],
+                ] as const).map(([q, pair, tag, fams]) => (
+                  <button
+                    key={q}
+                    onClick={() => {
+                      installDesignFonts([...fams]);
+                      const st = useStore.getState();
+                      const pageBoards = st.artboards.filter((b) => b.pageId === st.activePageId);
+                      const ov = detectThemeOverride(q, pageBoards[0]?.html ?? "");
+                      if (ov && pageBoards.length) {
+                        pageBoards.forEach((b) => st.reviseArtboard(b.id, applyThemeOverrideToHtml(b.html, ov)));
+                        st.notify(`Applied ${pair} across ${pageBoards.length} screen${pageBoards.length > 1 ? "s" : ""}`);
+                      }
+                    }}
+                    className="state flex flex-col items-start rounded-xl bg-surface-low px-2.5 py-1.5 text-left hover:bg-surface-high"
+                  >
+                    <span className="w-full truncate text-[11px] font-semibold text-on-surface">{pair}</span>
+                    <span className="text-[10px] text-on-surface-variant">{tag}</span>
+                  </button>
+                ))}
+              </div>
+            </Section>
+
             <Section title="Design System (Live Re-theme)">
               <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
                 {DESIGN_SYSTEMS.map((d) => {
@@ -870,7 +899,12 @@ export function Inspector() {
               <Section title="Typography">
                 <select
                   value=""
-                  onChange={(e) => e.target.value && editor.style({ "font-family": e.target.value })}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const fam = e.target.value.split(",")[0].replace(/['"]/g, "").trim();
+                    installDesignFonts([fam]);
+                    editor.style({ "font-family": e.target.value });
+                  }}
                   className="mb-2 h-8 w-full rounded-xl bg-surface-high px-2.5 text-[12px] text-on-surface outline-none"
                 >
                   <option value="">Font family ({s.ff.split(",")[0].replace(/['"]/g, "")})</option>
