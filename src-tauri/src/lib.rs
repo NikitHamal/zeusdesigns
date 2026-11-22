@@ -15,6 +15,7 @@ pub mod workspace;
 
 use serde_json::json;
 use std::sync::Arc;
+use tauri::Manager;
 
 extern "C" {
     fn zeus_engine_version() -> *const std::os::raw::c_char;
@@ -43,6 +44,13 @@ fn app_info() -> serde_json::Value {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.maximize();
+                let _ = win.set_focus();
+            }
+            Ok(())
+        })
         .manage(Arc::new(providers::ProviderEngine::default()))
         .manage(workspace::WorkspaceState::default())
         .manage(memory::MemoryStore::default())

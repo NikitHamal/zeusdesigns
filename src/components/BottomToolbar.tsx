@@ -91,8 +91,7 @@ export function BottomToolbar({ children }: { children?: React.ReactNode }) {
           </>
         )}
         {ask ? (
-          <div className="flex w-[min(620px,calc(100vw-120px))] items-center gap-1.5 pl-3 anim-fade">
-            <Icon name="auto_awesome" size={18} className="shrink-0 text-primary" />
+          <div className="flex w-[min(620px,calc(100vw-120px))] items-center gap-1.5 pl-2.5 anim-fade">
             {target ? (
               <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary-container">
                 {target.name}
@@ -110,13 +109,13 @@ export function BottomToolbar({ children }: { children?: React.ReactNode }) {
               </button>
             )}
             <button onClick={submit} disabled={!text.trim() || busy} className="state morph grid size-10 shrink-0 place-items-center rounded-full bg-primary text-on-primary">
-              {busy ? <Icon name="progress_activity" size={17} className="animate-spin" /> : <Icon name="send" size={17} />}
+              <Icon name="arrow_upward" size={18} />
             </button>
             <IconBtn label="Close" size={40} onClick={() => setAsk(false)}><Icon name="close" size={18} /></IconBtn>
           </div>
         ) : (
           <button onClick={() => setAsk(true)} title="Ask Zeus (Ctrl+K)" className="state morph flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary">
-            <Icon name="auto_awesome" size={16} /> Ask Zeus
+            {busy ? <span className="zshine">Designing…</span> : "Ask Zeus"}
             {target && <span className="max-w-24 truncate rounded-full bg-on-primary/20 px-2 py-0.5 text-[11px]">{target.name}</span>}
           </button>
         )}

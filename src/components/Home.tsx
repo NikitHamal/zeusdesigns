@@ -27,8 +27,8 @@ export function Home() {
   return (
     <div className="flex h-full w-full flex-1 flex-col items-center overflow-y-auto px-6">
       <div className="mx-auto flex w-full max-w-[700px] flex-1 flex-col justify-center py-10">
-        <h1 className="greeting mb-8 flex items-center justify-center gap-3 text-[40px] leading-none text-on-surface">
-          <Icon name="auto_awesome" size={34} fill className="text-primary" />{greeting()}
+        <h1 className="greeting mb-8 flex items-center justify-center text-[40px] leading-none text-on-surface">
+          {greeting()}
         </h1>
         <div className="-mx-3"><Composer hero /></div>
         <div className="mt-3 flex flex-wrap justify-center gap-2">

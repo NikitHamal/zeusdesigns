@@ -3,9 +3,27 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop, native Win32 working-set low-memory governor (`<25 MB` target). Stable (verified green on Windows CI run 45008395866).
-- UI & Canvas: Shadow DOM zero-iframe artboard and thumbnail renderer (`src/lib/shadowRenderer.tsx`), viewport frustum culling, per-chat isolated canvases.
+- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor.
+- UI & Canvas: Shimmer-only activity & collapsible reasoning UI (no orb/sparkle icons), Material 3 Expressive connected Model + Reasoning Effort split selector, architectural blueprint wireframe + diagonal shimmer canvas designing animation, Shadow DOM zero-iframe renderer.
+- Harness: Token reset protection, model class promotion, dedicated `notes` domain brief, and deterministic screen completeness synthesizer (`ensureCompleteScreen`).
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
+
+## Session 8
+Goal: eliminate startup window freeze ("Not Responding") and improper initial window sizing, remove the orb and `auto_awesome` chat/greeting icons in favor of clean shimmer text, innovate a Material 3 Expressive Reasoning Effort selector, replace the canvas designing animation, and guarantee complete, anti-slop screens even from weak/truncated model outputs.
+
+Shipped:
+- Startup & Window Responsiveness (`src-tauri/src/main.rs`, `src-tauri/tauri.conf.json`, `src-tauri/src/lib.rs`, `src-tauri/src/mcp.rs`, `src-tauri/src/agent.rs`, `src-tauri/src/workspace.rs`, `src-tauri/src/memory.rs`, `src-tauri/src/perf.rs`, `src/App.tsx`, `src/lib/tools.ts`):
+  - Converted all synchronous Tauri IPC commands (`mcp_tools`, `mcp_call`, `mcp_list`, `mcp_add`, `mcp_remove`, `title_generate`, `workspace_*`, `fs_*`, `shell_run`, `memory_*`, `perf_*`) to `#[tauri::command(async)]` so no IPC call ever blocks the Win32 main UI message loop.
+  - Stopped spawning external stdio MCP servers (`npx`) at app startup (`App.tsx` and `tools.ts`); cached empty/error tool discovery results and lowered stdio discovery timeout from 90s to 12s.
+  - Removed `--in-process-gpu` and the 48 MB V8 heap choke from WebView2 browser args, delayed initial working-set trim until 12s post-launch, and configured the main window to open maximized (`1280x800` restored size) and focused.
+- Shimmer Activity, Collapsible Reasoning & Effort Selector (`src/components/Activity.tsx`, `src/components/Chat.tsx`, `src/components/Home.tsx`, `src/components/BottomToolbar.tsx`, `src-tauri/src/providers.rs`):
+  - Removed `ZeusOrb` rings/dots and `auto_awesome` sparkle icons from AI chat messages, greeting, and Ask Zeus bar; all live states use clean `.zshine` shimmer typography.
+  - Added native reasoning extraction in `providers.rs` (`mercury3` `reasoning-delta` events and `k2horizon` `<details type="reasoning">` blocks) and leaked-plan extraction in `engine.ts` (`extractLeakedPlan`).
+  - Built a Material 3 Expressive connected split control in the composer pairing the Model selector with a 4-bar tactile Reasoning Effort selector (1-tap horizontal segmented popover + right-click/Shift-click cycle + top-of-menu segmented bar).
+- Canvas Designing Animation & Anti-Slop Harness (`src/components/Canvas.tsx`, `src/index.css`, `src/lib/harness.ts`, `src/lib/studio.ts`, `src/lib/blueprints.ts`, `src/lib/engine.ts`):
+  - Replaced the scanner line and spinning conic ring with a design-system-aware `BlueprintWireframe` and diagonal `.zc-sheen` shimmer.
+  - Added token reset protection (preventing model `<style>` blocks from overriding `:root` tokens or forcing `#fff` backgrounds), automatic class promotion (`CLASS_PROMOTIONS`), edge-margin protection on unclassed body children, a dedicated `notes` domain brief, and `ensureCompleteScreen()` so truncated/sparse model outputs are deterministically completed with design-system components.
+  - Prevented `selfCheck` (`design_repair`) from accepting sparser or truncated repairs.
 
 ## Session 7
 Goal: fix generations that still look broken on the canvas (stray FAB at the world origin, unreadable captions, no anatomy for notes-style apps).
