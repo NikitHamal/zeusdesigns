@@ -45,8 +45,9 @@ export function MemoryTab() {
   const [open, setOpen] = useState<MemoryCategory | null>(null);
   const [add, setAdd] = useState("");
   const [ask, setAsk] = useState("");
+  const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
-  const inCat = (c: MemoryCategory) => mem.filter((m) => (m.category ?? "preferences") === c);
+  const inCat = (c: MemoryCategory) => mem.filter((m) => (m.category ?? "preferences") === c && (!q.trim() || m.text.toLowerCase().includes(q.trim().toLowerCase())));
   const meta = CATEGORIES.find((c) => c.id === open);
 
   const submit = async () => {
@@ -77,6 +78,12 @@ export function MemoryTab() {
               <div className="min-w-0 flex-1"><div className="text-sm font-medium text-on-surface">Learn from my messages</div></div>
               <Toggle on={learn && on} onChange={(v) => on && patch({ learnOn: v })} />
             </div>
+            {mem.length > 2 && (
+              <div className="relative">
+                <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search memory" className="h-10 w-full rounded-xl border border-outline-variant bg-transparent pl-9 pr-3 text-sm outline-none focus:border-primary" />
+              </div>
+            )}
             {CATEGORIES.map((c) => {
               const l = inCat(c.id);
               return (

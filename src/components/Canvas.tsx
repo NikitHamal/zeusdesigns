@@ -21,7 +21,7 @@ const DEV_ICON = { mobile: "smartphone", tablet: "tablet", web: "desktop_windows
 /* ------------------------------------------------------------------ */
 /* Artboard (Zero-iframe Shadow DOM by default; sandboxed iframe in edit mode) */
 /* ------------------------------------------------------------------ */
-const Frame = memo(function Frame({ id, w, h, html, interactive, editing }: { id: string; w: number; h: number; html: string; interactive: boolean; editing: boolean }) {
+const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled }: { id: string; w: number; h: number; html: string; interactive: boolean; editing: boolean; culled?: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState(html);
   const emitted = useRef<string | null>(null);
@@ -53,6 +53,10 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing }: { id
     return () => { window.removeEventListener("message", onMsg); editorBridge.attach(null); };
   }, [editing, id]);
 
+  if (culled && !editing && !interactive) {
+    return <div style={{ width: w, height: h }} className="bg-surface-container/40" />;
+  }
+
   if (!needsIframe) {
     return <ShadowFrame html={html} w={w} h={h} interactive={interactive} />;
   }
@@ -66,8 +70,8 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing }: { id
   );
 });
 
-function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart, onResizeStart }: {
-  a: Artboard; z: number; selected: boolean; interacting: boolean; editing: boolean; tool: string;
+function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMoveStart, onResizeStart }: {
+  a: Artboard; z: number; selected: boolean; interacting: boolean; editing: boolean; culled?: boolean; tool: string;
   onMoveStart: (e: React.PointerEvent, id: string) => void; onResizeStart: (e: React.PointerEvent, id: string) => void;
 }) {
   const { updateArtboard, duplicateArtboard, removeArtboards, patchUI, restoreVersion } = useStore.getState();
@@ -150,7 +154,7 @@ function ArtboardView({ a, z, selected, interacting, editing, tool, onMoveStart,
         className={cn("relative overflow-hidden bg-white   transition-shadow", selected ? "ring-[3px] ring-primary" : "ring-1 ring-black/10")}
         style={{ width: a.w, height: a.h, borderRadius: radius }}
       >
-        <Frame id={a.id} w={a.w} h={a.h} html={a.html} interactive={interacting} editing={editing} />
+        <Frame id={a.id} w={a.w} h={a.h} html={a.html} interactive={interacting} editing={editing} culled={culled} />
         {selectable && !interacting && !editing && (
           <div
             className="absolute inset-0 cursor-default"
@@ -516,9 +520,15 @@ export function InfiniteCanvas() {
       style={{ cursor, backgroundSize: `${28 * vp.z}px ${28 * vp.z}px`, backgroundPosition: `${vp.x}px ${vp.y}px` }}
     >
       <div className="absolute left-0 top-0 origin-top-left will-change-transform" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.z})` }}>
-        {boards.map((a) => (
-          <ArtboardView key={a.id} a={a} z={vp.z} tool={tool} selected={sel.includes(a.id)} interacting={interactId === a.id} editing={editId === a.id} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
-        ))}
+        {boards.map((a) => {
+          const sx = a.x * vp.z + vp.x, sy = a.y * vp.z + vp.y;
+          const sw = a.w * vp.z, sh = a.h * vp.z;
+          const vw = window.innerWidth, vh = window.innerHeight;
+          const culled = boards.length > 4 && (sx + sw < -500 || sy + sh < -500 || sx > vw + 500 || sy > vh + 500);
+          return (
+            <ArtboardView key={a.id} a={a} z={vp.z} tool={tool} selected={sel.includes(a.id)} interacting={interactId === a.id} editing={editId === a.id} culled={culled} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
+          );
+        })}
         {els.map((el) => (
           <ElementView key={el.id} el={el} z={vp.z} tool={tool} selected={sel.includes(el.id)} editing={editing === el.id} setEditing={setEditing} onMoveStart={onMoveStart} onResizeStart={onResizeStart} />
         ))}

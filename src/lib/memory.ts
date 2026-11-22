@@ -86,6 +86,7 @@ export async function editWithAI(instruction: string): Promise<string> {
 const LEARN: { cat: MemoryCategory; re: RegExp }[] = [
   { cat: "preferences", re: /^(?:please\s+)?(?:remember(?:\s+that|:)?\s+)?(?:i\s+(?:always|never|prefer|only|don'?t like|do not like|hate|dislike)\b|(?:always|never)\s+(?:use|make|give|keep|avoid|add|write|show)\b|i\s+like\s+(?:my|designs?|it\s+when|things)\b)/i },
   { cat: "profile", re: /^(?:remember(?:\s+that|:)?\s+)?(?:i\s*(?:am|'m)\s+(?:a|an|the)\s+\w+|i\s+work\s+(?:at|as|for|in)\b|my\s+(?:name|role|job|title|studio|team)\s+(?:is|are)\b)/i },
+  { cat: "topics", re: /^(?:remember(?:\s+that|:)?\s+)?(?:i\s+(?:study|follow|specialize\s+in|focus\s+on)\b|my\s+(?:favorite|preferred)\s+(?:style|aesthetic|domain|stack|design\s+system)\s+is\b)/i },
   { cat: "areas", re: /^(?:remember(?:\s+that|:)?\s+)?(?:(?:my|our)\s+(?:brand|app|product|project|startup|company|website|client|business)\s+(?:is|are|called|named)\b|(?:we|i)(?:'re|\s+are|'m|\s+am)\s+(?:building|making|designing|working\s+on|launching)\b)/i },
 ];
 
