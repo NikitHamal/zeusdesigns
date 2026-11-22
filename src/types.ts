@@ -56,6 +56,8 @@ export interface Message {
   quote?: Quote;
   attachments?: Attachment[];
   tools?: ToolCall[];
+  reasoning?: string;
+  thinkMs?: number;
   artboardIds?: string[];
   model?: string;
   streaming?: boolean;

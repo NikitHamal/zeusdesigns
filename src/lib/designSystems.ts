@@ -12,8 +12,10 @@ export interface DesignSystem {
   tags: string[]; tokens: DSTokens; guidelines: string;
 }
 
-const sans = `"Segoe UI Variable Text","Google Sans Flex","Roboto Flex",Inter,system-ui,sans-serif`;
-const apple = `-apple-system,"SF Pro Text","Segoe UI Variable Text",Inter,system-ui,sans-serif`;
+// Every family below is bundled with the app (src/lib/fonts.ts), so a design looks the same on any machine.
+const sans = `"Google Sans Flex",Inter,"Segoe UI Variable Text",system-ui,sans-serif`;
+const apple = `-apple-system,"SF Pro Text",Inter,"Segoe UI Variable Text",system-ui,sans-serif`;
+const serif = `Fraunces,"Iowan Old Style",Georgia,serif`;
 
 export const DESIGN_SYSTEMS: DesignSystem[] = [
   {
@@ -57,7 +59,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#0f6cbd", onPrimary: "#fff", container: "#deecf9", onContainer: "#0a3d6b", secondary: "#616161", tertiary: "#8764b8",
       bg: "#f5f5f5", surface: "#ffffff", surface2: "#fafafa", text: "#242424", muted: "#616161", outline: "#d1d1d1", error: "#c50f1f",
-      rSm: 2, rMd: 4, rLg: 8, rXl: 12, rBtn: 4, rCard: 8, font: `"Segoe UI Variable Text","Segoe UI",${sans}`, heading: `"Segoe UI Variable Display","Segoe UI",${sans}`, weight: 600, shadow: "none", border: 1,
+      rSm: 2, rMd: 4, rLg: 8, rXl: 12, rBtn: 4, rCard: 8, font: `"Segoe UI Variable Text","Segoe UI",Inter,${sans}`, heading: `"Segoe UI Variable Display","Segoe UI",${sans}`, weight: 600, shadow: "none", border: 1,
     },
     guidelines: `Fluent 2 (Microsoft). Brand blue #0F6CBD, neutral greys, 4px control radius, 8px cards, 12px dialogs. Mica/acrylic backgrounds, subtle 1px strokes (#d1d1d1), layered tonal surfaces and 1px strokes for depth. Segoe UI Variable, 14px body, 12px caption. Controls 32px high; NavigationView left pane, CommandBar, TabList, Persona avatars, Badges, Toast, Teaching tips. Focus ring: 2px dark + 1px white inner. Reveal hover effects, smooth decelerate easing (0.1,0.9,0.2,1).`,
   },
@@ -75,7 +77,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#0f62fe", onPrimary: "#fff", container: "#d0e2ff", onContainer: "#001d6c", secondary: "#525252", tertiary: "#8a3ffc",
       bg: "#f4f4f4", surface: "#ffffff", surface2: "#f4f4f4", text: "#161616", muted: "#525252", outline: "#8d8d8d", error: "#da1e28",
-      rSm: 0, rMd: 0, rLg: 0, rXl: 0, rBtn: 0, rCard: 0, font: `"IBM Plex Sans",${sans}`, heading: `"IBM Plex Sans",${sans}`, weight: 400, shadow: "none", border: 1,
+      rSm: 0, rMd: 0, rLg: 0, rXl: 0, rBtn: 0, rCard: 0, font: `"IBM Plex Sans","DM Sans",${sans}`, heading: `"IBM Plex Sans","DM Sans",${sans}`, weight: 400, shadow: "none", border: 1,
     },
     guidelines: `IBM Carbon. Square corners (0 radius), 2x grid (8px), IBM Plex Sans, productive type (14px/18px), Blue 60 #0F62FE primary, Gray 100 header (#161616), bottom-border inputs (40px high, #f4f4f4 fill, 1px bottom #8d8d8d), flush rectangular buttons 48px with arrow icon right, tiles, data tables with zebra and toolbar, structured lists, tag pills, 110ms productive easing (0.2,0,0.38,0.9).`,
   },
@@ -84,7 +86,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#1677ff", onPrimary: "#fff", container: "#e6f4ff", onContainer: "#0958d9", secondary: "#8c8c8c", tertiary: "#722ed1",
       bg: "#f5f5f5", surface: "#ffffff", surface2: "#fafafa", text: "#000000e0", muted: "#00000073", outline: "#d9d9d9", error: "#ff4d4f",
-      rSm: 4, rMd: 6, rLg: 8, rXl: 12, rBtn: 6, rCard: 8, font: sans, heading: sans, weight: 500, shadow: "none", border: 1,
+      rSm: 4, rMd: 6, rLg: 8, rXl: 12, rBtn: 6, rCard: 8, font: `Inter,${sans}`, heading: `Inter,${sans}`, weight: 500, shadow: "none", border: 1,
     },
     guidelines: `Ant Design 5. Daybreak blue #1677FF, 6px radius, 14px base, 32px controls, 1px #d9d9d9 borders, sider + header + content admin layouts, Table/Form/Descriptions/Statistic/Steps/Tag/Badge/Breadcrumb, 24-col grid, 8px spacing, natural motion (0.2s cubic-bezier(0.645,0.045,0.355,1)).`,
   },
@@ -102,7 +104,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#0c66e4", onPrimary: "#fff", container: "#e9f2ff", onContainer: "#09326c", secondary: "#626f86", tertiary: "#6e5dc6",
       bg: "#ffffff", surface: "#ffffff", surface2: "#f7f8f9", text: "#172b4d", muted: "#626f86", outline: "#dcdfe4", error: "#c9372c",
-      rSm: 3, rMd: 3, rLg: 8, rXl: 12, rBtn: 3, rCard: 8, font: `"Atlassian Sans",${sans}`, heading: `"Atlassian Sans",${sans}`, weight: 600, shadow: "none", border: 0,
+      rSm: 3, rMd: 3, rLg: 8, rXl: 12, rBtn: 3, rCard: 8, font: `"Atlassian Sans","DM Sans",${sans}`, heading: `"Atlassian Sans","DM Sans",${sans}`, weight: 600, shadow: "none", border: 0,
     },
     guidelines: `Atlassian Design System. Blue #0C66E4, 3px control radius, 8px cards, 14px body, 32/40px controls, lozenges for status (bold/subtle), avatars with presence, left nav with collapsible sections, issue-card layouts, inline edit fields, subtle elevation tokens.`,
   },
@@ -120,7 +122,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#e8a07a", onPrimary: "#2a1408", container: "#4a2f20", onContainer: "#ffe3d3", secondary: "#c9b8a8", tertiary: "#c8cf9a",
       bg: "#14110f", surface: "#ffffff14", surface2: "#ffffff1f", text: "#f6f2ee", muted: "#b9b0a8", outline: "#ffffff33", error: "#ff8a8a",
-      rSm: 12, rMd: 18, rLg: 24, rXl: 32, rBtn: 16, rCard: 24, font: sans, heading: sans, weight: 600, shadow: "none", dark: true, border: 1,
+      rSm: 12, rMd: 18, rLg: 24, rXl: 32, rBtn: 16, rCard: 24, font: `"Plus Jakarta Sans",${sans}`, heading: `"Plus Jakarta Sans",${sans}`, weight: 600, shadow: "none", dark: true, border: 1,
     },
     guidelines: `Glassmorphism on a flat dark neutral. Background: solid #121110 or #181716, no gradients. Panels: rgba(255,255,255,.1) with backdrop-filter: blur(24px) saturate(160%), 1px rgba(255,255,255,.2) border, 24px radius. White text, 60–70% opacity secondary. Solid accent buttons in warm clay or amber, hairline light borders. Keep contrast ≥4.5:1 — never put light text over light glass.`,
   },
@@ -129,7 +131,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#1a1a1a", onPrimary: "#fff", container: "#efe9df", onContainer: "#1a1a1a", secondary: "#6b6459", tertiary: "#b4532a",
       bg: "#faf7f2", surface: "#ffffff", surface2: "#f3eee6", text: "#1a1a1a", muted: "#6b6459", outline: "#ddd5c7", error: "#b42318",
-      rSm: 2, rMd: 4, rLg: 6, rXl: 10, rBtn: 999, rCard: 4, font: sans, heading: `"Iowan Old Style","Palatino Linotype",Georgia,serif`, weight: 500, shadow: "none", border: 1,
+      rSm: 2, rMd: 4, rLg: 6, rXl: 10, rBtn: 999, rCard: 4, font: `"DM Sans",${sans}`, heading: serif, weight: 500, shadow: "none", border: 1,
     },
     guidelines: `Editorial minimal. Warm paper #FAF7F2, ink #1A1A1A, one terracotta accent. Serif display (Georgia/Iowan) at large sizes with tight leading, sans body 15–16px at 1.6. Hairline rules, generous 80–120px section spacing, asymmetric grids, small caps eyebrows, pill outlined buttons, imagery full-bleed, no shadows, restrained motion (fade + 12px rise).`,
   },
@@ -138,7 +140,7 @@ export const DESIGN_SYSTEMS: DesignSystem[] = [
     tokens: {
       primary: "#c96442", onPrimary: "#fff", container: "#f4e3da", onContainer: "#5c2a17", secondary: "#6e6a60", tertiary: "#3d7a6a",
       bg: "#faf9f5", surface: "#ffffff", surface2: "#f0eee6", text: "#141413", muted: "#6e6a60", outline: "#e3dfd2", error: "#b53333",
-      rSm: 8, rMd: 12, rLg: 16, rXl: 24, rBtn: 12, rCard: 16, font: sans, heading: `"Iowan Old Style","Palatino Linotype",Georgia,serif`, weight: 500, shadow: "none", border: 1,
+      rSm: 8, rMd: 12, rLg: 16, rXl: 24, rBtn: 12, rCard: 16, font: `"DM Sans",${sans}`, heading: serif, weight: 500, shadow: "none", border: 1,
     },
     guidelines: `Warm conversational UI: cream #FAF9F5 canvas, coral/clay #C96442 accent, serif headings, rounded 12–16px surfaces with hairline #E3DFD2 borders, input composer as a large rounded card with controls row beneath, gentle shadows, text-first layouts.`,
   },

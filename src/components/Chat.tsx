@@ -9,6 +9,7 @@ import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
+import { LiveStatus, WorkLog, ZeusOrb } from "./Activity";
 
 /* ------------------------------------------------------------------ */
 /* Message bits                                                        */
@@ -32,33 +33,6 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
   );
 }
 
-const TOOL_LABEL: Record<string, string> = {
-  design_lint: "Cleaned up", design_audit: "Checked layout", design_repair: "Repairing layout", read_file: "Read file", write_file: "Wrote file",
-  list_dir: "Listed folder", studio_brief: "Read the brief", studio_palette: "Built a palette", studio_contrast: "Checked contrast", studio_fonts: "Picked fonts", studio_icons: "Searched icons", studio_components: "Read the component kit", studio_tokens: "Read design tokens", studio_systems: "Listed design systems", studio_screens: "Listed screens", studio_read_screen: "Read a screen", studio_lint: "Linted a screen", studio_svg_chart: "Built SVG chart", studio_blueprint: "Loaded blueprint", studio_export_react: "Exported React TSX", search_code: "Searched code", shell: "Ran command", web_fetch: "Fetched page", memory: "Saved to memory",
-};
-function toolTitle(name: string): { label: string; sub?: string } {
-  if (name.startsWith("mcp:")) { const [, server, ...tool] = name.split(":"); return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, "") }; }
-  return { label: TOOL_LABEL[name] ?? name.replace(/_/g, " ") };
-}
-
-function ToolChip({ t }: { t: NonNullable<Message["tools"]>[number] }) {
-  const [open, setOpen] = useState(false);
-  const { label, sub } = toolTitle(t.name);
-  const arg = (() => { try { const j = JSON.parse(t.args ?? ""); return j.path || j.body || ""; } catch { return t.args ?? ""; } })();
-  return (
-    <div className="rounded-xl border border-outline-variant/70">
-      <button onClick={() => setOpen(!open)} className="state flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px]">
-        {t.status === "running" ? <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" /> : t.status === "ok" ? <Icon name="check" size={15} className="shrink-0 text-on-surface-variant" /> : <Icon name="error" size={15} className="shrink-0 text-error" />}
-        <span className="font-medium text-on-surface">{label}</span>
-        {sub && <span className="text-on-surface-variant">{sub}</span>}
-        <span className="min-w-0 flex-1 truncate text-on-surface-variant">{String(arg).replace(/\s+/g, " ")}</span>
-        {t.output && <Icon name={open ? "expand_less" : "expand_more"} size={15} className="shrink-0 text-on-surface-variant" />}
-      </button>
-      {open && t.output && <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words px-3 pb-3 font-mono text-xs text-on-surface-variant select-text">{t.output}</pre>}
-    </div>
-  );
-}
-
 function ArtboardCards({ ids }: { ids: string[] }) {
   const boards = useStore((s) => s.artboards);
   const list = ids.map((id) => boards.find((b) => b.id === id)).filter(Boolean) as typeof boards;
@@ -71,7 +45,7 @@ function ArtboardCards({ ids }: { ids: string[] }) {
             <Thumb html={a.html} w={a.w} h={a.h} width={118} className={a.loading ? "opacity-60" : ""} />
           </div>
           <div className="mt-1.5 truncate px-1 text-xs font-semibold text-on-surface">{a.name}</div>
-          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? "Designing…" : `v${a.version}`}</div>
+          <div className="px-1 pb-0.5 text-[10.5px] text-on-surface-variant">{a.loading ? <span className="inline-flex items-center gap-1.5"><ZeusOrb size={10} />Designing</span> : `v${a.version}`}</div>
         </button>
       ))}
     </div>
@@ -111,13 +85,12 @@ function MessageView({ m }: { m: Message }) {
   }
   return (
     <div className="anim-pop group flex gap-3">
-      <Icon name="auto_awesome" size={20} fill className="mt-1 text-primary" />
+      <Icon name="auto_awesome" size={20} fill className="mt-0.5 text-primary" />
       <div className="min-w-0 flex-1 space-y-2.5">
-        {m.tools && m.tools.length > 0 && <div className="space-y-1.5">{m.tools.map((t) => <ToolChip key={t.id} t={t} />)}</div>}
-        {m.text ? <div className={cn(m.streaming && "caret")}><Markdown text={m.text} /></div> : m.streaming && (
-          <div className="flex items-center gap-2 py-1.5 text-sm text-on-surface-variant"><span className="flex gap-1">{[0, 1, 2].map((i) => <i key={i} className="size-2 animate-bounce rounded-full bg-primary" style={{ animationDelay: `${i * 120}ms` }} />)}</span> Thinking…</div>
-        )}
+        <WorkLog m={m} />
+        {m.text && <div className={cn(m.streaming && "caret")}><Markdown text={m.text} /></div>}
         {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
+        <LiveStatus m={m} />
         {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
         {!m.streaming && (
           <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">

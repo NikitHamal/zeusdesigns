@@ -7,6 +7,7 @@ export const isNative = typeof window !== "undefined" && "__TAURI_INTERNALS__" i
 
 export type ChatEvent =
   | { type: "delta"; text: string }
+  | { type: "reasoning"; text: string }
   | { type: "tool_call"; id: string; name: string; args?: unknown }
   | { type: "tool_result"; id: string; ok: boolean; output: string }
   | { type: "done"; usage?: { inputTokens?: number; outputTokens?: number; tokensPerSecond?: number } }

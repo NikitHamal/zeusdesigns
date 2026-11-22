@@ -7,6 +7,7 @@ import { MATERIAL_ICONS } from "./materialIcons";
 import { DesignSystem, tokensCss } from "./designSystems";
 import type { Device } from "../types";
 import { blueprintFor } from "./blueprints";
+import { fontFaceCss, fontsUsedIn } from "./fonts";
 
 /* icons: home, search, settings, person, notifications, favorite, star, bookmark, share, mail, chat, call, calendar_today, schedule,
    location_on, shopping_cart, shopping_bag, payments, credit_card, wallet, bar_chart, trending_up, trending_down, pie_chart, insights,
@@ -25,7 +26,9 @@ const QUIET = `<style data-zeus-quiet>*{scrollbar-width:none!important;-ms-overf
 /** Hides every scroll indicator inside a rendered design (scrolling still works). Applied at every iframe. */
 export function quiet(html: string): string {
   if (!html || html.includes("data-zeus-quiet")) return html;
-  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + QUIET) : QUIET + html;
+  const used = fontsUsedIn(html);
+  const tag = QUIET + (used.length ? `<style data-zeus-fonts>${fontFaceCss(used)}</style>` : "");
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (h) => h + tag) : tag + html;
 }
 
 export const UI_ICON_NAMES = Object.keys(MATERIAL_ICONS).sort();

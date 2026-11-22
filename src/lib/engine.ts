@@ -258,6 +258,9 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const lastPush = new Map<number, { t: number; len: number }>();
   const tools: ToolCall[] = [];
   const linted = new Set<number>();
+  let extraThink = "";
+  let thinkT0 = 0;
+  let thinkEnd = 0;
 
   const sync = (final = false) => {
     const { text, blocks } = parseStream(extractRemember(full).clean);
@@ -302,7 +305,13 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     });
     const ms = performance.now() - t0;
+    const thoughts = [...full.matchAll(/<think>([\s\S]*?)(<\/think>|$)/g)];
+    const reasoning = [extraThink.trim(), ...thoughts.map((m) => m[1].trim())].filter(Boolean).join("\n\n");
+    if (reasoning && !thinkT0) thinkT0 = performance.now();
+    const thinkOpen = thoughts.length > 0 && thoughts[thoughts.length - 1][2] === "";
+    if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
     S.patchMessage(convId, asstId, {
+      reasoning: reasoning || undefined, thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
       text, artboardIds: [...new Set([...idMap.values()])], tools: [...tools],
       stats: final ? { ms, tokens: Math.round(full.length / 4), tps: Math.round(full.length / 4 / (ms / 1000)) } : undefined,
     });
@@ -404,6 +413,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               if (ci >= 0) roundText = roundText.slice(0, ci + 12);
               if (piece) onDelta(piece);
             }
+            else if (e.type === "reasoning") { extraThink += e.text; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }
             else if (e.type === "tool_call") { const t: ToolCall = { id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" }; tools.push(t); roundTools.push(t);
               if (isStudioTool(e.name)) studioRuns.set(e.id, runStudioTool(e.name, t.args).then((r) => { t.status = r.ok ? "ok" : "error"; t.output = r.output; sync(); }));
               sync(); }

@@ -11,6 +11,7 @@ import { ExportMenu } from "./ExportMenu";
 import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
+import { ZeusOrb } from "./Activity";
 import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
 import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
 
@@ -69,6 +70,57 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
     />
   );
 });
+
+
+/* ------------------------------------------------------------------ */
+/* Zeus designing: wireframe skeleton, scan sweep, travelling ring       */
+/* ------------------------------------------------------------------ */
+function Skeleton({ w, h, device }: { w: number; h: number; device: Device }) {
+  const bars: { x: number; y: number; w: number; h: number; r: number; d: number }[] = [];
+  const add = (x: number, y: number, bw: number, bh: number, r = 12) => bars.push({ x, y, w: bw, h: bh, r, d: bars.length * 90 });
+  if (device === "web") {
+    const m = w * 0.06;
+    add(m, 28, 110, 22, 8); add(w - m - 280, 28, 280, 22, 8);
+    add(m, h * 0.2, w * 0.46, 54, 14); add(m, h * 0.2 + 74, w * 0.38, 54, 14); add(m, h * 0.2 + 150, w * 0.3, 18, 8); add(m, h * 0.2 + 190, 150, 46, 23);
+    add(w * 0.56, h * 0.18, w * 0.38, h * 0.42, 24);
+    const cw = (w - m * 2 - 32) / 3; for (let i = 0; i < 3; i++) add(m + i * (cw + 16), h * 0.7, cw, h * 0.2, 20);
+  } else {
+    const m = 20, cw = w - m * 2;
+    add(m, 52, cw * 0.4, 26, 10); add(w - m - 40, 48, 40, 40, 20);
+    add(m, 112, cw, h * 0.2, 28);
+    for (let i = 0; i < 4; i++) { const y = 112 + h * 0.2 + 26 + i * 76; if (y + 60 > h - 90) break; add(m, y, 52, 52, 16); add(m + 68, y + 8, cw * 0.5, 16, 8); add(m + 68, y + 32, cw * 0.32, 12, 6); }
+    for (let i = 0; i < 4; i++) add(m + (cw / 4) * i + cw / 8 - 18, h - 62, 36, 36, 18);
+  }
+  return <>{bars.map((b, i) => <i key={i} style={{ left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: b.r, animationDelay: `${b.d}ms` }} />)}</>;
+}
+
+function DesigningFx({ a, radius }: { a: Artboard; radius: number }) {
+  const loading = !!a.loading;
+  const prev = useRef(loading);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (prev.current && !loading) { setDone(true); const t = setTimeout(() => setDone(false), 1000); prev.current = loading; return () => clearTimeout(t); }
+    prev.current = loading;
+  }, [loading]);
+  const empty = a.html.length < 500;
+  const d = Math.ceil(Math.hypot(a.w, a.h) * 1.1);
+  if (!loading && !done) return null;
+  return (
+    <>
+      {loading && <div className="zc-skel" style={{ opacity: empty ? 1 : 0 }}><Skeleton w={a.w} h={a.h} device={a.device} /></div>}
+      {loading && <div className="zc-scan"><i /></div>}
+      {done && <div className="zc-scan once"><i /></div>}
+      <div className={cn("zc-ring", done && "done")} style={{ ["--d" as string]: `${d}px`, borderRadius: radius }} />
+      {loading && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[4] grid place-items-center">
+          <div className="zc-pill flex items-center gap-2.5 rounded-full bg-inverse-surface py-2 pl-3 pr-4 text-[13px] font-medium text-inverse-on-surface" style={{ transform: `scale(${Math.min(2.4, Math.max(1, a.w / 520))})`, transformOrigin: "center bottom" }}>
+            <ZeusOrb size={16} /> Designing
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMoveStart, onResizeStart }: {
   a: Artboard; z: number; selected: boolean; interacting: boolean; editing: boolean; culled?: boolean; tool: string;
@@ -162,14 +214,7 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
             onDoubleClick={() => patchUI({ interactId: a.id })}
           />
         )}
-        {a.loading && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="shimmer absolute inset-0" />
-            <div className="relative flex items-center gap-2 rounded-full bg-inverse-surface px-4 py-2 text-sm font-medium text-inverse-on-surface ">
-              <span className="inline-block size-2.5 animate-ping rounded-full bg-primary" /> Zeus is designing…
-            </div>
-          </div>
-        )}
+        <DesigningFx a={a} radius={radius} />
       </div>
       {selected && selectable && (
         <div

@@ -1,5 +1,6 @@
 import { Dropdown, IconBtn, MenuItem, MenuLabel } from "./ui";
 import { useStore } from "../store";
+import { embedFonts } from "../lib/fonts";
 import { download, htmlToPng, writeWorkspaceFile, refreshTree } from "../lib/bridge";
 import { sendMessage } from "../lib/engine";
 import { runStudioTool } from "../lib/studio";
@@ -23,10 +24,10 @@ export function ExportMenu({ a, size = 32 }: { a: Artboard; size?: number }) {
       {(close) => (
         <>
           <MenuLabel>Export design</MenuLabel>
-          <MenuItem icon={<Icon name="download" size={16} />} label="Download HTML" desc={`${slug(a.name)}.html`} onClick={() => { download(`${slug(a.name)}.html`, a.html, "text/html"); close(); }} />
+          <MenuItem icon={<Icon name="download" size={16} />} label="Download HTML" desc={`${slug(a.name)}.html`} onClick={() => { download(`${slug(a.name)}.html`, embedFonts(a.html), "text/html"); close(); }} />
           <MenuItem icon={<Icon name="image" size={16} />} label="Download PNG" desc="2× raster snapshot" onClick={async () => {
             close();
-            try { download(`${slug(a.name)}.png`, await htmlToPng(a.html, a.w, a.h)); } catch { notify("PNG export failed for this design"); }
+            try { download(`${slug(a.name)}.png`, await htmlToPng(embedFonts(a.html), a.w, a.h)); } catch { notify("PNG export failed for this design"); }
           }} />
           <MenuItem icon={<Icon name="content_copy" size={16} />} label="Copy HTML" onClick={() => { navigator.clipboard.writeText(a.html); notify("HTML copied"); close(); }} />
           <MenuItem icon={<Icon name="terminal" size={16} />} label="Copy React TSX" onClick={async () => { const r = await runStudioTool("studio_export_react", a.id); navigator.clipboard.writeText(r.output); notify("React TSX copied"); close(); }} />
@@ -41,7 +42,7 @@ export function ExportMenu({ a, size = 32 }: { a: Artboard; size?: number }) {
               if (!ws) { notify("Open a project folder first (top bar)"); return; }
               try {
                 const path = `zeus-designs/${slug(a.name)}.html`;
-                await writeWorkspaceFile(ws, path, a.html);
+                await writeWorkspaceFile(ws, path, embedFonts(a.html));
                 useStore.getState().updateArtboard(a.id, { source: path });
                 useStore.getState().patchUI({ workspace: { ...ws, tree: await refreshTree(ws) } });
                 notify(`Saved to ${path}`);
