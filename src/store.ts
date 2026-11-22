@@ -109,9 +109,10 @@ interface State {
   setBusy: (b: boolean) => void;
 }
 
-const firstPage: Page = { id: "p1", name: "Page 1" };
 const firstConv = (): Conversation => ({ id: uid(), title: "New design chat", messages: [], at: Date.now() });
 const conv0 = firstConv();
+const firstPage: Page = { id: "p1", name: "Page 1", convId: conv0.id };
+conv0.activePageId = firstPage.id;
 
 // Debounced localStorage so drags / pans don't serialize the whole project every frame.
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -163,20 +164,37 @@ export const useStore = create<State>()(
       setViewport: (pageId, v) => set((s) => ({ viewport: { ...s.viewport, [pageId]: v } })),
 
       addPage: () => set((s) => {
-        const p = { id: uid(), name: `Page ${s.pages.length + 1}` };
-        return { pages: [...s.pages, p], activePageId: p.id, sel: [] };
+        const mine = s.pages.filter((p) => !p.convId || p.convId === s.activeConvId);
+        const p: Page = { id: uid(), name: `Page ${mine.length + 1}`, convId: s.activeConvId };
+        return {
+          pages: [...s.pages, p],
+          activePageId: p.id,
+          conversations: s.conversations.map((c) => (c.id === s.activeConvId ? { ...c, activePageId: p.id } : c)),
+          sel: [],
+        };
       }),
       renamePage: (id, name) => set((s) => ({ pages: s.pages.map((p) => (p.id === id ? { ...p, name } : p)) })),
       deletePage: (id) => set((s) => {
-        if (s.pages.length <= 1) return s;
+        const mine = s.pages.filter((p) => !p.convId || p.convId === s.activeConvId);
+        if (mine.length <= 1) return s;
         const pages = s.pages.filter((p) => p.id !== id);
+        const nextMine = pages.filter((p) => !p.convId || p.convId === s.activeConvId);
+        const nextPageId = s.activePageId === id ? (nextMine[0]?.id ?? pages[0].id) : s.activePageId;
         return {
-          pages, activePageId: s.activePageId === id ? pages[0].id : s.activePageId,
-          artboards: s.artboards.filter((a) => a.pageId !== id), elements: s.elements.filter((e) => e.pageId !== id),
-          pins: s.pins.filter((p) => p.pageId !== id), sel: [],
+          pages,
+          activePageId: nextPageId,
+          conversations: s.conversations.map((c) => (c.id === s.activeConvId ? { ...c, activePageId: nextPageId } : c)),
+          artboards: s.artboards.filter((a) => a.pageId !== id),
+          elements: s.elements.filter((e) => e.pageId !== id),
+          pins: s.pins.filter((p) => p.pageId !== id),
+          sel: [],
         };
       }),
-      setActivePage: (id) => set({ activePageId: id, sel: [] }),
+      setActivePage: (id) => set((s) => ({
+        activePageId: id,
+        conversations: s.conversations.map((c) => (c.id === s.activeConvId ? { ...c, activePageId: id } : c)),
+        sel: [],
+      })),
 
       slot: (pageId, w, h) => {
         const list = get().artboards.filter((a) => a.pageId === pageId);
@@ -256,14 +274,76 @@ export const useStore = create<State>()(
 
       newConversation: () => {
         const c = firstConv();
-        set((s) => ({ conversations: [c, ...s.conversations], activeConvId: c.id }));
+        const p: Page = { id: uid(), name: "Page 1", convId: c.id };
+        c.activePageId = p.id;
+        set((s) => ({
+          conversations: [c, ...s.conversations],
+          pages: [...s.pages, p],
+          activeConvId: c.id,
+          activePageId: p.id,
+          sel: [],
+          ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+        }));
         return c.id;
       },
-      setActiveConv: (id) => set({ activeConvId: id }),
+      setActiveConv: (id) => set((s) => {
+        const targetConv = s.conversations.find((c) => c.id === id);
+        let mine = s.pages.filter((p) => p.convId === id);
+        if (!mine.length) {
+          const legacy = s.pages.filter((p) => !p.convId);
+          if (legacy.length) {
+            mine = legacy;
+          } else {
+            const np: Page = { id: uid(), name: "Page 1", convId: id };
+            return {
+              activeConvId: id,
+              pages: [...s.pages, np],
+              activePageId: np.id,
+              conversations: s.conversations.map((c) => (c.id === id ? { ...c, activePageId: np.id } : c)),
+              sel: [],
+              ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+            };
+          }
+        }
+        const nextPage = (targetConv?.activePageId && mine.some((p) => p.id === targetConv.activePageId))
+          ? targetConv.activePageId
+          : mine[0].id;
+        return {
+          activeConvId: id,
+          activePageId: nextPage,
+          sel: [],
+          ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+        };
+      }),
       deleteConv: (id) => set((s) => {
+        const deadPageIds = new Set(s.pages.filter((p) => p.convId === id).map((p) => p.id));
+        let pages = s.pages.filter((p) => p.convId !== id);
         let conversations = s.conversations.filter((c) => c.id !== id);
-        if (!conversations.length) conversations = [firstConv()];
-        return { conversations, activeConvId: s.activeConvId === id ? conversations[0].id : s.activeConvId };
+        if (!conversations.length) {
+          const nc = firstConv();
+          const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
+          nc.activePageId = np.id;
+          conversations = [nc];
+          pages = [...pages, np];
+        }
+        const nextConv = s.activeConvId === id ? conversations[0] : (conversations.find((c) => c.id === s.activeConvId) ?? conversations[0]);
+        let nextPages = pages.filter((p) => p.convId === nextConv.id || !p.convId);
+        if (!nextPages.length) {
+          const np: Page = { id: uid(), name: "Page 1", convId: nextConv.id };
+          pages = [...pages, np];
+          nextPages = [np];
+        }
+        const nextPageId = nextConv.activePageId && nextPages.some((p) => p.id === nextConv.activePageId) ? nextConv.activePageId : nextPages[0].id;
+        return {
+          conversations,
+          pages,
+          activeConvId: nextConv.id,
+          activePageId: nextPageId,
+          artboards: s.artboards.filter((a) => !deadPageIds.has(a.pageId)),
+          elements: s.elements.filter((e) => !deadPageIds.has(e.pageId)),
+          pins: s.pins.filter((p) => !deadPageIds.has(p.pageId)),
+          sel: [],
+        };
       }),
       setTitle: (id, t) => set((s) => ({ conversations: s.conversations.map((c) => (c.id === id ? { ...c, title: t, titled: true } : c)) })),
       addMessage: (convId, m) => set((s) => ({ conversations: s.conversations.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, m] } : c)) })),

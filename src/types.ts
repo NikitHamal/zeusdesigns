@@ -4,7 +4,7 @@ export type ShapeKind = "rect" | "ellipse" | "triangle" | "line" | "arrow" | "st
 export type ViewMode = "canvas" | "grid" | "single";
 export type Effort = "low" | "medium" | "high" | "max";
 
-export interface Page { id: string; name: string }
+export interface Page { id: string; name: string; convId?: string }
 
 export interface Artboard {
   id: string;
@@ -64,7 +64,7 @@ export interface Message {
   at: number;
 }
 
-export interface Conversation { id: string; title: string; messages: Message[]; at: number; titled?: boolean }
+export interface Conversation { id: string; title: string; messages: Message[]; at: number; titled?: boolean; activePageId?: string }
 
 export interface CustomProvider { id: string; name: string; format: "openai" | "anthropic"; baseUrl: string; apiKey: string; model: string }
 export interface McpServer { id: string; name: string; transport: "stdio" | "http" | "builtin"; command: string; args?: string[]; enabled: boolean; catalogId?: string }

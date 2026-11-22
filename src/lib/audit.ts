@@ -119,7 +119,21 @@ export async function auditHtml(html: string, w: number, h: number): Promise<Aud
 
 /** Deterministic fixes that are always safe. Returns html with a patch style, or the input if nothing applies. */
 export function patchFor(html: string, issues: AuditIssue[]): string {
-  if (!issues.some((i) => i.kind === "overflow")) return html;
-  const tag = `<style data-zeus-fix>html,body{overflow-x:hidden}img,svg,video{max-width:100%}</style>`;
-  return html.includes("data-zeus-fix") ? html : html.replace(/<\/head>/i, tag + "</head>");
+  if (!issues.length || html.includes("data-zeus-fix")) return html;
+  const rules: string[] = [];
+  if (issues.some((i) => i.kind === "overflow")) {
+    rules.push("html,body{overflow-x:hidden!important;max-width:100%!important}img,svg,video,table{max-width:100%!important}.z-row,.z-grid,.z-grid-2,.z-grid-3,.z-grid-4{min-width:0}");
+  }
+  if (issues.some((i) => i.kind === "clipped")) {
+    rules.push(".z-card,.z-item,.z-row>*{min-width:0;overflow-wrap:break-word}h1,h2,h3,p,span{overflow-wrap:break-word}");
+  }
+  if (issues.some((i) => i.kind === "tap")) {
+    rules.push("button,.z-btn,.z-icon-btn,.z-chip{min-height:38px}");
+  }
+  if (issues.some((i) => i.kind === "sparse")) {
+    rules.push(".z-page{justify-content:space-between}");
+  }
+  if (!rules.length) return html;
+  const tag = `<style data-zeus-fix>${rules.join("")}</style>`;
+  return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, tag + "</head>") : tag + html;
 }

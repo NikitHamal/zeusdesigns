@@ -114,10 +114,19 @@ body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-r
 .z-tabs{display:flex;gap:4px;border-bottom:1px solid var(--outline)}
 .z-tab{padding:12px 16px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
 .z-tab.on{color:var(--primary);border-bottom-color:var(--primary)}
+.z-segs{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:var(--r-btn);background:var(--surface-2);border:var(--bw) solid var(--outline)}
+.z-seg{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border-radius:var(--r-btn);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:background-color .15s,color .15s}
+.z-seg.on{background:var(--surface);color:var(--text);border:var(--bw) solid var(--outline)}
+.z-banner{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-md);background:var(--container);color:var(--on-container);font-size:14px;font-weight:500}
+.z-kpi{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.z-kpi .delta{font-size:12px;font-weight:600;padding:2px 8px;border-radius:var(--r-btn);background:var(--container);color:var(--on-container)}
+.z-kv{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--outline);font-size:14px}.z-kv:last-child{border-bottom:0}
+.z-steps{display:flex;align-items:center;gap:8px}.z-step{flex:1;height:6px;border-radius:99px;background:var(--surface-2)}.z-step.on{background:var(--primary)}
+.z-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.z-day{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:58px;border-radius:var(--r-md);background:var(--surface);border:var(--bw) solid var(--outline);font-size:12px;font-weight:600;cursor:pointer}.z-day.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
 .z-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}.z-bar>i{display:block;height:100%;background:var(--primary);border-radius:99px}
 .z-stat{display:flex;flex-direction:column;gap:4px}.z-stat .v{font-family:var(--heading);font-size:32px;font-weight:var(--weight);letter-spacing:-.02em;line-height:1.1}
-.z-table{width:100%;border-collapse:collapse;font-size:14px}.z-table th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--outline)}
-.z-table td{padding:13px 14px;border-bottom:1px solid var(--outline)}.z-table tr:last-child td{border-bottom:0}
+.z-table,table{width:100%;border-collapse:collapse;font-size:14px}.z-table th,table th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--outline)}
+.z-table td,table td{padding:13px 14px;border-bottom:1px solid var(--outline)}.z-table tr:last-child td,table tr:last-child td{border-bottom:0}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([class]),select:not([class]),textarea:not([class]){height:44px;padding:0 14px;border-radius:var(--r-md);border:max(var(--bw),1px) solid var(--outline);background:var(--surface);outline:0}
 .z-img{background:var(--container);border-radius:var(--r-md);min-height:120px;width:100%}
 .z-nav{position:sticky;bottom:0;display:flex;justify-content:space-around;padding:10px 8px 22px;background:var(--surface);border-top:1px solid var(--outline);margin-top:auto}
 .z-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
@@ -173,10 +182,57 @@ export function kitExample(device: Device): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* Icon resolution                                                     */
+/* Icon resolution + 130+ synonym aliases for weak models              */
 /* ------------------------------------------------------------------ */
+const ICON_ALIASES: Record<string, string> = {
+  user: "person", users: "group", people: "groups", account: "person", account_circle: "person", profile: "person", avatar: "person",
+  bell: "notifications", notification: "notifications", alert: "notifications", alarm: "schedule",
+  heart: "favorite", like: "favorite", love: "favorite", favourite: "favorite", heart_fill: "favorite",
+  cart: "shopping_cart", bag: "shopping_bag", basket: "shopping_bag", shop: "storefront", store: "storefront",
+  gear: "settings", cog: "settings", preferences: "tune", sliders: "tune", options: "tune", config: "settings",
+  trash: "delete", trash_2: "delete", bin: "delete", remove_circle: "remove", erase: "delete",
+  plus: "add", add_circle: "add", new: "add", minus: "remove",
+  clock: "schedule", time: "schedule", watch: "timer", stopwatch: "timer",
+  calendar: "calendar_today", date: "calendar_today", events: "event",
+  envelope: "mail", email: "mail", inbox: "mail", message: "chat", messages: "chat", comment_dots: "comment",
+  phone: "call", telephone: "call", mobile: "smartphone", iphone: "phone_iphone", desktop: "desktop_windows", monitor: "desktop_windows", computer: "laptop",
+  dollar: "payments", attach_money: "payments", money: "payments", currency_dollar: "payments", cash: "payments", card: "credit_card", bank: "account_balance", piggy_bank: "savings",
+  chart: "bar_chart", graph: "trending_up", chart_bar: "bar_chart", chart_line: "trending_up", line_chart: "trending_up", chart_pie: "pie_chart", activity: "insights", stats: "analytics",
+  sparkles: "auto_awesome", ai: "auto_awesome", magic: "auto_awesome", wand: "auto_awesome", lightning: "bolt", zap: "bolt", flash: "bolt",
+  fire: "local_fire_department", flame: "local_fire_department", burn: "local_fire_department",calories: "local_fire_department",
+  run: "directions_run", running: "directions_run", walk: "directions_run", workout: "fitness_center", dumbbell: "fitness_center", gym: "fitness_center",
+  sun: "light_mode", moon: "dark_mode", eye: "visibility", eye_off: "visibility_off",
+  arrow_right: "arrow_forward", arrow_left: "arrow_back", arrow_up: "arrow_upward", arrow_down: "arrow_downward",
+  caret_right: "chevron_right", caret_left: "chevron_left", caret_down: "expand_more", caret_up: "expand_less", chevron_down: "expand_more", chevron_up: "expand_less",
+  check_mark: "check", checkmark: "check", tick: "check", done: "check", done_all: "check_circle", verified_user: "verified", shield_check: "verified",
+  x: "close", cancel: "close", cross: "close", clear: "close",
+  globe: "public", world: "public", earth: "public", web_asset: "web", browser: "language",
+  pin: "push_pin", map_pin: "location_on", location: "location_on", place: "location_on", navigation: "explore", compass: "explore",
+  play: "play_arrow", play_circle: "play_arrow", pause_circle: "pause", next: "skip_next", prev: "skip_previous", previous: "skip_previous", audio: "volume_up", speaker: "volume_up",
+  camera: "photo_camera", photo: "image", picture: "image", gallery: "image", video: "videocam", film: "movie",
+  file: "description", doc: "description", document: "description", page: "article", news: "newspaper", copy: "content_copy", clipboard: "content_copy",
+  code: "terminal", console: "terminal", cli: "terminal", server: "database", db: "database", storage: "database",
+  lock_closed: "lock", key_round: "key", security: "shield", sign_out: "logout", log_out: "logout", sign_in: "login", log_in: "login",
+  external_link: "open_in_new", launch: "open_in_new", link_2: "link", paperclip: "attach_file",
+  coffee: "local_cafe", food: "restaurant", utensils: "restaurant", plane: "flight", bed: "hotel", briefcase: "work", book: "menu_book", graduation_cap: "school",
+  truck: "local_shipping", package: "inventory_2", box: "inventory_2", tag: "sell", discount: "percent",
+  dots_vertical: "more_vert", dots_horizontal: "more_horiz", ellipsis: "more_horiz", bars: "menu", hamburger: "menu",
+  filter: "filter_list", funnel: "filter_list", reload: "refresh", rotate: "refresh",
+};
+
+export function resolveIconName(raw: string): string {
+  const clean = raw.trim().toLowerCase().replace(/[-\s]+/g, "_").replace(/^(?:lucide|fa|bi|ri|hi|md|icon)_/, "");
+  if (MATERIAL_ICONS[clean]) return clean;
+  if (ICON_ALIASES[clean] && MATERIAL_ICONS[ICON_ALIASES[clean]]) return ICON_ALIASES[clean];
+  const stripped = clean.replace(/_(?:outline|outlined|rounded|sharp|fill|filled|solid|line)$/, "");
+  if (MATERIAL_ICONS[stripped]) return stripped;
+  if (ICON_ALIASES[stripped] && MATERIAL_ICONS[ICON_ALIASES[stripped]]) return ICON_ALIASES[stripped];
+  return clean;
+}
+
 const svgFor = (name: string, fill: boolean, cls = "", style = ""): string => {
-  const e = MATERIAL_ICONS[name] ?? MATERIAL_ICONS.circle;
+  const resolved = resolveIconName(name);
+  const e = MATERIAL_ICONS[resolved] ?? MATERIAL_ICONS.circle;
   const d = fill && e[1] ? e[1] : e[0];
   return `<svg class="z-i${cls ? " " + cls : ""}" viewBox="0 -960 960 960" aria-hidden="true"${style ? ` style="${style}"` : ""}><path d="${d}"/></svg>`;
 };
@@ -186,15 +242,16 @@ const attr = (tag: string, n: string) => new RegExp(`\\b${n}\\s*=\\s*"([^"]*)"`,
 export function resolveIcons(html: string, fixes: string[]): string {
   let n = 0;
   const unknown = new Set<string>();
-  const sub = (name: string, tag: string) => {
+  const sub = (rawName: string, tag: string) => {
     n++;
-    if (!MATERIAL_ICONS[name]) unknown.add(name);
-    return svgFor(name, /data-fill|\bfill\b|FILL/.test(tag), attr(tag, "class").replace(/\b(material-symbols[\w-]*|material-icons[\w-]*|ms|icon|z-i)\b/g, "").trim(), attr(tag, "style"));
+    const name = resolveIconName(rawName);
+    if (!MATERIAL_ICONS[name]) unknown.add(rawName);
+    return svgFor(name, /data-fill|\bfill\b|FILL/.test(tag), attr(tag, "class").replace(/\b(material-symbols[\w-]*|material-icons[\w-]*|lucide[\w-]*|fa[\w-]*|ms|icon|z-i)\b/g, "").trim(), attr(tag, "style"));
   };
-  // <i data-i="home"></i>  (also self-closed)
-  html = html.replace(/<i\b([^>]*?)\bdata-i\s*=\s*"([a-z0-9_]+)"([^>]*?)(?:\/>|>\s*<\/i>)/gi, (_m, a, name, b) => sub(name, a + " " + b));
+  // <i data-i="home"></i> or <i data-lucide="home"></i> (also self-closed)
+  html = html.replace(/<(?:i|span)\b([^>]*?)\bdata-(?:i|icon|lucide)\s*=\s*"([a-z0-9_-]+)"([^>]*?)(?:\/>|>\s*<\/(?:i|span)>)/gi, (_m, a, name, b) => sub(name, a + " " + b));
   // <span class="material-symbols-rounded">home</span>, <i class="material-icons">home</i>, <span class="icon">home</span>
-  html = html.replace(/<(span|i)\b([^>]*class\s*=\s*"[^"]*\b(?:material-symbols[\w-]*|material-icons[\w-]*|ms|icon)\b[^"]*"[^>]*)>\s*([a-z][a-z0-9_]{1,40})\s*<\/\1>/gi, (_m, _t, tag, name) => sub(name, tag));
+  html = html.replace(/<(span|i)\b([^>]*class\s*=\s*"[^"]*\b(?:material-symbols[\w-]*|material-icons[\w-]*|ms|icon)\b[^"]*"[^>]*)>\s*([a-z][a-z0-9_-]{1,40})\s*<\/\1>/gi, (_m, _t, tag, name) => sub(name, tag));
   if (n) fixes.push(`${n} icon${n > 1 ? "s" : ""} resolved to Material Symbols`);
   if (unknown.size) fixes.push(`unknown icon replaced: ${[...unknown].slice(0, 4).join(", ")}`);
   return html;
@@ -304,8 +361,24 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
   html = html.replace(/<(span|div|small|b|i|em|strong|p|a|button|label)\b[^>]*>\s*(?:[\u25CF\u2022]\s*)?LIVE\s*<\/\1>/g, () => { live++; return ""; });
   if (live) fixes.push(`removed ${live} LIVE badge${live > 1 ? "s" : ""}`);
 
+  // --- off-palette Tailwind/Bootstrap blue/purple hex remapping (unless DS is blue-based) ---
+  if (!["hig", "fluent", "carbon", "antd", "atlassian", "m3", "m3e"].includes(ds.id)) {
+    let remapped = 0;
+    html = html.replace(/#(?:3b82f6|2563eb|1d4ed8|6366f1|4f46e5|8b5cf6|7c3aed|007bff|6f42c1)\b/gi, () => { remapped++; return "var(--primary)"; });
+    html = html.replace(/#(?:eff6ff|eef2ff|f5f3ff|dbeafe|e0e7ff|ede9fe)\b/gi, () => { remapped++; return "var(--container)"; });
+    if (remapped) fixes.push(`mapped ${remapped} off-palette color${remapped > 1 ? "s" : ""} to design tokens`);
+  }
+
   // --- icons ---
   html = resolveIcons(html, fixes);
+
+  // --- promote bare unclassed <button> elements so weak models never render invisible reset buttons ---
+  html = html.replace(/<button(\s[^>]*)?>([\s\S]*?)<\/button>/gi, (full, attrs = "", inner = "") => {
+    if (/\bclass\s*=|\bstyle\s*=/.test(attrs)) return full;
+    const textOnly = inner.replace(/<[^>]+>/g, "").trim();
+    const cls = textOnly.length === 0 && /<svg|<i\b/i.test(inner) ? "z-icon-btn" : "z-btn";
+    return `<button class="${cls}"${attrs}>${inner}</button>`;
+  });
 
   // --- kit injection (first in <head>, so the model's own CSS always wins) ---
   if (!html.includes("data-zeus-kit")) {
@@ -356,9 +429,9 @@ ${tokensCss(ds)}`,
 Compose screens from these classes first; write extra CSS only for what the kit cannot express, and always with the tokens.
 - Layout: z-screen, z-page, z-wide, z-row, z-col, z-between, z-wrap, z-center, z-grow, z-gap-4/8/16/24/32, z-grid (auto-fit), z-grid-2/3/4, z-section
 - Type: z-display, z-h1, z-h2, z-h3, z-title, z-body, z-small, z-muted, z-primary, z-truncate
-- Actions: z-btn (+ tonal, outline, text, sm, lg, block), z-icon-btn (+ tonal, filled), z-fab, z-chip (+ on), z-chips
-- Surfaces: z-card (+ tonal, accent, flat, bleed), z-hero, z-divider, z-badge, z-avatar (initials inside), z-img (image block)
-- Data: z-list > z-item (z-lead, z-grow), z-table, z-stat (.v), z-bar > i, z-tabs > z-tab, z-switch (input type=checkbox)
+- Actions: z-btn (+ tonal, outline, text, sm, lg, block), z-icon-btn (+ tonal, filled), z-fab, z-chip (+ on), z-chips, z-segs > z-seg (+ on)
+- Surfaces: z-card (+ tonal, accent, flat, bleed), z-hero, z-banner, z-divider, z-badge, z-avatar (initials inside), z-img (image block)
+- Data: z-list > z-item (z-lead, z-grow), z-table, z-stat (.v), z-kpi (.delta), z-kv, z-bar > i, z-steps > z-step (+ on), z-days > z-day (+ on), z-tabs > z-tab, z-switch (input type=checkbox)
 - Forms: z-input (icon + input), z-field
 - Navigation: z-appbar, z-nav > z-nav-item > z-nav-pill (mobile), z-shell > z-side > z-side-item + z-main, z-top (web)
 Tabs, chips, nav items and side items switch their "on" state on click automatically.

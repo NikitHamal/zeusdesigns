@@ -22,11 +22,13 @@ function ProjectName() {
 }
 
 function PageTabs() {
-  const pages = useStore((s) => s.pages);
+  const allPages = useStore((s) => s.pages);
+  const convId = useStore((s) => s.activeConvId);
   const active = useStore((s) => s.activePageId);
   const { setActivePage, addPage, renamePage, deletePage } = useStore.getState();
   const [editing, setEditing] = useState(false);
-  const cur = pages.find((p) => p.id === active) ?? pages[0];
+  const pages = allPages.filter((p) => !p.convId || p.convId === convId);
+  const cur = pages.find((p) => p.id === active) ?? pages[0] ?? allPages[0];
   if (editing) {
     return (
       <input

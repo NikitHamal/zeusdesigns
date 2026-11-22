@@ -58,7 +58,7 @@ function group(at: number): string {
   return "Older";
 }
 
-function ChatRow({ id, title, active }: { id: string; title: string; active: boolean }) {
+function ChatRow({ id, title, active, screenCount }: { id: string; title: string; active: boolean; screenCount: number }) {
   const [rename, setRename] = useState(false);
   const { setActiveConv, deleteConv, setTitle } = useStore.getState();
   const patchUI = useStore((s) => s.patchUI);
@@ -74,8 +74,9 @@ function ChatRow({ id, title, active }: { id: string; title: string; active: boo
   }
   return (
     <div className={cn("group relative rounded-lg", active && "bg-surface-high")}>
-      <button onClick={() => { setActiveConv(id); patchUI({ showCanvas: false }); }} onDoubleClick={() => setRename(true)} className="state flex h-9 w-full items-center rounded-lg px-3 pr-9 text-left text-[14px] text-on-surface">
-        <span className="truncate">{title}</span>
+      <button onClick={() => { setActiveConv(id); patchUI({ showCanvas: false }); }} onDoubleClick={() => setRename(true)} className="state flex h-9 w-full items-center gap-2 rounded-lg px-3 pr-9 text-left text-[14px] text-on-surface">
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        {screenCount > 0 && <span className="shrink-0 rounded-full bg-surface-container px-1.5 py-0.5 text-[11px] font-medium text-on-surface-variant group-hover:opacity-0">{screenCount}</span>}
       </button>
       <Dropdown align="right" width={180} className="!absolute right-1 top-1/2 -translate-y-1/2" trigger={({ toggle, open }) => (
         <button onClick={toggle} title="More" aria-label="More" className={cn("state grid size-7 place-items-center rounded-md text-on-surface-variant group-hover:opacity-100", open ? "opacity-100" : "opacity-0")}><Icon name="more_horiz" size={18} /></button>
@@ -135,6 +136,8 @@ function AccountMenu() {
 
 export function Sidebar() {
   const convs = useStore((s) => s.conversations);
+  const pages = useStore((s) => s.pages);
+  const artboards = useStore((s) => s.artboards);
   const current = useStore(activeConv);
   const ui = useStore((s) => s.ui);
   const patchUI = useStore((s) => s.patchUI);
@@ -144,6 +147,16 @@ export function Sidebar() {
   const [open, setOpen] = useState(true);
   const list = convs.filter((c) => c.messages.length > 0);
   const split = current.messages.length > 0 || ui.showCanvas;
+  const countByConv = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of convs) {
+      const pIds = new Set(pages.filter((p) => p.convId === c.id).map((p) => p.id));
+      const direct = artboards.filter((a) => pIds.has(a.pageId)).length;
+      const msgBoards = new Set(c.messages.flatMap((m) => m.artboardIds ?? [])).size;
+      map.set(c.id, Math.max(direct, msgBoards));
+    }
+    return map;
+  }, [convs, pages, artboards]);
   const groups = useMemo(() => {
     const order = ["Today", "Yesterday", "Previous 7 days", "Older"];
     const m = new Map<string, typeof list>();
@@ -181,7 +194,7 @@ export function Sidebar() {
         {open && groups.map(([g, items]) => (
           <div key={g} className="mb-1">
             {groups.length > 1 && <div className="px-3 pb-1 pt-2 text-xs text-on-surface-variant/80">{g}</div>}
-            {items.map((c) => <ChatRow key={c.id} id={c.id} title={c.title} active={c.id === current.id && split} />)}
+            {items.map((c) => <ChatRow key={c.id} id={c.id} title={c.title} active={c.id === current.id && split} screenCount={countByConv.get(c.id) ?? 0} />)}
           </div>
         ))}
         {open && list.length === 0 && <div className="px-3 py-2 text-[13px] text-on-surface-variant">No chats yet</div>}
