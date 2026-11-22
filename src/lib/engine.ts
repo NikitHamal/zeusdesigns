@@ -225,13 +225,28 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onRe
     });
     await sse(res, (j) => (j.type === "content_block_delta" ? { text: j.delta?.text ?? "", think: j.delta?.thinking ?? "" } : {}));
   } else {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (c.apiKey) headers.authorization = `Bearer ${c.apiKey}`;
+    const hasImgs = req.messages.some((m) => (m.attachments ?? []).some((a) => a.mime.startsWith("image/")));
+    const effModel =
+      base.includes("kilo.ai") && hasImgs && !/vl|omni|particle|openrouter\/free/i.test(req.model)
+        ? "nvidia/nemotron-3.5-super-vl:free"
+        : req.model;
     const res = await fetch(`${base}/chat/completions`, {
       method: "POST", signal,
-      headers: { "content-type": "application/json", authorization: `Bearer ${c.apiKey}` },
-      body: JSON.stringify({ model: req.model, stream: true, messages: [{ role: "system", content: req.system }, ...msgs], ...(req.effort !== "medium" ? { reasoning_effort: req.effort === "max" ? "high" : req.effort } : {}) }),
+      headers,
+      body: JSON.stringify({
+        model: effModel,
+        max_tokens: 16384,
+        stream: true,
+        messages: [{ role: "system", content: req.system }, ...msgs],
+        ...(req.effort !== "medium" && !base.includes("kilo.ai") && !base.includes("llm7.io")
+          ? { reasoning_effort: req.effort === "max" ? "high" : req.effort }
+          : {}),
+      }),
     });
     await sse(res, (j) => {
-      const d = j.choices?.[0]?.delta;
+      const d = j.choices?.[0]?.delta ?? j.choices?.[0]?.message;
       return { text: d?.content ?? "", think: d?.reasoning_content ?? d?.reasoning ?? "" };
     });
   }

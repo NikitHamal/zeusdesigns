@@ -184,7 +184,7 @@ export function Inspector() {
 
   const s = sel?.s;
   const flex = !!s && /flex|grid/.test(s.display);
-  const activeTab: InspectorTab = !editId ? "insert" : tab;
+  const activeTab: InspectorTab = tab;
 
   const askZeus = () => {
     if (!sel || !targetBoard) return;
@@ -309,10 +309,11 @@ export function Inspector() {
               <button
                 key={id}
                 onClick={() => {
-                  if (id === "insert") { setTab("insert"); setInsertOpen(true); }
-                  else if (targetBoard) enterEditOnTarget(id);
+                  setInsertOpen(true);
+                  if (id === "layers" && targetBoard && !editId) enterEditOnTarget("layers");
+                  else setTab(id);
                 }}
-                disabled={id !== "insert" && !targetBoard}
+                disabled={id === "layers" && !targetBoard}
                 className={cn(
                   "state flex h-7 items-center justify-center gap-1 rounded-lg text-[11.5px] font-semibold transition-colors disabled:opacity-40",
                   on ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
