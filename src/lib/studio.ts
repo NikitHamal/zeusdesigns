@@ -10,6 +10,7 @@ import { blueprintFor } from "./blueprints";
 import { auditHtml } from "./audit";
 import { insertBlockIntoHtml, UI_BLOCKS } from "./blocks";
 import { canvasApi } from "./canvasApi";
+import { applyThemeOverrideToHtml, detectThemeOverride } from "./context";
 import type { Device } from "../types";
 
 export const STUDIO_ID = "mcp-zeus-studio";
@@ -428,19 +429,44 @@ export const STUDIO_TOOLS: StudioTool[] = [
     },
   },
   {
-    name: "studio_retheme_page", icon: "palette", desc: "Switch the active design system and immediately re-theme all screens on the current canvas page",
-    params: { system: "design system id (m3e, m3, hig, fluent, shadcn, carbon, antd, polaris, atlassian, neo, glass, minimal, claude)" },
+    name: "studio_retheme_page", icon: "palette", desc: "Switch the active design system OR apply a color/theme palette (e.g. green, teal, orange, dark, light, or #hex) across all screens on the current canvas page",
+    params: { system: "design system id OR color/theme name (green, teal, orange, red, dark, light, #hex)" },
     run: (a) => {
+      const st = useStore.getState();
+      const rawArg = str(a.system ?? a.color ?? a.theme ?? a.seed ?? a.query).trim();
+      const boards = st.artboards.filter((b) => b.pageId === st.activePageId);
+
+      // 1. Check if rawArg matches a color/theme override (e.g. "green", "dark mode")
+      const themeOv = detectThemeOverride(rawArg, boards[0]?.html ?? "");
+      if (themeOv && boards.length > 0) {
+        boards.forEach((b) => {
+          st.reviseArtboard(b.id, applyThemeOverrideToHtml(b.html, themeOv));
+        });
+        return `Applied "${themeOv.name}" palette across ${boards.length} screen${boards.length === 1 ? "" : "s"} on the active page.`;
+      }
+
+      // 2. Check if rawArg is a hex color seed (e.g. "#2e7d32")
+      const pal = parseHex(rawArg) ? makePalette(rawArg, rawArg) : null;
+      if (pal && boards.length > 0) {
+        const c = pal.light;
+        const cssBlock = `<style data-zeus-theme>:root,body,.z-shadow-body,.z-screen,.z-shell{--primary:${c.primary};--on-primary:${c.onPrimary};--container:${c.container};--on-container:${c.onContainer};--bg:${c.bg};--surface:${c.surface};--surface-2:${c.surface2};--text:${c.text};--muted:${c.muted};--outline:${c.outline}}</style>`;
+        boards.forEach((b) => {
+          const next = b.html.replace(/<style\b[^>]*data-zeus-theme[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<\/head>/i, `${cssBlock}</head>`);
+          st.reviseArtboard(b.id, next);
+        });
+        return `Generated WCAG-verified palette from ${rawArg} and applied it to ${boards.length} screen${boards.length === 1 ? "" : "s"}.`;
+      }
+
       const ds = activeDS(a);
-      useStore.getState().patchSettings({ designSystemId: ds.id });
-      const count = useStore.getState().artboards.filter((b) => b.pageId === useStore.getState().activePageId).length;
-      return `Switched active design system to ${ds.name} (${ds.id}) and re-themed ${count} screen${count === 1 ? "" : "s"}.`;
+      st.patchSettings({ designSystemId: ds.id });
+      return `Switched active design system to ${ds.name} (${ds.id}) and re-themed ${boards.length} screen${boards.length === 1 ? "" : "s"}.`;
     },
   },
 ];
 
+const cleanStudioName = (name: string) => name.replace(/^(?:mcp:)?(?:mcp-zeus-studio:)?/, "");
 export const studioEnabled = () => useStore.getState().settings.studioOn;
-export const isStudioTool = (name: string) => STUDIO_TOOLS.some((t) => t.name === name);
+export const isStudioTool = (name: string) => STUDIO_TOOLS.some((t) => t.name === cleanStudioName(name));
 
 export function parseToolArgs(raw: string | undefined): Args {
   let path = "", body = "";
@@ -453,7 +479,8 @@ export function parseToolArgs(raw: string | undefined): Args {
 }
 
 export async function runStudioTool(name: string, raw: string | undefined): Promise<{ ok: boolean; output: string }> {
-  const t = STUDIO_TOOLS.find((x) => x.name === name);
+  const clean = cleanStudioName(name);
+  const t = STUDIO_TOOLS.find((x) => x.name === clean);
   if (!t) return { ok: false, output: `Unknown studio tool ${name}` };
   if (!studioEnabled()) return { ok: false, output: "Zeus Studio is turned off in Connectors" };
   try { return { ok: true, output: String(await t.run(parseToolArgs(raw))).slice(0, 7000) }; } catch (e) { return { ok: false, output: (e as Error).message }; }

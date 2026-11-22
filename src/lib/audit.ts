@@ -113,6 +113,7 @@ export async function auditHtml(html: string, w: number, h: number): Promise<Aud
       issues.push({ kind: "sparse", severe: true, msg: `content ends at ${Math.round((reach / h) * 100)}% of the screen height; add real sections instead of empty space` });
     return issues;
   } finally {
+    frame.srcdoc = "";
     frame.remove();
   }
 }

@@ -139,6 +139,10 @@ fn execute_inline_workspace_tools(
                 let items = store.add(body.to_string(), Some("agent".to_string()));
                 (true, format!("Saved to persistent memory ({} total items)", items.len()))
             }
+            other if other.starts_with("studio_") || other.contains("studio_") => {
+                // Built-in Zeus Studio tools execute directly in the frontend webview runtime.
+                continue;
+            }
             other if other.starts_with("mcp:") => {
                 let reg = crate::mcp::McpRegistry::default();
                 reg.invoke_tool(other, body)
