@@ -35,7 +35,8 @@ Edit mode (`ads_click` button on an artboard) injects `src/lib/editor.ts` into t
 - `src/App.tsx` shell: sidebar, home, workspace split.
 - `src/components/` UI. `src/lib/` engine bridge, prompts, design systems, skills, updater.
 - `src/store.ts` single persisted Zustand store.
-- `src-tauri/src/` commands: providers, agent, workspace, memory, mcp, updater.
+- `src-tauri/src/` commands: providers, agent, workspace, memory, mcp, updater, perf (low-memory Win32 working-set governor).
+- `src/lib/shadowRenderer.tsx` zero-iframe Shadow DOM renderer for artboards and thumbnails.
 - `.github/workflows/release.yml` Windows build, release, and run pruning.
 - `docs/BACKEND_CONTRACT.md` UI to engine contract. Update it when a command changes.
 

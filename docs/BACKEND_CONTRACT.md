@@ -20,6 +20,7 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` |
 | `memory_list` / `memory_add` / `memory_delete` | `{text}` / `{id}` | `MemoryItem[]` |
 | `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
+| `perf_stats` / `perf_trim` / `perf_set_auto` | – / – / `{enabled}` | `PerfStats` / `TrimReport` / `PerfStats` |
 
 ### `ChatRequest`
 ```ts

@@ -3,8 +3,25 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop. Stable.
+- Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop, native Win32 working-set low-memory governor (`<25 MB` target). Stable.
+- UI & Canvas: Shadow DOM zero-iframe artboard and thumbnail renderer (`src/lib/shadowRenderer.tsx`), viewport frustum culling, per-chat isolated canvases.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
+
+## Session 5
+Goal: keep Windows RAM working set under 20-30 MB without losing any features or visual quality, isolate canvases per chat, and elevate the agent harness and Zeus Studio MCP.
+
+Shipped:
+- Native Low-Memory Engine (`src-tauri/src/perf.rs`, `src-tauri/src/main.rs`, `src-tauri/tauri.conf.json`, `engine/zeus_engine.cpp`):
+  - WebView2 single-process / in-process-GPU / `--renderer-process-limit=1` / 48 MB V8 cap flags set in both `main.rs` and `tauri.conf.json`.
+  - C++20 Win32 process-tree working-set trimmer (`zeus_memory_stats`, `zeus_memory_trim` using `CreateToolhelp32Snapshot`, `SetProcessWorkingSetSize`, `K32EmptyWorkingSet`, `K32GetProcessMemoryInfo` across `zeusdesigns.exe` and all child `msedgewebview2.exe` processes).
+  - Background `PerfGovernor` trims startup DLL pages and keeps working set under ~20-25 MB; exposed via `perf_stats`, `perf_trim`, `perf_set_auto` in Settings > Appearance and the Sidebar account footer.
+- Zero-Iframe Shadow DOM Renderer (`src/lib/shadowRenderer.tsx`):
+  - Replaces heavy `<iframe>` sub-documents in `<Thumb>` and `<Frame>` (except during element edit mode or custom script execution) with scoped Shadow DOM (`:host`, `--z-vh`, `--z-vw`) + interactive kit click delegation, plus viewport frustum culling on `InfiniteCanvas`.
+- Per-Chat Isolated Canvases (`src/store.ts`, `src/types.ts`, `src/components/CanvasPane.tsx`, `src/components/Sidebar.tsx`):
+  - Each chat owns its pages and screens (`Page.convId`, `Conversation.activePageId`), with screen count badges in the sidebar chat list.
+- Harness & Zeus Studio (`src/lib/harness.ts`, `src/lib/studio.ts`, `src/lib/blueprints.ts`, `src/lib/audit.ts`):
+  - 130+ icon synonym aliases (`resolveIconName`), `.z-segs`, `.z-banner`, `.z-kpi`, `.z-kv`, `.z-steps`, `.z-days`, bare `<button>`/`<input>`/`<table>` promotion, off-palette blue/purple hex remapping, deterministic audit fixes for `overflow`/`clipped`/`tap`/`sparse`.
+  - 3 new Studio tools (`studio_svg_chart`, `studio_blueprint`, `studio_export_react`), inline SVG chart seeds in `studioBrief()`, 3 new blueprints (`kanban`, `chat`, `calendar`), and 1-click Copy React TSX in `ExportMenu`.
 
 ## Session 4
 Goal: fix layout defects seen in the issue #1 comparison, add an in-app MCP, make the harness carry weak models, and rewrite history under one author.
