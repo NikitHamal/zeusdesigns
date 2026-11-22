@@ -381,7 +381,15 @@ export const useStore = create<State>()(
         const p = (persisted ?? {}) as Partial<State>;
         const settings = { ...current.settings, ...(p.settings ?? {}) };
         if (settings.hue === 258 || settings.hue === 216) settings.hue = 17; // retired blue/violet seeds
-        return { ...current, ...p, settings };
+        const stripFontBlobs = (h: string) => h ? h.replace(/@font-face\s*\{[^}]*data:font\/woff2;base64,[^}]*\}/gi, "") : h;
+        const artboards = Array.isArray(p.artboards)
+          ? p.artboards.map((a) => ({
+              ...a,
+              html: stripFontBlobs(a.html),
+              history: Array.isArray(a.history) ? a.history.slice(-6).map(stripFontBlobs) : [],
+            }))
+          : current.artboards;
+        return { ...current, ...p, artboards, settings };
       },
     },
   ),

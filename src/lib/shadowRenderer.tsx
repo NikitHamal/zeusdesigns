@@ -55,6 +55,22 @@ export const hasCustomScript = (html: string): boolean => {
   return scripts.some((s) => !s.includes("data-zeus-kit-js") && !s.includes("data-zeus-edit"));
 };
 
+const sheetCache = new Map<string, CSSStyleSheet>();
+function getSharedSheet(cssText: string): CSSStyleSheet | null {
+  if (typeof CSSStyleSheet === "undefined" || !("replaceSync" in CSSStyleSheet.prototype)) return null;
+  let sheet = sheetCache.get(cssText);
+  if (!sheet) {
+    if (sheetCache.size > 48) {
+      const oldest = sheetCache.keys().next().value;
+      if (oldest !== undefined) sheetCache.delete(oldest);
+    }
+    sheet = new CSSStyleSheet();
+    sheet.replaceSync(cssText);
+    sheetCache.set(cssText, sheet);
+  }
+  return sheet;
+}
+
 export const ShadowFrame = memo(function ShadowFrame({
   html,
   w,
@@ -82,9 +98,7 @@ export const ShadowFrame = memo(function ShadowFrame({
     const { styles, bodyClass, bodyStyle, bodyHtml } = parseArtboardDocument(html);
     const vh = (h / 100).toFixed(3);
     const vw = (w / 100).toFixed(3);
-
-    root.innerHTML = `<style>
-:host {
+    const fullCss = `:host {
   display: block;
   width: ${w}px;
   height: ${h}px;
@@ -116,8 +130,15 @@ export const ShadowFrame = memo(function ShadowFrame({
   -webkit-font-smoothing: antialiased;
 }
 .z-shadow-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
-${styles}
-</style><div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+${styles}`;
+
+    const shared = getSharedSheet(fullCss);
+    if (shared && "adoptedStyleSheets" in root) {
+      root.adoptedStyleSheets = [shared];
+      root.innerHTML = `<div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+    } else {
+      root.innerHTML = `<style>${fullCss}</style><div class="z-shadow-body ${bodyClass}" style="${bodyStyle}">${bodyHtml}</div>`;
+    }
   }, [html, w, h, interactive]);
 
   useEffect(() => {
