@@ -3,7 +3,7 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop, native Win32 working-set low-memory governor (`<25 MB` target). Stable.
+- Engine: 8 keyless providers, custom OpenAI/Anthropic, workspace tools, memory, MCP, agent loop, native Win32 working-set low-memory governor (`<25 MB` target). Stable (verified green on Windows CI run 45008395866).
 - UI & Canvas: Shadow DOM zero-iframe artboard and thumbnail renderer (`src/lib/shadowRenderer.tsx`), viewport frustum culling, per-chat isolated canvases.
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
 
