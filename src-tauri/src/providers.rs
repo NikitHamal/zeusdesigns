@@ -159,56 +159,77 @@ pub fn catalog() -> Vec<ProviderInfo> {
                 ModelSpec {
                     id: "nvidia/nemotron-3.5-super-vl:free".to_string(),
                     label: "Nemotron 3.5 Super VL".to_string(),
-                    note: Some("262k ctx · 120B MoE vision & UI architect".to_string()),
+                    note: Some("1M ctx · 120B MoE vision & UI architect".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
-                    id: "nvidia/nemotron-3-ultra-550b-a55b:free".to_string(),
-                    label: "Nemotron 3 Ultra 550B".to_string(),
-                    note: Some("262k ctx · 550B MoE frontier reasoning".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "inclusionai/ling-3.2-flash:free".to_string(),
-                    label: "Ling 3.2 Flash VL".to_string(),
-                    note: Some("Fast multimodal UI coder".to_string()),
-                    reasoning: true,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "baidu/ernie-5.5-flash-preview:free".to_string(),
-                    label: "ERNIE 5.5 Flash".to_string(),
-                    note: Some("Baidu flagship reasoning & layout".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "reflection/beam-free".to_string(),
-                    label: "Reflection Beam 1.0".to_string(),
-                    note: Some("501B MoE software engineering".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "particle-ai/particle-1:free".to_string(),
-                    label: "Particle-1 VL".to_string(),
-                    note: Some("Multimodal design & reasoning".to_string()),
+                    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free".to_string(),
+                    label: "Nemotron 3 Nano Omni VL".to_string(),
+                    note: Some("256k ctx · 30B Omni vision & reasoning".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "openrouter/free".to_string(),
                     label: "OpenRouter Free VL".to_string(),
-                    note: Some("Auto-routed multimodal pool".to_string()),
+                    note: Some("200k ctx · Auto-routed multimodal VL pool".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
+                    id: "nvidia/nemotron-3-ultra-550b-a55b:free".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("1M ctx · 550B MoE frontier reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3.5-lightning:free".to_string(),
+                    label: "Nemotron 3.5 Lightning".to_string(),
+                    note: Some("1M ctx · High-speed MoE UI coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "inclusionai/ling-3.2-flash:free".to_string(),
+                    label: "Ling 3.2 Flash VL".to_string(),
+                    note: Some("1M ctx · Fast multimodal UI coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "baidu/ernie-5.5-flash-preview:free".to_string(),
+                    label: "ERNIE 5.5 Flash".to_string(),
+                    note: Some("1M ctx · Baidu flagship reasoning & layout".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "reflection/beam-free".to_string(),
+                    label: "Reflection Beam 1.0".to_string(),
+                    note: Some("1M ctx · 501B MoE software engineering".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "particle-ai/particle-1:free".to_string(),
+                    label: "Particle-1 VL".to_string(),
+                    note: Some("1M ctx · Multimodal design & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "recursive/flint-v1.0:free".to_string(),
+                    label: "Recursive Flint 1.0".to_string(),
+                    note: Some("262k ctx · Fast code & UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "kilo-auto/free".to_string(),
                     label: "Kilo Auto Free".to_string(),
-                    note: Some("Fastest available free model".to_string()),
+                    note: Some("256k ctx · Fastest available free model".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -224,35 +245,35 @@ pub fn catalog() -> Vec<ProviderInfo> {
                 ModelSpec {
                     id: "qwen4-max".to_string(),
                     label: "Qwen 4 Max".to_string(),
-                    note: Some("Alibaba flagship coder & multimodal UI architect".to_string()),
+                    note: Some("1M ctx · Alibaba flagship coder & OSS vision".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "qwen3.8-max".to_string(),
                     label: "Qwen 3.8 Max".to_string(),
-                    note: Some("Multimodal reasoning & frontend specialist".to_string()),
+                    note: Some("1M ctx · Multimodal reasoning & frontend specialist".to_string()),
                     reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "qwen3.8-omni-flash".to_string(),
                     label: "Qwen 3.8 Omni Flash".to_string(),
-                    note: Some("Fast native multimodal vision & UI".to_string()),
-                    reasoning: false,
+                    note: Some("1M ctx · Fast native multimodal vision & UI".to_string()),
+                    reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "qwen3.5-omni-plus".to_string(),
                     label: "Qwen 3.5 Omni Plus".to_string(),
-                    note: Some("Multimodal vision specialist".to_string()),
-                    reasoning: false,
+                    note: Some("1M ctx · Multimodal vision specialist".to_string()),
+                    reasoning: true,
                     vision: true,
                 },
                 ModelSpec {
                     id: "qwen3.7-plus".to_string(),
                     label: "Qwen 3.7 Plus".to_string(),
-                    note: Some("1M ctx · multimodal & thinking".to_string()),
+                    note: Some("1M ctx · Multimodal & thinking".to_string()),
                     reasoning: true,
                     vision: true,
                 },
@@ -268,23 +289,23 @@ pub fn catalog() -> Vec<ProviderInfo> {
                 ModelSpec {
                     id: "gpt-6.1-terra:voyage".to_string(),
                     label: "GPT-6.1 Terra".to_string(),
-                    note: Some("Frontier multimodal UI & code architect".to_string()),
+                    note: Some("Frontier multimodal vision & UI architect".to_string()),
                     reasoning: false,
                     vision: true,
                 },
                 ModelSpec {
                     id: "glm-5.3-flash".to_string(),
                     label: "GLM 5.3 Flash (Ptero)".to_string(),
-                    note: Some("Z.ai 320B MoE multimodal".to_string()),
+                    note: Some("Z.ai 320B MoE fast UI coder".to_string()),
                     reasoning: false,
-                    vision: true,
+                    vision: false,
                 },
                 ModelSpec {
-                    id: "qwen3.7-flash:minirouter".to_string(),
-                    label: "Qwen 3.7 Flash".to_string(),
-                    note: Some("Fast multimodal coder".to_string()),
-                    reasoning: false,
-                    vision: true,
+                    id: "mimo-v2.6-flash:tokenharbor".to_string(),
+                    label: "MiMo V2.6 Flash".to_string(),
+                    note: Some("Xiaomi fast reasoning & frontend coder".to_string()),
+                    reasoning: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "kimi-k3:apinex".to_string(),
@@ -409,30 +430,30 @@ pub fn catalog() -> Vec<ProviderInfo> {
                 ModelSpec {
                     id: "claude-haiku-5-5".to_string(),
                     label: "Claude Haiku 5.5 (DeepAI)".to_string(),
-                    note: Some("Anthropic multimodal UI & vision".to_string()),
+                    note: Some("Anthropic fast UI layout & code".to_string()),
                     reasoning: false,
-                    vision: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "gpt-6-luna".to_string(),
                     label: "GPT-6 Luna (DeepAI)".to_string(),
-                    note: Some("OpenAI multimodal fast UI generator".to_string()),
+                    note: Some("OpenAI fast UI generator".to_string()),
                     reasoning: false,
-                    vision: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "glm-5.3-flash".to_string(),
                     label: "GLM 5.3 Flash (DeepAI)".to_string(),
-                    note: Some("Z.ai 320B MoE vision & UI".to_string()),
+                    note: Some("Z.ai 320B MoE UI coder".to_string()),
                     reasoning: true,
-                    vision: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "gemma-4".to_string(),
                     label: "Gemma 4 (DeepAI)".to_string(),
-                    note: Some("Google compact multimodal".to_string()),
+                    note: Some("Google compact UI generator".to_string()),
                     reasoning: false,
-                    vision: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "qwen3.8-flash".to_string(),
@@ -1649,6 +1670,7 @@ where
         }
     }
 
+    let now_ms = now_secs() * 1000;
     let new_resp = client
         .post(format!("{}/chats/new", QWEN_APP_BASE))
         .header("User-Agent", QWEN_APP_UA)
@@ -1659,7 +1681,14 @@ where
         .header("x-request-id", uuid_v4())
         .header("x-device-id", &acct.device)
         .header("Authorization", format!("Bearer {}", acct.token))
-        .json(&json!({ "chat_mode": "normal", "project_id": "" }))
+        .json(&json!({
+            "title": "New Chat",
+            "models": [qwen_model],
+            "chat_mode": "normal",
+            "chat_type": "t2t",
+            "timestamp": now_ms,
+            "project_id": ""
+        }))
         .send()
         .map_err(|e| format!("Qwen chats/new failed: {}", e))?;
 
@@ -1672,7 +1701,11 @@ where
         .to_string();
 
     let ts = now_secs();
+    let _ = thinking;
     let mut user_msg = json!({
+        "fid": uuid_v4(),
+        "parentId": Value::Null,
+        "childrenIds": [],
         "chat_type": "t2t",
         "content": prompt,
         "role": "user",
@@ -1680,18 +1713,22 @@ where
         "sub_chat_type": "t2t",
         "models": [qwen_model],
         "user_action": "chat",
-        "extra": { "meta": { "subChatType": "t2t" } },
+        "files": uploaded_files,
+        "extra": {
+            "meta": { "subChatType": "t2t" },
+            "disable_recitation_policy": true,
+            "skip_safety_check": true
+        },
         "feature_config": {
             "output_schema": "phase",
-            "thinking_enabled": thinking,
-            "thinking_format": "summary",
-            "auto_thinking": false,
+            "thinking_enabled": true,
+            "thinking_mode": "Auto",
+            "auto_thinking": true,
+            "research_mode": "normal",
             "auto_search": false
         }
     });
-    if !uploaded_files.is_empty() {
-        user_msg["files"] = Value::Array(uploaded_files);
-    }
+    let _ = &mut user_msg;
 
     let payload = json!({
         "stream": true,
@@ -1699,6 +1736,7 @@ where
         "chat_id": chat_id,
         "chat_mode": "normal",
         "model": qwen_model,
+        "parent_id": Value::Null,
         "version": "2.1",
         "timestamp": ts,
         "share_id": "",
@@ -2160,7 +2198,7 @@ where
     let payload = json!({
         "model": eff_model,
         "stream": true,
-        "max_tokens": 12000,
+        "max_tokens": 16384,
         "messages": kilo_msgs
     });
 
@@ -2252,7 +2290,7 @@ fn extract_ptero_nonce(html: &str) -> Option<String> {
     None
 }
 
-/// Stream from Ptero Frontier (`https://ptero.pro/wp-json/mlp/v1/chat`, GPT-6.1 Terra & GLM 5.3 Flash with vision attachments).
+/// Stream from Ptero Frontier (`https://ptero.pro/wp-json/mlp/v1/chat-stream` SSE & `/chat` fallback, GPT-6.1 Terra vision + GLM 5.3 + MiMo V2.6).
 pub fn stream_ptero<F>(
     model: &str,
     system: &str,
@@ -2263,9 +2301,37 @@ pub fn stream_ptero<F>(
 where
     F: FnMut(&str),
 {
-    let eff_model = match model {
-        "gpt-6.1-terra:voyage" | "glm-5.3-flash" | "qwen3.7-flash:minirouter" | "kimi-k3:apinex" => model,
-        _ => "gpt-6.1-terra:voyage",
+    let mut attachments = Vec::new();
+    for m in messages {
+        for att in &m.attachments {
+            if !att.data_url.trim().is_empty() {
+                let approx_size = decode_data_url(&att.data_url)
+                    .map(|(_, b)| b.len())
+                    .unwrap_or_else(|| att.data_url.len() * 3 / 4);
+                attachments.push(json!({
+                    "name": if att.name.is_empty() { "image.png" } else { att.name.as_str() },
+                    "type": if att.mime.is_empty() { "image/png" } else { att.mime.as_str() },
+                    "size": approx_size,
+                    "data": att.data_url,
+                    "dataUrl": att.data_url,
+                    "url": att.data_url
+                }));
+            }
+        }
+    }
+
+    // On Ptero, gpt-6.1-terra:voyage is the free model with supports_images: true
+    let eff_model = if !attachments.is_empty() {
+        "gpt-6.1-terra:voyage"
+    } else {
+        match model {
+            "gpt-6.1-terra:voyage"
+            | "glm-5.3-flash"
+            | "mimo-v2.6-flash:tokenharbor"
+            | "qwen3.7-flash:minirouter"
+            | "kimi-k3:apinex" => model,
+            _ => "gpt-6.1-terra:voyage",
+        }
     };
 
     let client = build_client(180)?;
@@ -2302,20 +2368,6 @@ where
         format!("[System instructions: {}]\n\n{}", sys_safe, last_user)
     };
 
-    let mut attachments = Vec::new();
-    for m in messages {
-        for att in &m.attachments {
-            if !att.data_url.trim().is_empty() {
-                attachments.push(json!({
-                    "name": if att.name.is_empty() { "image.png" } else { att.name.as_str() },
-                    "type": if att.mime.is_empty() { "image/png" } else { att.mime.as_str() },
-                    "data": att.data_url,
-                    "url": att.data_url
-                }));
-            }
-        }
-    }
-
     let payload = json!({
         "message": message_text,
         "model": eff_model,
@@ -2325,6 +2377,69 @@ where
         "mode": "full"
     });
 
+    let guest_token = random_hex(32);
+    let mut stream_req = client
+        .post("https://ptero.pro/wp-json/mlp/v1/chat-stream")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .header("Origin", "https://ptero.pro")
+        .header("Referer", "https://ptero.pro/")
+        .header("X-MLP-Guest-Token", &guest_token)
+        .header("X-MLP-Guest-Username", "nebian");
+    if !nonce.is_empty() {
+        stream_req = stream_req.header("X-WP-Nonce", &nonce);
+    }
+
+    if let Ok(resp) = stream_req.json(&payload).send() {
+        if resp.status().is_success() {
+            let mut reader = BufReader::new(resp);
+            let mut line = String::new();
+            let mut in_think = false;
+            let mut saw_text = false;
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                if cancel.load(Ordering::Relaxed) {
+                    return Ok(());
+                }
+                let trimmed = line.trim();
+                if let Some(raw) = trimmed.strip_prefix("data:") {
+                    let raw = raw.trim();
+                    if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                        if let Some(th) = ev.get("thinking_token").and_then(|t| t.as_str()) {
+                            if !th.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(th);
+                            }
+                        }
+                        if let Some(tok) = ev.get("token").and_then(|t| t.as_str()) {
+                            if !tok.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(tok);
+                            }
+                        }
+                        if ev.get("done").and_then(|d| d.as_bool()) == Some(true) {
+                            break;
+                        }
+                    }
+                }
+                line.clear();
+            }
+            if in_think {
+                on_delta("</think>");
+            }
+            if saw_text {
+                return Ok(());
+            }
+        }
+    }
+
+    // Fallback to synchronous /wp-json/mlp/v1/chat if SSE stream was empty
     let mut req = client
         .post("https://ptero.pro/wp-json/mlp/v1/chat")
         .header("Content-Type", "application/json")
@@ -2983,12 +3098,21 @@ where
         "mercury3" => {
             if has_attachments {
                 stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
-                    .or_else(|_| stream_deepai("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta))
+                    .or_else(|_| stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta))
+                    .or_else(|_| stream_qwen_app(engine, "qwen4-max", &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
             } else {
                 stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
             }
         }
-        "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| {
+                if has_attachments {
+                    stream_kilo("openrouter/free", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_kilo("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", &req.system, &req.messages, cancel, &mut on_delta))
+                } else {
+                    Err("kilo primary failed".to_string())
+                }
+            }),
         "ptero" => stream_ptero(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "unikey" => stream_unikey(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "llm7" => stream_llm7(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -3004,12 +3128,20 @@ where
             cancel,
             &mut on_delta,
         ),
-        "deepai" => stream_deepai(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "deepai" => {
+            if has_attachments {
+                stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta)
+                    .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta))
+                    .or_else(|_| stream_qwen_app(engine, "qwen4-max", &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
+            } else {
+                stream_deepai(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            }
+        }
         "qwen" => stream_qwen_app(engine, &req.model, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
             .or_else(|_| {
                 if has_attachments {
-                    stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
-                        .or_else(|_| stream_deepai("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta))
+                    stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta))
                 } else {
                     stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta)
                         .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
@@ -3037,7 +3169,7 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["kilo", "deepai", "ptero", "qwen"]
+        &["ptero", "kilo", "qwen"]
     } else {
         &["mercury3", "kilo", "unikey", "llm7", "pollinations", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
@@ -3071,7 +3203,7 @@ where
             )
             .is_ok(),
             "deepai" => stream_deepai(
-                if has_attachments { "gpt-6-luna" } else { "claude-haiku-5-5" },
+                "claude-haiku-5-5",
                 &req.system,
                 &req.messages,
                 cancel,

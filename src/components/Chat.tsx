@@ -391,11 +391,60 @@ function ModelPicker() {
   );
 }
 
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i;
+
+const normalizeImageDataUrl = (rawUrl: string, mime: string): Promise<string> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxDim = 1280;
+        const w0 = img.naturalWidth || img.width || 512;
+        const h0 = img.naturalHeight || img.height || 512;
+        if (w0 <= maxDim && h0 <= maxDim && rawUrl.length < 350000 && (mime === "image/png" || mime === "image/jpeg")) {
+          resolve(rawUrl);
+          return;
+        }
+        const scale = Math.min(1, maxDim / Math.max(w0, h0));
+        const w = Math.max(16, Math.round(w0 * scale));
+        const h = Math.max(16, Math.round(h0 * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(rawUrl);
+          return;
+        }
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
+      } catch {
+        resolve(rawUrl);
+      }
+    };
+    img.onerror = () => resolve(rawUrl);
+    img.src = rawUrl;
+  });
+
 const readFile = (f: File): Promise<Attachment> => new Promise((res) => {
   const r = new FileReader();
-  const base = { id: Math.random().toString(36).slice(2), name: f.name, mime: f.type || "text/plain", size: f.size };
-  if (f.type.startsWith("image/")) { r.onload = () => res({ ...base, dataUrl: r.result as string }); r.readAsDataURL(f); }
-  else { r.onload = () => res({ ...base, text: String(r.result).slice(0, 60000) }); r.readAsText(f); }
+  const isImg = f.type.startsWith("image/") || IMAGE_EXT.test(f.name);
+  const inferredMime = f.type || ( isImg ? "image/png" : "text/plain" );
+  const base = { id: Math.random().toString(36).slice(2), name: f.name || "image.png", mime: inferredMime, size: f.size };
+  if (isImg) {
+    r.onload = async () => {
+      const rawUrl = String(r.result || "");
+      const normUrl = await normalizeImageDataUrl(rawUrl, inferredMime);
+      const finalMime = normUrl.startsWith("data:image/jpeg") ? "image/jpeg" : inferredMime;
+      res({ ...base, mime: finalMime, dataUrl: normUrl });
+    };
+    r.readAsDataURL(f);
+  } else {
+    r.onload = () => res({ ...base, text: String(r.result).slice(0, 60000) });
+    r.readAsText(f);
+  }
 });
 
 export function Composer({ hero }: { hero?: boolean }) {
