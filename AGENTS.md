@@ -33,10 +33,10 @@ All working states (`LiveStatus`, `WorkLog`, `ThinkingBlock`, `ToolRow`, `Bottom
 `src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.
 
 ## Canvas editing & Figma/Onlook Studio (`src/components/Inspector.tsx`, `src/lib/editor.ts`, `src/lib/blocks.ts`)
-The Studio panel (`Studio` button in the canvas header, `I` in the bottom toolbar, or `+` / `ads_click` on an artboard) provides 4 tabs:
-- `Design`: Figma-style Auto-Layout controls (`Row`, `Col`, `Grid`, `Block`, pack/align, gap), Sizing (`Hug`, `Fill`, `Fixed`), Padding/Margin, Typography (bundled `DESIGN_FONTS`), Design System token fill swatches, and Corner Radius/Border.
-- `Insert`: 24+ draggable `.z-*` UI blocks (`src/lib/blocks.ts`) that can be clicked or dragged onto any artboard or empty canvas space.
-- `Layers`: Live DOM hierarchy tree with selection sync and visibility toggles.
+The Studio panel (`Studio` button in the canvas header, `I` in the bottom toolbar, `Enter` on a selected artboard, right-click context menu, or `+` / `ads_click` on an artboard) provides 4 tabs:
+- `Design`: Frame & Design System inspector when no element is selected; when an element is selected, provides Component Variant & `.on` state switchers, live Material Symbol icon swapper, Figma-style Auto-Layout controls (`Row`, `Col`, `Grid`, `Block`, pack/align, gap), Sizing (`Hug`, `Fill`, `Fixed`), Padding/Margin, Typography (bundled `DESIGN_FONTS`), Design System token fill swatches, and Corner Radius/Border.
+- `Insert`: 36 draggable `.z-*` UI blocks and 6 full-screen starter layouts (`src/lib/blocks.ts`) that can be clicked or dragged onto any artboard (including in edit mode) or empty canvas space.
+- `Layers`: Live DOM hierarchy tree with selection sync and inline reorder (`Up`/`Down`), duplicate, visibility, and delete actions.
 - `Code`: Live HTML inspector and editor for the selected element.
 Edit mode injects `src/lib/editor.ts` into the artboard with on-canvas resize handles (`e`, `s`, `se`), `Shift+A` Auto-Layout wrapping, inline text editing, Undo/Redo (`Ctrl+Z` / `Ctrl+Shift+Z`), and version history recording.
 

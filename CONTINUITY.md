@@ -3,10 +3,25 @@
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
 ## Current state
-- Engine: 8 keyless providers (with native reasoning stream extraction for Mercury 3, K2Horizon, and OpenAI endpoints), custom OpenAI/Anthropic, async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor. Stable.
-- UI & Canvas: Figma/Onlook-style 4-tab Studio Dock (`Design`, `Insert`, `Layers`, `Code`), 24+ drag-and-drop UI component blocks (`src/lib/blocks.ts`), live DOM layer tree with visibility toggles and on-canvas resize handles, smart alignment snapping guides and multi-select alignment/distribution toolbar, live Design System re-theming (`rethemeHtml`), shimmer-only activity & collapsible reasoning UI, Material 3 Expressive connected Model + Reasoning Effort split selector, Shadow DOM zero-iframe renderer.
+- Engine: 8 keyless providers (with native reasoning stream extraction across Mercury 3, K2Horizon, Qwen `phase=="think"`, LongCat `reason`, Motif `chat.reasoning`, ChatJimmy `<|think|>`, and custom OpenAI/Anthropic endpoints), async Tauri IPC commands (zero Win32 main-thread blocking), lazy MCP discovery, native Win32 working-set low-memory governor. Stable.
+- UI & Canvas: Figma/Onlook-style 4-tab Studio Dock (`Design`, `Insert`, `Layers`, `Code`), 36 drag-and-drop UI component blocks & 6 full-screen starter layouts (`src/lib/blocks.ts`), Component Variant & interactive state switchers, live Material Symbol icon swapper (150+ bundled icons), live DOM layer tree with reorder/duplicate/delete/visibility actions, edit-mode drag-and-drop overlay, Figma right-click context menu & `Enter`-to-edit shortcut, live Design System switcher in the Canvas header and Frame Inspector, smart alignment snapping guides, Shadow DOM zero-iframe renderer.
 - Harness & Zeus Studio: 18 built-in Zeus Studio MCP tools including agentic canvas/DOM mutation (`studio_insert_block`, `studio_patch_screen`, `studio_arrange_canvas`, `studio_retheme_page`), token reset protection, model class promotion, and deterministic screen completeness synthesizer (`ensureCompleteScreen`).
 - CI: Windows build and release on every push to `main`, tag `v0.1.<run_number>`.
+
+## Session 10
+Goal: elevate the Figma/Onlook Studio experience with full-screen layout starters, component variant & icon swappers, layer tree actions, edit-mode drag-and-drop overlay, right-click canvas context menu, top-bar Design System switcher, and complete reasoning stream extraction across all providers.
+
+Shipped:
+- 36-Block UI Kit & Full-Screen Layout Starters (`src/lib/blocks.ts`, `src/components/Inspector.tsx`, `src/components/Canvas.tsx`):
+  - Added `Full Layouts` category (`slot: "screen"`) with 6 complete mobile/web architectural starters (`Notes & Knowledge Base`, `Fintech Wallet & Spend`, `Fitness & Workout Tracker`, `E-Commerce Storefront`, `Web Analytics Dashboard`, `Web Sprint Kanban Board`) plus 6 new rich domain blocks (`Profile Header Card`, `Now Playing Transport`, `Pricing Tier Card`, `Kanban Task Column`, `Message Thread + Composer`, `Empty State Callout`).
+  - Added edit-mode drag-and-drop capture overlay in `ArtboardView` so dragging blocks from the `Insert` panel onto an artboard works seamlessly even while an edit-mode or interactive iframe is active.
+- Component Variant Switcher, Live Icon Swapper & Frame Inspector (`src/components/Inspector.tsx`, `src/lib/editor.ts`, `src/components/CanvasPane.tsx`):
+  - Added 1-click Component Variant controls in the `Design` tab for `.z-btn` (`Filled`, `Tonal`, `Outline`, `Text`, `Small`, `Default`, `Large`, `Full W`), `.z-card` (`Surface`, `Tonal`, `Accent`, `Flat`), `.z-icon-btn` (`Outlined`, `Tonal`, `Filled`), and `.on` active state toggles for chips/tabs/segments/nav items.
+  - Added an interactive Material Symbol Icon Swapper in the `Design` tab when any element with an SVG icon is selected, plus hover actions (`Move Up`, `Move Down`, `Duplicate`, `Visibility`, `Delete`) on every node in the `Layers` tab.
+  - Upgraded the unselected state of the `Design` tab into a Frame & Design System Inspector, and added a live Design System switcher dropdown directly in the Canvas header (`CanvasPane.tsx`).
+- Figma Right-Click Context Menu & Provider Reasoning Extraction (`src/components/Canvas.tsx`, `src-tauri/src/providers.rs`, `src/lib/engine.ts`):
+  - Added right-click context menu on artboards and empty canvas space plus `Enter` shortcut to enter Studio Edit mode on a selected screen.
+  - Added `<think>...</think>` reasoning stream extraction for Qwen (`phase == "think"`), LongCat (`reason`), Motif (`chat.reasoning`), ChatJimmy (`<|think|>`), and custom OpenAI/Anthropic endpoints (`reasoning_content` / `thinking_delta`).
 
 ## Session 9
 Goal: transform the canvas into a Figma/Onlook-grade visual-first workspace so users can build UI/UX either from scratch with drag-and-drop components, auto-layout, and layers OR with AI, while upgrading Zeus Studio with agentic canvas/DOM mutation tools.
