@@ -144,11 +144,14 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "https://chat.qwen.ai/api/v2",
             "qwen4-max",
             {
-                {"qwen4-max", "Qwen 4 Max", "Alibaba flagship coder & UI architect", true, true, true, 95},
-                {"qwen3.8-max", "Qwen 3.8 Max", "Reasoning & frontend specialist", true, true, false, 90}
+                {"qwen4-max", "Qwen 4 Max", "Alibaba flagship coder & OSS vision", true, true, true, 95},
+                {"qwen3.8-max", "Qwen 3.8 Max", "Multimodal reasoning & frontend specialist", true, true, true, 90},
+                {"qwen3.8-omni-flash", "Qwen 3.8 Omni Flash", "Fast native multimodal vision & UI", true, false, true, 120},
+                {"qwen3.5-omni-plus", "Qwen 3.5 Omni Plus", "Multimodal vision specialist", true, false, true, 105},
+                {"qwen3.7-plus", "Qwen 3.7 Plus", "1M ctx multimodal & thinking", true, true, true, 95}
             },
-            128000,
-            8192,
+            256000,
+            16384,
             false,
             "~90 tok/s"
         },
@@ -196,10 +199,15 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "DeepAI",
             ProviderFormat::SCRAPER_DEEPAI,
             "https://api.deepai.org",
-            "standard",
+            "claude-haiku-5-5",
             {
-                {"standard", "DeepAI Standard", "SHA-256 tryit key rotation", false, false, true, 65},
-                {"qwen3.8-flash", "Qwen 3.8 Flash", "Fast coding fallback", false, false, true, 85}
+                {"claude-haiku-5-5", "Claude Haiku 5.5", "Clean UI layout & code", false, false, false, 75},
+                {"gpt-6-luna", "GPT-6 Luna", "Fast UI generator", false, false, false, 80},
+                {"glm-5.3-flash", "GLM 5.3 Flash", "320B MoE UI coder", true, false, false, 70},
+                {"gemma-4", "Gemma 4", "Compact UI generator", false, false, false, 85},
+                {"qwen3.8-flash", "Qwen 3.8 Flash", "Fast coding fallback", false, false, false, 85},
+                {"deepseek-v4.1-flash", "DeepSeek V4.1 Flash", "Fast code & layout", false, false, false, 80},
+                {"standard", "DeepAI Standard", "IslandKey rotation", false, false, false, 65}
             },
             64000,
             8192,
@@ -213,14 +221,17 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "https://api.kilo.ai/api/gateway",
             "nvidia/nemotron-3.5-super-vl:free",
             {
-                {"nvidia/nemotron-3.5-super-vl:free", "Nemotron 3.5 Super VL", "120B MoE vision & UI architect", true, false, true, 140},
-                {"nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra 550B", "550B MoE frontier reasoning", true, false, false, 110},
-                {"inclusionai/ling-3.2-flash:free", "Ling 3.2 Flash VL", "Fast multimodal UI coder", true, false, true, 160},
-                {"baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash", "Baidu flagship reasoning", true, false, false, 150},
-                {"reflection/beam-free", "Reflection Beam 1.0", "501B MoE software engineering", true, false, false, 120},
-                {"particle-ai/particle-1:free", "Particle-1 VL", "Multimodal design & reasoning", true, false, true, 135},
-                {"openrouter/free", "OpenRouter Free VL", "Auto-routed multimodal pool", true, false, true, 130},
-                {"kilo-auto/free", "Kilo Auto Free", "Fastest available free model", true, false, false, 150}
+                {"nvidia/nemotron-3.5-super-vl:free", "Nemotron 3.5 Super VL", "1M ctx 120B MoE vision & UI architect", true, false, true, 140},
+                {"nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "Nemotron 3 Nano Omni VL", "256k ctx 30B Omni vision & reasoning", true, false, true, 155},
+                {"openrouter/free", "OpenRouter Free VL", "Auto-routed multimodal VL pool", true, false, true, 130},
+                {"nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra 550B", "1M ctx 550B MoE frontier reasoning", true, false, false, 110},
+                {"nvidia/nemotron-3.5-lightning:free", "Nemotron 3.5 Lightning", "1M ctx High-speed MoE UI coder", false, false, false, 180},
+                {"inclusionai/ling-3.2-flash:free", "Ling 3.2 Flash VL", "1M ctx Fast multimodal UI coder", true, false, true, 160},
+                {"baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash", "1M ctx Baidu flagship reasoning", true, false, false, 150},
+                {"reflection/beam-free", "Reflection Beam 1.0", "1M ctx 501B MoE software engineering", true, false, false, 120},
+                {"particle-ai/particle-1:free", "Particle-1 VL", "1M ctx Multimodal design & reasoning", true, false, true, 135},
+                {"recursive/flint-v1.0:free", "Recursive Flint 1.0", "262k ctx Fast code & UI synthesis", true, false, false, 150},
+                {"kilo-auto/free", "Kilo Auto Free", "256k ctx Fastest available free model", true, false, false, 150}
             },
             262144,
             16384,
@@ -234,13 +245,13 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "https://ptero.pro/wp-json/mlp/v1",
             "gpt-6.1-terra:voyage",
             {
-                {"gpt-6.1-terra:voyage", "GPT-6.1 Terra", "Frontier multimodal UI & code architect", false, false, true, 110},
-                {"glm-5.3-flash", "GLM 5.3 Flash", "Z.ai 320B MoE multimodal", false, false, true, 130},
-                {"qwen3.7-flash:minirouter", "Qwen 3.7 Flash", "Fast multimodal coder", false, false, true, 140},
+                {"gpt-6.1-terra:voyage", "GPT-6.1 Terra", "Frontier multimodal vision & UI architect", false, false, true, 110},
+                {"glm-5.3-flash", "GLM 5.3 Flash", "Z.ai 320B MoE fast UI coder", false, false, false, 130},
+                {"mimo-v2.6-flash:tokenharbor", "MiMo V2.6 Flash", "Xiaomi fast reasoning & frontend coder", true, false, false, 145},
                 {"kimi-k3:apinex", "Kimi K3", "Moonshot 2.8T MoE", false, false, false, 105}
             },
             128000,
-            8192,
+            12288,
             false,
             "~120 tok/s"
         },
