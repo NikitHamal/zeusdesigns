@@ -146,7 +146,7 @@ ${styles}
   return (
     <div
       style={{ width: w * scale, height: h * scale }}
-      className={cn("relative overflow-hidden bg-white", className)}
+      className={cn("relative overflow-hidden bg-surface-container", className)}
     >
       <div
         ref={hostRef}

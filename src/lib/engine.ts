@@ -60,8 +60,28 @@ export function normalizeStream(full: string): string {
   return full.slice(0, m.index) + open + rest.slice(0, stop) + "\n</artboard>" + rest.slice(stop).replace(/^\s*```/, "");
 }
 
-export function parseStream(full: string): { text: string; blocks: Block[] } {
-  full = normalizeStream(full.replace(/<think>[\s\S]*?(<\/think>|$)/g, ""));
+const LEAKED_PLAN_LINE = /^\s*(?:[-*•]\s*)?(?:\*\*)?(?:Font pairing|Signature move|Sections|Data points|Audience|Primary action)(?:\*\*)?\s*:/i;
+
+export function extractLeakedPlan(raw: string): { cleanText: string; leakedPlan: string } {
+  const lines = raw.split("\n");
+  const kept: string[] = [];
+  const plan: string[] = [];
+  for (const line of lines) {
+    if (LEAKED_PLAN_LINE.test(line)) {
+      plan.push(line.trim());
+    } else {
+      kept.push(line);
+    }
+  }
+  return { cleanText: kept.join("\n").replace(/\n{3,}/g, "\n\n").trim(), leakedPlan: plan.join("\n") };
+}
+
+export function parseStream(full: string): { text: string; blocks: Block[]; leakedPlan?: string } {
+  full = normalizeStream(
+    full
+      .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
+      .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
+  );
   full = full.replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, ""); // agent tool calls render as chips, not text
   let text = "";
   const blocks: Block[] = [];
@@ -79,7 +99,8 @@ export function parseStream(full: string): { text: string; blocks: Block[] } {
     blocks.push({ attrs, html: clean(full.slice(gt + 1, e)), closed: true });
     i = e + 11;
   }
-  return { text: text.replace(/\n{3,}/g, "\n\n").trim(), blocks };
+  const { cleanText, leakedPlan } = extractLeakedPlan(text);
+  return { text: cleanText, blocks, leakedPlan: leakedPlan || undefined };
 }
 
 /* ------------------------------------------------------------------ */
@@ -263,21 +284,21 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   let thinkEnd = 0;
 
   const sync = (final = false) => {
-    const { text, blocks } = parseStream(extractRemember(full).clean);
+    const { text, blocks, leakedPlan } = parseStream(extractRemember(full).clean);
     const S = useStore.getState();
     blocks.forEach((b, i) => {
       let id = idMap.get(i);
+      const bDevice = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? "mobile") as Device;
       if (!id) {
         const existing = b.attrs.mode === "revise" && b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
         if (existing) {
           id = existing.id;
           S.updateArtboard(id, { loading: true });
         } else {
-          const device = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? "mobile") as Device;
           const ab = S.addArtboard({
-            name: b.attrs.name || `Screen ${S.artboards.length + 1}`, device, html: "", loading: true,
+            name: b.attrs.name || `Screen ${S.artboards.length + 1}`, device: bDevice, html: "", loading: true,
             groupId: opts.asVariant && target ? target.groupId : undefined,
-            w: DEVICE_SIZE[device].w, h: DEVICE_SIZE[device].h,
+            w: DEVICE_SIZE[bDevice].w, h: DEVICE_SIZE[bDevice].h,
           });
           id = ab.id;
           created.push(id);
@@ -291,7 +312,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       const isRevise = b.attrs.mode === "revise" && !created.includes(id);
       const dsNow = getDS(S.settings.designSystemId);
       if (b.closed || final) {
-        const out = harden(b.html, dsNow);
+        const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
         if (isRevise) S.reviseArtboard(id, out.html); else S.updateArtboard(id, { html: out.html });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
@@ -300,13 +321,13 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           tools.push({ id: uid(), name: "design_lint", args: b.attrs.name || "screen", status: "ok", output: out.fixes.join("\n") });
         }
       } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
-        S.updateArtboard(id, { html: harden(b.html, dsNow, { partial: true }).html });
+        S.updateArtboard(id, { html: harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html });
         lastPush.set(i, { t: now, len: b.html.length });
       }
     });
     const ms = performance.now() - t0;
-    const thoughts = [...full.matchAll(/<think>([\s\S]*?)(<\/think>|$)/g)];
-    const reasoning = [extraThink.trim(), ...thoughts.map((m) => m[1].trim())].filter(Boolean).join("\n\n");
+    const thoughts = [...full.matchAll(/<think(?:ing)?>([\s\S]*?)(<\/think(?:ing)?>|$)/gi)];
+    const reasoning = [extraThink.trim(), ...thoughts.map((m) => m[1].trim()), leakedPlan ?? ""].filter(Boolean).join("\n\n");
     if (reasoning && !thinkT0) thinkT0 = performance.now();
     const thinkOpen = thoughts.length > 0 && thoughts[thoughts.length - 1][2] === "";
     if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
@@ -361,10 +382,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               { effort: "low", timeoutMs: 90000 },
             ), new Promise<string>((_, rej) => signal.addEventListener("abort", () => rej(new Error("stopped"))))]);
             const b = parseStream(raw).blocks[0];
-            if (b && b.html.length > 300 && !signal.aborted) {
-              const fixed = harden(b.html, getDS(useStore.getState().settings.designSystemId)).html;
+            if (b && b.html.length > Math.max(600, bare.length * 0.75) && !signal.aborted) {
+              const fixed = harden(b.html, getDS(useStore.getState().settings.designSystemId), { intent: opts.text, name: a.name, device: a.device }).html;
               const again = await auditHtml(fixed, a.w, a.h);
-              if (again.filter((i) => i.severe).length < severe.length) {
+              const notSparse = !again.some((i) => i.kind === "sparse" || i.kind === "gap");
+              if (notSparse && again.filter((i) => i.severe).length < severe.length) {
                 useStore.getState().updateArtboard(id, { html: patchFor(fixed, again) });
                 log.push(`repaired: ${severe.length} defect${severe.length > 1 ? "s" : ""} fixed, ${again.filter((i) => i.severe).length} left`);
                 issues = again;

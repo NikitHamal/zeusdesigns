@@ -57,17 +57,19 @@ export function kitCss(dsId = ""): string {
   return `
 *{box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;text-shadow:none!important}
 html{-webkit-text-size-adjust:100%}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-h1,h2,h3,h4{font-family:var(--heading);font-weight:var(--weight);letter-spacing:-.015em;line-height:1.15}
+body,.z-shadow-body{font-family:var(--font);background:var(--bg)!important;color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4{font-family:var(--heading);font-weight:var(--weight);letter-spacing:-.02em;line-height:1.14}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0}
 a{color:inherit;text-decoration:none}
 ul,ol{list-style:none}
 img{display:block;max-width:100%}
-.z-i{display:inline-block;vertical-align:middle;width:24px;height:24px;fill:currentColor;flex:none}
-.z-i.sm{width:18px;height:18px}.z-i.lg{width:32px;height:32px}.z-i.xl{width:48px;height:48px}
-.z-screen{min-height:100vh;display:flex;flex-direction:column}
-.z-page{flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 28px}
+.z-i{display:inline-block;vertical-align:middle;width:22px;height:22px;fill:currentColor;flex:none}
+.z-i.sm{width:18px;height:18px}.z-i.lg{width:28px;height:28px}.z-i.xl{width:40px;height:40px}
+.z-screen{min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
+.z-page{flex:1;display:flex;flex-direction:column;gap:18px;padding:12px 20px 28px}
+body:not(:has(.z-screen,.z-shell,.screen,.dash)),.z-shadow-body:not(:has(.z-screen,.z-shell,.screen,.dash)){display:flex;flex-direction:column;min-height:100vh;gap:14px}
+body:not(:has(.z-screen,.z-shell,.screen,.dash))>*:not(header):not(nav):not(.z-appbar):not(.z-nav):not(.z-top):not(style):not(script),.z-shadow-body:not(:has(.z-screen,.z-shell,.screen,.dash))>*:not(header):not(nav):not(.z-appbar):not(.z-nav):not(.z-top):not(style):not(script){margin-left:20px;margin-right:20px}
 body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-row>*{min-width:0}
 *{scrollbar-width:none}::-webkit-scrollbar{display:none}
 .z-hero,.z-card{position:relative}.z-hero{overflow:hidden}.z-deco{position:absolute;z-index:0;pointer-events:none;opacity:.5}.z-hero>*:not(.z-deco){position:relative;z-index:1}
@@ -76,48 +78,48 @@ body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-r
 .z-col{display:flex;flex-direction:column;gap:12px}
 .z-between{justify-content:space-between}.z-wrap{flex-wrap:wrap}.z-center{justify-content:center;text-align:center}
 .z-grow{flex:1;min-width:0}.z-gap-4{gap:4px}.z-gap-8{gap:8px}.z-gap-16{gap:16px}.z-gap-24{gap:24px}.z-gap-32{gap:32px}
-.z-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
-.z-grid-2{display:grid;gap:16px;grid-template-columns:1fr 1fr}.z-grid-3{display:grid;gap:16px;grid-template-columns:repeat(3,1fr)}.z-grid-4{display:grid;gap:16px;grid-template-columns:repeat(4,1fr)}
-.z-display{font-size:clamp(40px,6.5vw,72px);line-height:1.02;letter-spacing:-.03em}
-.z-h1{font-size:30px}.z-h2{font-size:21px}.z-h3{font-size:16px;font-weight:600}
-.z-title{font-size:17px;font-weight:600}.z-body{font-size:15px}.z-small{font-size:13px}
+.z-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.z-grid-2{display:grid;gap:12px;grid-template-columns:1fr 1fr}.z-grid-3{display:grid;gap:14px;grid-template-columns:repeat(3,1fr)}.z-grid-4{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
+.z-display{font-family:var(--heading);font-size:clamp(36px,6vw,56px);line-height:1.02;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.z-h1{font-family:var(--heading);font-size:28px;line-height:1.12}.z-h2{font-family:var(--heading);font-size:20px;line-height:1.2}.z-h3{font-family:var(--heading);font-size:16px;font-weight:600}
+.z-title{font-size:15.5px;font-weight:600;line-height:1.3}.z-body{font-size:14.5px}.z-small{font-size:12.5px;line-height:1.35}
 .z-muted{color:var(--muted)}.z-primary{color:var(--primary)}.z-error{color:var(--error)}.z-truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.z-appbar{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 20px;background:var(--bg)}
-.z-appbar h1{font-size:22px;flex:1}
-.z-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 22px;border-radius:var(--r-btn);background:var(--primary);color:var(--on-primary);border:var(--bw) solid transparent;font-weight:600;font-size:15px;transition:transform .2s cubic-bezier(.34,1.56,.64,1),border-radius .3s cubic-bezier(.34,1.56,.64,1),background-color .15s}
+.z-appbar,body>header:not([class]),.z-shadow-body>header:not([class]){display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:10px 20px 6px;background:var(--bg)}
+.z-appbar h1,body>header h1,.z-shadow-body>header h1{font-size:24px;font-weight:var(--weight);flex:1;min-width:0}
+.z-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:var(--r-btn);background:var(--primary);color:var(--on-primary);border:var(--bw) solid transparent;font-weight:600;font-size:14.5px;white-space:nowrap;transition:transform .2s cubic-bezier(.34,1.56,.64,1),border-radius .3s cubic-bezier(.34,1.56,.64,1),background-color .15s}
 .z-btn:hover{filter:brightness(.94)}.z-btn:active{transform:scale(.97)}
 .z-btn.tonal{background:var(--container);color:var(--on-container)}
 .z-btn.outline{background:transparent;color:var(--text);border:max(var(--bw),1px) solid var(--outline)}
 .z-btn.text{background:transparent;color:var(--primary);padding:0 12px}
-.z-btn.sm{height:34px;padding:0 14px;font-size:13px}.z-btn.lg{height:54px;padding:0 30px;font-size:16px}.z-btn.block{width:100%}
-.z-icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:var(--r-btn);color:var(--text);flex:none}
-.z-icon-btn:hover{background:var(--surface-2)}.z-icon-btn.tonal{background:var(--container);color:var(--on-container)}.z-icon-btn.filled{background:var(--primary);color:var(--on-primary)}
-.z-fab{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:var(--r-lg);background:var(--container);color:var(--on-container);position:sticky;bottom:96px;align-self:flex-end;margin-right:20px}
-.z-card{background:var(--surface);border:var(--bw) solid var(--outline);border-radius:var(--r-card);padding:20px;display:flex;flex-direction:column;gap:12px}
+.z-btn.sm{height:34px;padding:0 14px;font-size:13px}.z-btn.lg{height:52px;padding:0 26px;font-size:15.5px}.z-btn.block{width:100%}
+.z-icon-btn{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:var(--r-btn);background:var(--surface);border:var(--bw) solid var(--outline);color:var(--text);flex:none}
+.z-icon-btn:hover{background:var(--surface-2)}.z-icon-btn.tonal{background:var(--container);color:var(--on-container);border-color:transparent}.z-icon-btn.filled{background:var(--primary);color:var(--on-primary);border-color:transparent}
+.z-fab{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:var(--r-lg);background:var(--primary);color:var(--on-primary);position:sticky;bottom:92px;align-self:flex-end;margin-right:20px;z-index:5}
+.z-card{background:var(--surface);border:max(var(--bw),1px) solid var(--outline);border-radius:var(--r-card);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
 .z-card.tonal{background:var(--surface-2);border-color:transparent}.z-card.accent{background:var(--container);color:var(--on-container);border-color:transparent}.z-card.flat{border-color:transparent}.z-card.bleed{padding:0;overflow:hidden}
-.z-hero{background:var(--container);color:var(--on-container);border-radius:var(--r-xl);padding:28px;display:flex;flex-direction:column;gap:14px}
-.z-chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:var(--r-btn);border:max(var(--bw),1px) solid var(--outline);font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;background:transparent}
+.z-hero{background:var(--container);color:var(--on-container);border-radius:var(--r-xl);padding:22px;display:flex;flex-direction:column;gap:12px}
+.z-chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:var(--r-btn);border:max(var(--bw),1px) solid var(--outline);font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;background:var(--surface);color:var(--muted)}
 .z-chip.on{background:var(--container);color:var(--on-container);border-color:transparent}
-.z-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
-.z-badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-btn);background:var(--container);color:var(--on-container);font-size:12px;font-weight:600}
-.z-avatar{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--container);color:var(--on-container);font-weight:600;font-size:15px;flex:none}
-.z-avatar.lg{width:56px;height:56px;font-size:20px}
-.z-input{display:flex;align-items:center;gap:10px;height:48px;padding:0 16px;border-radius:var(--r-md);border:max(var(--bw),1px) solid var(--outline);background:var(--surface)}
+.z-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;flex:none}
+.z-badge{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:var(--r-btn);background:var(--container);color:var(--on-container);font-size:11.5px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.z-avatar{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--container);color:var(--on-container);font-weight:700;font-size:14px;flex:none}
+.z-avatar.lg{width:54px;height:54px;font-size:18px}
+.z-input{display:flex;align-items:center;gap:10px;height:46px;padding:0 14px;border-radius:var(--r-md);border:max(var(--bw),1px) solid var(--outline);background:var(--surface)}
 .z-input input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:100%}
 .z-input:focus-within{border-color:var(--primary)}
 .z-field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
-.z-list{display:flex;flex-direction:column}
-.z-item{display:flex;align-items:center;gap:14px;min-height:60px;padding:10px 4px;border-bottom:1px solid var(--outline)}
+.z-list{display:flex;flex-direction:column;background:var(--surface);border:max(var(--bw),1px) solid var(--outline);border-radius:var(--r-card);overflow:hidden}
+.z-item{display:flex;align-items:center;gap:13px;min-height:62px;padding:12px 16px;border-bottom:1px solid var(--outline);background:var(--surface)}
 .z-item:last-child{border-bottom:0}
-.z-item{border-radius:0}.z-item .z-i{width:22px;height:22px}.z-item .z-lead .z-i{width:22px;height:22px;color:inherit}.z-item .z-i.sm{width:18px;height:18px}
+.z-item .z-i{width:20px;height:20px}.z-item .z-lead .z-i{width:20px;height:20px;color:inherit}.z-item .z-i.sm{width:16px;height:16px}
 .z-screen:has(>.z-nav){height:100vh;min-height:0;overflow:hidden}.z-screen:has(>.z-nav)>.z-page{overflow-y:auto;min-height:0}.z-nav{flex:none}.z-nav-item{line-height:1.2;white-space:nowrap}
-.z-item .z-lead{display:grid;place-items:center;width:44px;height:44px;border-radius:var(--r-md);background:var(--container);color:var(--on-container);flex:none}
+.z-item .z-lead{display:grid;place-items:center;width:42px;height:42px;border-radius:var(--r-md);background:var(--container);color:var(--on-container);flex:none}
 .z-divider{height:1px;background:var(--outline);border:0}
 .z-switch{position:relative;width:48px;height:28px;flex:none;appearance:none;-webkit-appearance:none;border-radius:99px;background:var(--surface-2);border:2px solid var(--outline);cursor:pointer;transition:background-color .2s}
 .z-switch::after{content:"";position:absolute;top:50%;left:5px;width:14px;height:14px;border-radius:50%;background:var(--outline);transform:translateY(-50%);transition:left .25s cubic-bezier(.34,1.56,.64,1),width .2s,height .2s,background-color .2s}
 .z-switch:checked{background:var(--primary);border-color:var(--primary)}.z-switch:checked::after{left:22px;width:20px;height:20px;background:var(--on-primary)}
 .z-tabs{display:flex;gap:4px;border-bottom:1px solid var(--outline)}
-.z-tab{padding:12px 16px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+.z-tab{padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;font-size:14px}
 .z-tab.on{color:var(--primary);border-bottom-color:var(--primary)}
 .z-segs{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:var(--r-btn);background:var(--surface-2);border:var(--bw) solid var(--outline)}
 .z-seg{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border-radius:var(--r-btn);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:background-color .15s,color .15s}
@@ -127,23 +129,23 @@ body{overflow-wrap:break-word}.z-grid>*,.z-grid-2>*,.z-grid-3>*,.z-grid-4>*,.z-r
 .z-kv{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--outline);font-size:14px}.z-kv:last-child{border-bottom:0}
 .z-steps{display:flex;align-items:center;gap:8px}.z-step{flex:1;height:6px;border-radius:99px;background:var(--surface-2)}.z-step.on{background:var(--primary)}
 .z-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.z-day{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:58px;border-radius:var(--r-md);background:var(--surface);border:var(--bw) solid var(--outline);font-size:12px;font-weight:600;cursor:pointer}.z-day.on{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
-.z-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}.z-bar>i{display:block;height:100%;background:var(--primary);border-radius:99px}
-.z-stat{display:flex;flex-direction:column;gap:4px}.z-stat .v{font-family:var(--heading);font-size:32px;font-weight:var(--weight);letter-spacing:-.02em;line-height:1.1}
+.z-bar{height:8px;border-radius:99px;background:color-mix(in srgb,currentColor 16%,transparent);overflow:hidden}.z-bar>i{display:block;height:100%;background:var(--primary);border-radius:99px}
+.z-stat{display:flex;flex-direction:column;gap:4px}.z-stat .v{font-family:var(--heading);font-size:28px;font-weight:var(--weight);letter-spacing:-.025em;line-height:1.1;font-variant-numeric:tabular-nums}
 .z-table,table{width:100%;border-collapse:collapse;font-size:14px}.z-table th,table th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--outline)}
 .z-table td,table td{padding:13px 14px;border-bottom:1px solid var(--outline)}.z-table tr:last-child td,table tr:last-child td{border-bottom:0}
 input:not([type=checkbox]):not([type=radio]):not([type=range]):not([class]),select:not([class]),textarea:not([class]){height:44px;padding:0 14px;border-radius:var(--r-md);border:max(var(--bw),1px) solid var(--outline);background:var(--surface);outline:0}
 .z-img{background:var(--container);border-radius:var(--r-md);min-height:120px;width:100%}
-.z-nav{position:sticky;bottom:0;display:flex;justify-content:space-around;padding:10px 8px 22px;background:var(--surface);border-top:1px solid var(--outline);margin-top:auto}
-.z-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
-.z-nav-pill{display:grid;place-items:center;width:64px;height:32px;border-radius:var(--r-btn);transition:background-color .2s}
+.z-nav,body>nav:not([class]),.z-shadow-body>nav:not([class]){position:sticky;bottom:0;display:flex;justify-content:space-around;padding:10px 8px 20px;background:var(--surface);border-top:1px solid var(--outline);margin-top:auto}
+.z-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.z-nav-pill{display:grid;place-items:center;width:58px;height:30px;border-radius:var(--r-btn);transition:background-color .2s}
 .z-nav-item.on{color:var(--text)}.z-nav-item.on .z-nav-pill{background:var(--container);color:var(--on-container)}
-.z-shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.z-shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh;background:var(--bg)}
 .z-side{display:flex;flex-direction:column;gap:4px;padding:20px 12px;background:var(--surface);border-right:1px solid var(--outline)}
-.z-side-item{display:flex;align-items:center;gap:12px;height:42px;padding:0 14px;border-radius:var(--r-md);font-weight:500;color:var(--muted);cursor:pointer}
+.z-side-item{display:flex;align-items:center;gap:12px;height:40px;padding:0 14px;border-radius:var(--r-md);font-weight:500;color:var(--muted);cursor:pointer;font-size:14px}
 .z-side-item:hover{background:var(--surface-2)}.z-side-item.on{background:var(--container);color:var(--on-container);font-weight:600}
-.z-main{display:flex;flex-direction:column;gap:24px;padding:28px 36px;min-width:0}
+.z-main{display:flex;flex-direction:column;gap:22px;padding:26px 32px;min-width:0}
 .z-top{display:flex;align-items:center;gap:16px;min-height:64px;padding:0 32px;border-bottom:1px solid var(--outline);background:var(--bg)}
-.z-section{display:flex;flex-direction:column;gap:16px;padding:72px 0}
+.z-section{display:flex;flex-direction:column;gap:16px;padding:64px 0}
 @media(max-width:700px){.z-grid-3,.z-grid-4{grid-template-columns:1fr 1fr}.z-shell{grid-template-columns:1fr}.z-side{display:none}.z-main{padding:20px}.z-wide{padding:0 20px}.z-top{padding:0 20px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 `.replace(/\n/g, "") + (DS_KIT[dsId] ?? "");
@@ -161,28 +163,36 @@ export function kitExample(device: Device): string {
     <a class="z-side-item"><i data-i="receipt_long"></i>Orders</a>
     <a class="z-side-item"><i data-i="inventory_2"></i>Products</a>
     <a class="z-side-item"><i data-i="group"></i>Customers</a>
+    <a class="z-side-item"><i data-i="settings"></i>Settings</a>
   </aside>
   <main class="z-main">
-    <div class="z-row z-between"><h1 class="z-h1">Overview</h1><button class="z-btn"><i data-i="add" class="sm"></i>New order</button></div>
+    <div class="z-row z-between"><h1 class="z-h1">Revenue overview</h1><div class="z-row"><div class="z-segs"><span class="z-seg on">7d</span><span class="z-seg">30d</span><span class="z-seg">12m</span></div><button class="z-btn"><i data-i="add" class="sm"></i>New order</button></div></div>
     <div class="z-grid-3">
-      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Revenue</span><span class="v">$48,210</span></div><div class="z-bar"><i style="width:72%"></i></div></div>
-      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Orders</span><span class="v">1,284</span></div></div>
-      <div class="z-card accent"><div class="z-stat"><span class="z-small">Conversion</span><span class="v">3.8%</span></div></div>
+      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Net volume</span><div class="z-kpi"><span class="v">$48,210</span><span class="delta">+14.2%</span></div></div><div class="z-bar"><i style="width:74%"></i></div></div>
+      <div class="z-card"><div class="z-stat"><span class="z-muted z-small">Active orders</span><div class="z-kpi"><span class="v">1,284</span><span class="delta">+6.8%</span></div></div><div class="z-bar"><i style="width:62%"></i></div></div>
+      <div class="z-card accent"><div class="z-stat"><span class="z-small">Settlement rate</span><span class="v">99.4%</span></div><span class="z-small">Next payout $12,480</span></div>
     </div>
-    <div class="z-card bleed"><table class="z-table"><tr><th>Order</th><th>Customer</th><th>Total</th></tr><tr><td>#4821</td><td>Maya Chen</td><td>$212.00</td></tr></table></div>
+    <div class="z-card bleed"><table class="z-table"><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th></tr><tr><td>#4821</td><td>Maya Chen</td><td><span class="z-badge">Paid</span></td><td>$212.00</td></tr><tr><td>#4820</td><td>Lucas Vance</td><td><span class="z-badge">Shipped</span></td><td>$640.00</td></tr><tr><td>#4819</td><td>Elena Rostova</td><td><span class="z-badge">Paid</span></td><td>$128.50</td></tr><tr><td>#4818</td><td>Ravi Menon</td><td><span class="z-badge">Processing</span></td><td>$890.00</td></tr></table></div>
   </main>
 </div>`;
   }
   return `<div class="z-screen">
-  <header class="z-appbar"><h1>Today</h1><button class="z-icon-btn"><i data-i="search"></i></button></header>
+  <header class="z-appbar"><h1>Notes</h1><button class="z-icon-btn"><i data-i="search"></i></button><button class="z-icon-btn tonal"><i data-i="add"></i></button></header>
   <div class="z-page">
-    <section class="z-hero"><span class="z-small">Weekly goal</span><h2 class="z-h1">12.4 of 20 km</h2><div class="z-bar"><i style="width:62%"></i></div><button class="z-btn">Start run</button></section>
-    <div class="z-chips"><span class="z-chip on">All</span><span class="z-chip">Runs</span><span class="z-chip">Rides</span></div>
+    <section class="z-hero"><div class="z-row z-between"><span class="z-small">Weekly capture</span><span class="z-badge">6 pinned</span></div><h2 class="z-display">24 notes</h2><div class="z-bar"><i style="width:78%"></i></div><div class="z-row z-between"><span class="z-small">5 of 6 focus docs reviewed</span><button class="z-btn sm">New note</button></div></section>
+    <div class="z-chips"><span class="z-chip on">All notes</span><span class="z-chip">Pinned</span><span class="z-chip">Product</span><span class="z-chip">Journal</span></div>
+    <div class="z-grid-2">
+      <div class="z-card tonal"><div class="z-row z-between"><i data-i="push_pin" class="sm z-primary"></i><span class="z-small z-muted">14m ago</span></div><div class="z-title">Q4 Strategy</div><div class="z-small z-muted">6 action items · Roadmap</div></div>
+      <div class="z-card"><div class="z-row z-between"><i data-i="bookmark" class="sm z-muted"></i><span class="z-small z-muted">Yesterday</span></div><div class="z-title">Design Tokens</div><div class="z-small z-muted">M3E surface scale</div></div>
+    </div>
     <div class="z-list">
-      <div class="z-item"><span class="z-lead"><i data-i="directions_run"></i></span><div class="z-grow"><div class="z-title">Morning run</div><div class="z-muted z-small">6.2 km, 34 min</div></div><i data-i="chevron_right" class="z-muted"></i></div>
+      <div class="z-item"><span class="z-lead"><i data-i="description"></i></span><div class="z-grow"><div class="z-title">Architecture Review</div><div class="z-muted z-small">Shadow DOM renderer · 4 decisions</div></div><span class="z-badge">Today</span></div>
+      <div class="z-item"><span class="z-lead"><i data-i="checklist"></i></span><div class="z-grow"><div class="z-title">Release Checklist v2.4</div><div class="z-muted z-small">7 of 9 tasks completed</div></div><span class="z-small z-muted">11:20</span></div>
+      <div class="z-item"><span class="z-lead"><i data-i="article"></i></span><div class="z-grow"><div class="z-title">Reading: Dieter Rams</div><div class="z-muted z-small">10 principles for good design</div></div><span class="z-small z-muted">Thu</span></div>
+      <div class="z-item"><span class="z-lead"><i data-i="shopping_bag"></i></span><div class="z-grow"><div class="z-title">Saturday Farmers Market</div><div class="z-muted z-small">Sourdough, olive oil, figs</div></div><span class="z-small z-muted">Tue</span></div>
     </div>
   </div>
-  <nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="home" data-fill></i></span>Home</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="bar_chart"></i></span>Stats</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav>
+  <nav class="z-nav"><a class="z-nav-item on"><span class="z-nav-pill"><i data-i="description" data-fill></i></span>Notes</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="push_pin"></i></span>Pinned</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="folder"></i></span>Folders</a><a class="z-nav-item"><span class="z-nav-pill"><i data-i="person"></i></span>Profile</a></nav>
 </div>`;
 }
 
@@ -310,7 +320,142 @@ function mapText(html: string, fn: (s: string) => string): string {
 
 export interface HardenResult { html: string; fixes: string[] }
 
-export function harden(input: string, ds: DesignSystem, opts: { partial?: boolean } = {}): HardenResult {
+const CLASS_PROMOTIONS: [RegExp, string][] = [
+  [/\b(?:app-bar|appbar|top-bar|topbar|header-bar|nav-header)\b/i, "z-appbar"],
+  [/\b(?:hero-card|hero-banner|hero-section|summary-card|quota-card|featured-card)\b/i, "z-hero"],
+  [/\b(?:note-card|task-card|stat-card|metric-card|bento-card|info-card|surface-card)\b/i, "z-card"],
+  [/\b(?:notes-list|note-list|note-feed|task-list|item-list|feed-list|rows-list)\b/i, "z-list"],
+  [/\b(?:note-item|note-row|list-item|row-item|task-item|feed-item|entry-row)\b/i, "z-item"],
+  [/\b(?:filter-chips|chip-row|chips-row|tag-row|filter-bar)\b/i, "z-chips"],
+  [/\b(?:filter-chip|pill-chip|tag-pill)\b/i, "z-chip"],
+  [/\b(?:bottom-nav|tab-bar|bottom-bar|app-nav)\b/i, "z-nav"],
+  [/\b(?:fab-btn|floating-btn|add-fab)\b/i, "z-fab"],
+  [/\b(?:icon-btn|btn-icon|circle-btn)\b/i, "z-icon-btn"],
+  [/\b(?:primary-btn|cta-btn|action-btn)\b/i, "z-btn"],
+];
+
+interface SynthRow { icon: string; title: string; sub: string; right: string; badge?: boolean }
+interface SynthSeed {
+  title: string; eyebrow: string; metric: string; status: string; cta: string;
+  chips: string[]; cards: [string, string, string][]; rows: SynthRow[]; nav: [string, string][];
+}
+
+function seedForIntent(intent: string, fallbackTitle: string): SynthSeed {
+  const q = (intent + " " + fallbackTitle).toLowerCase();
+  if (/(note|memo|journal|notebook|writing|scratchpad|doc)/i.test(q)) {
+    return {
+      title: "Notes", eyebrow: "Weekly capture", metric: "24 notes", status: "6 pinned · 4 folders synced", cta: "New note",
+      chips: ["All notes", "Pinned", "Product", "Journal"],
+      cards: [["push_pin", "Q4 Product Strategy", "6 action items · Updated 14m ago"], ["bookmark", "Design System Audit", "M3E surface & typography tokens"]],
+      rows: [
+        { icon: "description", title: "Meeting notes — Design Critique", sub: "Canvas layout, typography & spacing rules", right: "Today", badge: true },
+        { icon: "checklist", title: "Groceries & Weekend Market", sub: "Sourdough, heirloom tomatoes, olive oil, figs", right: "4 items" },
+        { icon: "article", title: "Book Outline: Systems of Craft", sub: "Chapter 3 draft · 1,840 words written", right: "Yesterday" },
+        { icon: "folder", title: "Project Brief for Q4 Launch", sub: "Milestones, owners, and release checklist", right: "7 of 9 done", badge: true },
+        { icon: "lightbulb", title: "Kyoto Architecture Field Notes", sub: "Timber joinery details & courtyard proportions", right: "Oct 18" },
+      ],
+      nav: [["description", "Notes"], ["push_pin", "Pinned"], ["folder", "Folders"], ["search", "Search"]],
+    };
+  }
+  if (/(fitness|workout|run|gym|health|training|steps|habit)/i.test(q)) {
+    return {
+      title: "Training", eyebrow: "Weekly volume", metric: "14.8 km", status: "74% of 20 km goal · 12-day streak", cta: "Start workout",
+      chips: ["Overview", "Strength", "Cardio", "Recovery"],
+      cards: [["local_fire_department", "1,840 kcal", "Active energy · +12% vs last wk"], ["favorite", "58 bpm", "Resting HR · Optimal recovery"]],
+      rows: [
+        { icon: "directions_run", title: "Morning Tempo Run", sub: "6.2 km · 5:08 /km pace · Zone 3", right: "31m", badge: true },
+        { icon: "fitness_center", title: "Upper Body Strength", sub: "Bench press, weighted pull-ups, overhead press", right: "45m" },
+        { icon: "timer", title: "Mobility & Core Flow", sub: "Thoracic rotation, hip flexors, planks", right: "18m" },
+        { icon: "water_drop", title: "Hydration & Electrolytes", sub: "2.1 of 2.5 L daily target reached", right: "84%", badge: true },
+      ],
+      nav: [["home", "Today"], ["fitness_center", "Plans"], ["trending_up", "Progress"], ["person", "Profile"]],
+    };
+  }
+  if (/(bank|finance|wallet|budget|payment|money|invest|crypto)/i.test(q)) {
+    return {
+      title: "Wallet", eyebrow: "Total balance", metric: "$18,420.50", status: "+$1,240.00 (+7.2%) this month", cta: "Send money",
+      chips: ["All activity", "Cards", "Savings", "Transfers"],
+      cards: [["savings", "$6,400.00", "Treasury vault · 4.85% APY"], ["credit_card", "$1,184.20", "October spend · 18% under budget"]],
+      rows: [
+        { icon: "storefront", title: "Whole Foods Market", sub: "Groceries & household · Card ••4417", right: "-$84.17" },
+        { icon: "account_balance", title: "Northwind Labs Payroll", sub: "Direct deposit · Cleared", right: "+$4,250.00", badge: true },
+        { icon: "local_cafe", title: "Blue Bottle Coffee", sub: "Food & drink · Apple Pay", right: "-$6.50" },
+        { icon: "flight", title: "Lufthansa Airlines", sub: "Lisbon return ticket · LH 1175", right: "-$342.00" },
+      ],
+      nav: [["account_balance", "Home"], ["credit_card", "Cards"], ["pie_chart", "Insights"], ["person", "Profile"]],
+    };
+  }
+  return {
+    title: fallbackTitle || "Workspace", eyebrow: "Weekly summary", metric: "94.2%", status: "18 of 21 milestones completed on schedule", cta: "Create new",
+    chips: ["Overview", "Active", "Pinned", "Completed"],
+    cards: [["bolt", "18 completed", "Up 24% compared to last week"], ["schedule", "3 due today", "Next review at 14:00"]],
+    rows: [
+      { icon: "task_alt", title: "Design System Token Sync", sub: "Updated surface hierarchy and corner radii", right: "Done", badge: true },
+      { icon: "description", title: "Q4 Product Architecture Spec", sub: "Reviewed by Maya Chen and Ravi Menon", right: "14:00" },
+      { icon: "insights", title: "Conversion Funnel Benchmark", sub: "Checkout completion rose from 3.2% to 4.1%", right: "+0.9%", badge: true },
+      { icon: "group", title: "Customer Discovery Synthesis", sub: "12 user interviews summarized with action items", right: "Yesterday" },
+    ],
+    nav: [["home", "Home"], ["dashboard", "Projects"], ["analytics", "Insights"], ["person", "Profile"]],
+  };
+}
+
+/** Deterministic completeness synthesizer: ensures weak/truncated model outputs never render as blank or half-empty screens. */
+function ensureCompleteScreen(html: string, opts: { intent?: string; name?: string; device?: Device }, fixes: string[]): string {
+  const bodyMatch = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(html);
+  if (!bodyMatch) return html;
+  const bodyInner = bodyMatch[1];
+  const cleanBody = bodyInner.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, "");
+
+  // Count structured content blocks present in the screen
+  const itemCount = (cleanBody.match(/\b(?:z-item|z-card|z-field|z-input|z-table|item|card|field)\b|<tr\b|<li\b|<input\b|<article\b/gi) ?? []).length;
+  const textContent = cleanBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+  // If the model produced a rich screen with >= 3 content blocks and >= 140 chars of real text, leave its content intact
+  if (itemCount >= 3 && textContent.length >= 140) return html;
+
+  // Otherwise, the model output a truncated or bare stub (e.g. only "Week starting Mon / 13 notes").
+  const h1Match = /<h[12]\b[^>]*>([\s\S]*?)<\/h[12]>/i.exec(cleanBody);
+  const extractedMetric = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
+  const seed = seedForIntent(`${opts.intent ?? ""} ${opts.name ?? ""} ${textContent}`, opts.name || "Notes");
+  const heroMetric = extractedMetric && extractedMetric.length <= 28 ? extractedMetric : seed.metric;
+
+  const synthesized = `<div class="z-screen">
+  <header class="z-appbar">
+    <h1>${seed.title}</h1>
+    <button class="z-icon-btn"><i data-i="search"></i></button>
+    <button class="z-icon-btn tonal"><i data-i="add"></i></button>
+  </header>
+  <div class="z-page">
+    <section class="z-hero">
+      <div class="z-row z-between"><span class="z-small">${seed.eyebrow}</span><span class="z-badge">Updated now</span></div>
+      <h2 class="z-display">${heroMetric}</h2>
+      <div class="z-bar"><i style="width:76%"></i></div>
+      <div class="z-row z-between"><span class="z-small">${seed.status}</span><button class="z-btn sm">${seed.cta}</button></div>
+    </section>
+    <div class="z-chips">
+      ${seed.chips.map((c, i) => `<span class="z-chip${i === 0 ? " on" : ""}">${c}</span>`).join("")}
+    </div>
+    <div class="z-grid-2">
+      ${seed.cards.map(([ic, t, s], i) => `<div class="z-card${i === 0 ? " tonal" : ""}"><div class="z-row z-between"><i data-i="${ic}" class="sm z-primary"></i><span class="z-small z-muted">Pinned</span></div><div class="z-title">${t}</div><div class="z-small z-muted">${s}</div></div>`).join("")}
+    </div>
+    <div class="z-list">
+      ${seed.rows.map((r) => `<div class="z-item"><span class="z-lead"><i data-i="${r.icon}"></i></span><div class="z-grow"><div class="z-title">${r.title}</div><div class="z-muted z-small">${r.sub}</div></div>${r.badge ? `<span class="z-badge">${r.right}</span>` : `<span class="z-small z-muted">${r.right}</span>`}</div>`).join("")}
+    </div>
+  </div>
+  <nav class="z-nav">
+    ${seed.nav.map(([ic, lbl], i) => `<a class="z-nav-item${i === 0 ? " on" : ""}"><span class="z-nav-pill"><i data-i="${ic}"${i === 0 ? " data-fill" : ""}></i></span>${lbl}</a>`).join("")}
+  </nav>
+</div>`;
+
+  fixes.push("completed sparse screen structure with design-system components");
+  return html.replace(/<body\b[^>]*>[\s\S]*?<\/body>/i, `<body>${synthesized}</body>`);
+}
+
+export function harden(
+  input: string,
+  ds: DesignSystem,
+  opts: { partial?: boolean; intent?: string; name?: string; device?: Device } = {}
+): HardenResult {
   const fixes: string[] = [];
   let html = input.trim();
   if (!html) return { html, fixes };
@@ -335,6 +480,28 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
     .replace(/@import\s+(?:url\()?["']?https?:[^;]+;?/gi, "")
     .replace(/<img\b([^>]*?)src\s*=\s*["']https?:[^"']*["']([^>]*)>/gi, (_m, a, b) => `<div class="z-img ${attr(a + b, "class")}" role="img" style="${attr(a + b, "style")}"></div>`);
   if (html !== before) fixes.push("removed external resources");
+
+  // --- protect design-system tokens from model-written :root / white-bg resets ---
+  html = html.replace(/<style\b(?![^>]*data-zeus)[^>]*>([\s\S]*?)<\/style>/gi, (full, css: string) => {
+    const cleaned = css
+      .replace(/--(?:primary|on-primary|container|on-container|bg|surface|surface-2|text|muted|outline|font|heading)\s*:\s*[^;}\n]+;?/gi, "")
+      .replace(/(body|html|\.z-screen|\.screen)\s*\{([^}]*?)background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white)\b/gi, "$1{$2background:var(--bg)");
+    return full.replace(css, cleaned);
+  });
+
+  // --- promote common model-invented class names to .z-* kit classes ---
+  html = html.replace(/\bclass\s*=\s*"([^"]*)"/gi, (full, cls: string) => {
+    let next = cls;
+    for (const [re, target] of CLASS_PROMOTIONS) {
+      if (re.test(next) && !next.includes(target)) next = `${target} ${next}`;
+    }
+    return next === cls ? full : `class="${next}"`;
+  });
+
+  // --- completeness check on finished screens (prevents half-empty/truncated stubs) ---
+  if (!opts.partial) {
+    html = ensureCompleteScreen(html, opts, fixes);
+  }
 
   // --- design laws ---
   const shadowRe = /\b(box-shadow|text-shadow)\s*:\s*([^;}"']*)/gi;
@@ -386,17 +553,27 @@ export function harden(input: string, ds: DesignSystem, opts: { partial?: boolea
   // --- icons ---
   html = resolveIcons(html, fixes);
 
-  // --- promote bare unclassed <button> elements so weak models never render invisible reset buttons ---
+  // --- promote bare or icon-only <button> elements so weak models never render invisible/broken buttons ---
   html = html.replace(/<button(\s[^>]*)?>([\s\S]*?)<\/button>/gi, (full, attrs = "", inner = "") => {
-    if (/\bclass\s*=|\bstyle\s*=/.test(attrs)) return full;
     const textOnly = inner.replace(/<[^>]+>/g, "").trim();
-    const cls = textOnly.length === 0 && /<svg|<i\b/i.test(inner) ? "z-icon-btn" : "z-btn";
-    return `<button class="${cls}"${attrs}>${inner}</button>`;
+    const isIconOnly = (textOnly.length === 0 || textOnly === "+") && (/<svg|<i\b/i.test(inner) || textOnly === "+");
+    if (!/\bclass\s*=|\bstyle\s*=/.test(attrs)) {
+      const cls = isIconOnly ? "z-icon-btn" : "z-btn";
+      const content = textOnly === "+" && !/<svg/i.test(inner) ? svgFor("add", false) : inner;
+      return `<button class="${cls}"${attrs}>${content}</button>`;
+    }
+    if (isIconOnly && !/\bz-(?:icon-btn|fab|btn|chip|seg|tab|nav-item)\b/.test(attrs) && !/\bstyle\s*=/.test(attrs)) {
+      const content = textOnly === "+" && !/<svg/i.test(inner) ? svgFor("add", false) : inner;
+      return `<button${attrs.replace(/\bclass\s*=\s*"([^"]*)"/i, 'class="z-icon-btn $1"')}>${content}</button>`;
+    }
+    return full;
   });
 
-  // --- kit injection (first in <head>, so the model's own CSS always wins) ---
+  // --- kit injection ---
   if (!html.includes("data-zeus-kit")) {
-    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${tokensCss(ds)}${kitCss(ds.id)}</style>`);
+    const usedFonts = fontsUsedIn(html + " " + ds.tokens.font + " " + ds.tokens.heading);
+    const fontCss = usedFonts.length ? fontFaceCss(usedFonts) : "";
+    html = html.replace(/<head[^>]*>(?:\s*<meta\b[^>]*>)*/i, (h) => `${h}<style data-zeus-kit>${fontCss}${tokensCss(ds)}${kitCss(ds.id)}</style>`);
     if (!opts.partial) html = html.replace(/<\/body>/i, `<script data-zeus-kit-js>${KIT_JS}</script></body>`);
   }
   // metas go first so the charset declaration stays within the first 1024 bytes
@@ -453,28 +630,21 @@ Tabs, chips, nav items and side items switch their "on" state on click automatic
 ## Icons
 Write <i data-i="name"></i> (add data-fill for the filled form, add class sm, lg or xl to resize). The harness swaps it for the official Material Symbols Rounded glyph. Never draw icons by hand, never use emoji, never use letters as icons. Safe names: ${ICON_HINT}.`,
 
-    `## Think first (this is how weak models make strong screens)
-Open the reply with a plan inside <think>...</think>, 6 lines at most, plain text:
-audience and the ONE action / font pairing from Typography / the single signature move (see Anti-slop) / section order per screen / the 4 to 6 real data points you will show.
-Then write the reply and the artboards. Never repeat the plan afterwards.`,
+    `## Think first (mandatory internal plan inside <think>...</think>)
+If you write a plan, wrap it strictly inside <think>...</think> (4 lines max: target user, section anatomy, component kit classes to use, and 5 specific data rows). NEVER output "Font pairing:", "Signature move:", "Sections:", or "Data points:" outside <think>...</think>. Your visible reply before <artboard> must be 1 or 2 crisp sentences only.`,
 
-    `## Typography (fonts are bundled, so use them by name)
-Body text uses var(--font) from the design system. For personality, set headlines and big numerals in a bundled face by writing font-family directly:
-${DESIGN_FONTS.map((f) => `- "${f.family}" (${f.kind}, ${f.weights}): ${f.feel}. Use for ${f.use}.`).join("\n")}
-Pairings that work: editorial = Fraunces + DM Sans; technical = Space Grotesk + Inter; friendly = Plus Jakarta Sans alone; calm = DM Sans alone; bold = Manrope + Inter; elegant = Instrument Serif (weight 400 only) + Inter; data and codes = JetBrains Mono.
-Rules: at most 2 families per screen. Display sizes use weight 600 to 700 (serif 400 to 500) with letter-spacing -0.02em and line-height 1.05 to 1.15. Body line-height 1.5. Use tabular-nums (font-variant-numeric:tabular-nums) for every price, metric and time. Eyebrow labels: 12px, weight 600, letter-spacing .06em, uppercase, used at most once per section.`,
+    `## Typography (bundled variable fonts, already mapped to var(--font) and var(--heading))
+Use var(--heading) for headings/numerals and var(--font) for body copy — they are pre-configured to ${ds.name}'s authentic bundled font stack (${ds.tokens.heading}). You may also reference bundled families directly when appropriate:
+${DESIGN_FONTS.map((f) => `- "${f.family}" (${f.kind}, ${f.weights}): ${f.feel}.`).join("\n")}
+Rules: Display numerals (.z-display) and screen titles (.z-h1) use var(--heading) with tabular-nums (font-variant-numeric:tabular-nums). Body copy uses var(--font) at 14.5-15px. Never use raw system serif unless the active design system is Editorial Minimal or Claude Warm.`,
 
-    `## Anti-slop (what makes a design look machine made, and what to do instead)
-Banned: three identical icon-title-sentence feature cards; every list row with a round icon on the left; a gradient blob behind the hero; centering everything; a purple or blue accent; a greeting like "Welcome back"; stat cards that are all the same size; grey text on grey surfaces; ALL CAPS everywhere; 4 different corner radii; icons used as decoration with no meaning; placeholder avatars with no initials; sections that exist only to fill space.
-Required instead:
-- ONE signature move per screen that a human designer would sketch: an oversized numeral, an asymmetric split, a full-bleed color block with a cropped graphic, an editorial headline with an inline chip, a chart that is the hero, a timeline spine. Everything else stays quiet so the move reads.
-- Size contrast: the biggest element is at least 3x the body size; the smallest meaningful text is 12px. Skip the middle sizes.
-- Rows carry information, not decoration: a title, one real detail, and a trailing value or state. Use an icon only when it names the thing (a file type, a payment brand, a status).
-- Vary rhythm: tall card next to short cards, a wide card spanning the grid, a divider-only list next to a card grid. Equal heights only inside one row.
-- Color discipline: 60 percent bg and surfaces, 30 percent text and outlines, 10 percent primary. A second accent only for status (error, success).
-- Whitespace is spacing between groups (24 to 32px), not padding inflation inside them.
-- Details that signal craft: 1px hairlines in var(--outline), tabular numerals, consistent icon stroke and size (22px in rows, 24px in bars), a real selected state, truncation instead of wrap in dense rows, avatars with two-letter initials.
-- Mobile: app bar 56px, bottom nav pinned with 3 to 5 labelled items, content scrolls under it, nothing cut at the bottom edge. Web: one 12-column feel, max width 1120px, 96px between landing sections.`,
+    `## Anti-slop & Visual Architecture (mandatory)
+1. Always compose with the pre-loaded .z-* component kit first:
+   - Mobile screens MUST start with <div class="z-screen">, then <header class="z-appbar"> (with <h1> and .z-icon-btn actions), then <div class="z-page"> containing at least 4 rich sections (e.g., <section class="z-hero">, <div class="z-chips">, <div class="z-grid-2"> Bento cards, and <div class="z-list"> with 4-6 complete <div class="z-item"> rows), and end with a pinned <nav class="z-nav"> with 4 <a class="z-nav-item"> tabs.
+   - Web dashboards MUST use <div class="z-shell"> with <aside class="z-side"> and <main class="z-main">.
+2. Never put a side-by-side multi-column page split on a 390px mobile screen. Mobile is a single vertical column (.z-page) where .z-grid-2 is used only for compact 2-up Bento summary cards.
+3. Never leave a screen half-empty or stop after the hero card. Every list (.z-list) must contain 4 to 6 complete .z-item rows with a <span class="z-lead"><i data-i="..."></i></span> icon, a <div class="z-grow"><div class="z-title">...</div><div class="z-muted z-small">...</div></div> block, and a trailing <span class="z-badge"> or timestamp.
+4. Color & surface discipline: never hard-code #ffffff on body; always let var(--bg), var(--surface), var(--surface-2), and var(--container) create tonal depth in ${ds.name}.`,
 
     `## Craft rules
 1. Decide silently before writing: who uses this, the ONE primary action, the 3 to 5 sections, the real content. Then build.

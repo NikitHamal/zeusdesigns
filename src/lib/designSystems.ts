@@ -13,9 +13,9 @@ export interface DesignSystem {
 }
 
 // Every family below is bundled with the app (src/lib/fonts.ts), so a design looks the same on any machine.
-const sans = `"Google Sans Flex",Inter,"Segoe UI Variable Text",system-ui,sans-serif`;
-const apple = `-apple-system,"SF Pro Text",Inter,"Segoe UI Variable Text",system-ui,sans-serif`;
-const serif = `Fraunces,"Iowan Old Style",Georgia,serif`;
+const sans = `"Google Sans Flex","Plus Jakarta Sans",Inter,"Segoe UI Variable Text",system-ui,sans-serif`;
+const apple = `"Plus Jakarta Sans",-apple-system,"SF Pro Text",Inter,system-ui,sans-serif`;
+const serif = `"Fraunces","Instrument Serif","Iowan Old Style",Georgia,serif`;
 
 export const DESIGN_SYSTEMS: DesignSystem[] = [
   {
