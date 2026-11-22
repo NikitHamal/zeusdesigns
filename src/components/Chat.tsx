@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "../store";
 import type { Attachment, FileNode, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
+import { compactConversation, getContextWindowStats } from "../lib/context";
 import { EFFORTS, findProvider, PROVIDERS } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
@@ -9,7 +10,7 @@ import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
-import { LiveStatus, WorkLog } from "./Activity";
+import { Collapse, LiveStatus, WorkLog } from "./Activity";
 
 /* ------------------------------------------------------------------ */
 /* Message bits                                                        */
@@ -63,9 +64,35 @@ function retry(m: Message) {
   sendMessage({ text: u.text, attachments: u.attachments, quote: u.quote });
 }
 
-function MessageView({ m }: { m: Message }) {
+function CompactedCard({ m }: { m: Message }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-outline-variant/60 bg-surface-low/60">
+      <button
+        onClick={() => setOpen(!open)}
+        className="state flex w-full items-center gap-2 rounded-2xl px-3.5 py-2 text-left text-xs text-on-surface-variant"
+      >
+        <Icon name="inventory_2" size={14} className="shrink-0 text-primary" />
+        <span className="font-semibold text-on-surface">Compacted conversation context</span>
+        <span className="min-w-0 flex-1 truncate text-[11.5px] text-on-surface-variant/75">Preserved screens, palette & constraints</span>
+        <Icon name="expand_more" size={15} className={cn("shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      <Collapse open={open}>
+        <div className="border-t border-outline-variant/40 px-3.5 py-2.5 text-xs text-on-surface-variant">
+          <Markdown text={m.text} />
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
+function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   const addMemory = useStore((s) => s.addMemory);
   const notify = useStore((s) => s.notify);
+  const busy = useStore((s) => s.busy);
+  if (m.compacted) {
+    return <CompactedCard m={m} />;
+  }
   if (m.role === "user") {
     return (
       <div className="anim-pop ml-auto flex max-w-[92%] flex-col items-end gap-1.5">
@@ -90,10 +117,31 @@ function MessageView({ m }: { m: Message }) {
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
       {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
+      {!m.streaming && m.truncated && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-outline-variant/60 bg-surface-low px-3 py-2 text-xs text-on-surface-variant">
+          <span>Output reached the turn limit before closing the artboard.</span>
+          <button
+            disabled={busy}
+            onClick={() => sendMessage({ text: "Continue from where you stopped and finish closing the current <artboard> and any remaining screens." })}
+            className="state rounded-full bg-primary px-3 py-1 font-semibold text-on-primary disabled:opacity-50"
+          >
+            Continue
+          </button>
+        </div>
+      )}
       {!m.streaming && (
         <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
           <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
           <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
+          {isLast && (
+            <IconBtn
+              label="Continue generation"
+              size={28}
+              onClick={() => !busy && sendMessage({ text: "Continue refining or completing the design from your previous turn." })}
+            >
+              <Icon name="arrow_forward" size={13} />
+            </IconBtn>
+          )}
           <IconBtn label="Remember this" size={28} onClick={async () => { const v = m.text.slice(0, 240); const l = await nativeMemory.add(v); if (l) useStore.getState().patchSettings({ memory: l.reverse() }); else addMemory(v); notify("Saved to Memory"); }}><Icon name="bookmark_add" size={13} /></IconBtn>
           {m.model && <span className="ml-1">{m.model}</span>}
           {m.stats?.tps ? <span className="rounded-full bg-surface-high px-2 py-0.5 font-medium text-on-surface-variant">{m.stats.tps.toLocaleString()} tok/s</span> : null}
@@ -106,6 +154,97 @@ function MessageView({ m }: { m: Message }) {
 /* ------------------------------------------------------------------ */
 /* Composer: M3 Expressive Connected Model + Effort Split Control      */
 /* ------------------------------------------------------------------ */
+function fmtTok(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+function ContextWindowPill() {
+  // Subscribe to store slices that affect context window calculation
+  useStore((s) => s.activeConvId);
+  useStore((s) => s.conversations);
+  useStore((s) => s.artboards);
+  useStore((s) => s.settings.providerId);
+  useStore((s) => s.settings.modelId);
+  useStore((s) => s.settings.designSystemId);
+  const busy = useStore((s) => s.busy);
+  const stats = getContextWindowStats();
+  const canCompact = stats.messageCount >= 4 && !busy;
+
+  return (
+    <Dropdown align="right" width={288} trigger={({ toggle, open }) => (
+      <button
+        onClick={toggle}
+        title={`Context window: ${stats.totalTokens.toLocaleString()} / ${stats.contextWindow.toLocaleString()} tokens (${stats.percentOfBudget}% of active budget)`}
+        className={cn(
+          "state flex h-8 items-center gap-1.5 rounded-full border border-outline-variant/60 bg-surface-low px-2.5 text-[11.5px] font-medium text-on-surface-variant",
+          open && "bg-surface-high text-on-surface"
+        )}
+      >
+        <span className="h-1.5 w-8 overflow-hidden rounded-full bg-surface-highest">
+          <i
+            style={{ width: `${Math.max(8, stats.percentOfBudget)}%` }}
+            className={cn("block h-full rounded-full transition-all", stats.needsCompaction ? "bg-error" : "bg-primary")}
+          />
+        </span>
+        <span className="font-mono tabular-nums">{fmtTok(stats.totalTokens)}</span>
+      </button>
+    )}>
+      {(close) => (
+        <div className="p-2.5 text-xs">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold text-on-surface">Context Window</span>
+            <span className="font-mono text-[11px] text-on-surface-variant">
+              {fmtTok(stats.totalTokens)} / {fmtTok(stats.contextWindow)} tok
+            </span>
+          </div>
+          <div className="mb-2.5 h-2 w-full overflow-hidden rounded-full bg-surface-low">
+            <div
+              style={{ width: `${Math.max(4, stats.percentOfBudget)}%` }}
+              className={cn("h-full rounded-full transition-all", stats.needsCompaction ? "bg-error" : "bg-primary")}
+            />
+          </div>
+          <div className="space-y-1.5 rounded-xl bg-surface-low p-2.5 text-[11.5px] text-on-surface-variant">
+            <div className="flex items-center justify-between">
+              <span>System & Component Kit</span>
+              <span className="font-mono text-on-surface">{fmtTok(stats.systemTokens)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Live Canvas ({stats.canvasScreenCount} screen{stats.canvasScreenCount === 1 ? "" : "s"})</span>
+              <span className="font-mono text-on-surface">{fmtTok(stats.canvasTokens)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Chat History ({stats.messageCount} msg{stats.messageCount === 1 ? "" : "s"})</span>
+              <span className="font-mono text-on-surface">{fmtTok(stats.historyTokens)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Memory & Studio MCP</span>
+              <span className="font-mono text-on-surface">{fmtTok(stats.memoryTokens)}</span>
+            </div>
+          </div>
+          {stats.compactedCount > 0 && (
+            <div className="mt-2 px-1 text-[11px] text-on-surface-variant">
+              Auto-compacted {stats.compactedCount} earlier message{stats.compactedCount === 1 ? "" : "s"} in this session.
+            </div>
+          )}
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <button
+              disabled={!canCompact}
+              onClick={async () => {
+                await compactConversation({ manual: true });
+                close();
+              }}
+              className="state flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 font-semibold text-on-primary disabled: bg-surface-high disabled:text-on-surface-variant/50"
+            >
+              <Icon name="inventory_2" size={14} />
+              Compact Context (/compact)
+            </button>
+          </div>
+        </div>
+      )}
+    </Dropdown>
+  );
+}
+
 const EFFORT_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3, max: 4 };
 const EFFORT_SHORT: Record<string, string> = { low: "Low", medium: "Med", high: "High", max: "Max" };
 
@@ -474,12 +613,13 @@ export function ChatPane() {
           </button>
         )}
         <span className="flex-1" />
+        <ContextWindowPill />
         <IconBtn label={leftTab === "files" ? "Back to chat" : "Project files"} size={36} active={leftTab === "files"} onClick={() => patchUI({ leftTab: leftTab === "files" ? "chat" : "files" })}><Icon name="account_tree" size={20} /></IconBtn>
         <IconBtn label="Hide chat" size={36} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={20} /></IconBtn>
       </div>
       {leftTab === "files" ? <FilesPanel /> : (
         <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">
-          {conv.messages.map((m) => <MessageView key={m.id} m={m} />)}
+          {conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)}
         </div>
       )}
       {away && leftTab !== "files" && (
