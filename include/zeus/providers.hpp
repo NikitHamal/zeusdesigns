@@ -13,10 +13,16 @@ enum class ProviderFormat {
     SCRAPER_CHATJIMMY,   // ChatJimmy (chatjimmy.ai) 20,000+ tok/s Llama 3.1 8B instant title & micro-task engine
     SCRAPER_MOTIF,       // Motif (chat.motiftech.io) Motif 3 102B / 12.7B Reasoning
     SCRAPER_K2HORIZON,   // K2Horizon (chat.ifm.ai) IFM/K2-Horizon-375B-A23B
-    SCRAPER_QWEN,        // Qwen (chat.qwen.ai) Qwen4 Max / Qwen3.8 Max
-    SCRAPER_DEEPAI,      // DeepAI (api.deepai.org) SHA-256 tryit key generator + 10 free models
+    SCRAPER_QWEN,        // Qwen (chat.qwen.ai) Qwen4 Max / Qwen3.8 Max + OSS vision upload
+    SCRAPER_DEEPAI,      // DeepAI (api.deepai.org) IslandKey + attachment upload
     SCRAPER_LONGCAT,     // LongCat (longcat.chat) LongCat 2.5 1.6T MoE
     SCRAPER_GEMINIWEB,   // Gemini Web (gemini.google.com/app) anonymous Flash-Lite StreamGenerate
+    SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
+    SCRAPER_PTERO,       // Ptero (ptero.pro/wp-json/mlp/v1/chat) GPT-6.1 Terra & GLM 5.3 Flash + vision
+    SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3
+    SCRAPER_LLM7,        // LLM7 (api.llm7.io/v1) Codestral Latest, Gemma 3 27B, GPT-OSS 20B
+    SCRAPER_POLLINATIONS,// Pollinations (text.pollinations.ai/openai) OpenAI reasoning stream
+    SCRAPER_YQCLOUD,     // YQCloud (api.binjie.fun/api/generateStream) zero-auth fast stream
     OFFICIAL_OPENAI,     // OpenAI-compatible (/v1/chat/completions)
     OFFICIAL_ANTHROPIC,  // Anthropic Messages API (/v1/messages)
     OFFICIAL_GEMINI      // Google Gemini API (/v1beta/models/{model}:streamGenerateContent)

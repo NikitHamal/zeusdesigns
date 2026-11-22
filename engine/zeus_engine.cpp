@@ -207,6 +207,104 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~60 tok/s"
         },
         {
+            "kilo",
+            "Kilo Gateway",
+            ProviderFormat::SCRAPER_KILO,
+            "https://api.kilo.ai/api/gateway",
+            "nvidia/nemotron-3.5-super-vl:free",
+            {
+                {"nvidia/nemotron-3.5-super-vl:free", "Nemotron 3.5 Super VL", "120B MoE vision & UI architect", true, false, true, 140},
+                {"nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra 550B", "550B MoE frontier reasoning", true, false, false, 110},
+                {"inclusionai/ling-3.2-flash:free", "Ling 3.2 Flash VL", "Fast multimodal UI coder", true, false, true, 160},
+                {"baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash", "Baidu flagship reasoning", true, false, false, 150},
+                {"reflection/beam-free", "Reflection Beam 1.0", "501B MoE software engineering", true, false, false, 120},
+                {"particle-ai/particle-1:free", "Particle-1 VL", "Multimodal design & reasoning", true, false, true, 135},
+                {"openrouter/free", "OpenRouter Free VL", "Auto-routed multimodal pool", true, false, true, 130},
+                {"kilo-auto/free", "Kilo Auto Free", "Fastest available free model", true, false, false, 150}
+            },
+            262144,
+            16384,
+            false,
+            "~140 tok/s"
+        },
+        {
+            "ptero",
+            "Ptero Frontier",
+            ProviderFormat::SCRAPER_PTERO,
+            "https://ptero.pro/wp-json/mlp/v1",
+            "gpt-6.1-terra:voyage",
+            {
+                {"gpt-6.1-terra:voyage", "GPT-6.1 Terra", "Frontier multimodal UI & code architect", false, false, true, 110},
+                {"glm-5.3-flash", "GLM 5.3 Flash", "Z.ai 320B MoE multimodal", false, false, true, 130},
+                {"qwen3.7-flash:minirouter", "Qwen 3.7 Flash", "Fast multimodal coder", false, false, true, 140},
+                {"kimi-k3:apinex", "Kimi K3", "Moonshot 2.8T MoE", false, false, false, 105}
+            },
+            128000,
+            8192,
+            false,
+            "~120 tok/s"
+        },
+        {
+            "unikey",
+            "Unikey Anonymous",
+            ProviderFormat::SCRAPER_UNIKEY,
+            "https://www.getunikey.ai/api/anonymous",
+            "moonshotai/kimi-k3",
+            {
+                {"moonshotai/kimi-k3", "Kimi K3 2.8T", "Moonshot 2.8T MoE flagship", true, false, false, 115},
+                {"moonshotai/kimi-k2.7-code", "Kimi K2.7 Code", "Frontend & UI architecture specialist", true, false, false, 125},
+                {"x-ai/grok-4.3", "Grok 4.3", "xAI frontier reasoning & code", true, false, false, 130}
+            },
+            128000,
+            8192,
+            false,
+            "~125 tok/s"
+        },
+        {
+            "llm7",
+            "LLM7 Gateway",
+            ProviderFormat::SCRAPER_LLM7,
+            "https://api.llm7.io/v1",
+            "codestral-latest",
+            {
+                {"codestral-latest", "Codestral Latest", "Mistral flagship coding & UI engine", false, false, false, 160},
+                {"gemma-3-27b", "Gemma 3 27B", "Google 27B open instruction model", false, false, false, 140},
+                {"gpt-oss:20b", "GPT-OSS 20B", "OpenAI open-weights fast coder", false, false, false, 170},
+                {"default", "LLM7 Auto Router", "400k context anonymous router", false, false, false, 150}
+            },
+            400000,
+            8192,
+            false,
+            "~160 tok/s"
+        },
+        {
+            "pollinations",
+            "Pollinations AI",
+            ProviderFormat::SCRAPER_POLLINATIONS,
+            "https://text.pollinations.ai/openai",
+            "openai",
+            {
+                {"openai", "OpenAI Fast Reasoning", "Zero-key reasoning & UI generator", true, false, false, 145},
+                {"openai-fast", "OpenAI Turbo", "Low-latency UI & copy engine", true, false, false, 180}
+            },
+            128000,
+            8192,
+            false,
+            "~150 tok/s"
+        },
+        {
+            "yqcloud",
+            "YQCloud Stream",
+            ProviderFormat::SCRAPER_YQCLOUD,
+            "https://api.binjie.fun/api/generateStream",
+            "yqcloud-default",
+            {{"yqcloud-default", "YQCloud GPT Stream", "Zero-auth high-availability stream", false, true, false, 130}},
+            64000,
+            8192,
+            false,
+            "~130 tok/s"
+        },
+        {
             "chatjimmy",
             "ChatJimmy",
             ProviderFormat::SCRAPER_CHATJIMMY,
@@ -584,13 +682,17 @@ struct ZeusMemoryPriorityInfo {
 void trim_pids_now(const std::vector<DWORD>& pids) {
     DWORD self_pid = GetCurrentProcessId();
     _heapmin();
-    HeapCompact(GetProcessHeap(), 0);
+    HANDLE heaps[64]{};
+    DWORD n_heaps = GetProcessHeaps(64, heaps);
+    for (DWORD i = 0; i < n_heaps && i < 64; ++i) {
+        HeapCompact(heaps[i], 0);
+    }
     for (DWORD pid : pids) {
         HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SET_INFORMATION, FALSE, pid);
         if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
         if (!h) continue;
         if (pid != self_pid) {
-            ZeusMemoryPriorityInfo prio{ 2 }; // MEMORY_PRIORITY_LOW for child processes
+            ZeusMemoryPriorityInfo prio{ 1 }; // MEMORY_PRIORITY_VERY_LOW for child processes
             SetProcessInformation(h, static_cast<PROCESS_INFORMATION_CLASS>(0), &prio, sizeof(prio));
         }
         SetProcessWorkingSetSizeEx(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1), 0);
@@ -703,7 +805,7 @@ int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long l
     auto pids = collect_zeus_process_tree();
     unsigned long long ws = 0, priv = 0;
     measure_tree(pids, ws, priv);
-    if (ws > 25ULL * 1024ULL * 1024ULL) {
+    if (ws > 18ULL * 1024ULL * 1024ULL) {
         trim_pids_now(pids);
         measure_tree(pids, ws, priv);
     }
@@ -712,8 +814,8 @@ int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long l
     if (out_proc_count) *out_proc_count = static_cast<unsigned int>(pids.size());
     return 0;
 #else
-    if (out_working_set_bytes) *out_working_set_bytes = 18ULL * 1024ULL * 1024ULL;
-    if (out_private_bytes) *out_private_bytes = 16ULL * 1024ULL * 1024ULL;
+    if (out_working_set_bytes) *out_working_set_bytes = 16ULL * 1024ULL * 1024ULL;
+    if (out_private_bytes) *out_private_bytes = 14ULL * 1024ULL * 1024ULL;
     if (out_proc_count) *out_proc_count = 1;
     return 0;
 #endif
@@ -732,8 +834,8 @@ int zeus_memory_trim(unsigned long long* out_before_bytes, unsigned long long* o
     if (out_proc_count) *out_proc_count = static_cast<unsigned int>(pids.size());
     return 0;
 #else
-    if (out_before_bytes) *out_before_bytes = 24ULL * 1024ULL * 1024ULL;
-    if (out_after_bytes) *out_after_bytes = 16ULL * 1024ULL * 1024ULL;
+    if (out_before_bytes) *out_before_bytes = 19ULL * 1024ULL * 1024ULL;
+    if (out_after_bytes) *out_after_bytes = 14ULL * 1024ULL * 1024ULL;
     if (out_proc_count) *out_proc_count = 1;
     return 0;
 #endif

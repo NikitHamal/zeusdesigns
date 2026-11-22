@@ -58,14 +58,14 @@ impl Default for PerfGovernor {
                     let _ = trim_now();
                 }
             }
-            // Continuous low-overhead governor every 1.2s whenever working set exceeds 20 MB
+            // Continuous low-overhead governor every 1.0s whenever working set exceeds 18 MB
             loop {
-                std::thread::sleep(Duration::from_millis(1200));
+                std::thread::sleep(Duration::from_millis(1000));
                 if !flag.load(Ordering::Relaxed) {
                     continue;
                 }
                 let s = current_stats(true);
-                if s.working_set_bytes > 20 * 1024 * 1024 {
+                if s.working_set_bytes > 18 * 1024 * 1024 {
                     let _ = trim_now();
                 }
             }
@@ -92,7 +92,7 @@ pub fn current_stats(auto_trim: bool) -> PerfStats {
         private_mb: round1(priv_b as f64 / (1024.0 * 1024.0)),
         process_count: procs,
         auto_trim,
-        target_mb: 25,
+        target_mb: 19,
     }
 }
 

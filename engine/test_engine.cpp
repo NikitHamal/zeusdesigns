@@ -39,11 +39,17 @@ int main() {
     assert(rc == 0);
     assert(std::string(title_buf) == "Design a Material 3 Expressive");
 
-    char cat_buf[4096]{};
+    char cat_buf[8192]{};
     int count = zeus_providers_catalog_json(cat_buf, sizeof(cat_buf));
-    assert(count == 8);
+    assert(count == 14);
     std::string cat(cat_buf);
     assert(cat.find("mercury3") != std::string::npos);
+    assert(cat.find("kilo") != std::string::npos);
+    assert(cat.find("ptero") != std::string::npos);
+    assert(cat.find("unikey") != std::string::npos);
+    assert(cat.find("llm7") != std::string::npos);
+    assert(cat.find("pollinations") != std::string::npos);
+    assert(cat.find("yqcloud") != std::string::npos);
     assert(cat.find("chatjimmy") != std::string::npos);
 
     zeus::PersistentMemoryStore mem;
