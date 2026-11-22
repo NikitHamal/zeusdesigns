@@ -102,7 +102,7 @@ function AccountMenu() {
   useEffect(() => {
     let alive = true;
     const poll = () => nativePerf.stats().then((s) => alive && setRamMb(s.workingSetMb)).catch(() => {});
-    poll();
+    nativePerf.trim().then(poll).catch(poll);
     const id = setInterval(poll, 8000);
     return () => { alive = false; clearInterval(id); };
   }, []);

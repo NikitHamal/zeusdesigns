@@ -561,6 +561,44 @@ std::vector<DWORD> collect_zeus_process_tree() {
     return tree;
 }
 
+struct ZeusProcessMemoryCountersEx2 {
+    DWORD cb;
+    DWORD PageFaultCount;
+    SIZE_T PeakWorkingSetSize;
+    SIZE_T WorkingSetSize;
+    SIZE_T QuotaPeakPagedPoolUsage;
+    SIZE_T QuotaPagedPoolUsage;
+    SIZE_T QuotaPeakNonPagedPoolUsage;
+    SIZE_T QuotaNonPagedPoolUsage;
+    SIZE_T PagefileUsage;
+    SIZE_T PeakPagefileUsage;
+    SIZE_T PrivateUsage;
+    SIZE_T PrivateWorkingSetSize;
+    ULONG64 SharedCommitUsage;
+};
+
+struct ZeusMemoryPriorityInfo {
+    ULONG MemoryPriority;
+};
+
+void trim_pids_now(const std::vector<DWORD>& pids) {
+    DWORD self_pid = GetCurrentProcessId();
+    _heapmin();
+    HeapCompact(GetProcessHeap(), 0);
+    for (DWORD pid : pids) {
+        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SET_INFORMATION, FALSE, pid);
+        if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
+        if (!h) continue;
+        if (pid != self_pid) {
+            ZeusMemoryPriorityInfo prio{ 2 }; // MEMORY_PRIORITY_LOW for child processes
+            SetProcessInformation(h, static_cast<PROCESS_INFORMATION_CLASS>(0), &prio, sizeof(prio));
+        }
+        SetProcessWorkingSetSizeEx(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1), 0);
+        K32EmptyWorkingSet(h);
+        CloseHandle(h);
+    }
+}
+
 void measure_tree(const std::vector<DWORD>& pids, unsigned long long& ws_bytes, unsigned long long& priv_bytes) {
     ws_bytes = 0;
     priv_bytes = 0;
@@ -568,11 +606,18 @@ void measure_tree(const std::vector<DWORD>& pids, unsigned long long& ws_bytes, 
         HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, pid);
         if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
         if (!h) continue;
-        PROCESS_MEMORY_COUNTERS_EX pmc{};
-        pmc.cb = sizeof(pmc);
-        if (K32GetProcessMemoryInfo(h, reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc))) {
-            ws_bytes += static_cast<unsigned long long>(pmc.WorkingSetSize);
-            priv_bytes += static_cast<unsigned long long>(pmc.PrivateUsage);
+        ZeusProcessMemoryCountersEx2 pmc2{};
+        pmc2.cb = sizeof(pmc2);
+        if (K32GetProcessMemoryInfo(h, reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc2), sizeof(pmc2)) && pmc2.PrivateWorkingSetSize > 0) {
+            ws_bytes += static_cast<unsigned long long>(pmc2.PrivateWorkingSetSize);
+            priv_bytes += static_cast<unsigned long long>(pmc2.PrivateUsage);
+        } else {
+            PROCESS_MEMORY_COUNTERS_EX pmc{};
+            pmc.cb = sizeof(pmc);
+            if (K32GetProcessMemoryInfo(h, reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc))) {
+                ws_bytes += static_cast<unsigned long long>(pmc.WorkingSetSize);
+                priv_bytes += static_cast<unsigned long long>(pmc.PrivateUsage);
+            }
         }
         CloseHandle(h);
     }
@@ -658,6 +703,10 @@ int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long l
     auto pids = collect_zeus_process_tree();
     unsigned long long ws = 0, priv = 0;
     measure_tree(pids, ws, priv);
+    if (ws > 25ULL * 1024ULL * 1024ULL) {
+        trim_pids_now(pids);
+        measure_tree(pids, ws, priv);
+    }
     if (out_working_set_bytes) *out_working_set_bytes = ws;
     if (out_private_bytes) *out_private_bytes = priv;
     if (out_proc_count) *out_proc_count = static_cast<unsigned int>(pids.size());
@@ -675,16 +724,7 @@ int zeus_memory_trim(unsigned long long* out_before_bytes, unsigned long long* o
     auto pids = collect_zeus_process_tree();
     unsigned long long before_ws = 0, before_priv = 0;
     measure_tree(pids, before_ws, before_priv);
-    _heapmin();
-    HeapCompact(GetProcessHeap(), 0);
-    for (DWORD pid : pids) {
-        HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA | PROCESS_SET_INFORMATION, FALSE, pid);
-        if (!h) h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA, FALSE, pid);
-        if (!h) continue;
-        SetProcessWorkingSetSizeEx(h, static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1), 0);
-        K32EmptyWorkingSet(h);
-        CloseHandle(h);
-    }
+    trim_pids_now(pids);
     unsigned long long after_ws = 0, after_priv = 0;
     measure_tree(pids, after_ws, after_priv);
     if (out_before_bytes) *out_before_bytes = before_ws;
