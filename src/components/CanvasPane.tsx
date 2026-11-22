@@ -100,6 +100,8 @@ function LeftStudioRail({ onClose }: { onClose: () => void }) {
   const sel = useStore((s) => s.sel);
   const editId = useStore((s) => s.ui.editId);
   const dsId = useStore((s) => s.settings.designSystemId);
+  const tree = useEditor((s) => s.tree);
+  const activeEl = useEditor((s) => s.sel);
   const boards = allBoards.filter((a) => a.pageId === pageId);
   const targetBoard = boards.find((b) => b.id === editId) ?? boards.find((b) => sel.includes(b.id)) ?? boards[0];
 
@@ -184,71 +186,117 @@ function LeftStudioRail({ onClose }: { onClose: () => void }) {
 
       {railTab === "screens" ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="grid grid-cols-2 gap-1.5 border-b border-outline-variant/50 p-2.5">
+          <div className="grid grid-cols-3 gap-1 border-b border-outline-variant/50 p-2">
             <button
               onClick={() => spawnFrame("mobile")}
-              className="state flex h-8 items-center justify-center gap-1.5 rounded-xl bg-primary-container text-xs font-semibold text-on-primary-container"
+              className="state flex h-7 items-center justify-center gap-1 rounded-lg bg-primary-container text-[11px] font-semibold text-on-primary-container"
             >
-              <Icon name="smartphone" size={14} /> + Mobile
+              <Icon name="smartphone" size={13} /> Mobile
+            </button>
+            <button
+              onClick={() => spawnFrame("tablet")}
+              className="state flex h-7 items-center justify-center gap-1 rounded-lg bg-surface-high text-[11px] font-semibold text-on-surface"
+            >
+              <Icon name="tablet" size={13} /> Tablet
             </button>
             <button
               onClick={() => spawnFrame("web")}
-              className="state flex h-8 items-center justify-center gap-1.5 rounded-xl bg-surface-high text-xs font-semibold text-on-surface"
+              className="state flex h-7 items-center justify-center gap-1 rounded-lg bg-surface-high text-[11px] font-semibold text-on-surface"
             >
-              <Icon name="desktop_windows" size={14} /> + Web
+              <Icon name="desktop_windows" size={13} /> Web
             </button>
           </div>
           <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
             {boards.length === 0 ? (
               <div className="px-3 py-8 text-center text-xs text-on-surface-variant">
-                No screens on this page yet. Click + Mobile or + Web above, or drag any UI block onto the canvas.
+                Click Mobile, Tablet, or Web above, or drag any UI block onto the canvas.
               </div>
             ) : (
               boards.map((b) => {
                 const isSelected = sel.includes(b.id);
                 const isEditing = editId === b.id;
                 return (
-                  <div
-                    key={b.id}
-                    onClick={() => {
-                      useStore.getState().setSel([b.id]);
-                      canvasApi.fit([b.id]);
-                    }}
-                    onDoubleClick={() => {
-                      useEditor.getState().begin(b.id, b.html, "design");
-                      useEditor.getState().setInsertOpen(true);
-                      useStore.getState().patchUI({ editId: b.id, interactId: null });
-                    }}
-                    className={cn(
-                      "group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-xs transition-colors",
-                      isEditing
-                        ? "bg-primary text-on-primary font-semibold"
-                        : isSelected
-                          ? "bg-primary-container text-on-primary-container font-semibold"
-                          : "text-on-surface hover:bg-surface-high"
-                    )}
-                  >
-                    <Icon name={DEV_ICON[b.device]} size={14} className="shrink-0 opacity-80" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate">{b.name}</div>
-                      <div className="font-mono text-[10px] opacity-70">{b.w}×{b.h} · v{b.version}</div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isEditing) {
-                          editor.finish();
-                        } else {
-                          useEditor.getState().begin(b.id, b.html, "design");
-                          useEditor.getState().setInsertOpen(true);
-                          useStore.getState().patchUI({ editId: b.id, interactId: null });
-                        }
+                  <div key={b.id} className="space-y-1">
+                    <div
+                      onClick={() => {
+                        useStore.getState().setSel([b.id]);
+                        canvasApi.fit([b.id]);
                       }}
-                      title={isEditing ? "Finish editing" : "Edit DOM & Auto-Layout"}
-                      className="grid size-6 place-items-center rounded-lg bg-black/10 hover:bg-black/20"
+                      onDoubleClick={() => {
+                        useEditor.getState().begin(b.id, b.html, "design");
+                        useEditor.getState().setInsertOpen(true);
+                        useStore.getState().patchUI({ editId: b.id, interactId: null });
+                      }}
+                      className={cn(
+                        "group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-xs transition-colors",
+                        isEditing
+                          ? "bg-primary text-on-primary font-semibold"
+                          : isSelected
+                            ? "bg-primary-container text-on-primary-container font-semibold"
+                            : "text-on-surface hover:bg-surface-high"
+                      )}
                     >
-                      <Icon name={isEditing ? "check" : "ads_click"} size={13} />
-                    </button>
+                      <Icon name={DEV_ICON[b.device]} size={14} className="shrink-0 opacity-80" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{b.name}</div>
+                        <div className="font-mono text-[10px] opacity-70">{b.w}×{b.h} · v{b.version}</div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEditing) {
+                            editor.finish();
+                          } else {
+                            useEditor.getState().begin(b.id, b.html, "design");
+                            useEditor.getState().setInsertOpen(true);
+                            useStore.getState().patchUI({ editId: b.id, interactId: null });
+                          }
+                        }}
+                        title={isEditing ? "Finish editing" : "Edit DOM & Auto-Layout"}
+                        className="grid size-6 place-items-center rounded-lg bg-black/10 hover:bg-black/20"
+                      >
+                        <Icon name={isEditing ? "check" : "ads_click"} size={13} />
+                      </button>
+                    </div>
+                    {isEditing && tree.length > 0 && (
+                      <div className="ml-2 space-y-0.5 border-l border-outline-variant/60 pl-1.5 py-0.5">
+                        {tree.map((node, ni) => {
+                          const pKey = node.path.join(".");
+                          const activePath = activeEl ? activeEl.path.join(".") : "";
+                          return (
+                            <div key={pKey + ":" + ni}>
+                              <button
+                                onClick={() => editor.selectPath(node.path)}
+                                className={cn(
+                                  "state flex h-6 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px]",
+                                  pKey === activePath ? "bg-secondary-container font-semibold text-on-secondary-container" : "text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
+                                )}
+                              >
+                                <Icon name="layers" size={11} className="shrink-0 opacity-75" />
+                                <span className="min-w-0 flex-1 truncate">{node.label}</span>
+                                <span className="font-mono text-[9.5px] opacity-60">{node.tag}</span>
+                              </button>
+                              {node.children.map((ch, ci) => {
+                                const cKey = ch.path.join(".");
+                                return (
+                                  <button
+                                    key={cKey + ":" + ci}
+                                    onClick={() => editor.selectPath(ch.path)}
+                                    className={cn(
+                                      "state flex h-5.5 w-full items-center gap-1.5 rounded-md pl-5 pr-2 text-left text-[10.5px]",
+                                      cKey === activePath ? "bg-secondary-container font-semibold text-on-secondary-container" : "text-on-surface-variant/85 hover:bg-surface-high hover:text-on-surface"
+                                    )}
+                                  >
+                                    <span className="min-w-0 flex-1 truncate">{ch.label}</span>
+                                    <span className="font-mono text-[9px] opacity-55">{ch.tag}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })

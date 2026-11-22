@@ -111,7 +111,7 @@ export const editor = {
     const svg = /<svg[\s\S]*?<\/svg>/i.exec(wrapped)?.[0];
     if (svg) editorBridge.post({ op: "swapIcon", svg });
   },
-  wrap: (dir: "row" | "column") => editorBridge.post({ op: "wrap", dir }),
+  wrap: (dir: "row" | "column" | "card") => editorBridge.post({ op: "wrap", dir }),
   replaceHtml: (html: string) => editorBridge.post({ op: "replaceHtml", html }),
   insertHtml: (html: string, where: "after" | "inside" | "append" = "after") => {
     const ds = getDS(useStore.getState().settings.designSystemId);
@@ -170,6 +170,43 @@ st.textContent="[data-zhov]{outline:1.5px dashed "+ACC+"!important;outline-offse
 document.head.appendChild(st);
 var lab=document.createElement("div");lab.setAttribute("data-zeus-edit","");
 lab.style.cssText="position:absolute;z-index:2147483647;pointer-events:auto;background:"+ACC+";color:#fff;font:600 10.5px/1 system-ui,sans-serif;padding:3px 6px;border-radius:6px;display:none;white-space:nowrap;align-items:center;gap:4px";
+var dropLine=document.createElement("div");dropLine.setAttribute("data-zeus-edit","");
+dropLine.style.cssText="position:absolute;z-index:2147483647;pointer-events:none;display:none;background:"+ACC+";height:3px;border-radius:2px";
+document.body.appendChild(dropLine);
+var grip=document.createElement("span");grip.setAttribute("data-zeus-edit","");grip.textContent="⠿";grip.title="Drag to reorder element";
+grip.style.cssText="cursor:grab!important;padding:1px 3px;border-radius:3px;background:rgba(255,255,255,0.22);font:700 11px/1 system-ui,sans-serif";
+grip.addEventListener("pointerdown",function(ev){
+  ev.preventDefault();ev.stopPropagation();
+  if(!sel||sel===document.body)return;
+  var dropTarget=null,dropAfter=true;
+  function mv(e2){
+    var elAt=document.elementFromPoint(e2.clientX,e2.clientY);
+    if(!elAt||elAt===sel||sel.contains(elAt)||elAt.closest("[data-zeus-edit]")){dropLine.style.display="none";dropTarget=null;return}
+    var cand=elAt;
+    while(cand&&cand.parentElement&&cand.parentElement!==sel.parentElement&&cand!==document.body){
+      if(cand.parentElement===sel.parentElement)break;
+      cand=cand.parentElement;
+    }
+    if(!cand||cand===document.body||cand===sel||sel.contains(cand)){dropLine.style.display="none";dropTarget=null;return}
+    dropTarget=cand;
+    var r=cand.getBoundingClientRect(),sx=window.scrollX,sy=window.scrollY;
+    dropAfter=(e2.clientY-r.top)>(r.height/2);
+    dropLine.style.display="block";
+    dropLine.style.left=(r.left+sx)+"px";
+    dropLine.style.width=Math.max(24,r.width)+"px";
+    dropLine.style.top=(dropAfter?(r.bottom+sy):(r.top+sy-3))+"px";
+  }
+  function up(){
+    window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);
+    dropLine.style.display="none";
+    if(dropTarget&&sel&&dropTarget!==sel&&!sel.contains(dropTarget)){
+      if(dropAfter)dropTarget.after(sel);else dropTarget.before(sel);
+      pick(sel);touched();
+    }
+  }
+  window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up);
+});
+lab.appendChild(grip);
 var labTxt=document.createElement("span");labTxt.setAttribute("data-zeus-edit","");lab.appendChild(labTxt);
 function mkAct(txt,title,fn){
   var b=document.createElement("button");b.setAttribute("data-zeus-edit","");b.type="button";b.textContent=txt;b.title=title;
@@ -177,10 +214,13 @@ function mkAct(txt,title,fn){
   b.addEventListener("click",function(ev){ev.preventDefault();ev.stopPropagation();fn()});
   lab.appendChild(b);
 }
-mkAct("↑","Move up",function(){run({op:"move",dir:-1})});
-mkAct("↓","Move down",function(){run({op:"move",dir:1})});
+mkAct("↑","Move up ([)",function(){run({op:"move",dir:-1})});
+mkAct("↓","Move down (])",function(){run({op:"move",dir:1})});
+mkAct("+Txt","Insert text after",function(){run({op:"insertHtml",html:'<div class="z-sub" style="font-size:14px;color:var(--text)">New text label</div>',where:"after"})});
+mkAct("+Btn","Insert button after",function(){run({op:"insertHtml",html:'<button class="z-btn sm">Action</button>',where:"after"})});
+mkAct("⊞Row","Wrap Auto-Layout Row (Shift+A)",function(){run({op:"wrap",dir:"row"})});
+mkAct("⊞Col","Wrap Auto-Layout Column",function(){run({op:"wrap",dir:"column"})});
 mkAct("⧉","Duplicate (Ctrl+D)",function(){run({op:"duplicate"})});
-mkAct("⊞","Wrap Auto-Layout Row (Shift+A)",function(){run({op:"wrap",dir:"row"})});
 mkAct("✕","Delete (Del)",function(){run({op:"delete"})});
 document.body.appendChild(lab);
 var box=document.createElement("div");box.setAttribute("data-zeus-edit","");
@@ -280,7 +320,11 @@ var mod=e.ctrlKey||e.metaKey;
 if(mod&&e.key.toLowerCase()==="z"){e.preventDefault();P.postMessage({zeus:"edit",type:e.shiftKey?"redo":"undo"},"*");return}
 if(mod&&e.key.toLowerCase()==="y"){e.preventDefault();P.postMessage({zeus:"edit",type:"redo"},"*");return}
 if(!sel||sel===document.body)return;
-if(e.shiftKey&&e.key.toLowerCase()==="a"){e.preventDefault();run({op:"wrap",dir:"row"});return}
+if(e.shiftKey&&e.key.toLowerCase()==="a"){e.preventDefault();var cs0=getComputedStyle(sel);if(/flex/.test(cs0.display)){sel.style.flexDirection=cs0.flexDirection==="column"?"row":"column";touched()}else{run({op:"wrap",dir:"row"})}return}
+if(mod&&e.key.toLowerCase()==="g"){e.preventDefault();run({op:"wrap",dir:"card"});return}
+if(e.key==="["){e.preventDefault();run({op:"move",dir:-1});return}
+if(e.key==="]"){e.preventDefault();run({op:"move",dir:1});return}
+if(e.key==="Enter"){e.preventDefault();if(simpleText(sel)){editing=sel;sel.setAttribute("contenteditable","true");sel.focus()}else if(sel.firstElementChild){pick(sel.firstElementChild)}return}
 if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();run({op:"delete"})}
 else if(mod&&e.key.toLowerCase()==="d"){e.preventDefault();run({op:"duplicate"})}
 else if(e.key==="Escape"){pick(null)}
@@ -338,7 +382,7 @@ function run(d){
   else if(d.op==="wrap"){
     if(el===document.body)return;
     var w=document.createElement("div");
-    w.className=d.dir==="column"?"z-col":"z-row z-between";
+    w.className=d.dir==="card"?"z-card z-col":d.dir==="column"?"z-col":"z-row z-between";
     el.before(w);w.appendChild(el);pick(w);touched();
   }
   else if(d.op==="delete"){if(el===document.body)return;var par=el.parentElement;el.remove();sel=null;lab.style.display="none";box.style.display="none";P.postMessage({zeus:"edit",type:"select",info:null},"*");emit();if(par&&par!==document.body)pick(par)}
