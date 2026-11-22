@@ -10,6 +10,7 @@ import { CompareDialog, GridView, SingleView } from "./Views";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
 import { editor, useEditor } from "../lib/editor";
+import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 
 function ProjectName() {
   const name = useStore((s) => s.projectName);
@@ -82,6 +83,9 @@ export function CanvasPane() {
   const pageId = useStore((s) => s.activePageId);
   const allBoards = useStore((s) => s.artboards);
   const sel = useStore((s) => s.sel);
+  const dsId = useStore((s) => s.settings.designSystemId);
+  const patchSettings = useStore((s) => s.patchSettings);
+  const ds = getDS(dsId);
   const boards = allBoards.filter((a) => a.pageId === pageId);
   const pickedBoards = boards.filter((b) => sel.includes(b.id));
   const studioActive = !!editId || insertOpen;
@@ -133,6 +137,40 @@ export function CanvasPane() {
               { id: "single", icon: <Icon name="crop_landscape" size={16} />, title: "Single screen" },
             ]}
           />
+          <Dropdown align="right" width={280} trigger={({ toggle, open }) => (
+            <button
+              onClick={toggle}
+              title={`Active Design System: ${ds.name} — click to live re-theme canvas`}
+              className={cn(
+                "state flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3 text-sm font-medium text-on-surface",
+                open && "bg-surface-high"
+              )}
+            >
+              <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: ds.tokens.primary }} />
+              <span className="max-w-[130px] truncate @max-[1020px]:hidden">{ds.name}</span>
+              <Icon name="expand_more" size={14} className="shrink-0 text-on-surface-variant" />
+            </button>
+          )}>
+            {(close) => (
+              <>
+                <MenuLabel>Design System (live re-theme)</MenuLabel>
+                {DESIGN_SYSTEMS.map((d) => (
+                  <MenuItem
+                    key={d.id}
+                    active={d.id === dsId}
+                    icon={<span className="size-3.5 rounded-full border border-black/15" style={{ background: d.tokens.primary }} />}
+                    label={d.name}
+                    desc={d.vendor}
+                    onClick={() => {
+                      patchSettings({ designSystemId: d.id });
+                      useStore.getState().notify(`Switched to ${d.name}`);
+                      close();
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </Dropdown>
           <button
             onClick={() => {
               const ed = useEditor.getState();

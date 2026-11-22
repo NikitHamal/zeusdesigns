@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { editor, useEditor, type InspectorTab, type LayerNode } from "../lib/editor";
 import { BLOCK_CATEGORIES, insertBlockIntoHtml, UI_BLOCKS, type BlockCategory } from "../lib/blocks";
-import { getDS } from "../lib/designSystems";
+import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { DESIGN_FONTS } from "../lib/fonts";
 import { UI_ICON_NAMES } from "../lib/harness";
 import { canvasApi } from "../lib/canvasApi";
-import type { Quote } from "../types";
+import { DEVICE_SIZE, type Device, type Quote } from "../types";
 import { cn } from "../utils/cn";
 import { IconBtn } from "./ui";
 import { Icon } from "./Icon";
@@ -461,20 +461,73 @@ export function Inspector() {
       {/* TAB 4: DESIGN (Figma Visual & Auto-Layout Properties) */}
       {activeTab === "design" && (
         !sel || !s ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <div className="grid size-12 place-items-center rounded-2xl bg-surface-high text-on-surface-variant">
-              <Icon name="ads_click" size={22} />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {targetBoard && (
+              <>
+                <Section title="Frame Properties">
+                  <input
+                    value={targetBoard.name}
+                    onChange={(e) => useStore.getState().updateArtboard(targetBoard.id, { name: e.target.value })}
+                    className="mb-2 h-8 w-full rounded-xl bg-surface-high px-2.5 text-[12.5px] font-semibold text-on-surface outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <div className="mb-2 grid grid-cols-3 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                    {(["mobile", "tablet", "web"] as Device[]).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => useStore.getState().updateArtboard(targetBoard.id, { device: d, w: DEVICE_SIZE[d].w, h: DEVICE_SIZE[d].h })}
+                        className={cn(
+                          "state h-7 rounded-lg capitalize",
+                          targetBoard.device === d ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+                        )}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Num label="W" value={targetBoard.w} min={240} max={2560} onChange={(v) => useStore.getState().updateArtboard(targetBoard.id, { w: v })} />
+                    <Num label="H" value={targetBoard.h} min={240} max={4000} onChange={(v) => useStore.getState().updateArtboard(targetBoard.id, { h: v })} />
+                  </div>
+                </Section>
+              </>
+            )}
+
+            <Section title="Design System (Live Re-theme)">
+              <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
+                {DESIGN_SYSTEMS.map((d) => {
+                  const on = d.id === dsId;
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => {
+                        useStore.getState().patchSettings({ designSystemId: d.id });
+                        useStore.getState().notify(`Applied ${d.name}`);
+                      }}
+                      className={cn(
+                        "state flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-xs transition-colors",
+                        on ? "bg-primary-container font-semibold text-on-primary-container" : "bg-surface-low text-on-surface hover:bg-surface-high"
+                      )}
+                    >
+                      <span className="size-3.5 shrink-0 rounded-full border border-black/15" style={{ background: d.tokens.primary }} />
+                      <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                      <span className="text-[10.5px] opacity-65">{d.vendor}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Section>
+
+            <div className="flex flex-col items-center gap-2.5 border-t border-outline-variant/60 px-5 py-5 text-center">
+              <div className="text-xs text-on-surface-variant">
+                Click any element on the screen to style its Auto-Layout, tokens, and typography, or insert new blocks.
+              </div>
+              <button
+                onClick={() => setTab("insert")}
+                className="state inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
+              >
+                <Icon name="add" size={15} /> Browse 36 UI Blocks & Layouts
+              </button>
             </div>
-            <div className="text-[13.5px] font-medium text-on-surface">Select any element on the screen</div>
-            <div className="text-xs text-on-surface-variant">
-              Click to style, double-click text to edit inline, drag handles to resize, or switch to <b>Insert</b> to add components.
-            </div>
-            <button
-              onClick={() => setTab("insert")}
-              className="state mt-1 inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
-            >
-              <Icon name="add" size={15} /> Browse Insert Library
-            </button>
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">
