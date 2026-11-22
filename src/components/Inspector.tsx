@@ -261,7 +261,7 @@ export function Inspector() {
 
   return (
     <aside
-      className="anim-pop pointer-events-auto absolute bottom-24 right-3 top-[68px] z-40 flex w-[304px] flex-col overflow-hidden rounded-[24px] border border-outline-variant bg-surface-container"
+      className="pointer-events-auto z-30 flex h-full w-[304px] shrink-0 flex-col overflow-hidden border-l border-outline-variant/60 bg-surface-container"
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >

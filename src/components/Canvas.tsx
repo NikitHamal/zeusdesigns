@@ -270,7 +270,10 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
             className="h-7 w-40 rounded-lg bg-surface-high px-2 text-[13px] font-semibold text-on-surface outline-none ring-2 ring-primary"
           />
         ) : (
-          <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold", selected ? "text-primary" : "text-on-surface-variant")}>{a.name}</span>
+          <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold", selected || editing ? "text-primary" : "text-on-surface-variant")}>
+            {a.name}
+            <span className="ml-1.5 font-mono text-[10.5px] font-normal opacity-65">{a.w}×{a.h}</span>
+          </span>
         )}
         {(a.version > 1 || a.history.length > 0) && (
           <Dropdown width={220} trigger={({ toggle }) => (
@@ -345,7 +348,14 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
           <div
             className="absolute inset-0 cursor-default"
             onPointerDown={(e) => { e.stopPropagation(); onMoveStart(e, a.id); }}
-            onDoubleClick={() => patchUI({ interactId: a.id })}
+            onDoubleClick={() => {
+              if (a.loading) return;
+              if (useEditor.getState().artboardId) editor.finish();
+              useEditor.getState().begin(a.id, a.html, "design");
+              useEditor.getState().setInsertOpen(true);
+              patchUI({ editId: a.id, interactId: null });
+              useStore.getState().setSel([a.id]);
+            }}
           />
         )}
         {draggingBlockId && (

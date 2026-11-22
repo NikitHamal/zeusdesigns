@@ -94,6 +94,22 @@ export const UI_BLOCKS: UIBlock[] = [
 
   // Primitives & Auto-Layout
   {
+    id: "card_surface",
+    name: "Surface Card",
+    category: "primitives",
+    icon: "crop_landscape",
+    desc: "Tonal design-system card container with header and body",
+    html: () => `<div class="z-card tonal"><div class="z-row z-between"><span class="z-small z-muted">Card Header</span><span class="z-badge">Active</span></div><div class="z-title">Surface Container</div><div class="z-small z-muted">Double-click any text to edit inline or drop blocks here.</div></div>`,
+  },
+  {
+    id: "input_field",
+    name: "Input Field",
+    category: "primitives",
+    icon: "edit",
+    desc: "Labeled text input field with leading icon",
+    html: () => `<div class="z-field"><label class="z-label">Field label</label><div class="z-input"><i data-i="search" class="sm z-muted"></i><span>Type a value…</span></div></div>`,
+  },
+  {
     id: "auto_row",
     name: "Auto-Layout Row",
     category: "primitives",

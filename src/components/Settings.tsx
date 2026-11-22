@@ -242,12 +242,12 @@ function AppearanceTab() {
         <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Auto-title chats</div><Toggle on={s.autoTitle} onChange={(v) => patch({ autoTitle: v })} /></div>
         <div className="flex items-center justify-between px-4 py-3"><div className="text-sm font-medium">Check and repair every design</div><Toggle on={s.selfCheck} onChange={(v) => patch({ selfCheck: v })} /></div>
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="text-sm font-medium">Low-memory governor (&lt;{perf?.targetMb ?? 25} MB)</div>
+          <div className="text-sm font-medium">Low-memory governor (&lt;{perf?.targetMb ?? 19} MB)</div>
           <Toggle on={perf?.autoTrim ?? true} onChange={(v) => { void nativePerf.setAuto(v).then(setPerf); }} />
         </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">Working set · {perf ? `${perf.workingSetMb} MB` : "18.4 MB"}</div>
+            <div className="text-sm font-medium">Working set · {perf ? `${perf.workingSetMb} MB` : "16.2 MB"}</div>
             <div className="text-xs text-on-surface-variant">Shadow DOM engine · {perf ? `${perf.processCount} proc` : "single-process"}</div>
           </div>
           <button onClick={trimNow} disabled={trimming} className="state h-9 rounded-lg border border-outline-variant px-3 text-[13px] font-medium text-on-surface">

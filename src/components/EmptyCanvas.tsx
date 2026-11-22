@@ -32,19 +32,19 @@ export function EmptyCanvas() {
       <div className="anim-pop pointer-events-auto max-w-[560px] text-center" onPointerDown={(e) => e.stopPropagation()}>
         <h2 className="greeting text-[34px] leading-tight text-on-surface">What are we designing?</h2>
 
-        {/* Build from scratch (Figma / Onlook visual mode) */}
+        {/* Build from scratch (Figma / Penpot / Onlook visual mode) */}
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => startScratch("mobile")}
             className="state flex h-10 items-center gap-2 rounded-full border border-primary/40 bg-primary-container px-4 text-sm font-semibold text-on-primary-container"
           >
-            <Icon name="widgets" size={17} /> Blank Mobile + UI Kit
+            <Icon name="smartphone" size={17} /> Blank Mobile + Figma Studio
           </button>
           <button
             onClick={() => startScratch("web")}
             className="state flex h-10 items-center gap-2 rounded-full border border-outline-variant bg-surface-high px-4 text-sm font-semibold text-on-surface"
           >
-            <Icon name="desktop_windows" size={17} /> Blank Web + UI Kit
+            <Icon name="desktop_windows" size={17} /> Blank Web + Figma Studio
           </button>
         </div>
 
