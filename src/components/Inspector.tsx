@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { editor, useEditor, type InspectorTab, type LayerNode } from "../lib/editor";
 import { BLOCK_CATEGORIES, insertBlockIntoHtml, UI_BLOCKS, type BlockCategory } from "../lib/blocks";
+import { applyThemeOverrideToHtml, detectThemeOverride } from "../lib/context";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { DESIGN_FONTS } from "../lib/fonts";
-import { UI_ICON_NAMES } from "../lib/harness";
+import { harden, rethemeHtml, stripKitBoilerplate, UI_ICON_NAMES } from "../lib/harness";
 import { canvasApi } from "../lib/canvasApi";
 import { DEVICE_SIZE, type Device, type Quote } from "../types";
 import { cn } from "../utils/cn";
@@ -175,8 +176,8 @@ export function Inspector() {
   const key = sel ? sel.path.join(".") + sel.tag : "";
   useEffect(() => {
     setText(sel?.text ?? "");
-    setCodeText(sel?.outerHtml ?? "");
-  }, [key, sel?.outerHtml]);
+    setCodeText(sel?.outerHtml ?? (targetBoard ? stripKitBoilerplate(targetBoard.html) : ""));
+  }, [key, sel?.outerHtml, targetBoard?.id, targetBoard?.html]);
 
   const isOpen = !!editId || insertOpen;
   if (!isOpen) return null;
@@ -423,12 +424,12 @@ export function Inspector() {
         </div>
       )}
 
-      {/* TAB 3: CODE (Live HTML Inspector & Editor) */}
+      {/* TAB 3: CODE (Live HTML Inspector & Editor — Element or Full Screen) */}
       {activeTab === "code" && (
         <div className="flex min-h-0 flex-1 flex-col p-3 gap-2.5">
           <div className="flex items-center justify-between text-xs text-on-surface-variant">
-            <span>{sel ? `Selected <${sel.tag}> HTML` : "Select an element to edit its HTML"}</span>
-            {sel && (
+            <span>{sel ? `Selected <${sel.tag}> HTML` : targetBoard ? `Screen HTML (${targetBoard.name})` : "Select a screen to edit its HTML"}</span>
+            {(sel || targetBoard) && (
               <button
                 onClick={() => { navigator.clipboard.writeText(codeText); useStore.getState().notify("Copied HTML"); }}
                 className="font-semibold text-primary hover:underline"
@@ -440,20 +441,27 @@ export function Inspector() {
           <textarea
             value={codeText}
             onChange={(e) => setCodeText(e.target.value)}
-            disabled={!sel}
+            disabled={!sel && !targetBoard}
             spellCheck={false}
-            placeholder="Click any element on the artboard to inspect and edit its live HTML markup…"
+            placeholder="Inspect and edit live HTML markup…"
             className="min-h-0 flex-1 resize-none rounded-2xl border border-outline-variant/60 bg-surface-low p-3 font-mono text-[11.5px] leading-relaxed text-on-surface outline-none focus:border-primary"
           />
           <button
-            disabled={!sel || !codeText.trim()}
+            disabled={(!sel && !targetBoard) || !codeText.trim()}
             onClick={() => {
-              editor.replaceHtml(codeText);
-              useStore.getState().notify("Updated element HTML");
+              if (sel) {
+                editor.replaceHtml(codeText);
+                useStore.getState().notify("Updated element HTML");
+              } else if (targetBoard) {
+                const ds = getDS(dsId);
+                const next = harden(codeText, ds, { partial: true, device: targetBoard.device }).html;
+                useStore.getState().reviseArtboard(targetBoard.id, next);
+                useStore.getState().notify(`Updated ${targetBoard.name} HTML`);
+              }
             }}
             className="state h-9 w-full rounded-full bg-primary text-xs font-semibold text-on-primary disabled:opacity-40"
           >
-            Apply HTML changes
+            {sel ? "Apply element HTML" : "Apply screen HTML"}
           </button>
         </div>
       )}
@@ -491,6 +499,71 @@ export function Inspector() {
                 </Section>
               </>
             )}
+
+            <Section title="Color Theme & Surface Palette">
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  ["green", "Emerald", "#1b6d3e"],
+                  ["teal", "Teal", "#0f6b63"],
+                  ["orange", "Clay", "#b84a1d"],
+                  ["yellow", "Gold", "#8f6200"],
+                  ["red", "Crimson", "#b3262e"],
+                  ["pink", "Sakura", "#a83264"],
+                  ["monochrome", "Mono", "#18181b"],
+                  ["reset", "System", getDS(dsId).tokens.primary],
+                ] as const).map(([key, lbl, swatch]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      const st = useStore.getState();
+                      const pageBoards = st.artboards.filter((b) => b.pageId === st.activePageId);
+                      if (!pageBoards.length) return;
+                      if (key === "reset") {
+                        const ds = getDS(dsId);
+                        pageBoards.forEach((b) => {
+                          const cleaned = b.html.replace(/<style\b[^>]*data-zeus-theme[^>]*>[\s\S]*?<\/style>/gi, "");
+                          st.reviseArtboard(b.id, rethemeHtml(cleaned, ds));
+                        });
+                        st.notify(`Reset to ${ds.name} palette`);
+                        return;
+                      }
+                      const ov = detectThemeOverride(`change theme to ${key}`, pageBoards[0]?.html ?? "");
+                      if (ov) {
+                        pageBoards.forEach((b) => st.reviseArtboard(b.id, applyThemeOverrideToHtml(b.html, ov)));
+                        st.notify(`Applied ${lbl} theme to ${pageBoards.length} screen${pageBoards.length > 1 ? "s" : ""}`);
+                      }
+                    }}
+                    className="state flex flex-col items-center gap-1 rounded-xl bg-surface-low py-1.5 px-1 text-[10.5px] font-semibold text-on-surface hover:bg-surface-high"
+                  >
+                    <span className="size-4 rounded-full border border-black/15" style={{ background: swatch }} />
+                    <span className="truncate">{lbl}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                {([
+                  ["light mode", "light_mode", "Light Surfaces"],
+                  ["dark mode", "dark_mode", "Dark Surfaces"],
+                ] as const).map(([q, ic, lbl]) => (
+                  <button
+                    key={q}
+                    onClick={() => {
+                      const st = useStore.getState();
+                      const pageBoards = st.artboards.filter((b) => b.pageId === st.activePageId);
+                      const ov = detectThemeOverride(q, pageBoards[0]?.html ?? "");
+                      if (ov && pageBoards.length) {
+                        pageBoards.forEach((b) => st.reviseArtboard(b.id, applyThemeOverrideToHtml(b.html, ov)));
+                        st.notify(`Switched ${pageBoards.length} screen${pageBoards.length > 1 ? "s" : ""} to ${lbl}`);
+                      }
+                    }}
+                    className="state flex h-7 items-center justify-center gap-1.5 rounded-lg bg-surface-low text-[11px] font-semibold text-on-surface hover:bg-surface-high"
+                  >
+                    <Icon name={ic} size={13} />
+                    <span>{lbl}</span>
+                  </button>
+                ))}
+              </div>
+            </Section>
 
             <Section title="Design System (Live Re-theme)">
               <div className="max-h-48 space-y-1 overflow-y-auto pr-0.5">
