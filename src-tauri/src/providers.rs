@@ -739,6 +739,7 @@ where
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
     let mut saw_text = false;
+    let mut in_think = false;
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -748,9 +749,23 @@ where
             let raw = raw.trim();
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                 let etype = ev.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                if etype == "chat.text" {
+                if etype == "chat.reasoning" || etype == "chat.thinking" || etype == "chat.thought" {
                     if let Some(d) = ev.get("data").and_then(|d| d.as_str()) {
                         if !d.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(d);
+                        }
+                    }
+                } else if etype == "chat.text" {
+                    if let Some(d) = ev.get("data").and_then(|d| d.as_str()) {
+                        if !d.is_empty() {
+                            if in_think {
+                                in_think = false;
+                                on_delta("</think>");
+                            }
                             saw_text = true;
                             on_delta(d);
                         }
@@ -767,6 +782,9 @@ where
             }
         }
         line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
     }
 
     if saw_text {
@@ -1206,6 +1224,7 @@ where
     let mut reader = BufReader::new(comp_resp);
     let mut line = String::new();
     let mut saw_text = false;
+    let mut in_think = false;
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -1220,7 +1239,17 @@ where
                 {
                     let phase = delta.get("phase").and_then(|p| p.as_str()).unwrap_or("answer");
                     let content = delta.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                    if phase == "answer" && !content.is_empty() {
+                    if (phase == "think" || phase == "thinking") && !content.is_empty() {
+                        if !in_think {
+                            in_think = true;
+                            on_delta("<think>");
+                        }
+                        on_delta(content);
+                    } else if phase == "answer" && !content.is_empty() {
+                        if in_think {
+                            in_think = false;
+                            on_delta("</think>");
+                        }
                         saw_text = true;
                         on_delta(content);
                     }
@@ -1228,6 +1257,9 @@ where
             }
         }
         line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
     }
 
     let _ = client
@@ -1346,6 +1378,7 @@ where
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
     let mut saw_text = false;
+    let mut in_think = false;
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -1356,9 +1389,23 @@ where
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                 if let Some(event_obj) = ev.get("event") {
                     let etype = event_obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    if etype == "content" {
+                    if etype == "reason" || etype == "think" || etype == "thinking" {
                         if let Some(c) = event_obj.get("content").and_then(|c| c.as_str()) {
                             if !c.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(c);
+                            }
+                        }
+                    } else if etype == "content" {
+                        if let Some(c) = event_obj.get("content").and_then(|c| c.as_str()) {
+                            if !c.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
                                 saw_text = true;
                                 on_delta(c);
                             }
@@ -1370,6 +1417,9 @@ where
             }
         }
         line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
     }
 
     if saw_text {
@@ -1589,6 +1639,7 @@ where
         }
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
+        let mut in_think = false;
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -1597,19 +1648,32 @@ where
                 let raw = raw.trim();
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                     if ev.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
-                        if let Some(text) = ev
-                            .get("delta")
-                            .and_then(|d| d.get("text"))
-                            .and_then(|t| t.as_str())
-                        {
-                            if !text.is_empty() {
-                                on_delta(text);
+                        if let Some(delta) = ev.get("delta") {
+                            if let Some(th) = delta.get("thinking").and_then(|t| t.as_str()) {
+                                if !th.is_empty() {
+                                    if !in_think {
+                                        in_think = true;
+                                        on_delta("<think>");
+                                    }
+                                    on_delta(th);
+                                }
+                            } else if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    on_delta(text);
+                                }
                             }
                         }
                     }
                 }
             }
             line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
         }
         Ok(())
     } else {
@@ -1647,6 +1711,7 @@ where
         }
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
+        let mut in_think = false;
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -1657,20 +1722,39 @@ where
                     break;
                 }
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
-                    if let Some(text) = ev
+                    if let Some(delta) = ev
                         .get("choices")
                         .and_then(|c| c.get(0))
                         .and_then(|c0| c0.get("delta"))
-                        .and_then(|d| d.get("content"))
-                        .and_then(|t| t.as_str())
                     {
-                        if !text.is_empty() {
-                            on_delta(text);
+                        let r_text = delta
+                            .get("reasoning_content")
+                            .or_else(|| delta.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                        }
+                        if let Some(text) = delta.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                on_delta(text);
+                            }
                         }
                     }
                 }
             }
             line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
         }
         Ok(())
     }
