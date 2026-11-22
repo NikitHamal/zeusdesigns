@@ -19,9 +19,11 @@ import {
   buildContinuationPrompt,
   buildMultiTurnContext,
   compactConversation,
+  getConversationBoards,
   getContextWindowStats,
   getProviderSpecialization,
   isCanvasRefusal,
+  looksLikeRefusalStart,
 } from "./context";
 
 /* ------------------------------------------------------------------ */
@@ -32,7 +34,7 @@ export function buildSystemPrompt(opts: { intent?: string; device?: Device; tool
   const ds = getDS(s.settings.designSystemId);
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
   const skills = SKILLS.filter((k) => s.settings.skills.includes(k.id));
-  const boards = s.artboards.filter((a) => a.pageId === s.activePageId);
+  const boards = getConversationBoards(s);
   const ws = s.ui.workspace;
   return [
     harnessPrompt(ds, opts.intent, opts.device),
@@ -299,7 +301,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     generateTitle(opts.text).then((t) => useStore.getState().setTitle(convId, t));
   }
 
-  const boards = freshSt.artboards.filter((a) => a.pageId === freshSt.activePageId);
+  const boards = getConversationBoards(freshSt);
   const spec = getProviderSpecialization(settings.providerId, settings.modelId);
   const { messages: history, themeOverride, isCanvasFollowUp } = buildMultiTurnContext({
     convMessages: conv.messages,
@@ -316,6 +318,35 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   let full = "";
   const t0 = performance.now();
   const idMap = new Map<number, string>();
+  const preSyncedIds = new Set<string>();
+
+  // Instant pre-stream canvas synchronization for theme/palette/mode changes on existing sheets
+  if (themeOverride && boards.length > 0 && !opts.asVariant) {
+    const S = useStore.getState();
+    const targetBoards = target ? [target] : boards;
+    targetBoards.forEach((b, idx) => {
+      const cur = S.artboards.find((x) => x.id === b.id);
+      if (cur) {
+        const themed = applyThemeOverrideToHtml(cur.html, themeOverride);
+        S.reviseArtboard(b.id, themed);
+        idMap.set(100 + idx, b.id);
+        preSyncedIds.add(b.id);
+      }
+    });
+    if (preSyncedIds.size > 0) {
+      tools.push({
+        id: uid(),
+        name: "studio_retheme_page",
+        args: `${themeOverride.name} · ${preSyncedIds.size} screen${preSyncedIds.size > 1 ? "s" : ""}`,
+        status: "ok",
+        output: `Applied ${themeOverride.name} token overrides across ${preSyncedIds.size} canvas screen(s) while preserving layout structure.`,
+      });
+      S.patchMessage(convId, asstId, {
+        artboardIds: [...preSyncedIds],
+        tools: [...tools],
+      });
+    }
+  }
   const created: string[] = [];
   const lastPush = new Map<number, { t: number; len: number }>();
   const linted = new Set<number>();
@@ -363,7 +394,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       if (b.closed || final) {
         const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
         const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
-        if (isRevise) S.reviseArtboard(id, finalHtml); else S.updateArtboard(id, { html: finalHtml });
+        if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml); else S.updateArtboard(id, { html: finalHtml });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
         if (out.fixes.length && !linted.has(i)) {
@@ -477,6 +508,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         const roundTools: ToolCall[] = [];
         const studioRuns = new Map<string, Promise<void>>();
         let roundText = "";
+        let heldBuffer = "";
         await new Promise<void>((resolve, reject) => {
           const onEvent = (e: ChatEvent) => {
             if (e.type === "delta") {
@@ -486,7 +518,19 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               const ci = roundText.indexOf("</zeus_tool>");
               const piece = ci >= 0 ? roundText.slice(before, ci + 12) : e.text;
               if (ci >= 0) roundText = roundText.slice(0, ci + 12);
-              if (piece) onDelta(piece);
+              if (!piece) return;
+              // Gate potential web-scraper refusal prefixes so they never flash in the chat UI
+              if (isCanvasFollowUp && !roundText.includes("<artboard") && roundText.length < 320 && (looksLikeRefusalStart(roundText) || isCanvasRefusal(roundText))) {
+                heldBuffer += piece;
+                return;
+              }
+              if (heldBuffer) {
+                const flush = heldBuffer + piece;
+                heldBuffer = "";
+                onDelta(flush);
+              } else {
+                onDelta(piece);
+              }
             }
             else if (e.type === "reasoning") { extraThink += e.text; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }
             else if (e.type === "tool_call") { const t: ToolCall = { id: e.id, name: e.name, args: typeof e.args === "string" ? e.args : JSON.stringify(e.args), status: "running" }; tools.push(t); roundTools.push(t);
@@ -531,9 +575,13 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           }
 
           // 2. Refusal recovery or missing <artboard> nudge on design/canvas follow-up turns
-          const refused = isCanvasRefusal(roundText);
+          const refused = isCanvasRefusal(roundText) || looksLikeRefusalStart(roundText);
           if (refused && full.endsWith(roundText)) {
             full = full.slice(0, full.length - roundText.length);
+          }
+          // If pre-stream theme sync already updated all canvas sheets and the scraper model only emitted a refusal, finish cleanly immediately
+          if (refused && preSyncedIds.size > 0) {
+            break;
           }
           if ((!produced || refused) && !nudged && (DESIGN_INTENT.test(opts.text) || isCanvasFollowUp || refused)) {
             nudged = true;

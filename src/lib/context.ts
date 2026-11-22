@@ -106,13 +106,25 @@ export interface ContextWindowStats {
   needsCompaction: boolean;
 }
 
+/** Resolves all active artboards for the current page or conversation so multi-turn follow-ups never lose canvas sheets. */
+export function getConversationBoards(s = useStore.getState()): Artboard[] {
+  const onActivePage = s.artboards.filter((a) => a.pageId === s.activePageId);
+  if (onActivePage.length > 0) return onActivePage;
+  const conv = activeConv(s);
+  const msgBoardIds = new Set(conv.messages.flatMap((m) => m.artboardIds ?? []));
+  const fromMessages = s.artboards.filter((a) => msgBoardIds.has(a.id));
+  if (fromMessages.length > 0) return fromMessages;
+  const convPageIds = new Set(s.pages.filter((p) => p.convId === s.activeConvId).map((p) => p.id));
+  return s.artboards.filter((a) => convPageIds.has(a.pageId));
+}
+
 export function getContextWindowStats(): ContextWindowStats {
   const s = useStore.getState();
   const conv = activeConv(s);
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
   const ds = getDS(s.settings.designSystemId);
   const skills = SKILLS.filter((k) => s.settings.skills.includes(k.id));
-  const boards = s.artboards.filter((a) => a.pageId === s.activePageId);
+  const boards = getConversationBoards(s);
 
   const sysBase = tokensCss(ds) + ds.guidelines + skills.map((k) => k.prompt).join("\n") + studioBrief("", ds) + spec.specializationPrompt;
   const systemTokens = estimateTokens(sysBase) + 1450; // base harness prompt rules
@@ -269,6 +281,31 @@ export function detectThemeOverride(prompt: string, existingHtml = ""): ThemePal
     }
   }
 
+  const hexMatch = /#([0-9a-f]{6})\b/i.exec(t);
+  if (hexMatch) {
+    const hex = `#${hexMatch[1].toLowerCase()}`;
+    const pal = useDark ? COLOR_PALETTES.monochrome.dark : COLOR_PALETTES.monochrome.light;
+    const vars: Record<string, string> = {
+      "--primary": hex,
+      "--on-primary": "#ffffff",
+      "--container": `color-mix(in srgb, ${hex} 22%, ${pal.surface})`,
+      "--on-container": pal.text,
+      "--bg": pal.bg,
+      "--surface": pal.surface,
+      "--surface-2": pal.surface2,
+      "--text": pal.text,
+      "--muted": pal.muted,
+      "--outline": pal.outline,
+    };
+    const cssVars = Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(";");
+    return {
+      name: `Custom Accent (${hex})`,
+      mode: wantsDark ? "dark" : wantsLight ? "light" : "preserve",
+      vars,
+      cssBlock: `<style data-zeus-theme>:root,body,.z-shadow-body,.z-screen,.z-shell{${cssVars}}</style>`,
+    };
+  }
+
   if (wantsDark || wantsLight) {
     const pal = wantsDark ? COLOR_PALETTES.monochrome.dark : COLOR_PALETTES.monochrome.light;
     const vars: Record<string, string> = {
@@ -315,16 +352,24 @@ export function applyThemeOverrideToHtml(html: string, theme: ThemePaletteOverri
 /* Refusal Detector for Keyless Scraped Models                         */
 /* ------------------------------------------------------------------ */
 const REFUSAL_PATTERNS = [
-  /can['’]?t\s+(?:directly\s+)?(?:access|edit|inspect|modify|see|view)\s+(?:or\s+(?:edit|inspect|modify)\s+)?(?:the\s+)?(?:canvas|sheets|artboards|screens)/i,
-  /cannot\s+(?:directly\s+)?(?:access|edit|inspect|modify|see|view)\s+(?:or\s+(?:edit|inspect|modify)\s+)?(?:the\s+)?(?:canvas|sheets|artboards|screens)/i,
-  /share\s+(?:their|the|your)\s+html/i,
-  /paste\s+(?:their|the|your)\s+html/i,
-  /don['’]?t\s+have\s+(?:direct\s+)?access\s+to\s+(?:the\s+)?(?:canvas|existing\s+sheets|existing\s+screens)/i,
+  /can['’]?t\s+(?:directly\s+)?(?:access|edit|inspect|modify|see|view|reach|update)\s+(?:or\s+(?:edit|inspect|modify|update)\s+)?(?:the\s+)?(?:canvas|sheets|artboards|screens|existing)/i,
+  /cannot\s+(?:directly\s+)?(?:access|edit|inspect|modify|see|view|reach|update)\s+(?:or\s+(?:edit|inspect|modify|update)\s+)?(?:the\s+)?(?:canvas|sheets|artboards|screens|existing)/i,
+  /unable\s+to\s+(?:directly\s+)?(?:access|edit|inspect|modify|see|view)\s+(?:the\s+)?(?:canvas|sheets|artboards|screens)/i,
+  /share\s+(?:their|the|your)\s+(?:html|code|markup|sheets)/i,
+  /paste\s+(?:their|the|your)\s+(?:html|code|markup|sheets)/i,
+  /provide\s+(?:their|the|your)\s+(?:html|code|markup|sheets)/i,
+  /don['’]?t\s+have\s+(?:direct\s+)?(?:access|visibility)\s+to\s+(?:the\s+)?(?:canvas|existing\s+sheets|existing\s+screens)/i,
 ];
 
 export function isCanvasRefusal(text: string): boolean {
   if (!text || text.includes("<artboard")) return false;
   return REFUSAL_PATTERNS.some((re) => re.test(text));
+}
+
+export function looksLikeRefusalStart(text: string): boolean {
+  const clean = text.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, "").trim();
+  if (!clean || clean.includes("<artboard") || clean.includes("<zeus_tool")) return false;
+  return /^(?:i\s+can['’]?t|i\s+cannot|i\s+am\s+unable|i\s+don['’]?t\s+have\s+direct|sorry,?\s+i\s+can['’]?t)/i.test(clean);
 }
 
 /* ------------------------------------------------------------------ */
