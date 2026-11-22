@@ -425,7 +425,7 @@ pub fn stream_mercury3<F>(
     engine: &ProviderEngine,
     system: &str,
     messages: &[ChatMessage],
-    cancel: &AtomicBool,
+     cancel: &AtomicBool,
     on_delta: &mut F,
 ) -> Result<(), String>
 where
@@ -441,11 +441,16 @@ where
                 "parts": [{ "type": "text", "text": system }]
             }));
         }
-        for m in messages {
+        for (idx, m) in messages.iter().enumerate() {
+            let text = if idx == 0 && m.role == "user" && messages.len() > 1 && !system.trim().is_empty() {
+                format!("[Zeus System Harness]\n{}\n\n[User Request]\n{}", system.chars().take(12000).collect::<String>(), m.content)
+            } else {
+                m.content.clone()
+            };
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": m.role,
-                "parts": [{ "type": "text", "text": m.content }]
+                "parts": [{ "type": "text", "text": text }]
             }));
         }
 
@@ -1317,12 +1322,13 @@ where
         .last()
         .map(|m| m.content.as_str())
         .unwrap_or("");
-    let content = if system.trim().is_empty() {
-        last_user.chars().take(8000).collect::<String>()
+    let sys_prefix: String = system.chars().take(14000).collect();
+    let content = if sys_prefix.trim().is_empty() {
+        last_user.chars().take(24000).collect::<String>()
     } else {
-        format!("{}\n\n{}", &system[..system.len().min(4000)], last_user)
+        format!("{}\n\n{}", sys_prefix, last_user)
             .chars()
-            .take(8000)
+            .take(24000)
             .collect::<String>()
     };
 
@@ -1339,7 +1345,7 @@ where
             "role": role,
             "events": [{
                 "type": ev_type,
-                "content": m.content.chars().take(8000).collect::<String>(),
+                "content": m.content.chars().take(16000).collect::<String>(),
                 "status": "FINISHED"
             }],
             "chatStatus": "FINISHED",
@@ -1497,7 +1503,8 @@ where
 
     let mut prompt = String::new();
     if !system.trim().is_empty() {
-        prompt.push_str(&format!("{}\n\n", &system[..system.len().min(4000)]));
+        let sys_safe: String = system.chars().take(16000).collect();
+        prompt.push_str(&format!("{}\n\n", sys_safe));
     }
     if messages.len() > 1 {
         prompt.push_str("Previous conversation:\n");

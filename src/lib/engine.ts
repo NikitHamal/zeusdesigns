@@ -7,13 +7,22 @@ import { detectArchetype, renderScreen, VARIANT_NAMES } from "./templates";
 import { generateTitle, isNative, nativeChat, nativePerf, ChatEvent, ChatRequest } from "./bridge";
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
-import { harden, harnessPrompt } from "./harness";
+import { harden, harnessPrompt, stripKitBoilerplate } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { tokensCss } from "./designSystems";
 import { isStudioTool, runStudioTool, studioBrief } from "./studio";
+import {
+  applyThemeOverrideToHtml,
+  buildContinuationPrompt,
+  buildMultiTurnContext,
+  compactConversation,
+  getContextWindowStats,
+  getProviderSpecialization,
+  isCanvasRefusal,
+} from "./context";
 
 /* ------------------------------------------------------------------ */
 /* System prompt                                                       */
@@ -21,11 +30,13 @@ import { isStudioTool, runStudioTool, studioBrief } from "./studio";
 export function buildSystemPrompt(opts: { intent?: string; device?: Device; tools?: string } = {}): string {
   const s = useStore.getState();
   const ds = getDS(s.settings.designSystemId);
+  const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
   const skills = SKILLS.filter((k) => s.settings.skills.includes(k.id));
   const boards = s.artboards.filter((a) => a.pageId === s.activePageId);
   const ws = s.ui.workspace;
   return [
     harnessPrompt(ds, opts.intent, opts.device),
+    spec.specializationPrompt,
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
     studioBrief(opts.intent ?? "", ds, opts.device),
     memoryBlock(),
@@ -245,19 +256,42 @@ const quoteToText = (q: Quote, boards: Artboard[]) => {
 export async function sendMessage(opts: { text: string; attachments?: Attachment[]; quote?: Quote; asVariant?: boolean }) {
   const st = useStore.getState();
   if (st.busy || !opts.text.trim()) return;
+  if (opts.text.trim().toLowerCase() === "/compact") {
+    await compactConversation({ manual: true });
+    return;
+  }
+
   const convId = st.activeConvId;
-  const conv = activeConv(st);
   const { settings } = st;
-  const target = opts.quote?.artboardId ? st.artboards.find((a) => a.id === opts.quote!.artboardId) : undefined;
+  const tools: ToolCall[] = [];
+
+  // Auto-compaction when multi-turn context approaches provider budget
+  const ctxStats = getContextWindowStats();
+  if (ctxStats.needsCompaction) {
+    const compacted = await compactConversation({ convId, manual: false });
+    if (compacted.compacted) {
+      tools.push({
+        id: uid(),
+        name: "context_compact",
+        args: `freed ~${compacted.savedTokens.toLocaleString()} tokens`,
+        status: "ok",
+        output: compacted.summary,
+      });
+    }
+  }
+
+  const freshSt = useStore.getState();
+  const conv = activeConv(freshSt);
+  const target = opts.quote?.artboardId ? freshSt.artboards.find((a) => a.id === opts.quote!.artboardId) : undefined;
 
   const userMsg: Message = { id: uid(), role: "user", text: opts.text.trim(), quote: opts.quote, attachments: opts.attachments, at: Date.now() };
   const asstId = uid();
   const prov = settings.providerId.startsWith("custom:") ? null : findProvider(settings.providerId);
   const custom = settings.providerId.startsWith("custom:") ? settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId) : undefined;
   const modelLabel = custom ? custom.model : prov?.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
-  st.addMessage(convId, userMsg);
-  st.addMessage(convId, { id: asstId, role: "assistant", text: "", streaming: true, model: modelLabel, at: Date.now(), tools: [], artboardIds: [] });
-  st.setBusy(true);
+  freshSt.addMessage(convId, userMsg);
+  freshSt.addMessage(convId, { id: asstId, role: "assistant", text: "", streaming: true, model: modelLabel, at: Date.now(), tools: [...tools], artboardIds: [] });
+  freshSt.setBusy(true);
   void learnFromText(opts.text).then((l) => { if (l.length) useStore.getState().notify(l.length === 1 ? "Saved to memory" : `Saved ${l.length} lines to memory`); });
 
   // instant title via ChatJimmy (micro-task engine)
@@ -265,17 +299,17 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     generateTitle(opts.text).then((t) => useStore.getState().setTitle(convId, t));
   }
 
-  const boards = st.artboards.filter((a) => a.pageId === st.activePageId);
-  const history = [...conv.messages, userMsg].filter((m) => !m.error).map((m) => {
-    let content = m.text;
-    if (m.quote) content = quoteToText(m.quote, boards) + "\n" + content;
-    if (m.attachments) for (const a of m.attachments) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 20000)}`;
-    return { role: m.role, content, attachments: (m.attachments ?? []).filter((a) => a.dataUrl && a.mime.startsWith("image/")).map((a) => ({ name: a.name, mime: a.mime, dataUrl: a.dataUrl! })) };
+  const boards = freshSt.artboards.filter((a) => a.pageId === freshSt.activePageId);
+  const spec = getProviderSpecialization(settings.providerId, settings.modelId);
+  const { messages: history, themeOverride, isCanvasFollowUp } = buildMultiTurnContext({
+    convMessages: conv.messages,
+    userMsg,
+    boards,
+    target,
+    asVariant: opts.asVariant,
+    quoteToText,
+    spec,
   });
-  if (target) {
-    const last = history[history.length - 1];
-    last.content += `\n\n<current_artboard id="${target.id}" name="${target.name}" device="${target.device}">\n${target.html.slice(0, 40000)}\n</current_artboard>\n${opts.asVariant ? 'Create this as a NEW variant (mode="new").' : 'Revise in place (mode="revise", same id).'}`;
-  }
 
   controller = new AbortController();
   const signal = controller.signal;
@@ -284,7 +318,6 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const idMap = new Map<number, string>();
   const created: string[] = [];
   const lastPush = new Map<number, { t: number; len: number }>();
-  const tools: ToolCall[] = [];
   const linted = new Set<number>();
   let extraThink = "";
   let thinkT0 = 0;
@@ -295,9 +328,18 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     const S = useStore.getState();
     blocks.forEach((b, i) => {
       let id = idMap.get(i);
-      const bDevice = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? "mobile") as Device;
+      const bDevice = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? boards[i]?.device ?? "mobile") as Device;
       if (!id) {
-        const existing = b.attrs.mode === "revise" && b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
+        // Match existing artboard by explicit id, by name, or by positional index during a multi-turn canvas revision
+        const byId = b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
+        const byName = !byId && isCanvasFollowUp && b.attrs.name
+          ? boards.find((a) => a.name.toLowerCase() === b.attrs.name.toLowerCase())
+          : undefined;
+        const byTarget = !byId && !byName && target && !opts.asVariant && i === 0 ? target : undefined;
+        const byIndex = !byId && !byName && !byTarget && isCanvasFollowUp && !opts.asVariant && (b.attrs.mode === "revise" || Boolean(themeOverride))
+          ? boards[i]
+          : undefined;
+        const existing = byId ?? byName ?? byTarget ?? byIndex;
         if (existing) {
           id = existing.id;
           S.updateArtboard(id, { loading: true });
@@ -316,11 +358,12 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
       const lp = lastPush.get(i)!;
       const now = performance.now();
-      const isRevise = b.attrs.mode === "revise" && !created.includes(id);
+      const isRevise = !created.includes(id);
       const dsNow = getDS(S.settings.designSystemId);
       if (b.closed || final) {
         const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
-        if (isRevise) S.reviseArtboard(id, out.html); else S.updateArtboard(id, { html: out.html });
+        const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
+        if (isRevise) S.reviseArtboard(id, finalHtml); else S.updateArtboard(id, { html: finalHtml });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
         if (out.fixes.length && !linted.has(i)) {
@@ -328,7 +371,8 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           tools.push({ id: uid(), name: "design_lint", args: b.attrs.name || "screen", status: "ok", output: out.fixes.join("\n") });
         }
       } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
-        S.updateArtboard(id, { html: harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html });
+        const partialHtml = harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html;
+        S.updateArtboard(id, { html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml });
         lastPush.set(i, { t: now, len: b.html.length });
       }
     });
@@ -338,9 +382,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     if (reasoning && !thinkT0) thinkT0 = performance.now();
     const thinkOpen = thoughts.length > 0 && thoughts[thoughts.length - 1][2] === "";
     if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
+    const hasUnclosed = final && blocks.some((b) => !b.closed);
     S.patchMessage(convId, asstId, {
       reasoning: reasoning || undefined, thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
       text, artboardIds: [...new Set([...idMap.values()])], tools: [...tools],
+      truncated: hasUnclosed || undefined,
       stats: final ? { ms, tokens: Math.round(full.length / 4), tps: Math.round(full.length / 4 / (ms / 1000)) } : undefined,
     });
   };
@@ -462,18 +508,48 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         for (const t of roundTools) if (t.status === "running") t.status = "error";
         if (signal.aborted || round >= 4) break;
         if (!roundTools.length) {
-          // Recovery: a design request that produced no artboard never reaches the canvas. Weak models do this often; ask once more, strictly.
-          const produced = parseStream(extractRemember(full).clean).blocks.length > 0;
-          if (produced || nudged || !DESIGN_INTENT.test(opts.text) || roundText.trim().length === 0 && round > 0) break;
-          nudged = true;
-          if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
-          msgs = [
-            ...msgs,
-            { role: "assistant", content: roundText },
-            { role: "user", content: 'Your reply had no <artboard> block, so nothing reached the canvas. Reply again in the exact output protocol: one short sentence, then complete <artboard name="..." device="mobile|tablet|web" mode="new"> documents. No code fences, no explanation of how to build it.' },
-          ];
-          current = { ...req, requestId: uid(), messages: msgs };
-          continue;
+          const parsedNow = parseStream(extractRemember(full).clean);
+          const produced = parsedNow.blocks.length > 0;
+          const unclosedBlock = parsedNow.blocks.find((b) => !b.closed && b.html.length > 100);
+
+          // 1. Auto-continuation if an <artboard> truncated mid-stream before </artboard>
+          if (unclosedBlock && round < 3) {
+            tools.push({
+              id: uid(),
+              name: "auto_continue",
+              args: unclosedBlock.attrs.name || "screen",
+              status: "ok",
+              output: "Continued truncated artboard HTML stream to completion",
+            });
+            msgs = [
+              ...msgs,
+              { role: "assistant", content: roundText },
+              { role: "user", content: buildContinuationPrompt(unclosedBlock.attrs.name || "Screen", unclosedBlock.html) },
+            ];
+            current = { ...req, requestId: uid(), messages: msgs };
+            continue;
+          }
+
+          // 2. Refusal recovery or missing <artboard> nudge on design/canvas follow-up turns
+          const refused = isCanvasRefusal(roundText);
+          if (refused && full.endsWith(roundText)) {
+            full = full.slice(0, full.length - roundText.length);
+          }
+          if ((!produced || refused) && !nudged && (DESIGN_INTENT.test(opts.text) || isCanvasFollowUp || refused)) {
+            nudged = true;
+            if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
+            const targetHint = boards.length > 0 && isCanvasFollowUp
+              ? `Revise the existing canvas screens (${boards.map((b) => `id="${b.id}" name="${b.name}"`).join(", ")}) using <artboard id="<id>" name="<name>" device="<device>" mode="revise"><!doctype html>...</html></artboard>.`
+              : 'Output complete <artboard name="..." device="mobile|tablet|web" mode="new"><!doctype html>...</html></artboard> documents.';
+            msgs = [
+              ...msgs,
+              { role: "assistant", content: refused ? "Understood, I will update the canvas screens directly." : roundText },
+              { role: "user", content: `Your reply had no <artboard> block, so nothing reached the canvas. ${targetHint} Reply with one short sentence followed immediately by the <artboard> blocks.` },
+            ];
+            current = { ...req, requestId: uid(), messages: msgs };
+            continue;
+          }
+          break;
         }
         const closeAt = roundText.lastIndexOf("</zeus_tool>");
         const said = closeAt >= 0 ? roundText.slice(0, closeAt + 12) : roundText;
@@ -492,6 +568,39 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
     }
     if (raf) cancelAnimationFrame(raf);
+    // Guaranteed Multi-Sheet Theme Sync: if the user asked to change the theme/palette across the canvas
+    // (or if a model only updated a subset of screens on a global theme request), synchronize all target boards in place.
+    if (themeOverride && boards.length > 0 && !opts.asVariant) {
+      const S = useStore.getState();
+      const targetBoards = target ? [target] : boards;
+      const updatedIds = new Set(idMap.values());
+      let syncedCount = 0;
+      targetBoards.forEach((b, idx) => {
+        if (!updatedIds.has(b.id)) {
+          const cur = S.artboards.find((x) => x.id === b.id);
+          if (cur) {
+            const themed = applyThemeOverrideToHtml(cur.html, themeOverride);
+            S.reviseArtboard(b.id, themed);
+            idMap.set(100 + idx, b.id);
+            syncedCount++;
+          }
+        }
+      });
+      if (syncedCount > 0) {
+        tools.push({
+          id: uid(),
+          name: "studio_retheme_page",
+          args: `${themeOverride.name} · ${targetBoards.length} screen${targetBoards.length > 1 ? "s" : ""}`,
+          status: "ok",
+          output: `Applied ${themeOverride.name} token overrides across ${targetBoards.length} canvas screen(s) while preserving layout structure.`,
+        });
+      }
+      const parsedEnd = parseStream(extractRemember(full).clean);
+      if (!parsedEnd.text.trim() || isCanvasRefusal(parsedEnd.text)) {
+        const blocksOnly = full.slice(Math.max(0, full.indexOf("<artboard")));
+        full = `Applied the **${themeOverride.name}** theme across ${targetBoards.length === 1 ? `**${targetBoards[0].name}**` : `all **${targetBoards.length} screens** on the canvas`} while preserving their layouts.\n\n${blocksOnly.startsWith("<artboard") ? blocksOnly : ""}`;
+      }
+    }
     sync(true);
     useStore.getState().patchMessage(convId, asstId, { streaming: false });
     await selfCheck();

@@ -62,11 +62,21 @@ export interface Message {
   model?: string;
   streaming?: boolean;
   error?: string;
+  compacted?: boolean;
+  truncated?: boolean;
   stats?: { tps?: number; tokens?: number; ms?: number };
   at: number;
 }
 
-export interface Conversation { id: string; title: string; messages: Message[]; at: number; titled?: boolean; activePageId?: string }
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  at: number;
+  titled?: boolean;
+  activePageId?: string;
+  compactedCount?: number;
+}
 
 export interface CustomProvider { id: string; name: string; format: "openai" | "anthropic"; baseUrl: string; apiKey: string; model: string }
 export interface McpServer { id: string; name: string; transport: "stdio" | "http" | "builtin"; command: string; args?: string[]; enabled: boolean; catalogId?: string }
