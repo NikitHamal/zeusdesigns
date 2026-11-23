@@ -11,7 +11,7 @@ import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
 import { runOpenCode } from "./opencode";
-import { agentPrompt, buildPlainContext, classifyIntent } from "./agent";
+import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
@@ -512,7 +512,8 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const nativeOn = isNative && useStore.getState().ui.nativeReady;
-  const toolsText = nativeOn ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
+  const isGreeting = mode === "chat" && GREETING_RE.test(opts.text.trim());
+  const toolsText = nativeOn && !isGreeting ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
   const system = mode === "design"
     ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
     : [agentPrompt(mode, opts.text), toolsText].filter(Boolean).join("\n\n");

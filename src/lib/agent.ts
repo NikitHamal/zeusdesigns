@@ -24,7 +24,12 @@ export function classifyIntent(text: string, ctx: { boards: number; quote?: bool
   return "chat";
 }
 
+export const GREETING_RE = /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(morning|afternoon|evening))[!.?\s]*$/i;
+
 export function agentPrompt(mode: Intent, userText = ""): string {
+  if (mode === "chat" && GREETING_RE.test(userText.trim())) {
+    return "You are Zeus, a free general-purpose AI coding and design agent running inside the ZeusDesigns desktop app. Reply to the user's greeting in one plain, direct sentence (for example: \"Hello! What would you like to build or work on?\") with no tools, no files, no code blocks, no emojis, and no roleplay.";
+  }
   const s = useStore.getState();
   const ws = s.ui.workspace;
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
