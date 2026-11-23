@@ -21,8 +21,9 @@ export function EmptyCanvas() {
     const ab = st.addBlankFrame(140, 100, sz.w, sz.h);
     st.updateArtboard(ab.id, { device: dev, name: `${sz.label} Screen` });
     st.setSel([ab.id]);
-    useEditor.getState().begin(ab.id, ab.html, "insert");
+    useEditor.getState().begin(ab.id, ab.html, "design");
     useEditor.getState().setInsertOpen(true);
+    useEditor.getState().setLeftRailOpen(true);
     st.patchUI({ editId: ab.id, interactId: null });
     setTimeout(() => canvasApi.fit([ab.id], { right: 310 }), 40);
   };

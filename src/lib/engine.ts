@@ -229,7 +229,7 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onRe
     if (c.apiKey) headers.authorization = `Bearer ${c.apiKey}`;
     const hasImgs = req.messages.some((m) => (m.attachments ?? []).some((a) => a.mime.startsWith("image/")));
     const effModel =
-      base.includes("kilo.ai") && hasImgs && !/vl|omni|particle|openrouter\/free/i.test(req.model)
+      base.includes("kilo.ai") && hasImgs && !/vl|omni|particle|dots-3|openrouter\/free/i.test(req.model)
         ? "nvidia/nemotron-3.5-super-vl:free"
         : req.model;
     const res = await fetch(`${base}/chat/completions`, {

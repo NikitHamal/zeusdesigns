@@ -265,31 +265,44 @@ function LeftStudioRail({ onClose }: { onClose: () => void }) {
                           const activePath = activeEl ? activeEl.path.join(".") : "";
                           return (
                             <div key={pKey + ":" + ni}>
-                              <button
+                              <div
                                 onClick={() => editor.selectPath(node.path)}
                                 className={cn(
-                                  "state flex h-6 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px]",
+                                  "group/ln flex h-6 cursor-pointer items-center gap-1 rounded-md px-1.5 text-left text-[11px]",
                                   pKey === activePath ? "bg-secondary-container font-semibold text-on-secondary-container" : "text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
                                 )}
                               >
                                 <Icon name="layers" size={11} className="shrink-0 opacity-75" />
-                                <span className="min-w-0 flex-1 truncate">{node.label}</span>
-                                <span className="font-mono text-[9.5px] opacity-60">{node.tag}</span>
-                              </button>
+                                <span className={cn("min-w-0 flex-1 truncate", node.hidden && "line-through opacity-50")}>{node.label}</span>
+                                <span className="font-mono text-[9.5px] opacity-60 group-hover/ln:hidden">{node.tag}</span>
+                                <span className="hidden items-center gap-0.5 group-hover/ln:flex">
+                                  <button onClick={(e) => { e.stopPropagation(); editor.movePath(node.path, -1); }} title="Move up" className="grid size-4 place-items-center rounded hover:bg-surface-highest"><Icon name="keyboard_arrow_up" size={11} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); editor.movePath(node.path, 1); }} title="Move down" className="grid size-4 place-items-center rounded hover:bg-surface-highest"><Icon name="keyboard_arrow_down" size={11} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); editor.duplicatePath(node.path); }} title="Duplicate" className="grid size-4 place-items-center rounded hover:bg-surface-highest"><Icon name="content_copy" size={10} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); editor.toggleHide(node.path); }} title={node.hidden ? "Show" : "Hide"} className="grid size-4 place-items-center rounded hover:bg-surface-highest"><Icon name={node.hidden ? "visibility_off" : "visibility"} size={10} /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); editor.deletePath(node.path); }} title="Delete" className="grid size-4 place-items-center rounded text-error hover:bg-error-container"><Icon name="delete" size={10} /></button>
+                                </span>
+                              </div>
                               {node.children.map((ch, ci) => {
                                 const cKey = ch.path.join(".");
                                 return (
-                                  <button
+                                  <div
                                     key={cKey + ":" + ci}
                                     onClick={() => editor.selectPath(ch.path)}
                                     className={cn(
-                                      "state flex h-5.5 w-full items-center gap-1.5 rounded-md pl-5 pr-2 text-left text-[10.5px]",
+                                      "group/cn flex h-5.5 cursor-pointer items-center gap-1 rounded-md pl-4 pr-1.5 text-left text-[10.5px]",
                                       cKey === activePath ? "bg-secondary-container font-semibold text-on-secondary-container" : "text-on-surface-variant/85 hover:bg-surface-high hover:text-on-surface"
                                     )}
                                   >
-                                    <span className="min-w-0 flex-1 truncate">{ch.label}</span>
-                                    <span className="font-mono text-[9px] opacity-55">{ch.tag}</span>
-                                  </button>
+                                    <span className={cn("min-w-0 flex-1 truncate", ch.hidden && "line-through opacity-50")}>{ch.label}</span>
+                                    <span className="font-mono text-[9px] opacity-55 group-hover/cn:hidden">{ch.tag}</span>
+                                    <span className="hidden items-center gap-0.5 group-hover/cn:flex">
+                                      <button onClick={(e) => { e.stopPropagation(); editor.movePath(ch.path, -1); }} title="Move up" className="grid size-3.5 place-items-center rounded hover:bg-surface-highest"><Icon name="keyboard_arrow_up" size={10} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); editor.movePath(ch.path, 1); }} title="Move down" className="grid size-3.5 place-items-center rounded hover:bg-surface-highest"><Icon name="keyboard_arrow_down" size={10} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); editor.duplicatePath(ch.path); }} title="Duplicate" className="grid size-3.5 place-items-center rounded hover:bg-surface-highest"><Icon name="content_copy" size={9} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); editor.deletePath(ch.path); }} title="Delete" className="grid size-3.5 place-items-center rounded text-error hover:bg-error-container"><Icon name="delete" size={9} /></button>
+                                    </span>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -413,7 +426,8 @@ export function CanvasPane() {
   const boards = allBoards.filter((a) => a.pageId === pageId);
   const pickedBoards = boards.filter((b) => sel.includes(b.id));
   const studioActive = !!editId || insertOpen;
-  const [leftRailOpen, setLeftRailOpen] = useState(false);
+  const leftRailOpen = useEditor((s) => s.leftRailOpen);
+  const setLeftRailOpen = useEditor((s) => s.setLeftRailOpen);
 
   const spawnBlankFrame = (dev: Device) => {
     const st = useStore.getState();
@@ -463,7 +477,7 @@ export function CanvasPane() {
         <div className="flex min-w-0 shrink items-center gap-1.5">
           {chatCollapsed && <IconBtn label="Show chat" size={32} tonal onClick={() => patchUI({ chatCollapsed: false })}><Icon name="left_panel_open" size={17} /></IconBtn>}
           <button
-            onClick={() => setLeftRailOpen((v) => !v)}
+            onClick={() => setLeftRailOpen(!leftRailOpen)}
             title="Toggle Figma Assets & Screens Rail"
             className={cn(
               "state flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors",

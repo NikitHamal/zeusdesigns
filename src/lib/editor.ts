@@ -44,6 +44,7 @@ interface EditorState {
   artboardId: string | null;
   tab: InspectorTab;
   insertOpen: boolean;
+  leftRailOpen: boolean;
   draggingBlockId: string | null;
   startHtml: string;
   stack: string[];
@@ -55,6 +56,7 @@ interface EditorState {
   setTree: (t: LayerNode[]) => void;
   setTab: (t: InspectorTab) => void;
   setInsertOpen: (open: boolean) => void;
+  setLeftRailOpen: (open: boolean) => void;
   setDraggingBlockId: (id: string | null) => void;
   record: (prev: string) => void;
 }
@@ -65,6 +67,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   artboardId: null,
   tab: "design",
   insertOpen: false,
+  leftRailOpen: false,
   draggingBlockId: null,
   startHtml: "",
   stack: [],
@@ -77,6 +80,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   setTree: (tree) => set({ tree }),
   setTab: (tab) => set({ tab }),
   setInsertOpen: (insertOpen) => set({ insertOpen }),
+  setLeftRailOpen: (leftRailOpen) => set({ leftRailOpen }),
   setDraggingBlockId: (draggingBlockId) => set({ draggingBlockId }),
   record: (prev) => {
     const now = Date.now();

@@ -12,7 +12,7 @@ import { PinDraft, PinView } from "./Pins";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { Icon } from "./Icon";
 import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
-import { insertBlockIntoHtml } from "../lib/blocks";
+import { insertBlockIntoHtml, UI_BLOCKS } from "../lib/blocks";
 import { getDS } from "../lib/designSystems";
 import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
 
@@ -228,8 +228,16 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
     e.preventDefault();
     e.stopPropagation();
     setDropOver(false);
+    useEditor.getState().setDraggingBlockId(null);
     const st = useStore.getState();
     const ds = getDS(st.settings.designSystemId);
+    const b = UI_BLOCKS.find((x) => x.id === blockId);
+    if (editing && b && b.slot !== "screen" && b.slot !== "top" && b.slot !== "bottom" && !a.html.includes("data-zeus-empty-frame")) {
+      editor.insertHtml(b.html(), useEditor.getState().sel ? "after" : "append");
+      st.setSel([a.id]);
+      st.notify(`Dropped ${b.name} into ${a.name}`);
+      return;
+    }
     const updated = insertBlockIntoHtml(a.html, blockId, ds, a.device);
     if (editing) {
       useEditor.getState().record(a.html);
