@@ -80,6 +80,7 @@ pub fn run() {
             agent::chat_stream,
             agent::chat_cancel,
             agent::title_generate,
+            workspace::workspace_pick,
             workspace::workspace_open,
             workspace::workspace_tree,
             workspace::workspace_list,

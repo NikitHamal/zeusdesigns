@@ -110,8 +110,8 @@ fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
     Ok(candidate)
 }
 
-const MAX_NODES: usize = 700;
-const MAX_PER_DIR: usize = 250;
+const MAX_NODES: usize = 350;
+const MAX_PER_DIR: usize = 180;
 
 fn is_link_or_hidden_system(entry: &fs::DirEntry) -> bool {
     let ft = match entry.file_type() {
@@ -125,8 +125,9 @@ fn is_link_or_hidden_system(entry: &fs::DirEntry) -> bool {
     {
         use std::os::windows::fs::MetadataExt;
         if let Ok(m) = entry.metadata() {
-            // REPARSE_POINT (junctions) | SYSTEM
-            if m.file_attributes() & (0x400 | 0x4) != 0 {
+            // Skip hidden/system OS junctions like "Application Data" or "Local Settings" (SYSTEM = 0x4, REPARSE+HIDDEN = 0x402)
+            let attr = m.file_attributes();
+            if (attr & 0x4) != 0 || ((attr & 0x400) != 0 && (attr & 0x2) != 0) {
                 return true;
             }
         }
@@ -134,24 +135,17 @@ fn is_link_or_hidden_system(entry: &fs::DirEntry) -> bool {
     false
 }
 
-/// Refuses folders that would drag the whole machine into memory (drive roots, home, system dirs).
+/// Refuses only bare drive roots (`C:\`) and OS system folders (`C:\Windows`), while allowing any user folder
+/// (including OneDrive/junction folders and user directories) since the walker is strictly depth-1 bounded.
 pub fn check_project_root(root: &Path) -> Result<(), String> {
     let canon = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     if canon.parent().is_none() {
-        return Err("That is a drive root. Pick a project folder inside it.".into());
+        return Err("That is a drive root. Pick a folder inside it.".into());
     }
     let s = canon.to_string_lossy().replace('\\', "/").trim_start_matches("//?/").trim_end_matches('/').to_lowercase();
     let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
-    let is_home = |p: &[&str]| {
-        (p.len() == 2 && (p[0] == "users" || p[0] == "home"))
-            || (p.len() == 3 && p[1] == "users")
-            || (p.len() == 1 && p[0] == "root")
-    };
-    if is_home(&parts) {
-        return Err("That is your home folder. Pick a project folder inside it.".into());
-    }
-    if parts.len() <= 2 && parts.iter().any(|p| matches!(*p, "windows" | "program files" | "program files (x86)" | "programdata" | "system32")) {
-        return Err("System folders cannot be opened as a project.".into());
+    if parts.len() <= 2 && parts.iter().any(|p| matches!(*p, "windows" | "system32" | "syswow64" | "$recycle.bin" | "system volume information")) {
+        return Err("OS system folders cannot be opened as a project.".into());
     }
     Ok(())
 }
@@ -236,6 +230,44 @@ pub fn walk_workspace_n(base_root: &Path, current: &Path, depth: usize, max_node
 }
 
 #[tauri::command(async)]
+pub fn workspace_pick(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WorkspaceState>,
+) -> Result<Option<Value>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Open project folder")
+        .blocking_pick_folder();
+    let Some(fp) = picked else {
+        return Ok(None);
+    };
+    let path_buf = fp
+        .into_path()
+        .map_err(|e| format!("Could not resolve selected folder path: {}", e))?;
+    if !path_buf.exists() || !path_buf.is_dir() {
+        return Err(format!("Selected folder does not exist: {}", path_buf.display()));
+    }
+    check_project_root(&path_buf)?;
+    let root_str = path_buf.to_string_lossy().to_string();
+    let name = path_buf
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| root_str.clone());
+    if let Ok(mut guard) = state.current_root.lock() {
+        *guard = Some(root_str.clone());
+    }
+    let tree = walk_workspace(&path_buf, &path_buf, 1);
+    Ok(Some(json!({
+        "name": name,
+        "root": root_str,
+        "tree": tree
+    })))
+}
+
+#[tauri::command(async)]
 pub fn workspace_open(
     path: String,
     state: tauri::State<'_, WorkspaceState>,
@@ -265,7 +297,7 @@ pub fn workspace_tree(root: String, depth: Option<usize>) -> Result<Vec<FileNode
         return Err(format!("Workspace root not found: {}", root));
     }
     check_project_root(root_path)?;
-    let max_depth = depth.unwrap_or(2).min(4);
+    let max_depth = depth.unwrap_or(1).min(3);
     Ok(walk_workspace(root_path, root_path, max_depth))
 }
 
