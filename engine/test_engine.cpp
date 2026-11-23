@@ -41,7 +41,7 @@ int main() {
 
     char cat_buf[32768]{};
     int count = zeus_providers_catalog_json(cat_buf, sizeof(cat_buf));
-    assert(count == 28);
+    assert(count == 31);
     std::string cat(cat_buf);
     assert(cat.find("mercury3") != std::string::npos);
     assert(cat.find("kilo") != std::string::npos);
@@ -50,6 +50,9 @@ int main() {
     assert(cat.find("frontierlab") != std::string::npos);
     assert(cat.find("liquidai") != std::string::npos);
     assert(cat.find("claudebridge") != std::string::npos);
+    assert(cat.find("groqlpu") != std::string::npos);
+    assert(cat.find("bonsaicloud") != std::string::npos);
+    assert(cat.find("unslothcloud") != std::string::npos);
     assert(cat.find("koboldcloud") != std::string::npos);
     assert(cat.find("blockrun") != std::string::npos);
     assert(cat.find("ovhcloud") != std::string::npos);

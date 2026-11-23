@@ -21,8 +21,11 @@ enum class ProviderFormat {
     SCRAPER_ZENCLOUD,    // Zen & NIM Multi-Cloud (yash030-claude-code-proxy.hf.space) Ring 2.6 1T, Qwen3 Coder 480B, Mistral Large 3 675B, Groq, Cerebras
     SCRAPER_GEMMA4PRO,   // Gemma 4 Flagship Cluster (markpaulm-gemma-4-31b / 12b / shanghsin-gemma-4-12b / rikunarita-gemma-4-e4b)
     SCRAPER_FRONTIERLAB, // Frontier Open-Weights Lab (bananamort-inkling-2-mini / apathy-exe-qwen3-8-flash-next / nanbeige4.3-33b / usermma-mellum2)
-    SCRAPER_LIQUIDAI,    // Liquid AI LFM Gateway (apathy-exe-lfm2-5-24b-a2b / lfm3-1-7b / l0d0v1c-lfm3-1-7b)
+    SCRAPER_LIQUIDAI,    // Liquid AI LFM Gateway (apathy-exe-lfm2-5-24b-a2b / usermma-lfm2-5-8b-a1b / lfm3-1-7b)
     SCRAPER_CLAUDEBRIDGE,// Claude & Gemini Bridge (hamdyahned-ree-claude-proxy.hf.space) Claude 4 Opus/Sonnet/Haiku Bridge
+    SCRAPER_GROQLPU,     // Groq LPU Anonymous Bridge (squirrelcoagent-llama-api-server.hf.space) Llama 3.3 70B & 3.1 8B Instant LPU
+    SCRAPER_BONSAICLOUD, // Bonsai & Ternary Frontier (bananamort-ternary-bonsai-2-27b / mikeee-bonsai-8b / vibethinker-3b-q4)
+    SCRAPER_UNSLOTHCLOUD,// Unsloth Qwen 3.5 & Gemma 4 Cloud (bleak-openai-compatible-server / elseodelasgalletas-gemma4-e2b)
     SCRAPER_KOBOLDCLOUD, // KoboldAI Multi-Node Cloud (koboldai / nanoph / nxdev-org koboldcpp nodes)
     SCRAPER_PTERO,       // Ptero (ptero.pro/wp-json/mlp/v1/chat) GPT-6.1 Terra & GLM 5.3 Flash + vision
     SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3

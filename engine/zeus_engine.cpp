@@ -303,6 +303,7 @@ KeylessProviderEngine::KeylessProviderEngine() {
                 {"muse-glimmer-30b", "Meta Muse Glimmer 30B", "128k ctx Meta Superintelligence Labs 30B expressive UI designer", true, false, false, 140},
                 {"xing4.0-29b-a4b", "Xing 4.0 29B A4B MoE", "128k ctx XingChen AGI 29B A4B fast reasoning & code", true, false, false, 155},
                 {"mellum2-12b-thinking", "JetBrains Mellum 2 12B Thinking", "64k ctx JetBrains 12B A2.5B Thinking code & UI specialist", true, false, false, 165},
+                {"nanbeige4.2-3b", "Nanbeige 4.2 3B", "64k ctx Fast reasoning & frontend code synthesis", true, false, false, 175},
                 {"minicpm5-1b", "OpenBMB MiniCPM 5", "64k ctx Ultra-fast lightweight instruction & code model", false, false, false, 190}
             },
             131072,
@@ -318,6 +319,7 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "lfm2.5-24b-a2b",
             {
                 {"lfm2.5-24b-a2b", "Liquid LFM 2.5 24B A2B (Q8_0)", "128k ctx Liquid AI 24B A2B MoE flagship in 8-bit Q8_0", true, false, false, 165},
+                {"lfm2.5-8b-a1b", "Liquid LFM 2.5 8B A1B (Q4_K_M)", "128k ctx Liquid AI 8B A1B fast MoE UI & code architect", true, false, false, 175},
                 {"lfm3-1.7b", "Liquid LFM 3 1.7B", "64k ctx Next-gen LFM 3 ultra-low-latency UI & copy engine", false, false, false, 195},
                 {"lfm2.5-2.6b", "Liquid LFM 2.5 2.6B", "64k ctx Compact state-space code & layout generator", false, false, false, 185}
             },
@@ -342,6 +344,54 @@ KeylessProviderEngine::KeylessProviderEngine() {
             16384,
             false,
             "~160 tok/s"
+        },
+        {
+            "groqlpu",
+            "Groq LPU Anonymous Bridge",
+            ProviderFormat::SCRAPER_GROQLPU,
+            "https://squirrelcoagent-llama-api-server.hf.space/v1",
+            "llama-3.3-70b-versatile",
+            {
+                {"llama-3.3-70b-versatile", "Llama 3.3 70B Versatile LPU", "128k ctx Groq LPU ultra-fast 70B UI & frontend coder", false, false, false, 350},
+                {"llama-3.1-8b-instant", "Llama 3.1 8B Instant LPU", "128k ctx Groq LPU 850+ tok/s low-latency layout & copy", false, false, false, 850}
+            },
+            131072,
+            16384,
+            false,
+            "350-850 tok/s"
+        },
+        {
+            "bonsaicloud",
+            "Bonsai & Ternary Frontier",
+            ProviderFormat::SCRAPER_BONSAICLOUD,
+            "https://bananamort-ternary-bonsai-2-27b.hf.space/v1",
+            "ternary-bonsai-2-27b",
+            {
+                {"ternary-bonsai-2-27b", "Ternary Bonsai 2 27B (PTQ1_0)", "64k ctx Prism-ML 27B ternary reasoning & UI architect", true, false, false, 145},
+                {"bonsai-8b", "Ternary Bonsai 8B", "64k ctx Fast 8B ternary code & UI generator", false, false, false, 165},
+                {"vibethinker-3b-q4", "VibeThinker 3B Reasoning", "32k ctx Compact step-by-step UI & code thinker", true, false, false, 175}
+            },
+            65536,
+            8192,
+            false,
+            "~150 tok/s"
+        },
+        {
+            "unslothcloud",
+            "Unsloth Qwen 3.5 & Gemma 4 Cloud",
+            ProviderFormat::SCRAPER_UNSLOTHCLOUD,
+            "https://bleak-openai-compatible-server.hf.space/v1",
+            "qwen3.5-4b-q6",
+            {
+                {"qwen3.5-4b-q6", "Qwen 3.5 4B (Q6_K)", "64k ctx Unsloth high-precision Q6_K fast UI & code generator", true, false, false, 165},
+                {"gemma-4-e2b-ud-q4", "Gemma 4 E2B IT (UD-Q4_K_XL)", "64k ctx Unsloth Dynamic Q4_K_XL Google Gemma 4 UI coder", true, false, false, 160},
+                {"gemma-4-e2b-qat-ud", "Gemma 4 E2B QAT (UD-Q4_K_XL)", "64k ctx Quantization-aware Unsloth Dynamic Gemma 4 stream", true, false, false, 165},
+                {"gemma-4-e2b-q4ks", "Gemma 4 E2B IT (Q4_K_S)", "64k ctx Unsloth fast Gemma 4 E2B frontend node", false, false, false, 175}
+            },
+            65536,
+            8192,
+            false,
+            "~165 tok/s"
         },
         {
             "koboldcloud",
