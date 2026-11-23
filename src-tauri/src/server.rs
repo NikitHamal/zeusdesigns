@@ -503,22 +503,36 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
                                 });
                             }
                         }
-                        "tool_use" => {
-                            let name = part.get("name").and_then(|n| n.as_str()).unwrap_or("tool");
-                            let id = part.get("id").and_then(|i| i.as_str()).unwrap_or("call_1");
-                            let input = part.get("input").cloned().unwrap_or_else(|| json!({}));
+                        "tool_use" | "tool-call" => {
+                            let name = part
+                                .get("name")
+                                .or_else(|| part.get("toolName"))
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("tool");
+                            let id = part
+                                .get("id")
+                                .or_else(|| part.get("toolCallId"))
+                                .and_then(|i| i.as_str())
+                                .unwrap_or("call_1");
+                            let input = part
+                                .get("input")
+                                .or_else(|| part.get("args"))
+                                .cloned()
+                                .unwrap_or_else(|| json!({}));
                             text_parts.push(format!(
                                 "<tool_call>{}</tool_call>",
                                 json!({ "id": id, "name": name, "arguments": input })
                             ));
                         }
-                        "tool_result" => {
+                        "tool_result" | "tool-result" => {
                             let tid = part
                                 .get("tool_use_id")
+                                .or_else(|| part.get("toolCallId"))
                                 .and_then(|i| i.as_str())
                                 .unwrap_or("call_1");
                             let tcontent = part
                                 .get("content")
+                                .or_else(|| part.get("result"))
                                 .map(|c| {
                                     if let Some(s) = c.as_str() {
                                         s.to_string()
@@ -527,9 +541,10 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
                                     }
                                 })
                                 .unwrap_or_default();
+                            let capped: String = tcontent.chars().take(14000).collect();
                             text_parts.push(format!(
                                 "<tool_response id=\"{}\">\n{}\n</tool_response>",
-                                tid, tcontent
+                                tid, capped
                             ));
                         }
                         _ => {}
@@ -571,9 +586,10 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
                     .or_else(|| m.get("name"))
                     .and_then(|i| i.as_str())
                     .unwrap_or("tool");
+                let capped: String = combined.chars().take(14000).collect();
                 let wrapped = format!(
                     "<tool_response id=\"{}\">\n{}\n</tool_response>",
-                    call_id, combined
+                    call_id, capped
                 );
                 if let Some(last) = chat_msgs.last_mut() {
                     if last.role == "user" {
@@ -590,6 +606,20 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
             }
             "assistant" => {
                 if !combined.is_empty() {
+                    if let Some(last) = chat_msgs.last_mut() {
+                        if last.role == "assistant" {
+                            last.content.push_str("\n\n");
+                            last.content.push_str(&combined);
+                            continue;
+                        }
+                    }
+                    if chat_msgs.is_empty() {
+                        chat_msgs.push(ChatMessage {
+                            role: "user".to_string(),
+                            content: "Continue.".to_string(),
+                            attachments: Vec::new(),
+                        });
+                    }
                     chat_msgs.push(ChatMessage {
                         role: "assistant".to_string(),
                         content: combined,
@@ -666,22 +696,66 @@ pub fn extract_tool_calls_from_text(
     let mut cleaned = answer.to_string();
     let mut calls = Vec::new();
 
-    // 1. Parse explicit `<tool_call>...</tool_call>` tags
-    while let Some(start) = cleaned.find("<tool_call>") {
-        let rest = &cleaned[start + 11..];
-        let (body, remove_end) = if let Some(end_rel) = rest.find("</tool_call>") {
-            (&rest[..end_rel], start + 11 + end_rel + 12)
-        } else {
-            (rest, cleaned.len())
+    // 1. Parse explicit `<tool_call>...</tool_call>` and `<function_call>...</function_call>` tags
+    for (open_tag, close_tag) in [
+        ("<tool_call>", "</tool_call>"),
+        ("<function_call>", "</function_call>"),
+    ] {
+        while let Some(start) = cleaned.find(open_tag) {
+            let rest = &cleaned[start + open_tag.len()..];
+            let (body, remove_end) = if let Some(end_rel) = rest.find(close_tag) {
+                (
+                    &rest[..end_rel],
+                    start + open_tag.len() + end_rel + close_tag.len(),
+                )
+            } else {
+                (rest, cleaned.len())
+            };
+            let raw_json = body
+                .trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+            if let Some(tc) = parse_single_tool_json(raw_json) {
+                calls.push(tc);
+            }
+            cleaned.replace_range(start..remove_end, "");
+        }
+    }
+
+    // 1b. Also parse `<zeus_tool name="...">...</zeus_tool>` if emitted by a scraper
+    while let Some(start) = cleaned.find("<zeus_tool") {
+        let rest = &cleaned[start..];
+        let Some(gt) = rest.find('>') else {
+            break;
         };
-        let raw_json = body
+        let header = &rest[..gt];
+        let name = header
+            .split("name=\"")
+            .nth(1)
+            .and_then(|s| s.split('"').next())
+            .unwrap_or("")
             .trim()
-            .trim_start_matches("```json")
-            .trim_start_matches("```")
-            .trim_end_matches("```")
-            .trim();
-        if let Some(tc) = parse_single_tool_json(raw_json) {
-            calls.push(tc);
+            .to_string();
+        let after_gt = &rest[gt + 1..];
+        let (body, remove_end) = if let Some(end_rel) = after_gt.find("</zeus_tool>") {
+            (&after_gt[..end_rel], start + gt + 1 + end_rel + 12)
+        } else {
+            (after_gt, cleaned.len())
+        };
+        if !name.is_empty() {
+            let args_trimmed = body.trim();
+            let arguments = if args_trimmed.is_empty() {
+                "{}".to_string()
+            } else {
+                args_trimmed.to_string()
+            };
+            calls.push(ParsedToolCall {
+                id: format!("call_{}", random_hex(12)),
+                name,
+                arguments,
+            });
         }
         cleaned.replace_range(start..remove_end, "");
     }
@@ -1016,10 +1090,24 @@ fn handle_http_connection(
                 known_tool_names.insert(n.to_string());
             }
         }
+        let mut chat_messages = chat_messages;
         if !tools_arr.is_empty() {
             let tool_block =
                 build_opencode_tools_system_block(&tools_arr, req_json.get("tool_choice"));
-            system_prompt.push_str(&tool_block);
+            // Place tool protocol at the top of system_prompt so provider character caps never truncate tool schemas
+            if system_prompt.is_empty() {
+                system_prompt = tool_block.trim().to_string();
+            } else {
+                system_prompt = format!("{}\n\n{}", tool_block.trim(), system_prompt);
+            }
+            // Reinforce `<tool_call>` syntax after `<tool_response>` on multi-turn OpenCode tool loops
+            if let Some(last_msg) = chat_messages.last_mut() {
+                if last_msg.role == "user" && last_msg.content.contains("<tool_response") {
+                    last_msg.content.push_str(
+                        "\n\n[OpenCode Tool-Call Protocol: Review the <tool_response> above. If another tool action is required, output ONLY <tool_call>{\"name\": \"tool_name\", \"arguments\": {...}}</tool_call>. If no more tools are needed, answer the user directly without <tool_call> tags.]",
+                    );
+                }
+            }
         }
 
         let effort = req_json
