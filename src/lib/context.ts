@@ -27,6 +27,9 @@ export interface ProviderSpecialization {
 const SCRAPER_PROVIDERS = new Set([
   "mercury3",
   "kilo",
+  "blockrun",
+  "ovhcloud",
+  "apisfreellm",
   "qwen",
   "ptero",
   "unikey",
