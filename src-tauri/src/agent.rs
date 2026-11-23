@@ -429,7 +429,8 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
-    // 3. Support `<function name="..."><param name="path">...</param>...</function>` and `<invoke name="...">` XML formats
+    // 3. Support `<function name="...">`, `<function=name>`, and `<invoke name="...">` XML formats
+    // (including Qwen3/GLM/Step `<tool_call><function=shell><parameter=command>...</parameter></function></tool_call>`)
     if list.is_empty() {
         for (open_tag, close_tag) in [("<function", "</function>"), ("<invoke", "</invoke>")] {
             let mut from = 0;
@@ -438,16 +439,30 @@ pub fn parse_inline_invocations_segment(
                 let rest = &clean_text[start..];
                 let Some(gt) = rest.find('>') else { break };
                 let header = &rest[open_tag.len()..gt];
+                if header.starts_with("_call") {
+                    from = start + gt + 1;
+                    continue;
+                }
                 let Some(end_rel) = rest.find(close_tag) else { break };
                 let inner = rest[gt + 1..end_rel].trim();
                 from = start + end_rel + close_tag.len();
-                let name = extract_attr(header, "name").unwrap_or_default();
+                let name = extract_attr(header, "name")
+                    .or_else(|| {
+                        header
+                            .trim()
+                            .strip_prefix('=')
+                            .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                    })
+                    .unwrap_or_default();
                 if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
                     continue;
                 }
                 let mut path_arg = extract_attr(header, "path").unwrap_or_default();
-                let mut body_out = inner.to_string();
-                for ptag in ["param", "parameter"] {
+                let mut start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
+                let mut end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
+                let mut body_out = String::new();
+                let mut saw_params = false;
+                for ptag in ["parameter", "param"] {
                     let p_open = format!("<{}", ptag);
                     let p_close = format!("</{}>", ptag);
                     let mut pfrom = 0;
@@ -456,22 +471,46 @@ pub fn parse_inline_invocations_segment(
                         let prest = &inner[pstart..];
                         let Some(pgt) = prest.find('>') else { break };
                         let phead = &prest[p_open.len()..pgt];
+                        if !phead.is_empty()
+                            && !phead.starts_with(char::is_whitespace)
+                            && !phead.starts_with('=')
+                        {
+                            pfrom = pstart + pgt + 1;
+                            continue;
+                        }
                         let Some(pend) = prest.find(&p_close) else { break };
                         let pval = prest[pgt + 1..pend].trim();
-                        let pname = extract_attr(phead, "name").unwrap_or_default();
-                        if matches!(pname.as_str(), "path" | "file" | "id" | "category") && path_arg.is_empty() {
+                        let pname = extract_attr(phead, "name")
+                            .or_else(|| {
+                                phead
+                                    .trim()
+                                    .strip_prefix('=')
+                                    .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                            })
+                            .unwrap_or_default();
+                        saw_params = true;
+                        if matches!(pname.as_str(), "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
                             path_arg = pval.to_string();
-                        } else if matches!(pname.as_str(), "content" | "body" | "command" | "cmd" | "script" | "query" | "text") {
+                        } else if pname == "start" {
+                            start_line = pval.parse::<usize>().ok();
+                        } else if pname == "end" {
+                            end_line = pval.parse::<usize>().ok();
+                        } else if matches!(pname.as_str(), "content" | "body" | "command" | "cmd" | "script" | "code" | "query" | "pattern" | "text" | "fact" | "value") {
+                            body_out = pval.to_string();
+                        } else if body_out.is_empty() && path_arg.is_empty() {
                             body_out = pval.to_string();
                         }
                         pfrom = pstart + pend + p_close.len();
                     }
                 }
+                if !saw_params {
+                    body_out = inner.to_string();
+                }
                 list.push(InlineToolInvocation {
                     name,
                     path: path_arg,
-                    start_line: None,
-                    end_line: None,
+                    start_line,
+                    end_line,
                     body: body_out,
                     offset: start,
                 });
@@ -1096,6 +1135,15 @@ pub fn chat_stream(
             if stripped.contains("</zeus_tool>")
                 || stripped.contains("</tool_call>")
                 || stripped.contains("</function_call>")
+                || stripped.contains("</function>")
+                || stripped.contains("</invoke>")
+                || stripped.contains("</bash>")
+                || stripped.contains("</shell>")
+                || stripped.contains("</python>")
+                || stripped.contains("</memory_search>")
+                || stripped.contains("</memory_save>")
+                || stripped.contains("</memory_edit>")
+                || stripped.contains("</memory_delete>")
                 || (stripped.contains("<zeus_tool") && stripped.contains("/>"))
             {
                 let root = enriched_req.workspace_root.as_deref().unwrap_or("");
@@ -1113,7 +1161,13 @@ pub fn chat_stream(
         if res.is_ok()
             && (accumulated.contains("<zeus_tool")
                 || accumulated.contains("<tool_call>")
-                || accumulated.contains("<function_call>"))
+                || accumulated.contains("<function_call>")
+                || accumulated.contains("<function")
+                || accumulated.contains("<invoke")
+                || accumulated.contains("<bash")
+                || accumulated.contains("<shell")
+                || accumulated.contains("<python")
+                || accumulated.contains("<memory_"))
         {
             let root = enriched_req.workspace_root.as_deref().unwrap_or("");
             execute_inline_workspace_tools(
