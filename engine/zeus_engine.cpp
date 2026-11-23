@@ -114,6 +114,18 @@ std::string sha256_cpp(const std::string& input) {
 KeylessProviderEngine::KeylessProviderEngine() {
     presets_ = {
         {
+            "mercury3",
+            "Mercury 3 (Inception Diffusion)",
+            ProviderFormat::SCRAPER_INCEPTION,
+            "https://chat.inceptionlabs.ai",
+            "mercury-3",
+            {{"mercury-3", "Mercury 3", "Diffusion LLM · 1,000-2,000+ tok/s", true, true, false, 1800}},
+            128000,
+            16384,
+            false,
+            "1,000-2,000+ tok/s"
+        },
+        {
             "qwen",
             "Qwen (Android App Gateway)",
             ProviderFormat::SCRAPER_QWEN,
@@ -178,6 +190,30 @@ KeylessProviderEngine::KeylessProviderEngine() {
             8192,
             false,
             "~60 tok/s"
+        },
+        {
+            "longcat",
+            "LongCat",
+            ProviderFormat::SCRAPER_LONGCAT,
+            "https://longcat.chat",
+            "longcat-2.5",
+            {{"longcat-2.5", "LongCat 2.5", "1.6T MoE oversea-V2 stream", true, true, false, 100}},
+            128000,
+            8192,
+            false,
+            "~100 tok/s"
+        },
+        {
+            "geminiweb",
+            "Gemini Web",
+            ProviderFormat::SCRAPER_GEMINIWEB,
+            "https://gemini.google.com",
+            "gemini-flash-lite",
+            {{"gemini-flash-lite", "Gemini Flash-Lite", "Anonymous StreamGenerate wrb.fr", false, true, false, 150}},
+            128000,
+            8192,
+            false,
+            "~150 tok/s"
         },
         {
             "kilo",

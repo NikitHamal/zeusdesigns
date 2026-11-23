@@ -142,7 +142,7 @@ export const useStore = create<State>()(
       sel: [],
       busy: false,
       settings: {
-        theme: "dark", hue: 17, providerId: "kilo", modelId: "nvidia/nemotron-3.5-super-vl:free", effort: "medium",
+        theme: "dark", hue: 17, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
         designSystemId: "m3e", skills: SKILLS.filter((s) => s.default).map((s) => s.id),
         customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true, studioOn: true, learnOn: true,
       },
@@ -386,10 +386,10 @@ export const useStore = create<State>()(
         const settings = { ...current.settings, ...(p.settings ?? {}) };
         if (settings.hue === 258 || settings.hue === 216 || !Number.isFinite(settings.hue)) settings.hue = 17; // retired blue/violet seeds
         if (!settings.providerId.startsWith("custom:")) {
-          const deadProviders = new Set(["mercury3", "zencloud", "claudebridge", "groqlpu", "longcat", "geminiweb"]);
+          const deadProviders = new Set(["zencloud", "claudebridge", "groqlpu"]);
           if (deadProviders.has(settings.providerId)) {
-            settings.providerId = "kilo";
-            settings.modelId = "nvidia/nemotron-3.5-super-vl:free";
+            settings.providerId = "mercury3";
+            settings.modelId = "mercury-3";
           }
         }
         try { applyTheme(settings.theme, settings.hue); } catch { /* ignore */ }

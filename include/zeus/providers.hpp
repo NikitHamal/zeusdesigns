@@ -9,11 +9,14 @@
 namespace zeus {
 
 enum class ProviderFormat {
+    SCRAPER_INCEPTION,   // Mercury 3 (chat.inceptionlabs.ai) 1,000-2,000+ tok/s diffusion LLM
     SCRAPER_CHATJIMMY,   // ChatJimmy (chatjimmy.ai) 20,000+ tok/s Llama 3.1 8B instant title & micro-task engine
     SCRAPER_MOTIF,       // Motif (chat.motiftech.io) Motif 3 102B / 12.7B Reasoning
     SCRAPER_K2HORIZON,   // K2Horizon (chat.ifm.ai) IFM/K2-Horizon-375B-A23B
     SCRAPER_QWEN,        // Qwen (chat.qwen.ai) Qwen4 Max / Qwen3.8 Max + OSS vision upload
     SCRAPER_DEEPAI,      // DeepAI (api.deepai.org) IslandKey + attachment upload
+    SCRAPER_LONGCAT,     // LongCat (longcat.chat) LongCat 2.5 1.6T MoE
+    SCRAPER_GEMINIWEB,   // Gemini Web (gemini.google.com/app) anonymous Flash-Lite StreamGenerate
     SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
     SCRAPER_NIMCLOUD,    // NVIDIA NIM OpenAI Cloud (mmoranguito-openai-nim-proxy / garystu-openai-nim-proxy)
     SCRAPER_COLIBRIQWEN, // Colibri Qwen 3.6 MoE Cloud (kartik1302-qwen-3-6-35b-a3b.hf.space)

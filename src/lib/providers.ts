@@ -16,6 +16,11 @@ export interface ProviderMeta {
 
 export const PROVIDERS: ProviderMeta[] = [
   {
+    id: "mercury3", name: "Mercury 3", tagline: "Diffusion LLM · blazing fast", speed: "1,000–2,000+ tok/s", color: "#d96b43", icon: "waves",
+    contextWindow: 128000,
+    models: [{ id: "mercury-3", label: "Mercury 3", note: "128k ctx · Diffusion UI architect", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 }],
+  },
+  {
     id: "kilo", name: "Kilo Gateway", tagline: "Free frontier & VL pool · no key", speed: "~140 tok/s", color: "#2f9e66", icon: "bolt",
     contextWindow: 262144,
     models: [
@@ -27,10 +32,13 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "inclusionai/ling-3.2-flash:free", label: "Ling 3.2 Flash VL", note: "1M ctx · Fast multimodal UI coder", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "baidu/ernie-5.5-flash-preview:free", label: "ERNIE 5.5 Flash", note: "1M ctx · Flagship reasoning & layout", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "reflection/beam-free", label: "Reflection Beam 1.0", note: "1M ctx · 501B MoE software engineering", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "particle-ai/particle-1:free", label: "Particle-1 VL", note: "1M ctx · Multimodal design & reasoning", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "dots-studio/dots-3-note-preview:free", label: "Dots 3 Note VL", note: "262k ctx · Multimodal vision & UI notes", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "recursive/flint-v1.0:free", label: "Recursive Flint 1.0", note: "262k ctx · Fast code & UI synthesis", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "cohere/north-mini-code:free", label: "Cohere North Mini Code", note: "256k ctx · Cohere coding & UI specialist", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
       { id: "liquid/lfm-3-1.7b:free", label: "Liquid LFM 3 1.7B", note: "128k ctx · Fast state-space UI & code generator", reasoning: false, vision: false, contextWindow: 131072, maxOutput: 8192 },
       { id: "stealth/glyph-cluster", label: "Stealth Glyph Cluster", note: "256k ctx · Stealth frontier UI & code model", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
+      { id: "kilo-auto/free", label: "Kilo Auto Free", note: "256k ctx · Fastest available free model", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
     ],
   },
   {
@@ -95,9 +103,12 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
-    id: "gemma4pro", name: "Gemma 4 Flagship Cluster", tagline: "Gemma 4 E4B Vision · E4B QAT · Ollama stream", speed: "~155 tok/s", color: "#2f9e66", icon: "memory",
-    contextWindow: 65536,
+    id: "gemma4pro", name: "Gemma 4 Flagship Cluster", tagline: "Gemma 4 31B · 12B Coding · E4B Vision · zero-key vLLM", speed: "~155 tok/s", color: "#2f9e66", icon: "memory",
+    contextWindow: 131072,
     models: [
+      { id: "gemma-4-31b-it", label: "Gemma 4 31B IT Flagship", note: "128k ctx · Google largest 31B dense Gemma 4 UI architect", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "gemma-4-12b-it", label: "Gemma 4 12B IT", note: "128k ctx · Google 12B dense instruction & UI model", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "gemma-4-12b-coding", label: "Gemma 4 12B Coding", note: "128k ctx · Specialized Gemma 4 frontend coding fine-tune", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
       { id: "gemma-4-e4b-ud-q5", label: "Gemma 4 E4B VL (UD-Q5_K_XL)", note: "64k ctx · High-precision UD-Q5_K_XL multimodal vision & code", reasoning: false, vision: true, contextWindow: 65536, maxOutput: 8192 },
       { id: "gemma-4-e4b-qat", label: "Gemma 4 E4B QAT", note: "64k ctx · Quantization-aware fast UI coder", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "gemma-4-ollama", label: "Gemma 4 Latest", note: "64k ctx · Ollama fast Gemma 4 stream", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
@@ -137,9 +148,10 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
-    id: "unslothcloud", name: "Unsloth Gemma 4 Cloud", tagline: "Gemma 4 UD-Q4_K_XL · QAT multi-node", speed: "~165 tok/s", color: "#12b886", icon: "memory",
+    id: "unslothcloud", name: "Unsloth Qwen 3.5 & Gemma 4 Cloud", tagline: "Qwen 3.5 4B Q6_K · Gemma 4 UD-Q4_K_XL · QAT multi-node", speed: "~165 tok/s", color: "#12b886", icon: "memory",
     contextWindow: 65536,
     models: [
+      { id: "qwen3.5-4b-q6", label: "Qwen 3.5 4B (Q6_K)", note: "64k ctx · Unsloth high-precision Q6_K fast UI & code generator", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "gemma-4-e2b-ud-q4", label: "Gemma 4 E2B IT (UD-Q4_K_XL)", note: "64k ctx · Unsloth Dynamic Q4_K_XL Google Gemma 4 UI coder", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "gemma-4-e2b-qat-ud", label: "Gemma 4 E2B QAT (UD-Q4_K_XL)", note: "64k ctx · Quantization-aware Unsloth Dynamic Gemma 4 stream", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "gemma-4-e2b-q4ks", label: "Gemma 4 E2B IT (Q4_K_S)", note: "64k ctx · Unsloth fast Gemma 4 E2B frontend node", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
@@ -162,6 +174,7 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni VL", note: "256k ctx · 30B Omni vision & reasoning", reasoning: true, vision: true, contextWindow: 256000, maxOutput: 16384 },
       { id: "nvidia/nemotron-nano-12b-v2-vl", label: "Nemotron Nano 12B V2 VL", note: "131k ctx · NVIDIA 12B multimodal vision & UI parser", reasoning: false, vision: true, contextWindow: 131072, maxOutput: 16384 },
       { id: "nvidia/gpt-oss-120b", label: "GPT-OSS 120B (NVIDIA)", note: "131k ctx · OpenAI 120B open-weights reasoning workhorse", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "nvidia/step-3.7-flash", label: "StepFun Step 3.7 Flash", note: "131k ctx · StepFun fast reasoning & UI synthesis", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
       { id: "nvidia/minimax-m3.1-flash", label: "MiniMax M3.1 Flash", note: "1M ctx · MiniMax M3.1 fast UI & code engine", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "nvidia/nemotron-3-ultra-550b", label: "Nemotron 3 Ultra 550B", note: "1M ctx · 550B MoE deep software engineering", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "nvidia/nemotron-3.5-lightning", label: "Nemotron 3.5 Lightning", note: "262k ctx · High-speed MoE UI coder", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
@@ -187,16 +200,20 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "gemma-4-26b-a4b", label: "Gemma 4 26B MoE", note: "128k ctx · Google Gemma 4 A4B fast UI coder", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 },
       { id: "laguna-xs-2.1", label: "Poolside Laguna XS 2.1", note: "128k ctx · Poolside agentic coding engine", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 16384 },
       { id: "nemotron3-nano-30b", label: "Nemotron 3 Nano 30B", note: "256k ctx · NVIDIA fast reasoning MoE", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
+      { id: "gpt-oss-120b", label: "GPT-OSS 120B", note: "128k ctx · OpenAI 120B open-weights reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 },
       { id: "gpt-oss-20b", label: "GPT-OSS 20B", note: "128k ctx · OpenAI 20B fast coder", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 },
       { id: "Meta-Llama-3_3-70B-Instruct", label: "Llama 3.3 70B Instruct", note: "128k ctx · Meta 70B instruction model", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 16384 },
+      { id: "Mistral-Small-3.2-24B-Instruct-2506", label: "Mistral Small 3.2 24B", note: "128k ctx · Mistral fast instruction coder", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 16384 },
     ],
   },
   {
-    id: "freecc", name: "FreeClaude & Gemini 4", tagline: "Gemini 4 Hydrogen · Gemini 3 VL · Step 5 · Nemotron 3.5", speed: "~170 tok/s", color: "#d96b43", icon: "diamond",
+    id: "freecc", name: "FreeClaude & Gemini 4", tagline: "Gemini 4 Hydrogen · Gemini 3 VL · Kimi K3.1 Pro · Step 5", speed: "~170 tok/s", color: "#d96b43", icon: "diamond",
     contextWindow: 262144,
     models: [
       { id: "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview", label: "Gemini 3 Flash VL", note: "1M ctx · Google multimodal vision & UI architect", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen", label: "Gemini 4 Hydrogen", note: "1M ctx · Google Gemini 4 frontier reasoning & code", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite VL", note: "1M ctx · Low-latency multimodal vision & layout", reasoning: false, vision: true, contextWindow: 262144, maxOutput: 16384 },
+      { id: "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro", label: "Kimi K3.1 Pro", note: "256k ctx · Moonshot K3.1 Pro flagship software engineer", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview", label: "StepFun Step 5 Preview", note: "256k ctx · StepFun Step 5 frontier reasoning & code", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b", label: "Nemotron 3.5 Super VL 120B", note: "262k ctx · NVIDIA 120B MoE vision & UI architect", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B VL", note: "256k ctx · NVIDIA 30B Omni reasoning & vision", reasoning: true, vision: true, contextWindow: 256000, maxOutput: 16384 },
@@ -207,11 +224,12 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
-    id: "vlmrun", name: "VLM Run Gateway", tagline: "DiffusionGemma 26B VL · Qwen 3.5 VL · zero-key", speed: "~155 tok/s", color: "#0ca678", icon: "visibility",
+    id: "vlmrun", name: "VLM Run Gateway", tagline: "DiffusionGemma 26B VL · Qwen 3.5 VL · GLM-OCR · zero-key", speed: "~155 tok/s", color: "#0ca678", icon: "visibility",
     contextWindow: 131072,
     models: [
       { id: "google/diffusiongemma-26b-a4b-it", label: "DiffusionGemma 26B A4B VL", note: "128k ctx · Google 26B MoE multimodal vision & UI coder", reasoning: false, vision: true, contextWindow: 131072, maxOutput: 16384 },
       { id: "qwen/qwen3.5-0.8b", label: "Qwen 3.5 0.8B VL", note: "128k ctx · Ultra-fast multimodal vision & layout", reasoning: false, vision: true, contextWindow: 131072, maxOutput: 8192 },
+      { id: "zai-org/glm-ocr", label: "GLM-OCR Vision", note: "64k ctx · Z.ai visual UI & document screenshot parser", reasoning: false, vision: true, contextWindow: 65536, maxOutput: 8192 },
     ],
   },
   {
@@ -293,10 +311,13 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
-    id: "llm7", name: "LLM7 Gateway", tagline: "Codestral Latest · 400k ctx", speed: "~160 tok/s", color: "#d9480f", icon: "terminal",
+    id: "llm7", name: "LLM7 Gateway", tagline: "Codestral & Gemma 3 · 400k ctx", speed: "~160 tok/s", color: "#d9480f", icon: "terminal",
     contextWindow: 400000,
     models: [
       { id: "codestral-latest", label: "Codestral Latest", note: "400k ctx · Mistral flagship coding & UI engine", reasoning: false, vision: false, contextWindow: 400000, maxOutput: 8192 },
+      { id: "gemma-3-27b", label: "Gemma 3 27B", note: "128k ctx · Google 27B open instruction model", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "gpt-oss:20b", label: "GPT-OSS 20B", note: "128k ctx · OpenAI open-weights fast coder", reasoning: false, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "default", label: "LLM7 Auto Router", note: "400k ctx · Anonymous router", reasoning: false, vision: false, contextWindow: 400000, maxOutput: 8192 },
     ],
   },
   {
@@ -304,6 +325,7 @@ export const PROVIDERS: ProviderMeta[] = [
     contextWindow: 128000,
     models: [
       { id: "openai", label: "OpenAI Fast Reasoning", note: "128k ctx · Zero-key reasoning & UI generator", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
+      { id: "openai-fast", label: "OpenAI Turbo", note: "128k ctx · Low-latency UI & copy engine", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
     ],
   },
   {
@@ -338,6 +360,16 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "motif-3-102b", label: "Motif 3 102B", note: "128k ctx · Enterprise 102B reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
       { id: "motif-3-12.7b", label: "Motif 3 12.7B", note: "128k ctx · Fast reasoning", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 },
     ],
+  },
+  {
+    id: "longcat", name: "LongCat", tagline: "LongCat 2.5 · 1.6T MoE", speed: "~100 tok/s", color: "#f59f00", icon: "pets",
+    contextWindow: 128000,
+    models: [{ id: "longcat-2.5", label: "LongCat 2.5", note: "128k ctx · 1.6T MoE oversea-V2", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 8192 }],
+  },
+  {
+    id: "geminiweb", name: "Gemini Web", tagline: "Anonymous Gemini Flash-Lite", speed: "~150 tok/s", color: "#2f9e66", icon: "diamond",
+    contextWindow: 128000,
+    models: [{ id: "gemini-flash-lite", label: "Gemini Flash-Lite", note: "128k ctx · Fast UI generation", vision: false, contextWindow: 128000, maxOutput: 8192 }],
   },
   {
     id: "chatjimmy", name: "ChatJimmy", tagline: "Llama 3.1 8B · instant micro-tasks", speed: "20,000+ tok/s", color: "#d6336c", icon: "rocket_launch", role: "title",

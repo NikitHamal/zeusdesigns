@@ -105,8 +105,17 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
     let mut list = Vec::new();
     let mut seen = HashSet::new();
 
-    // Featured top-level aliases so OpenCode users can select `gemini-4-hydrogen` etc. directly
+    // Featured top-level aliases so OpenCode users can select `gemini-4-hydrogen`, `mercury-3`, etc. directly
     let featured = [
+        (
+            "mercury-3",
+            "mercury3",
+            "Mercury 3 Diffusion 2,000+ tok/s (Zeus Inception)",
+            true,
+            false,
+            128000,
+            16384,
+        ),
         (
             "gemini-4-hydrogen",
             "freecc",
@@ -374,6 +383,15 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
         "motif-3-102b" | "motif-102b" => ("motif".to_string(), "motif-3-102b".to_string()),
         "motif-3-12.7b" | "motif-12-7b-reasoning" => {
             ("motif".to_string(), "motif-3-12.7b".to_string())
+        }
+        "mercury-3" | "mercury-2" | "mercury3" => {
+            ("mercury3".to_string(), "mercury-3".to_string())
+        }
+        "longcat-2.5" | "longcat" => {
+            ("longcat".to_string(), "longcat-2.5".to_string())
+        }
+        "gemini-flash-lite" | "geminiweb" => {
+            ("geminiweb".to_string(), "gemini-flash-lite".to_string())
         }
         _ => {
             let cat = catalog();

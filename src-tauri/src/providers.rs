@@ -281,6 +281,20 @@ pub fn normalize_multi_turn_messages(
 pub fn catalog() -> Vec<ProviderInfo> {
     vec![
         ProviderInfo {
+            id: "mercury3".to_string(),
+            name: "Mercury 3 (Inception Diffusion)".to_string(),
+            kind: "keyless".to_string(),
+            speed: "1,000–2,000+ tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "mercury-3".to_string(),
+                label: "Mercury 3".to_string(),
+                note: Some("Diffusion LLM · 1,000–2,000+ tok/s".to_string()),
+                reasoning: true,
+                vision: false,
+            }],
+        },
+        ProviderInfo {
             id: "kilo".to_string(),
             name: "Kilo Gateway".to_string(),
             kind: "keyless".to_string(),
@@ -344,6 +358,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "particle-ai/particle-1:free".to_string(),
+                    label: "Particle-1 VL".to_string(),
+                    note: Some("1M ctx · Multimodal design & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "dots-studio/dots-3-note-preview:free".to_string(),
                     label: "Dots 3 Note VL".to_string(),
                     note: Some("262k ctx · Multimodal vision & UI notes".to_string()),
@@ -358,6 +379,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "cohere/north-mini-code:free".to_string(),
+                    label: "Cohere North Mini Code".to_string(),
+                    note: Some("256k ctx · Cohere coding & UI specialist".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "liquid/lfm-3-1.7b:free".to_string(),
                     label: "Liquid LFM 3 1.7B".to_string(),
                     note: Some("128k ctx · Fast state-space UI & code generator".to_string()),
@@ -368,6 +396,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "stealth/glyph-cluster".to_string(),
                     label: "Stealth Glyph Cluster".to_string(),
                     note: Some("256k ctx · Stealth frontier UI & code model".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "kilo-auto/free".to_string(),
+                    label: "Kilo Auto Free".to_string(),
+                    note: Some("256k ctx · Fastest available free model".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -608,6 +643,27 @@ pub fn catalog() -> Vec<ProviderInfo> {
             status: "ready".to_string(),
             models: vec![
                 ModelSpec {
+                    id: "gemma-4-31b-it".to_string(),
+                    label: "Gemma 4 31B IT Flagship".to_string(),
+                    note: Some("128k ctx · Google largest 31B dense Gemma 4 UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-12b-it".to_string(),
+                    label: "Gemma 4 12B IT".to_string(),
+                    note: Some("128k ctx · Google 12B dense instruction & UI model".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-12b-coding".to_string(),
+                    label: "Gemma 4 12B Coding".to_string(),
+                    note: Some("128k ctx · Specialized Gemma 4 frontend coding fine-tune".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "gemma-4-e4b-ud-q5".to_string(),
                     label: "Gemma 4 E4B VL (UD-Q5_K_XL)".to_string(),
                     note: Some("64k ctx · High-precision UD-Q5_K_XL multimodal vision & code".to_string()),
@@ -764,11 +820,18 @@ pub fn catalog() -> Vec<ProviderInfo> {
         },
         ProviderInfo {
             id: "unslothcloud".to_string(),
-            name: "Unsloth Gemma 4 Cloud".to_string(),
+            name: "Unsloth Qwen 3.5 & Gemma 4 Cloud".to_string(),
             kind: "keyless".to_string(),
             speed: "~165 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
+                ModelSpec {
+                    id: "qwen3.5-4b-q6".to_string(),
+                    label: "Qwen 3.5 4B (Q6_K)".to_string(),
+                    note: Some("64k ctx · Unsloth high-precision Q6_K fast UI & code generator".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
                 ModelSpec {
                     id: "gemma-4-e2b-ud-q4".to_string(),
                     label: "Gemma 4 E2B IT (UD-Q4_K_XL)".to_string(),
@@ -854,6 +917,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "nvidia/gpt-oss-120b".to_string(),
                     label: "GPT-OSS 120B (NVIDIA)".to_string(),
                     note: Some("131k ctx · OpenAI 120B open-weights reasoning workhorse".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/step-3.7-flash".to_string(),
+                    label: "StepFun Step 3.7 Flash".to_string(),
+                    note: Some("131k ctx · StepFun fast reasoning & UI synthesis".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -1000,6 +1070,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B".to_string(),
+                    note: Some("128k ctx · OpenAI 120B open-weights reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "gpt-oss-20b".to_string(),
                     label: "GPT-OSS 20B".to_string(),
                     note: Some("128k ctx · OpenAI 20B fast coder".to_string()),
@@ -1010,6 +1087,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "Meta-Llama-3_3-70B-Instruct".to_string(),
                     label: "Llama 3.3 70B Instruct".to_string(),
                     note: Some("128k ctx · Meta 70B instruction model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Mistral-Small-3.2-24B-Instruct-2506".to_string(),
+                    label: "Mistral Small 3.2 24B".to_string(),
+                    note: Some("128k ctx · Mistral fast instruction coder".to_string()),
                     reasoning: false,
                     vision: false,
                 },
@@ -1033,6 +1117,20 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen".to_string(),
                     label: "Gemini 4 Hydrogen".to_string(),
                     note: Some("1M ctx · Google Gemini 4 frontier reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite".to_string(),
+                    label: "Gemini 3.1 Flash Lite VL".to_string(),
+                    note: Some("1M ctx · Low-latency multimodal vision & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro".to_string(),
+                    label: "Kimi K3.1 Pro".to_string(),
+                    note: Some("256k ctx · Moonshot K3.1 Pro flagship software engineer".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -1105,6 +1203,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "qwen/qwen3.5-0.8b".to_string(),
                     label: "Qwen 3.5 0.8B VL".to_string(),
                     note: Some("128k ctx · Ultra-fast multimodal vision & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "zai-org/glm-ocr".to_string(),
+                    label: "GLM-OCR Vision".to_string(),
+                    note: Some("64k ctx · Z.ai visual UI & document screenshot parser".to_string()),
                     reasoning: false,
                     vision: true,
                 },
@@ -1437,6 +1542,27 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     reasoning: false,
                     vision: false,
                 },
+                ModelSpec {
+                    id: "gemma-3-27b".to_string(),
+                    label: "Gemma 3 27B".to_string(),
+                    note: Some("Google 27B open instruction model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss:20b".to_string(),
+                    label: "GPT-OSS 20B".to_string(),
+                    note: Some("OpenAI open-weights fast coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "default".to_string(),
+                    label: "LLM7 Auto Router".to_string(),
+                    note: Some("400k context anonymous router".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
             ],
         },
         ProviderInfo {
@@ -1450,6 +1576,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "openai".to_string(),
                     label: "OpenAI Fast Reasoning".to_string(),
                     note: Some("Zero-key reasoning & UI generator".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "openai-fast".to_string(),
+                    label: "OpenAI Turbo".to_string(),
+                    note: Some("Low-latency UI & copy engine".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -1563,6 +1696,34 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
             ],
+        },
+        ProviderInfo {
+            id: "longcat".to_string(),
+            name: "LongCat".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~100 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "longcat-2.5".to_string(),
+                label: "LongCat 2.5".to_string(),
+                note: Some("1.6T MoE oversea-V2 stream".to_string()),
+                reasoning: true,
+                vision: false,
+            }],
+        },
+        ProviderInfo {
+            id: "geminiweb".to_string(),
+            name: "Gemini Web".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "gemini-flash-lite".to_string(),
+                label: "Gemini Flash-Lite".to_string(),
+                note: Some("Anonymous StreamGenerate wrb.fr".to_string()),
+                reasoning: false,
+                vision: false,
+            }],
         },
         ProviderInfo {
             id: "chatjimmy".to_string(),
@@ -6790,6 +6951,12 @@ where
         .any(|m| !m.attachments.is_empty());
     let primary = req.provider.as_str();
     let res = match primary {
+        "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
+            .or_else(|_| stream_kilo("kilo-auto/free", &req.system, &req.messages, cancel, &mut on_delta)),
+        "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_unikey("moonshotai/kimi-k3", &req.system, &req.messages, cancel, &mut on_delta)),
+        "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_freecc("claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview", &req.system, &req.messages, cancel, &mut on_delta)),
         "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| {
                 if has_attachments {
@@ -6908,13 +7075,16 @@ where
     let fallbacks: &[&str] = if has_attachments {
         &["freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["kilo", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "kilo", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
             continue;
         }
         let ok = match fb {
+            "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
+            "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "nimcloud" => stream_nimcloud("nvidia/nemotron-3.5-super-vl-120b-a12b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "colibriqwen" => stream_colibriqwen("Qwen3.6-35B-A3B", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemma4vl" => stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -7027,7 +7197,10 @@ mod tests {
     fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 31);
+        assert_eq!(cat.len(), 34);
+        assert!(ids.contains(&"mercury3"));
+        assert!(ids.contains(&"longcat"));
+        assert!(ids.contains(&"geminiweb"));
         assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"nimcloud"));
         assert!(ids.contains(&"colibriqwen"));

@@ -25,6 +25,7 @@ export interface ProviderSpecialization {
 }
 
 const SCRAPER_PROVIDERS = new Set([
+  "mercury3",
   "kilo",
   "nimcloud",
   "colibriqwen",
@@ -55,6 +56,8 @@ const SCRAPER_PROVIDERS = new Set([
   "k2horizon",
   "motif",
   "deepai",
+  "longcat",
+  "geminiweb",
   "chatjimmy",
 ]);
 
