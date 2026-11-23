@@ -217,10 +217,16 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
         .map_err(|e| format!("Failed to execute command: {}", e))?;
 
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new("sh")
+    let output = Command::new("bash")
         .args(["-lc", &cmd])
         .current_dir(&workdir)
         .output()
+        .or_else(|_| {
+            Command::new("sh")
+                .args(["-lc", &cmd])
+                .current_dir(&workdir)
+                .output()
+        })
         .map_err(|e| format!("Failed to execute command: {}", e))?;
 
     let code = output.status.code().unwrap_or(-1);
@@ -232,6 +238,60 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
         "stdout": stdout,
         "stderr": stderr
     }))
+}
+
+pub fn python_run(root: String, script: String) -> Result<Value, String> {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let workdir = if root.trim().is_empty() {
+        std::env::current_dir().map_err(|e| e.to_string())?
+    } else {
+        PathBuf::from(&root)
+    };
+
+    let candidates: &[(&str, &[&str])] = if cfg!(target_os = "windows") {
+        &[("python", &["-u", "-"]), ("python3", &["-u", "-"]), ("py", &["-3", "-u", "-"])]
+    } else {
+        &[("python3", &["-u", "-"]), ("python", &["-u", "-"])]
+    };
+
+    let mut last_err = String::from("Python interpreter not found");
+    for (bin, args) in candidates {
+        let mut cmd = Command::new(bin);
+        cmd.args(*args)
+            .current_dir(&workdir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+        match cmd.spawn() {
+            Ok(mut child) => {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(script.as_bytes());
+                }
+                let output = child
+                    .wait_with_output()
+                    .map_err(|e| format!("Python execution failed: {}", e))?;
+                let code = output.status.code().unwrap_or(-1);
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                return Ok(json!({
+                    "code": code,
+                    "stdout": stdout,
+                    "stderr": stderr
+                }));
+            }
+            Err(e) => {
+                last_err = format!("{}: {}", bin, e);
+            }
+        }
+    }
+    Err(last_err)
 }
 
 pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec<Value> {

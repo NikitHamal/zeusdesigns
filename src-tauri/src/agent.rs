@@ -1,7 +1,9 @@
 use crate::providers::{
     catalog, chatjimmy_complete, dispatch_stream, ChatRequest, ProviderEngine, ProviderInfo,
 };
-use crate::workspace::{fs_read, fs_write, search_workspace_code, shell_run, walk_workspace};
+use crate::workspace::{
+    fs_read, fs_write, python_run, search_workspace_code, shell_run, walk_workspace, FileNode,
+};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::{
@@ -111,8 +113,218 @@ fn resolve_workspace_root(workspace_root: &str) -> String {
         .unwrap_or_else(|_| ".".to_string())
 }
 
-/// Parse inline `<zeus_tool name="..." ...>...</zeus_tool>` blocks emitted by the agent
-/// outside `<think>` blocks, executing local file/search/shell actions and emitting
+#[derive(Debug, Clone)]
+struct InlineToolInvocation {
+    name: String,
+    path: String,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
+    body: String,
+    offset: usize,
+}
+
+fn format_tree_compact(nodes: &[FileNode], indent: usize, out: &mut String) {
+    let pad = "  ".repeat(indent);
+    for n in nodes {
+        if n.dir {
+            out.push_str(&format!("{}{}/\n", pad, n.name));
+            if let Some(children) = &n.children {
+                format_tree_compact(children, indent + 1, out);
+            }
+        } else {
+            let size_label = match n.size {
+                Some(b) if b >= 1024 => format!(" ({:.1} KB)", b as f64 / 1024.0),
+                Some(b) => format!(" ({} B)", b),
+                None => String::new(),
+            };
+            out.push_str(&format!("{}{}{}\n", pad, n.name, size_label));
+        }
+    }
+}
+
+fn format_exec_result(v: &Value) -> (bool, String) {
+    let code = v.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
+    let stdout = v.get("stdout").and_then(|s| s.as_str()).unwrap_or("").trim_end();
+    let stderr = v.get("stderr").and_then(|s| s.as_str()).unwrap_or("").trim_end();
+    let mut parts = Vec::new();
+    if !stdout.is_empty() {
+        parts.push(stdout.to_string());
+    }
+    if !stderr.is_empty() {
+        parts.push(if stdout.is_empty() {
+            stderr.to_string()
+        } else {
+            format!("[stderr]\n{}", stderr)
+        });
+    }
+    if code != 0 {
+        parts.push(format!("[exit code: {}]", code));
+    }
+    let text = if parts.is_empty() {
+        format!("[exit {}] (no output)", code)
+    } else {
+        parts.join("\n")
+    };
+    (code == 0, text)
+}
+
+fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
+    let mut list = Vec::new();
+
+    // 1. Parse `<zeus_tool ...>...</zeus_tool>` and self-closing `<zeus_tool ... />`
+    let mut search_from = 0;
+    while let Some(rel_start) = clean_text[search_from..].find("<zeus_tool") {
+        let start = search_from + rel_start;
+        let rest = &clean_text[start..];
+        let Some(gt) = rest.find('>') else { break };
+        let header = &rest[10..gt];
+        let self_closing = header.trim_end().ends_with('/');
+        let (body, next_pos) = if self_closing {
+            ("", start + gt + 1)
+        } else {
+            let Some(end_rel) = rest.find("</zeus_tool>") else { break };
+            (rest[gt + 1..end_rel].trim(), start + end_rel + 12)
+        };
+        search_from = next_pos;
+
+        let name = extract_attr(header, "name").unwrap_or_default();
+        let mut path_arg = extract_attr(header, "path")
+            .or_else(|| extract_attr(header, "file"))
+            .or_else(|| extract_attr(header, "cmd"))
+            .or_else(|| extract_attr(header, "command"))
+            .or_else(|| extract_attr(header, "url"))
+            .unwrap_or_default();
+        let start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
+        let end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
+        let mut eff_body = body.to_string();
+
+        // If the model placed a JSON object inside `<zeus_tool>`, unpack common fields
+        if eff_body.starts_with('{') && eff_body.ends_with('}') {
+            if let Ok(j) = serde_json::from_str::<Value>(&eff_body) {
+                if path_arg.is_empty() {
+                    if let Some(p) = j
+                        .get("path")
+                        .or_else(|| j.get("file"))
+                        .or_else(|| j.get("filePath"))
+                        .or_else(|| j.get("url"))
+                        .and_then(|v| v.as_str())
+                    {
+                        path_arg = p.to_string();
+                    }
+                }
+                if let Some(c) = j
+                    .get("content")
+                    .or_else(|| j.get("command"))
+                    .or_else(|| j.get("cmd"))
+                    .or_else(|| j.get("script"))
+                    .or_else(|| j.get("code"))
+                    .or_else(|| j.get("query"))
+                    .or_else(|| j.get("pattern"))
+                    .or_else(|| j.get("body"))
+                    .and_then(|v| v.as_str())
+                {
+                    eff_body = c.to_string();
+                }
+            }
+        } else if path_arg.is_empty()
+            && matches!(name.as_str(), "read_file" | "read" | "cat" | "list_dir" | "ls")
+            && !eff_body.contains('\n')
+        {
+            path_arg = eff_body.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
+        }
+
+        list.push(InlineToolInvocation {
+            name,
+            path: path_arg,
+            start_line,
+            end_line,
+            body: eff_body,
+            offset: start,
+        });
+    }
+
+    // 2. Also parse `<tool_call>{...}</tool_call>` and `<function_call>{...}</function_call>`
+    for (open_tag, close_tag) in [
+        ("<tool_call>", "</tool_call>"),
+        ("<function_call>", "</function_call>"),
+    ] {
+        let mut from = 0;
+        while let Some(rel_start) = clean_text[from..].find(open_tag) {
+            let start = from + rel_start;
+            let after_open = start + open_tag.len();
+            let Some(rel_end) = clean_text[after_open..].find(close_tag) else { break };
+            let raw = clean_text[after_open..after_open + rel_end]
+                .trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+            from = after_open + rel_end + close_tag.len();
+
+            if let Ok(v) = serde_json::from_str::<Value>(raw) {
+                let name = v
+                    .get("name")
+                    .or_else(|| v.get("tool"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let args = v
+                    .get("arguments")
+                    .or_else(|| v.get("parameters"))
+                    .or_else(|| v.get("input"))
+                    .or_else(|| v.get("args"))
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
+                let args_obj = if let Some(s) = args.as_str() {
+                    serde_json::from_str::<Value>(s).unwrap_or_else(|_| json!({ "body": s }))
+                } else {
+                    args
+                };
+                let path = args_obj
+                    .get("path")
+                    .or_else(|| args_obj.get("file"))
+                    .or_else(|| args_obj.get("filePath"))
+                    .or_else(|| args_obj.get("url"))
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let start_line = args_obj.get("start").and_then(|x| x.as_u64()).map(|x| x as usize);
+                let end_line = args_obj.get("end").and_then(|x| x.as_u64()).map(|x| x as usize);
+                let body = if let Some(b) = args_obj
+                    .get("command")
+                    .or_else(|| args_obj.get("cmd"))
+                    .or_else(|| args_obj.get("script"))
+                    .or_else(|| args_obj.get("code"))
+                    .or_else(|| args_obj.get("content"))
+                    .or_else(|| args_obj.get("query"))
+                    .or_else(|| args_obj.get("pattern"))
+                    .or_else(|| args_obj.get("body"))
+                    .and_then(|x| x.as_str())
+                {
+                    b.to_string()
+                } else {
+                    serde_json::to_string(&args_obj).unwrap_or_default()
+                };
+                if !name.is_empty() {
+                    list.push(InlineToolInvocation {
+                        name,
+                        path,
+                        start_line,
+                        end_line,
+                        body,
+                        offset: start,
+                    });
+                }
+            }
+        }
+    }
+
+    list.sort_by_key(|x| x.offset);
+    list
+}
+
+/// Parse inline `<zeus_tool>` or `<tool_call>` blocks emitted by the agent
+/// outside `<think>` blocks, executing local file/search/shell/python actions and emitting
 /// `tool_call` + `tool_result` events back to the UI.
 fn execute_inline_workspace_tools(
     app: &AppHandle,
@@ -123,30 +335,26 @@ fn execute_inline_workspace_tools(
 ) {
     let clean_text = strip_thinking_blocks(full_text);
     let eff_root = resolve_workspace_root(workspace_root);
-    let mut search_from = 0;
-    while let Some(rel_start) = clean_text[search_from..].find("<zeus_tool ") {
-        let start = search_from + rel_start;
-        let rest = &clean_text[start..];
-        let Some(gt) = rest.find('>') else { break };
-        let Some(end_rel) = rest.find("</zeus_tool>") else { break };
-        let header = &rest[11..gt];
-        let body = rest[gt + 1..end_rel].trim();
-        search_from = start + end_rel + 12;
+    for inv in parse_inline_invocations(&clean_text) {
+        let name = inv.name.trim().to_string();
+        let path_arg = inv.path;
+        let body = inv.body.trim();
 
-        let name = extract_attr(header, "name").unwrap_or_else(|| "workspace_tool".to_string());
-        let path_arg = extract_attr(header, "path").unwrap_or_default();
-
-        // Ignore literal syntax examples if a model ever echoes the template placeholder
+        // Ignore literal syntax examples if a model ever echoes a template placeholder
         if matches!(name.as_str(), "TOOL" | "tool_name" | "NAME" | "") {
             continue;
         }
+        if name.starts_with("studio_") || name.contains("studio_") {
+            // Built-in Zeus Studio tools execute directly in the frontend webview runtime.
+            continue;
+        }
 
-        let tool_id = format!("tool-{}-{}-{}", executed_ids.len() + 1, name, start);
-        let dedup_key = format!("{}|{}|{}", name, path_arg, body);
+        let dedup_key = format!("{}|{}|{}|{}", inv.offset, name, path_arg, body);
         if executed_ids.contains(&dedup_key) {
             continue;
         }
         executed_ids.insert(dedup_key);
+        let tool_id = format!("tool-{}-{}", executed_ids.len(), inv.offset);
 
         let _ = app.emit(
             event_topic,
@@ -159,34 +367,39 @@ fn execute_inline_workspace_tools(
         );
 
         let (ok, output) = match name.as_str() {
-            "read_file" | "read" | "cat" => match fs_read(eff_root.clone(), path_arg.clone()) {
-                Ok(content) => {
-                    let total = content.lines().count();
-                    let start = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok()).unwrap_or(1).max(1);
-                    let end = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok()).unwrap_or(usize::MAX);
-                    let mut out = String::new();
-                    let mut last = start;
-                    for (i, line) in content.lines().enumerate() {
-                        let n = i + 1;
-                        if n < start {
-                            continue;
+            "read_file" | "read" | "cat" | "view_file" | "open_file" => {
+                match fs_read(eff_root.clone(), path_arg.clone()) {
+                    Ok(content) => {
+                        let total = content.lines().count();
+                        let start = inv.start_line.unwrap_or(1).max(1);
+                        let end = inv.end_line.unwrap_or(usize::MAX);
+                        let mut out = String::new();
+                        let mut last = start;
+                        for (i, line) in content.lines().enumerate() {
+                            let n = i + 1;
+                            if n < start {
+                                continue;
+                            }
+                            if n > end {
+                                break;
+                            }
+                            if out.len() > 40000 {
+                                out.push_str("\n[truncated: call read_file again with start/end]");
+                                break;
+                            }
+                            out.push_str(line);
+                            out.push('\n');
+                            last = n;
                         }
-                        if n > end {
-                            break;
-                        }
-                        if out.len() > 40000 {
-                            out.push_str("\n[truncated: call read_file again with start/end]");
-                            break;
-                        }
-                        out.push_str(line);
-                        out.push('\n');
-                        last = n;
+                        (
+                            true,
+                            format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out),
+                        )
                     }
-                    (true, format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out))
+                    Err(e) => (false, e),
                 }
-                Err(e) => (false, e),
-            },
-            "edit_file" | "edit" | "patch_file" => {
+            }
+            "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" => {
                 let res = fs_read(eff_root.clone(), path_arg.clone())
                     .and_then(|content| apply_search_replace(&content, body))
                     .and_then(|updated| fs_write(eff_root.clone(), path_arg.clone(), updated));
@@ -195,62 +408,91 @@ fn execute_inline_workspace_tools(
                     Err(e) => (false, e),
                 }
             }
-            "write_file" | "write" | "create_file" | "sync_artboard" => {
-                let target_path = if !path_arg.is_empty() {
-                    path_arg.clone()
-                } else {
-                    extract_attr(header, "file").unwrap_or_default()
-                };
-                match fs_write(eff_root.clone(), target_path.clone(), body.to_string()) {
-                    Ok(_) => (true, format!("Synchronized {} ({} bytes)", target_path, body.len())),
+            "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "sync_artboard" => {
+                match fs_write(eff_root.clone(), path_arg.clone(), body.to_string()) {
+                    Ok(_) => (
+                        true,
+                        format!("Synchronized {} ({} bytes)", path_arg, body.len()),
+                    ),
                     Err(e) => (false, e),
                 }
             }
-            "search_code" | "grep" | "search" => {
+            "search_code" | "grep" | "rg" | "search" | "ripgrep" | "find_in_files" => {
                 let query = if !body.is_empty() { body } else { path_arg.as_str() };
-                let results = search_workspace_code(&eff_root, query, 20);
+                let results = search_workspace_code(&eff_root, query, 25);
                 if results.is_empty() {
                     (true, format!("No matches found for '{}'", query))
                 } else {
-                    (true, serde_json::to_string_pretty(&results).unwrap_or_default())
+                    let formatted = results
+                        .iter()
+                        .filter_map(|r| {
+                            Some(format!(
+                                "{}:{}: {}",
+                                r.get("path")?.as_str()?,
+                                r.get("line")?.as_u64()?,
+                                r.get("snippet")?.as_str()?
+                            ))
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    (true, formatted)
                 }
             }
-            "list_dir" | "ls" | "list_files" => {
+            "list_dir" | "ls" | "dir" | "list_files" | "glob" | "find_files" => {
                 let p = Path::new(&eff_root);
                 if path_arg.contains("..") {
                     (false, "list_dir: path must stay inside the project".to_string())
                 } else {
-                    let clean_rel = path_arg.trim().trim_matches(|c| c == '.' || c == '/' || c == '\\');
-                    let target = if clean_rel.is_empty() { p.to_path_buf() } else { p.join(clean_rel) };
+                    let clean_rel = path_arg
+                        .trim()
+                        .trim_matches(|c| c == '.' || c == '/' || c == '\\');
+                    let target = if clean_rel.is_empty() {
+                        p.to_path_buf()
+                    } else {
+                        p.join(clean_rel)
+                    };
                     let tree = walk_workspace(p, &target, 2);
                     if tree.is_empty() {
-                        (true, "Directory is empty (0 files). Proceed directly without re-listing.".to_string())
+                        (
+                            true,
+                            "Directory is empty (0 files). Proceed directly without re-listing."
+                                .to_string(),
+                        )
                     } else {
-                        (true, serde_json::to_string(&tree).unwrap_or_default())
+                        let mut out = String::new();
+                        format_tree_compact(&tree, 0, &mut out);
+                        (true, out.trim_end().to_string())
                     }
                 }
             }
-            "shell" | "bash" | "cmd" | "exec" | "run_command" => {
-                let cmd_str = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
-                match shell_run(eff_root.clone(), cmd_str) {
-                    Ok(v) => (true, v.to_string()),
-                    Err(e) => (false, e),
-                }
-            }
-            "python" | "python_exec" => {
-                let script = if !body.is_empty() { body } else { path_arg.as_str() };
-                let py_cmd = if cfg!(windows) {
-                    format!("python -c {}", serde_json::to_string(script).unwrap_or_else(|_| "\"\"".to_string()))
+            "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" => {
+                let cmd_str = if !body.is_empty() {
+                    body.to_string()
                 } else {
-                    format!("python3 -c {}", serde_json::to_string(script).unwrap_or_else(|_| "\"\"".to_string()))
+                    path_arg.clone()
                 };
-                match shell_run(eff_root.clone(), py_cmd) {
-                    Ok(v) => (true, v.to_string()),
+                match shell_run(eff_root.clone(), cmd_str) {
+                    Ok(v) => format_exec_result(&v),
                     Err(e) => (false, e),
                 }
             }
-            "web_fetch" | "fetch" => {
-                let target_url = if !path_arg.is_empty() { path_arg.as_str() } else { body };
+            "python" | "python3" | "py" | "python_exec" | "run_python" => {
+                let script = if !body.is_empty() {
+                    body.to_string()
+                } else {
+                    path_arg.clone()
+                };
+                match python_run(eff_root.clone(), script) {
+                    Ok(v) => format_exec_result(&v),
+                    Err(e) => (false, e),
+                }
+            }
+            "web_fetch" | "fetch" | "curl" | "webfetch" => {
+                let target_url = if !path_arg.is_empty() {
+                    path_arg.as_str()
+                } else {
+                    body
+                };
                 match reqwest::blocking::Client::builder()
                     .timeout(std::time::Duration::from_secs(15))
                     .build()
@@ -258,7 +500,11 @@ fn execute_inline_workspace_tools(
                     .and_then(|r| r.text())
                 {
                     Ok(txt) => {
-                        let readable = if txt.contains('<') { html_to_text(&txt) } else { txt };
+                        let readable = if txt.contains('<') {
+                            html_to_text(&txt)
+                        } else {
+                            txt
+                        };
                         (true, readable.chars().take(8000).collect::<String>())
                     }
                     Err(e) => (false, format!("web_fetch failed: {}", e)),
@@ -267,17 +513,22 @@ fn execute_inline_workspace_tools(
             "memory" => {
                 let store = crate::memory::MemoryStore::default();
                 let items = store.add(body.to_string(), Some("agent".to_string()));
-                (true, format!("Saved to persistent memory ({} total items)", items.len()))
-            }
-            other if other.starts_with("studio_") || other.contains("studio_") => {
-                // Built-in Zeus Studio tools execute directly in the frontend webview runtime.
-                continue;
+                (
+                    true,
+                    format!("Saved to persistent memory ({} total items)", items.len()),
+                )
             }
             other if other.starts_with("mcp:") => {
                 let reg = crate::mcp::McpRegistry::default();
                 reg.invoke_tool(other, body)
             }
-            _ => (false, format!("Unknown tool '{}'. Valid tools: read_file, write_file, edit_file, list_dir, search_code, shell, python, web_fetch, memory.", name)),
+            _ => (
+                false,
+                format!(
+                    "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory.",
+                    name
+                ),
+            ),
         };
 
         let _ = app.emit(
@@ -335,12 +586,76 @@ fn html_to_text(html: &str) -> String {
     res
 }
 
-/// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks. Each SEARCH must match exactly once.
+fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: usize) -> Result<String, String> {
+    let crlf = content.contains("\r\n");
+    let (search, replace) = if crlf {
+        (
+            search_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
+            replace_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
+        )
+    } else {
+        (search_raw.replace("\r\n", "\n"), replace_raw.replace("\r\n", "\n"))
+    };
+    let count = content.matches(search.as_str()).count();
+    if count == 1 {
+        return Ok(content.replacen(search.as_str(), replace.as_str(), 1));
+    }
+    if count > 1 {
+        return Err(format!(
+            "edit_file: SEARCH block {} matches {} places. Add surrounding lines so it is unique.",
+            idx, count
+        ));
+    }
+
+    // Fallback: line-trimmed whitespace-insensitive match when exact whitespace/indentation differs slightly
+    let file_lines: Vec<&str> = content.lines().collect();
+    let search_lines: Vec<&str> = search_raw.lines().map(|l| l.trim()).collect();
+    if search_lines.is_empty() {
+        return Err("edit_file: SEARCH block is empty".to_string());
+    }
+    let mut match_indices = Vec::new();
+    if file_lines.len() >= search_lines.len() {
+        for start in 0..=(file_lines.len() - search_lines.len()) {
+            let matches = (0..search_lines.len()).all(|k| file_lines[start + k].trim() == search_lines[k]);
+            if matches {
+                match_indices.push(start);
+            }
+        }
+    }
+    if match_indices.len() == 1 {
+        let start = match_indices[0];
+        let mut rebuilt = Vec::new();
+        rebuilt.extend_from_slice(&file_lines[..start]);
+        for rl in replace_raw.lines() {
+            rebuilt.push(rl);
+        }
+        rebuilt.extend_from_slice(&file_lines[start + search_lines.len()..]);
+        let sep = if crlf { "\r\n" } else { "\n" };
+        let mut joined = rebuilt.join(sep);
+        if content.ends_with('\n') && !joined.ends_with('\n') {
+            joined.push_str(sep);
+        }
+        return Ok(joined);
+    }
+    if match_indices.len() > 1 {
+        return Err(format!(
+            "edit_file: SEARCH block {} matches {} places (line-trimmed). Add surrounding lines so it is unique.",
+            idx,
+            match_indices.len()
+        ));
+    }
+    Err(format!(
+        "edit_file: SEARCH block {} not found. Read the file again and copy the lines accurately.",
+        idx
+    ))
+}
+
+/// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or JSON `oldString`/`newString` edits),
+/// with automatic line-trimmed fuzzy fallback when exact whitespace differs.
 fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
     let s_tag = "<<<<<<< SEARCH";
     let m_tag = "=======";
     let r_tag = ">>>>>>> REPLACE";
-    let crlf = content.contains("\r\n");
     let mut out = content.to_string();
     let mut rest = body;
     let mut n = 0usize;
@@ -359,36 +674,50 @@ fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
         if search_raw.is_empty() {
             return Err("edit_file: SEARCH block is empty".to_string());
         }
-        let (search, replace) = if crlf {
-            (
-                search_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
-                replace_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
-            )
-        } else {
-            (search_raw.to_string(), replace_raw.to_string())
-        };
-        let count = out.matches(search.as_str()).count();
-        if count == 0 {
-            return Err(format!("edit_file: SEARCH block {} not found. Read the file again and copy the lines exactly.", n + 1));
-        }
-        if count > 1 {
-            return Err(format!("edit_file: SEARCH block {} matches {} places. Add surrounding lines so it is unique.", n + 1, count));
-        }
-        out = out.replacen(search.as_str(), replace.as_str(), 1);
+        out = replace_hunk_fuzzy(&out, search_raw, replace_raw, n + 1)?;
         n += 1;
     }
-    if n == 0 {
-        return Err("edit_file: BODY needs a <<<<<<< SEARCH / ======= / >>>>>>> REPLACE block".to_string());
+    if n > 0 {
+        return Ok(out);
     }
-    Ok(out)
+
+    // Fallback: JSON {"oldString" / "old_str" / "search": "...", "newString" / "new_str" / "replace": "..."}
+    let trimmed = body.trim();
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        if let Ok(j) = serde_json::from_str::<Value>(trimmed) {
+            let old_s = j
+                .get("oldString")
+                .or_else(|| j.get("old_str"))
+                .or_else(|| j.get("old_string"))
+                .or_else(|| j.get("search"))
+                .and_then(|v| v.as_str());
+            let new_s = j
+                .get("newString")
+                .or_else(|| j.get("new_str"))
+                .or_else(|| j.get("new_string"))
+                .or_else(|| j.get("replace"))
+                .and_then(|v| v.as_str());
+            if let (Some(o), Some(r)) = (old_s, new_s) {
+                return replace_hunk_fuzzy(&out, o, r, 1);
+            }
+        }
+    }
+
+    Err("edit_file: BODY needs a <<<<<<< SEARCH / ======= / >>>>>>> REPLACE block".to_string())
 }
 
 fn extract_attr(header: &str, key: &str) -> Option<String> {
-    let pat = format!("{}=\"", key);
-    let start = header.find(&pat)? + pat.len();
-    let rest = &header[start..];
-    let end = rest.find('"')?;
-    Some(rest[..end].to_string())
+    for quote in ['"', '\''] {
+        let pat = format!("{}={}", key, quote);
+        if let Some(idx) = header.find(&pat) {
+            let start = idx + pat.len();
+            let rest = &header[start..];
+            if let Some(end) = rest.find(quote) {
+                return Some(rest[..end].to_string());
+            }
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -438,7 +767,12 @@ pub fn chat_stream(
                     "text": delta
                 }),
             );
-            if strip_thinking_blocks(&accumulated).contains("</zeus_tool>") {
+            let stripped = strip_thinking_blocks(&accumulated);
+            if stripped.contains("</zeus_tool>")
+                || stripped.contains("</tool_call>")
+                || stripped.contains("</function_call>")
+                || (stripped.contains("<zeus_tool") && stripped.contains("/>"))
+            {
                 let root = enriched_req.workspace_root.as_deref().unwrap_or("");
                 execute_inline_workspace_tools(
                     &app,

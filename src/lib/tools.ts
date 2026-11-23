@@ -1,6 +1,7 @@
 // Agent tool protocol shown to the model: built-in project tools plus whatever the enabled MCP servers expose.
 import { useStore } from "../store";
 import { nativeMcp, type McpToolInfo } from "./bridge";
+import { getCodingHarnessProfile } from "./codingHarness";
 import { studioToolsPrompt } from "./studio";
 
 let cache: { key: string; at: number; tools: McpToolInfo[] } | null = null;
@@ -46,19 +47,16 @@ function sig(schema: unknown): string {
 }
 
 export async function toolsPrompt(opts: { design?: boolean } = { design: true }): Promise<string> {
-  const ws = useStore.getState().ui.workspace;
+  const st = useStore.getState();
+  const ws = st.ui.workspace;
+  const profile = getCodingHarnessProfile(st.settings.providerId, st.settings.modelId);
   let mcp: McpToolInfo[] = [];
-  try { mcp = (await enabledMcpTools()).slice(0, 40); } catch { /* none */ }
+  const maxMcp = profile.style === "guided_compact" ? 8 : 40;
+  try { mcp = (await enabledMcpTools()).slice(0, maxMcp); } catch { /* none */ }
   const lines = [
     "## Agent tools",
-    "When you need to inspect or modify the workspace, run shell/python commands, or fetch a URL, emit a `<zeus_tool>` block outside `<think>` and stop your turn so the harness can return `<tool_result>`. Never emit a literal placeholder name; always use one of the exact tool names below.",
-    ws ? `- \`<zeus_tool name="shell">command</zeus_tool>\` — run any bash/cmd/git/npm/cargo/python command in \`${ws.root || ws.name}\`
-- \`<zeus_tool name="python">python_script_code</zeus_tool>\` — execute inline Python 3 script directly in the workspace
-- \`<zeus_tool name="read_file" path="relative/file" start="1" end="200"></zeus_tool>\` — read file lines
-- \`<zeus_tool name="write_file" path="relative/file">full_file_content</zeus_tool>\` — create or overwrite a file (do NOT call \`list_dir\` before creating a requested file if the path is already clear)
-- \`<zeus_tool name="edit_file" path="relative/file"><<<<<<< SEARCH\\nexact existing lines\\n=======\\nnew lines\\n>>>>>>> REPLACE</zeus_tool>\` — surgical exact search/replace
-- \`<zeus_tool name="search_code">pattern</zeus_tool>\` — fast substring search across the repo
-- \`<zeus_tool name="list_dir" path=""></zeus_tool>\` — list directory tree (top-level files are already listed in \`## Project\` above; do NOT call \`list_dir\` on \`.\` if top-level files are already shown)` : "",
+    "Emit tool blocks outside `<think>` and stop your turn after the closing tag so the harness can execute and return `<tool_result>`. Never emit a placeholder tool name.",
+    ws || !opts.design ? profile.toolExamples : "",
     "- `<zeus_tool name=\"web_fetch\" path=\"https://...\"></zeus_tool>` | `<zeus_tool name=\"memory\">one durable fact worth keeping</zeus_tool>`",
     opts.design ? studioToolsPrompt() : "",
     ...(mcp.length ? ["MCP tools, BODY is a JSON object of arguments:", ...mcp.map((t) => `- name="mcp:${t.server_id}:${t.name}" ${sig(t.input_schema)} ${t.description.replace(/\s+/g, " ").slice(0, 110)}`)] : []),

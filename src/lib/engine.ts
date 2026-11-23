@@ -12,6 +12,7 @@ import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } 
 import { toolsPrompt } from "./tools";
 import { runOpenCode } from "./opencode";
 import { agentPrompt, buildPlainContext, classifyIntent } from "./agent";
+import { getCodingHarnessProfile } from "./codingHarness";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { tokensCss } from "./designSystems";
@@ -97,7 +98,13 @@ export function parseStream(full: string): { text: string; blocks: Block[]; leak
       .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
       .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
   );
-  full = full.replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, ""); // agent tool calls render as chips, not text
+  // Strip fenced or raw tool call blocks so agent tool calls render as chips, not raw XML/JSON text
+  full = full
+    .replace(/```(?:xml|json|tool_call)?\s*<(?:zeus_tool|tool_call|function_call)[\s\S]*?<\/(?:zeus_tool|tool_call|function_call)>\s*```/gi, "")
+    .replace(/<zeus_tool[^>]*\/>/g, "")
+    .replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, "")
+    .replace(/<tool_call[\s\S]*?(<\/tool_call>|$)/g, "")
+    .replace(/<function_call[\s\S]*?(<\/function_call>|$)/g, "");
   let text = "";
   const blocks: Block[] = [];
   let i = 0;
@@ -550,12 +557,20 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
                 s
                   .replace(/<think>[\s\S]*?(<\/think>|$)/gi, (m) => " ".repeat(m.length))
                   .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, (m) => " ".repeat(m.length));
-              if (outsideThink(roundText).includes("</zeus_tool>")) return; // a real tool call outside <think> ends the turn
+              const findCloseTag = (s: string): { idx: number; len: number } | null => {
+                const clean = outsideThink(s);
+                for (const tag of ["</zeus_tool>", "</tool_call>", "</function_call>"]) {
+                  const i = clean.indexOf(tag);
+                  if (i >= 0) return { idx: i, len: tag.length };
+                }
+                return null;
+              };
+              if (findCloseTag(roundText)) return; // a real tool call outside <think> ends the turn
               const before = roundText.length;
               roundText += e.text;
-              const ci = outsideThink(roundText).indexOf("</zeus_tool>");
-              const piece = ci >= 0 ? roundText.slice(before, ci + 12) : e.text;
-              if (ci >= 0) roundText = roundText.slice(0, ci + 12);
+              const closed = findCloseTag(roundText);
+              const piece = closed ? roundText.slice(before, closed.idx + closed.len) : e.text;
+              if (closed) roundText = roundText.slice(0, closed.idx + closed.len);
               if (!piece) return;
               // Gate potential web-scraper refusal prefixes so they never flash in the chat UI
               if (isCanvasFollowUp && !roundText.includes("<artboard") && roundText.length < 320 && (looksLikeRefusalStart(roundText) || isCanvasRefusal(roundText))) {
@@ -586,9 +601,10 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           signal.addEventListener("abort", () => resolve());
           nativeChat(current, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
         });
+        const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (signal.aborted || round >= (mode === "code" ? 30 : mode === "chat" ? 6 : 4)) break;
+        if (signal.aborted || round >= (mode === "code" ? codingProfile.maxToolRounds : mode === "chat" ? 8 : 4)) break;
         if (!roundTools.length) {
           const parsedNow = parseStream(extractRemember(full).clean);
           const produced = parsedNow.blocks.length > 0;
@@ -637,12 +653,14 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           }
           break;
         }
-        const closeAt = roundText.lastIndexOf("</zeus_tool>");
-        const said = closeAt >= 0 ? roundText.slice(0, closeAt + 12) : roundText;
+        const closeZeus = roundText.lastIndexOf("</zeus_tool>");
+        const closeToolCall = roundText.lastIndexOf("</tool_call>");
+        const closeAt = Math.max(closeZeus >= 0 ? closeZeus + 12 : -1, closeToolCall >= 0 ? closeToolCall + 12 : -1);
+        const said = closeAt >= 0 ? roundText.slice(0, closeAt) : roundText;
         msgs = [
           ...msgs,
           { role: "assistant", content: said },
-          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, mode === "code" ? 16000 : 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
+          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, mode === "code" ? codingProfile.maxToolOutputChars : 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
         ];
         current = { ...req, requestId: uid(), messages: msgs };
         full += "\n\n";

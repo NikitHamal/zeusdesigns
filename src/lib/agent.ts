@@ -3,6 +3,7 @@ import type { Message, Quote, Artboard } from "../types";
 import { useStore } from "../store";
 import { memoryBlock } from "./memory";
 import { getProviderSpecialization } from "./context";
+import { getCodingHarnessProfile } from "./codingHarness";
 import { M3E_GUIDE, M3E_TRIGGER } from "./m3e";
 
 export type Intent = "chat" | "code" | "design";
@@ -27,26 +28,36 @@ export function agentPrompt(mode: Intent, userText = ""): string {
   const s = useStore.getState();
   const ws = s.ui.workspace;
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
+  const profile = getCodingHarnessProfile(s.settings.providerId, s.settings.modelId);
+  const topFiles = ws
+    ? ws.tree.length > 0
+      ? ws.tree.slice(0, 50).map((n) => n.name + (n.dir ? "/" : "")).join(", ")
+      : "(empty directory — 0 files)"
+    : "";
+
   return [
-    `You are Zeus, a free general-purpose AI agent running inside the ZeusDesigns desktop app. You talk, reason, write and edit code, run commands, research and, only when asked, design interfaces. You work like a senior engineer pairing with the user.`,
+    `You are Zeus, a free general-purpose AI coding & design agent running inside the ZeusDesigns desktop app. You talk, reason, write and edit code, execute bash and python scripts, research, and—only when asked—design interfaces. You work like a principal software engineer pairing with the user.`,
     `## How to respond
 - Answer what was asked, at the size it was asked. A greeting or a simple question gets one or two plain sentences. No tools, no files, no screens, no artifacts, no plan.
 - Never produce a design, template, landing page or mockup unless the user asks for a visual deliverable.
 - Be direct. No filler openers, no recaps of what you just did, no emojis, no taglines, no pep.
 - Ask one short question only when a missing fact would change the result; otherwise decide and proceed.
 - Match the user's language and the conventions of the project you are in.`,
-    mode === "code" ? `## Working on code
-1. Explore before you edit: list_dir, search_code, read_file. Read the files you are about to change, and their callers when the change could break them.
-2. Make the smallest correct change. Follow the existing style, naming and structure. Do not rewrite files you were not asked to touch, do not add dependencies without reason.
-3. Edit existing files with edit_file (exact SEARCH/REPLACE). Use write_file only for new files or full rewrites.
-4. Verify: run the project's own build, type-check or tests with shell, read the output, fix what failed, run again. Never claim something works that you did not run.
-5. Finish with 1 to 3 sentences: what changed and where, and anything the user must do. No code dump of what you already wrote to disk.
-6. Work in steps. One tool call per turn, then continue from its result. Stop calling tools as soon as the task is done.` : `## Tools
-Use tools only when the task needs something you cannot know otherwise (a file in the project, a URL, a command result). Answer from your own knowledge first.`,
+    mode === "code" ? profile.familyDirective : "",
+    mode === "code"
+      ? profile.workflowDirective
+      : `## Tools
+Use tools only when the task needs something you cannot know otherwise (a file in the project, a URL, a shell/python command result). Answer from your own knowledge first.`,
     `## Artifacts
 When the user asks for a standalone visual deliverable (a page, a small game, a widget, a diagram, a prototype), emit it as one complete self-contained HTML document in <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard>. It opens next to the chat as a live preview. Inline CSS and JS only, no CDNs. Everything else (code, explanations, answers) stays in the chat or on disk in the user's project.`,
-    spec.isKeylessScraper ? `Native tools are available through <zeus_tool> blocks (see Agent tools). Do not say you lack file or shell access when a project folder is open.` : "",
-    ws ? `## Project\nOpen folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top level: ${ws.tree.slice(0, 40).map((n) => n.name + (n.dir ? "/" : "")).join(", ")}.` : (mode === "code" ? `## Project\nNo folder is open. You can still write and explain code in the chat; tell the user to open a project folder from the sidebar when you need to read or change files.` : ""),
+    spec.isKeylessScraper
+      ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. Never claim you lack file, terminal, or python access.`
+      : "",
+    ws
+      ? `## Project\nOpen folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top-level entries: ${topFiles}.`
+      : mode === "code"
+      ? `## Project\nNo explicit project folder is selected (tools default to the current working directory). You can still run \`shell\`/\`python\` or read/write files relative to the current directory, or ask the user to open a specific project folder from the sidebar.`
+      : "",
     M3E_TRIGGER.test(userText) ? M3E_GUIDE : "",
     memoryBlock(),
   ].filter(Boolean).join("\n\n");
