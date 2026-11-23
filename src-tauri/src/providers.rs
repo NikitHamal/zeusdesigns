@@ -3564,10 +3564,13 @@ where
         .map(|m| m.content.as_str())
         .unwrap_or("");
     let user_len = last_user.chars().count();
+    let wants_tools = is_agent_tool_request(system);
     let max_sys = 26000usize.saturating_sub(user_len).max(6000);
     let sys_prefix: String = system.chars().take(max_sys).collect();
     let content = if sys_prefix.trim().is_empty() {
         last_user.chars().take(26000).collect::<String>()
+    } else if wants_tools {
+        format!("{}\n\n{}\n\n{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", scraper_xml_dsl_banner(), sys_prefix, last_user)
     } else {
         format!("{}\n\n{}", sys_prefix, last_user)
     };
@@ -4157,6 +4160,7 @@ where
         }));
     }
 
+    let wants_tools = is_agent_tool_request(system);
     let last_user = messages
         .last()
         .map(|m| m.content.as_str())
@@ -4165,7 +4169,11 @@ where
         last_user.to_string()
     } else {
         let sys_safe: String = system.chars().take(18000).collect();
-        format!("[System instructions: {}]\n\n{}", sys_safe, last_user)
+        if wants_tools {
+            format!("{}\n\n[System instructions: {}]\n\n{}\n(Output ONLY the <zeus_tool> XML tag if a workspace action is needed.)", scraper_xml_dsl_banner(), sys_safe, last_user)
+        } else {
+            format!("[System instructions: {}]\n\n{}", sys_safe, last_user)
+        }
     };
 
     let payload = json!({

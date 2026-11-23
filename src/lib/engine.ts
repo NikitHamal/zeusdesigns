@@ -267,10 +267,27 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onRe
           : {}),
       }),
     });
+    const tcMap = new Map<number, { name: string; args: string }>();
     await sse(res, (j) => {
       const d = j.choices?.[0]?.delta ?? j.choices?.[0]?.message;
+      if (Array.isArray(d?.tool_calls)) {
+        d.tool_calls.forEach((tc: any, idx: number) => {
+          const i = typeof tc.index === "number" ? tc.index : idx;
+          const cur = tcMap.get(i) ?? { name: "", args: "" };
+          if (tc.function?.name) cur.name += tc.function.name;
+          if (tc.function?.arguments) cur.args += tc.function.arguments;
+          tcMap.set(i, cur);
+        });
+      }
       return { text: d?.content ?? "", think: d?.reasoning_content ?? d?.reasoning ?? "" };
     });
+    for (const tc of tcMap.values()) {
+      if (tc.name.trim()) {
+        let parsed: any = { body: tc.args };
+        try { parsed = JSON.parse(tc.args); } catch { /* raw */ }
+        onDelta(`\n<tool_call>${JSON.stringify({ name: tc.name.trim(), arguments: parsed })}</tool_call>`);
+      }
+    }
   }
 }
 
