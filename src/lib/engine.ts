@@ -196,8 +196,8 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onRe
       const lines = buf.split("\n");
       buf = lines.pop() ?? "";
       for (const l of lines) {
-        if (!l.startsWith("data:")) continue;
-        const d = l.slice(5).trim();
+        const t = l.trim();
+        const d = t.startsWith("data:") ? t.slice(5).trim() : t.startsWith("{") ? t : "";
         if (!d || d === "[DONE]") continue;
         try {
           const out = pick(JSON.parse(d));
@@ -205,6 +205,14 @@ async function streamCustom(req: ChatRequest, onDelta: (t: string) => void, onRe
           if (out.text) onDelta(out.text);
         } catch { /* ignore partial */ }
       }
+    }
+    const tail = buf.trim();
+    if (tail.startsWith("{")) {
+      try {
+        const out = pick(JSON.parse(tail));
+        if (out.think) onReasoning(out.think);
+        if (out.text) onDelta(out.text);
+      } catch { /* ignore partial */ }
     }
   };
   const msgs = req.messages.map((m) => {

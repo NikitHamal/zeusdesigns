@@ -479,6 +479,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "nanbeige4.2-3b".to_string(),
+                    label: "Nanbeige 4.2 3B".to_string(),
+                    note: Some("64k ctx · Fast reasoning & frontend code synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "minicpm5-1b".to_string(),
                     label: "OpenBMB MiniCPM 5".to_string(),
                     note: Some("64k ctx · Ultra-fast lightweight instruction & code model".to_string()),
@@ -498,6 +505,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "lfm2.5-24b-a2b".to_string(),
                     label: "Liquid LFM 2.5 24B A2B (Q8_0)".to_string(),
                     note: Some("128k ctx · Liquid AI 24B A2B MoE flagship in 8-bit Q8_0".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "lfm2.5-8b-a1b".to_string(),
+                    label: "Liquid LFM 2.5 8B A1B (Q4_K_M)".to_string(),
+                    note: Some("128k ctx · Liquid AI 8B A1B fast MoE UI & code architect".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -551,6 +565,96 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     note: Some("200k ctx · Precision HTML/CSS & interactive screen builder".to_string()),
                     reasoning: false,
                     vision: true,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "groqlpu".to_string(),
+            name: "Groq LPU Anonymous Bridge".to_string(),
+            kind: "keyless".to_string(),
+            speed: "350–850 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "llama-3.3-70b-versatile".to_string(),
+                    label: "Llama 3.3 70B Versatile LPU".to_string(),
+                    note: Some("128k ctx · Groq LPU ultra-fast 70B UI & frontend coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "llama-3.1-8b-instant".to_string(),
+                    label: "Llama 3.1 8B Instant LPU".to_string(),
+                    note: Some("128k ctx · Groq LPU 850+ tok/s low-latency layout & copy".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "bonsaicloud".to_string(),
+            name: "Bonsai & Ternary Frontier".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "ternary-bonsai-2-27b".to_string(),
+                    label: "Ternary Bonsai 2 27B (PTQ1_0)".to_string(),
+                    note: Some("64k ctx · Prism-ML 27B ternary reasoning & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "bonsai-8b".to_string(),
+                    label: "Ternary Bonsai 8B".to_string(),
+                    note: Some("64k ctx · Fast 8B ternary code & UI generator".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "vibethinker-3b-q4".to_string(),
+                    label: "VibeThinker 3B Reasoning".to_string(),
+                    note: Some("32k ctx · Compact step-by-step UI & code thinker".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "unslothcloud".to_string(),
+            name: "Unsloth Qwen 3.5 & Gemma 4 Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~165 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "qwen3.5-4b-q6".to_string(),
+                    label: "Qwen 3.5 4B (Q6_K)".to_string(),
+                    note: Some("64k ctx · Unsloth high-precision Q6_K fast UI & code generator".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-e2b-ud-q4".to_string(),
+                    label: "Gemma 4 E2B IT (UD-Q4_K_XL)".to_string(),
+                    note: Some("64k ctx · Unsloth Dynamic Q4_K_XL Google Gemma 4 UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-e2b-qat-ud".to_string(),
+                    label: "Gemma 4 E2B QAT (UD-Q4_K_XL)".to_string(),
+                    note: Some("64k ctx · Quantization-aware Unsloth Dynamic Gemma 4 stream".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-e2b-q4ks".to_string(),
+                    label: "Gemma 4 E2B IT (Q4_K_S)".to_string(),
+                    note: Some("64k ctx · Unsloth fast Gemma 4 E2B frontend node".to_string()),
+                    reasoning: false,
+                    vision: false,
                 },
             ],
         },
@@ -5021,6 +5125,16 @@ where
                 "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
             ),
         ],
+        "nanbeige4.2-3b" => &[
+            (
+                "https://apathy-exe-nanbeige4-2-3b.hf.space/v1/chat/completions",
+                "/app/nanbeige4.2-3b-Q4_K_M.gguf",
+            ),
+            (
+                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
+            ),
+        ],
         "minicpm5-1b" => &[
             (
                 "https://usermma-minicpm5-abliterated-q3.hf.space/v1/chat/completions",
@@ -5152,6 +5266,16 @@ where
     F: FnMut(&str),
 {
     let targets: &[(&str, &str)] = match model {
+        "lfm2.5-8b-a1b" => &[
+            (
+                "https://usermma-lfm2-5-8b-a1b-abliterated-q3.hf.space/v1/chat/completions",
+                "Huihui-LFM2.5-8B-A1B-abliterated.Q4_K_M.gguf",
+            ),
+            (
+                "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf",
+            ),
+        ],
         "lfm3-1.7b" => &[
             (
                 "https://apathy-exe-lfm3-1-7b.hf.space/v1/chat/completions",
@@ -5525,6 +5649,370 @@ where
     Err("KoboldAI Multi-Node Cloud stream ended without output".to_string())
 }
 
+/// Stream from Groq LPU Anonymous Bridge (`https://squirrelcoagent-llama-api-server.hf.space/v1/chat/completions` with automatic failover to ZenCloud Groq LPU).
+pub fn stream_groqlpu<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = if model == "llama-3.1-8b-instant" {
+        "llama-3.1-8b-instant"
+    } else {
+        "llama-3.3-70b-versatile"
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(20000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let client = build_client(120)?;
+    for &cand_model in &[eff_model, "llama-3.3-70b-versatile", "llama-3.1-8b-instant"] {
+        let payload = json!({
+            "model": cand_model,
+            "stream": true,
+            "max_tokens": 8192,
+            "messages": oai_msgs
+        });
+
+        let resp = match client
+            .post("https://squirrelcoagent-llama-api-server.hf.space/v1/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut saw_text = false;
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            let trimmed = line.trim();
+            let raw_opt = trimmed
+                .strip_prefix("data:")
+                .map(|s| s.trim())
+                .or_else(|| if trimmed.starts_with('{') { Some(trimmed) } else { None });
+            if let Some(raw) = raw_opt {
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(text) = delta.and_then(|d| d.get("content")).and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+
+    stream_zencloud("anthropic/groq/llama-3.3-70b-versatile", system, messages, cancel, on_delta)
+}
+
+/// Stream from Bonsai & Ternary Frontier (`bananamort-ternary-bonsai-2-27b`, `mikeee-bonsai-8b`, `mikeee-llama-cpp-server`).
+pub fn stream_bonsaicloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "bonsai-8b" => &[
+            ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
+            (
+                "https://bananamort-ternary-bonsai-2-27b.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--prism-ml--Ternary-Bonsai-2-27B-gguf/snapshots/839bd57023c1558945afea70a74fa83c054f35f9/Ternary-Bonsai-2-27B-PTQ1_0.gguf",
+            ),
+        ],
+        "vibethinker-3b-q4" => &[
+            ("https://mikeee-llama-cpp-server.hf.space/v1/chat/completions", "vibethinker-3b-q4"),
+            ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
+        ],
+        _ => &[
+            (
+                "https://bananamort-ternary-bonsai-2-27b.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--prism-ml--Ternary-Bonsai-2-27B-gguf/snapshots/839bd57023c1558945afea70a74fa83c054f35f9/Ternary-Bonsai-2-27B-PTQ1_0.gguf",
+            ),
+            ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
+            ("https://mikeee-llama-cpp-server.hf.space/v1/chat/completions", "vibethinker-3b-q4"),
+        ],
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(18000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let client = build_client(180)?;
+    for &(endpoint, upstream_model) in targets {
+        let payload = json!({
+            "model": upstream_model,
+            "stream": true,
+            "max_tokens": 8192,
+            "messages": oai_msgs
+        });
+
+        let resp = match client
+            .post(endpoint)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut fallback_reason = String::new();
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(d) = delta {
+                            let r_text = d
+                                .get("reasoning_content")
+                                .or_else(|| d.get("reasoning"))
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("");
+                            if !r_text.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(r_text);
+                                fallback_reason.push_str(r_text);
+                            }
+                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if !saw_text && !fallback_reason.trim().is_empty() {
+            on_delta(fallback_reason.trim());
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+    Err("Bonsai & Ternary Frontier stream ended without output".to_string())
+}
+
+/// Stream from Unsloth Qwen 3.5 & Gemma 4 Cloud (`bleak-openai-compatible-server`, `elseodelasgalletas-gemma4-e2b`, `elseodelasgalletas-gemma4-e2b-qat`, `bleak-openai-compatible-server-gemma4`).
+pub fn stream_unslothcloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "gemma-4-e2b-ud-q4" => &[
+            (
+                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
+            ),
+            (
+                "https://bleak-openai-compatible-server.hf.space/v1/chat/completions",
+                "unsloth/Qwen3.5-4B-GGUF:Q6_K",
+            ),
+        ],
+        "gemma-4-e2b-qat-ud" => &[
+            (
+                "https://elseodelasgalletas-gemma4-e2b-qat.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
+            ),
+            (
+                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
+            ),
+        ],
+        "gemma-4-e2b-q4ks" => &[
+            (
+                "https://bleak-openai-compatible-server-gemma4.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S",
+            ),
+            (
+                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
+            ),
+        ],
+        _ => &[
+            (
+                "https://bleak-openai-compatible-server.hf.space/v1/chat/completions",
+                "unsloth/Qwen3.5-4B-GGUF:Q6_K",
+            ),
+            (
+                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
+            ),
+            (
+                "https://bleak-openai-compatible-server-gemma4.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S",
+            ),
+        ],
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(18000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let client = build_client(180)?;
+    for &(endpoint, upstream_model) in targets {
+        let payload = json!({
+            "model": upstream_model,
+            "stream": true,
+            "max_tokens": 8192,
+            "messages": oai_msgs
+        });
+
+        let resp = match client
+            .post(endpoint)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut fallback_reason = String::new();
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(d) = delta {
+                            let r_text = d
+                                .get("reasoning_content")
+                                .or_else(|| d.get("reasoning"))
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("");
+                            if !r_text.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(r_text);
+                                fallback_reason.push_str(r_text);
+                            }
+                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if !saw_text && !fallback_reason.trim().is_empty() {
+            on_delta(fallback_reason.trim());
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+    Err("Unsloth Qwen 3.5 & Gemma 4 Cloud stream ended without output".to_string())
+}
+
 /// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).
 pub fn stream_yqcloud<F>(
     system: &str,
@@ -5866,6 +6354,12 @@ where
             .or_else(|_| stream_liquidai("lfm2.5-24b-a2b", &req.system, &req.messages, cancel, &mut on_delta)),
         "claudebridge" => stream_claudebridge(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_claudebridge("claude-opus-4-20250514", &req.system, &req.messages, cancel, &mut on_delta)),
+        "groqlpu" => stream_groqlpu(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_groqlpu("llama-3.3-70b-versatile", &req.system, &req.messages, cancel, &mut on_delta)),
+        "bonsaicloud" => stream_bonsaicloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_bonsaicloud("ternary-bonsai-2-27b", &req.system, &req.messages, cancel, &mut on_delta)),
+        "unslothcloud" => stream_unslothcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_unslothcloud("qwen3.5-4b-q6", &req.system, &req.messages, cancel, &mut on_delta)),
         "koboldcloud" => stream_koboldcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_koboldcloud("koboldcpp/Gemma4-E2B", &req.system, &req.messages, cancel, &mut on_delta)),
         "blockrun" => stream_blockrun(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -5956,7 +6450,7 @@ where
     let fallbacks: &[&str] = if has_attachments {
         &["freecc", "claudebridge", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "blockrun", "qwen"]
     } else {
-        &["mercury3", "zencloud", "freecc", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "zencloud", "groqlpu", "freecc", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "bonsaicloud", "unslothcloud", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -5965,6 +6459,7 @@ where
         let ok = match fb {
             "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
             "zencloud" => stream_zencloud("anthropic/zen/ring-2.6-1t-free", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "groqlpu" => stream_groqlpu("llama-3.3-70b-versatile", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemma4pro" => stream_gemma4pro(
                 if has_attachments { "gemma-4-e4b-ud-q5" } else { "gemma-4-31b-it" },
                 &req.system,
@@ -5975,6 +6470,8 @@ where
             "frontierlab" => stream_frontierlab("qwen3.8-flash-next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "liquidai" => stream_liquidai("lfm2.5-24b-a2b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "claudebridge" => stream_claudebridge("claude-opus-4-20250514", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "bonsaicloud" => stream_bonsaicloud("ternary-bonsai-2-27b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "unslothcloud" => stream_unslothcloud("qwen3.5-4b-q6", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "koboldcloud" => stream_koboldcloud("koboldcpp/Gemma4-E2B", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "freecc" => stream_freecc(
                 "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
@@ -6061,10 +6558,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_catalog_contains_all_twenty_eight_keyless_providers() {
+    fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 28);
+        assert_eq!(cat.len(), 31);
         assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"zencloud"));
@@ -6072,6 +6569,9 @@ mod tests {
         assert!(ids.contains(&"frontierlab"));
         assert!(ids.contains(&"liquidai"));
         assert!(ids.contains(&"claudebridge"));
+        assert!(ids.contains(&"groqlpu"));
+        assert!(ids.contains(&"bonsaicloud"));
+        assert!(ids.contains(&"unslothcloud"));
         assert!(ids.contains(&"koboldcloud"));
         assert!(ids.contains(&"blockrun"));
         assert!(ids.contains(&"ovhcloud"));
