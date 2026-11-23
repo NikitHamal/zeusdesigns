@@ -2038,19 +2038,13 @@ where
         }
     }
 
-    let eff = match effort {
-        "low" => "low",
-        "high" | "max" => "high",
-        _ => "medium",
-    };
-
+    let _ = effort;
     let payload = json!({
         "stream": true,
         "model": "IFM/K2-Horizon-375B-A23B",
         "messages": repaired,
         "params": {},
-        "features": { "web_search": false },
-        "extra_body": { "chat_template_kwargs": { "reasoning_effort": eff } }
+        "features": { "web_search": false }
     });
 
     let client = build_client(240)?;
@@ -6133,7 +6127,7 @@ where
     Err(format!("{} stream ended without output", provider_label))
 }
 
-/// Stream from NVIDIA NIM OpenAI Cloud (`mmoranguito-openai-nim-proxy.hf.space` + `garystu-openai-nim-proxy.hf.space`).
+/// Stream from NVIDIA NIM OpenAI Cloud (`garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
 pub fn stream_nimcloud<F>(
     model: &str,
     system: &str,
@@ -6144,18 +6138,24 @@ pub fn stream_nimcloud<F>(
 where
     F: FnMut(&str),
 {
-    let primary_alias = match model {
-        "nvidia/nemotron-3-ultra-550b-a55b" => "nemotron-550",
-        "nvidia/nemotron-3.5-bolt-e4b" => "nvidia/nemotron-3.5-bolt-e4b",
-        "nvidia/nemotron-3.5-lightning-30b-a3b" => "nvidia/nemotron-3.5-lightning-30b-a3b",
-        _ => "nvidia/nemotron-3.5-bolt-e4b",
+    let gary_model = match model {
+        "nvidia/nemotron-3-ultra-550b-a55b"
+        | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+        | "nvidia/nemotron-3.5-lightning-30b-a3b"
+        | "nvidia/nemotron-3.5-bolt-e4b"
+        | "mistralai/mistral-large-4-1t-a52b"
+        | "nvidia/ising-calibration-1.5-31b"
+        | "poolside/laguna-xs-2.1" => model,
+        "nvidia/nemotron-3.5-super-vl-120b-a12b" => "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        _ => "nvidia/nemotron-3-ultra-550b-a55b",
     };
     let targets = [
-        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", primary_alias),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", gary_model),
         ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
-        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nemotron-550"),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
+        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nemotron-bolt"),
     ];
-    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 16, cancel, on_delta)
+    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 14, cancel, on_delta)
         .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", system, messages, cancel, on_delta))
 }
 
