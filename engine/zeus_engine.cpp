@@ -292,6 +292,22 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~150 tok/s"
         },
         {
+            "vlmrun",
+            "VLM Run Gateway",
+            ProviderFormat::SCRAPER_VLMRUN,
+            "https://gateway.vlm.run/v1/openai",
+            "google/diffusiongemma-26b-a4b-it",
+            {
+                {"google/diffusiongemma-26b-a4b-it", "DiffusionGemma 26B A4B VL", "128k ctx Google 26B MoE multimodal vision & UI coder", false, false, true, 155},
+                {"qwen/qwen3.5-0.8b", "Qwen 3.5 0.8B VL", "128k ctx Ultra-fast multimodal vision & layout", false, false, true, 180},
+                {"zai-org/glm-ocr", "GLM-OCR Vision", "64k ctx Z.ai visual UI & document screenshot parser", false, false, true, 145}
+            },
+            131072,
+            16384,
+            false,
+            "~155 tok/s"
+        },
+        {
             "together2api",
             "Together Frontier",
             ProviderFormat::SCRAPER_TOGETHER2API,

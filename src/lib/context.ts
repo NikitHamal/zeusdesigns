@@ -29,6 +29,7 @@ const SCRAPER_PROVIDERS = new Set([
   "kilo",
   "blockrun",
   "ovhcloud",
+  "vlmrun",
   "together2api",
   "aihorde",
   "apisfreellm",

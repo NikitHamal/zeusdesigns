@@ -47,6 +47,7 @@ int main() {
     assert(cat.find("kilo") != std::string::npos);
     assert(cat.find("blockrun") != std::string::npos);
     assert(cat.find("ovhcloud") != std::string::npos);
+    assert(cat.find("vlmrun") != std::string::npos);
     assert(cat.find("together2api") != std::string::npos);
     assert(cat.find("aihorde") != std::string::npos);
     assert(cat.find("apisfreellm") != std::string::npos);
