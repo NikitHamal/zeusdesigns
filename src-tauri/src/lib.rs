@@ -1,8 +1,8 @@
 // ZeusDesigns native shell & AI engine.
 //
 // OWNERSHIP: the UI (React, /src) is owned by the frontend track. The backend engine
-// (keyless providers, workspace indexer, persistent memory, agent loop, MCP client)
-// lives in sibling modules and is registered below.
+// (keyless providers, workspace indexer, persistent memory, agent loop, MCP client,
+// and Local OpenAI/OpenCode Server) lives in sibling modules and is registered below.
 
 pub mod agent;
 pub mod crypto;
@@ -10,6 +10,7 @@ pub mod mcp;
 pub mod memory;
 pub mod perf;
 pub mod providers;
+pub mod server;
 pub mod updater;
 pub mod workspace;
 
@@ -42,6 +43,16 @@ fn app_info() -> serde_json::Value {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let provider_engine = Arc::new(providers::ProviderEngine::default());
+    let local_server_state = Arc::new(server::LocalServerState::default());
+
+    // Auto-start the local OpenAI & OpenCode server on 127.0.0.1:11435 at launch
+    let _ = server::start_local_server(
+        provider_engine.clone(),
+        local_server_state.clone(),
+        Some(server::DEFAULT_SERVER_PORT),
+    );
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -51,7 +62,8 @@ pub fn run() {
             }
             Ok(())
         })
-        .manage(Arc::new(providers::ProviderEngine::default()))
+        .manage(provider_engine)
+        .manage(local_server_state)
         .manage(workspace::WorkspaceState::default())
         .manage(memory::MemoryStore::default())
         .manage(mcp::McpRegistry::default())
@@ -61,6 +73,11 @@ pub fn run() {
             perf::perf_stats,
             perf::perf_trim,
             perf::perf_set_auto,
+            server::server_status,
+            server::server_start,
+            server::server_stop,
+            server::server_opencode_config,
+            server::server_install_opencode,
             updater::update_check,
             updater::update_install,
             agent::providers_list,
