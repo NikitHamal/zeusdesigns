@@ -1121,6 +1121,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash".to_string(),
+                    label: "Gemini 3.5 Flash VL".to_string(),
+                    note: Some("1M ctx · Sub-second Google Gemini 3.5 multimodal vision & code".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite".to_string(),
                     label: "Gemini 3.1 Flash Lite VL".to_string(),
                     note: Some("1M ctx · Low-latency multimodal vision & layout".to_string()),
@@ -1895,15 +1902,20 @@ where
         let mut inc_msgs = Vec::new();
         if !system.trim().is_empty() {
             let sys_full: String = system.chars().take(24000).collect();
+            let is_opencode = sys_full.contains("OpenCode / OpenAI Tool-Calling Protocol");
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": "user",
-                "parts": [{ "type": "text", "text": format!("[Zeus Desktop Harness & Design System Specification]\n{}", sys_full) }]
+                "parts": [{ "type": "text", "text": format!("[System Specification]\n{}", sys_full) }]
             }));
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": "assistant",
-                "parts": [{ "type": "text", "text": "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML." }]
+                "parts": [{ "type": "text", "text": if is_opencode {
+                    "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> and wait for <tool_response>."
+                } else {
+                    "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML."
+                } }]
             }));
         }
         for m in messages.iter() {

@@ -212,6 +212,7 @@ export const PROVIDERS: ProviderMeta[] = [
     models: [
       { id: "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview", label: "Gemini 3 Flash VL", note: "1M ctx · Google multimodal vision & UI architect", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen", label: "Gemini 4 Hydrogen", note: "1M ctx · Google Gemini 4 frontier reasoning & code", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash", label: "Gemini 3.5 Flash VL", note: "1M ctx · Sub-second Google Gemini 3.5 multimodal vision & code", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite VL", note: "1M ctx · Low-latency multimodal vision & layout", reasoning: false, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro", label: "Kimi K3.1 Pro", note: "256k ctx · Moonshot K3.1 Pro flagship software engineer", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
       { id: "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview", label: "StepFun Step 5 Preview", note: "256k ctx · StepFun Step 5 frontier reasoning & code", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
