@@ -20,6 +20,7 @@ int zeus_chat_cancel(const char* request_id);
 int zeus_title_generate(const char* user_text, char* out_buf, size_t out_len);
 int zeus_providers_catalog_json(char* out_buf, size_t out_len);
 int zeus_workspace_index_count(const char* folder_path);
+int zeus_pick_folder_dialog(char* out_buf, size_t out_len);
 
 // Native Win32 process-tree working-set & low-memory telemetry/trimming
 int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long long* out_private_bytes, unsigned int* out_proc_count);

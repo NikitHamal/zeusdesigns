@@ -156,6 +156,13 @@ export async function runOpenCode(opts: { convId: string; title: string; prompt:
     opts.signal.removeEventListener("abort", stop);
     (events as unknown as { stream: { return?: () => Promise<unknown> } }).stream.return?.();
     void pump;
+    const curWs = useStore.getState().ui.workspace;
+    if (curWs) {
+      import("./bridge")
+        .then(({ refreshTree }) => refreshTree(curWs))
+        .then((tree) => useStore.getState().patchUI({ workspace: { ...curWs, tree } }))
+        .catch(() => {});
+    }
   }
 }
 

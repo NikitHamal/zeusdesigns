@@ -22,9 +22,12 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <shobjidl.h>
+#include <shlobj.h>
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <malloc.h>
+#include <thread>
 #endif
 
 namespace fs = std::filesystem;
@@ -1324,6 +1327,90 @@ int zeus_workspace_index_count(const char* folder_path) {
     zeus::WorkspaceEngine ws;
     if (!ws.open_workspace(folder_path)) return -1;
     return static_cast<int>(ws.indexed_files().size());
+}
+
+int zeus_pick_folder_dialog(char* out_buf, size_t out_len) {
+    if (!out_buf || out_len == 0) return -1;
+    out_buf[0] = '\0';
+#ifdef _WIN32
+    std::string chosen_utf8;
+    int status = 0; // 0 = cancelled, 1 = picked, -1 = error
+    std::thread sta_worker([&]() {
+        HRESULT hr_init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        bool must_uninit = SUCCEEDED(hr_init);
+        HWND owner = GetForegroundWindow();
+
+        IFileOpenDialog* pfd = nullptr;
+        HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+        if (SUCCEEDED(hr) && pfd) {
+            DWORD opts = 0;
+            if (SUCCEEDED(pfd->GetOptions(&opts))) {
+                pfd->SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+            }
+            pfd->SetTitle(L"Open project folder");
+            hr = pfd->Show(owner);
+            if (SUCCEEDED(hr)) {
+                IShellItem* psi = nullptr;
+                if (SUCCEEDED(pfd->GetResult(&psi)) && psi) {
+                    PWSTR pszPath = nullptr;
+                    if (SUCCEEDED(psi->GetDisplayName(SIGDN_FILESYSPATH, &pszPath)) && pszPath) {
+                        int needed = WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, nullptr, 0, nullptr, nullptr);
+                        if (needed > 1) {
+                            std::string buf(static_cast<size_t>(needed - 1), '\0');
+                            WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, buf.data(), needed, nullptr, nullptr);
+                            chosen_utf8 = std::move(buf);
+                            status = 1;
+                        }
+                        CoTaskMemFree(pszPath);
+                    }
+                    psi->Release();
+                }
+            } else if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+                status = 0;
+            } else {
+                status = -1;
+            }
+            pfd->Release();
+        } else {
+            status = -1;
+        }
+        if (status == -1) {
+            wchar_t display_name[MAX_PATH]{};
+            BROWSEINFOW bi{};
+            bi.hwndOwner = owner;
+            bi.pszDisplayName = display_name;
+            bi.lpszTitle = L"Open project folder";
+            bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_USENEWUI;
+            PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
+            if (pidl) {
+                wchar_t path_w[MAX_PATH]{};
+                if (SHGetPathFromIDListW(pidl, path_w)) {
+                    int needed = WideCharToMultiByte(CP_UTF8, 0, path_w, -1, nullptr, 0, nullptr, nullptr);
+                    if (needed > 1) {
+                        std::string buf(static_cast<size_t>(needed - 1), '\0');
+                        WideCharToMultiByte(CP_UTF8, 0, path_w, -1, buf.data(), needed, nullptr, nullptr);
+                        chosen_utf8 = std::move(buf);
+                        status = 1;
+                    }
+                }
+                CoTaskMemFree(pidl);
+            } else {
+                status = 0;
+            }
+        }
+        if (must_uninit) {
+            CoUninitialize();
+        }
+    });
+    sta_worker.join();
+    if (status == 1 && !chosen_utf8.empty()) {
+        copy_to_c_buf(chosen_utf8, out_buf, out_len);
+        return 1;
+    }
+    return status;
+#else
+    return -1;
+#endif
 }
 
 int zeus_memory_stats(unsigned long long* out_working_set_bytes, unsigned long long* out_private_bytes, unsigned int* out_proc_count) {

@@ -16,5 +16,12 @@ fn main() {
         .warnings(false)
         .compile("zeus_engine");
 
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rustc-link-lib=ole32");
+        println!("cargo:rustc-link-lib=shell32");
+        println!("cargo:rustc-link-lib=uuid");
+        println!("cargo:rustc-link-lib=user32");
+    }
+
     tauri_build::build()
 }

@@ -229,23 +229,45 @@ pub fn walk_workspace_n(base_root: &Path, current: &Path, depth: usize, max_node
     nodes
 }
 
+extern "C" {
+    fn zeus_pick_folder_dialog(out_buf: *mut std::os::raw::c_char, out_len: usize) -> i32;
+}
+
 #[tauri::command(async)]
 pub fn workspace_pick(
     app: tauri::AppHandle,
     state: tauri::State<'_, WorkspaceState>,
 ) -> Result<Option<Value>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    let picked = app
-        .dialog()
-        .file()
-        .set_title("Open project folder")
-        .blocking_pick_folder();
-    let Some(fp) = picked else {
-        return Ok(None);
+    let mut c_buf = vec![0u8; 4096];
+    let rc = unsafe {
+        zeus_pick_folder_dialog(
+            c_buf.as_mut_ptr() as *mut std::os::raw::c_char,
+            c_buf.len(),
+        )
     };
-    let path_buf = fp
-        .into_path()
-        .map_err(|e| format!("Could not resolve selected folder path: {}", e))?;
+    let path_buf = if rc == 1 {
+        let len = c_buf.iter().position(|&b| b == 0).unwrap_or(c_buf.len());
+        let s = String::from_utf8_lossy(&c_buf[..len]).trim().to_string();
+        if s.is_empty() {
+            return Ok(None);
+        }
+        PathBuf::from(s)
+    } else if rc == 0 {
+        return Ok(None);
+    } else {
+        use tauri::Manager;
+        use tauri_plugin_dialog::DialogExt;
+        let mut builder = app.dialog().file().set_title("Open project folder");
+        if let Some(win) = app.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        let picked = builder.blocking_pick_folder();
+        let Some(fp) = picked else {
+            return Ok(None);
+        };
+        fp.into_path()
+            .map_err(|e| format!("Could not resolve selected folder path: {}", e))?
+    };
     if !path_buf.exists() || !path_buf.is_dir() {
         return Err(format!("Selected folder does not exist: {}", path_buf.display()));
     }

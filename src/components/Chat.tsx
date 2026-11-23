@@ -602,14 +602,24 @@ export function FilesPanel() {
   };
 
   const openFile = async (path: string) => {
-    if (!ws) return;
+    const curWs = useStore.getState().ui.workspace;
+    if (!curWs) return;
     try {
-      const content = await readWorkspaceFile(ws, path);
+      const content = await readWorkspaceFile(curWs, path);
       setActiveFile({ path, content, dirty: false });
     } catch {
       notify(`Could not read ${path}`);
     }
   };
+
+  useEffect(() => {
+    const h = (e: Event) => {
+      const p = (e as CustomEvent<string>).detail;
+      if (p) void openFile(p);
+    };
+    window.addEventListener("zeus:open-file", h);
+    return () => window.removeEventListener("zeus:open-file", h);
+  }, []);
 
   const saveActiveFile = async () => {
     if (!ws || !activeFile) return;
@@ -995,22 +1005,132 @@ export function TerminalPanel() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Project Workspace Overview (shown on new chat inside a project)     */
+/* ------------------------------------------------------------------ */
+const AGENT_TASKS = [
+  { icon: "manage_search", label: "Map codebase", prompt: "Map the architecture and key files of this project." },
+  { icon: "bug_report", label: "Find & fix bugs", prompt: "Inspect the codebase, run checks or tests, and fix any bugs." },
+  { icon: "terminal", label: "Run tests & build", prompt: "Run the test suite or build in this project and fix any issues." },
+  { icon: "description", label: "Generate AGENTS.md", prompt: "Analyze this project and create a concise AGENTS.md file." },
+];
+
+function ProjectWorkspaceCard({ onOpenDock }: { onOpenDock: (tab: "files" | "terminal", filePath?: string) => void }) {
+  const ws = useStore((s) => s.ui.workspace);
+  const curProject = useStore(activeProject);
+  const runtime = useStore((s) => s.settings.agentRuntime ?? "zeus");
+  const patchSettings = useStore((s) => s.patchSettings);
+  const topNodes = (ws?.tree ?? []).slice(0, 12);
+
+  return (
+    <div className="mx-auto my-auto flex w-full max-w-[680px] flex-col gap-4 py-6">
+      <div className="rounded-2xl border border-outline-variant/60 bg-surface-low p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-container text-on-primary-container">
+              <Icon name="folder_open" size={19} />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate font-display text-base font-semibold text-on-surface">
+                {ws?.name ?? curProject?.name ?? "Workspace"}
+              </div>
+              {(ws?.root ?? curProject?.root) && (
+                <div className="truncate font-mono text-[11.5px] text-on-surface-variant">
+                  {ws?.root ?? curProject?.root}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="flex rounded-full border border-outline-variant/60 bg-surface p-0.5 text-[11.5px] font-semibold">
+              {(["zeus", "opencode"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => patchSettings({ agentRuntime: r })}
+                  className={cn(
+                    "h-7 rounded-full px-2.5 transition-colors",
+                    runtime === r ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
+                  )}
+                >
+                  {r === "zeus" ? "Zeus" : "OpenCode SDK"}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => onOpenDock("files")}
+              className="state inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-high px-3 text-xs font-medium text-on-surface"
+            >
+              <Icon name="account_tree" size={14} />
+              Files ({ws?.tree.length ?? 0})
+            </button>
+            <button
+              onClick={() => onOpenDock("terminal")}
+              className="state inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-high px-3 text-xs font-medium text-on-surface"
+            >
+              <Icon name="terminal" size={14} />
+              Terminal
+            </button>
+          </div>
+        </div>
+
+        {topNodes.length > 0 && (
+          <div className="mt-3.5 grid grid-cols-2 gap-1.5 border-t border-outline-variant/40 pt-3 sm:grid-cols-3">
+            {topNodes.map((n) => (
+              <button
+                key={n.path}
+                onClick={() => onOpenDock("files", n.dir ? undefined : n.path)}
+                className="state flex items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5 text-left text-xs text-on-surface"
+              >
+                <Icon
+                  name={n.dir ? "folder" : "code"}
+                  size={14}
+                  className={cn("shrink-0", n.dir ? "text-primary" : "text-on-surface-variant")}
+                />
+                <span className="truncate font-mono text-[11.5px]">{n.name}{n.dir ? "/" : ""}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {AGENT_TASKS.map((t) => (
+          <button
+            key={t.label}
+            onClick={() => window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: t.prompt }))}
+            className="state flex h-9 items-center gap-2 rounded-xl bg-surface-container px-3 text-xs font-medium text-on-surface"
+          >
+            <Icon name={t.icon} size={16} className="text-primary" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Chat pane                                                           */
 /* ------------------------------------------------------------------ */
 export function ChatPane() {
   const conv = useStore(activeConv);
   const curProject = useStore(activeProject);
   const projects = useStore((s) => s.projects);
+  const ws = useStore((s) => s.ui.workspace);
   const leftTab = useStore((s) => s.ui.leftTab);
   const patchUI = useStore((s) => s.patchUI);
   const setTitle = useStore((s) => s.setTitle);
   const showCanvas = useStore((s) => s.ui.showCanvas);
+  const m3eOpen = useStore((s) => !!s.ui.m3e);
   const artifacts = useStore((s) => convArtifactCount(s, s.activeConvId));
   const [editing, setEditing] = useState(false);
+  const [dockOpen, setDockOpen] = useState(true);
+  const [dockTab, setDockTab] = useState<"files" | "terminal">("files");
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [away, setAway] = useState(false);
   const last = conv.messages[conv.messages.length - 1];
+  const hasProjectFolder = Boolean(ws?.root || curProject?.root);
+  const canSplitIde = hasProjectFolder && !showCanvas && !m3eOpen && leftTab === "chat";
 
   useEffect(() => {
     if (stick.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -1022,7 +1142,7 @@ export function ChatPane() {
     st.setActiveProject(projectId);
     if (proj?.root) {
       openWorkspaceByPath(proj.root, proj.name)
-        .then((ws) => ws && useStore.getState().patchUI({ workspace: ws }))
+        .then((w) => w && useStore.getState().patchUI({ workspace: w }))
         .catch(() => {});
     }
   };
@@ -1032,14 +1152,31 @@ export function ChatPane() {
       .then((w) => {
         if (w) {
           useStore.getState().addOrSelectProject(w);
+          setDockOpen(true);
+          setDockTab("files");
           useStore.getState().notify(`Opened project ${w.name}`);
         }
       })
       .catch((e) => useStore.getState().notify(e.message));
   };
 
+  const handleOpenDock = (tab: "files" | "terminal", filePath?: string) => {
+    if (!showCanvas && !m3eOpen) {
+      setDockOpen(true);
+      setDockTab(tab);
+      patchUI({ leftTab: "chat" });
+    } else {
+      patchUI({ leftTab: tab });
+    }
+    if (filePath) {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: filePath }));
+      }, 30);
+    }
+  };
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
       <div className="flex h-14 shrink-0 items-center gap-1.5 border-b border-outline-variant/40 px-3">
         <Dropdown width={240} trigger={({ toggle, open }) => (
           <button
@@ -1051,7 +1188,7 @@ export function ChatPane() {
             )}
           >
             <Icon name="folder_open" size={15} className="text-primary" />
-            <span className="max-w-[110px] truncate">{curProject?.name ?? "Workspace"}</span>
+            <span className="max-w-[130px] truncate">{curProject?.name ?? "Workspace"}</span>
             <Icon name="expand_more" size={14} className="text-on-surface-variant" />
           </button>
         )}>
@@ -1084,7 +1221,7 @@ export function ChatPane() {
             autoFocus defaultValue={conv.title} spellCheck={false}
             onBlur={(e) => { if (e.target.value.trim()) setTitle(conv.id, e.target.value.trim()); setEditing(false); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
-            className="h-8 min-w-0 flex-1 rounded-lg bg-surface-container px-2.5 font-display text-[14.5px] font-medium outline-none ring-2 ring-primary/50"
+            className="h-8 min-w-0 flex-1 rounded-lg border border-primary bg-surface-container px-2.5 font-display text-[14.5px] font-medium outline-none"
           />
         ) : (
           <button onClick={() => setEditing(true)} title="Rename chat" className="state flex min-w-0 items-center gap-1 rounded-lg px-2 py-1">
@@ -1119,6 +1256,17 @@ export function ChatPane() {
           })}
         </div>
 
+        {hasProjectFolder && !showCanvas && !m3eOpen && leftTab === "chat" && (
+          <IconBtn
+            label={dockOpen ? "Hide project panel" : "Show project panel"}
+            size={34}
+            active={dockOpen}
+            onClick={() => setDockOpen(!dockOpen)}
+          >
+            <Icon name="account_tree" size={18} />
+          </IconBtn>
+        )}
+
         <ContextWindowPill />
         {(artifacts > 0 || showCanvas) && (
           <IconBtn label={showCanvas ? "Close canvas" : "Open canvas"} size={34} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="dashboard" size={19} /></IconBtn>
@@ -1131,20 +1279,65 @@ export function ChatPane() {
       ) : leftTab === "terminal" ? (
         <TerminalPanel />
       ) : (
-        <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">
-          {conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="mx-auto flex min-h-0 w-full max-w-[840px] flex-1 flex-col space-y-5 overflow-y-auto px-4 py-3">
+              {conv.messages.length === 0 ? (
+                <ProjectWorkspaceCard onOpenDock={handleOpenDock} />
+              ) : (
+                conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)
+              )}
+            </div>
+            {away && (
+              <div className="pointer-events-none relative h-0">
+                <button
+                  onClick={() => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }}
+                  title="Jump to latest" aria-label="Jump to latest"
+                  className="state pointer-events-auto absolute -top-12 left-1/2 grid size-9 -translate-x-1/2 place-items-center rounded-full border border-outline-variant bg-surface-container text-on-surface"
+                ><Icon name="arrow_downward" size={18} /></button>
+              </div>
+            )}
+            <div className="mx-auto w-full max-w-[840px]">
+              <Composer />
+            </div>
+          </div>
+
+          {canSplitIde && dockOpen && (
+            <div className="hidden h-full w-[420px] shrink-0 flex-col border-l border-outline-variant/60 bg-surface-dim lg:flex xl:w-[480px]">
+              <div className="flex h-10 shrink-0 items-center justify-between border-b border-outline-variant/50 px-3">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDockTab("files")}
+                    className={cn(
+                      "state flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium",
+                      dockTab === "files" ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant"
+                    )}
+                  >
+                    <Icon name="account_tree" size={14} />
+                    Project Files
+                  </button>
+                  <button
+                    onClick={() => setDockTab("terminal")}
+                    className={cn(
+                      "state flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium",
+                      dockTab === "terminal" ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant"
+                    )}
+                  >
+                    <Icon name="terminal" size={14} />
+                    Terminal
+                  </button>
+                </div>
+                <IconBtn label="Close project panel" size={28} onClick={() => setDockOpen(false)}>
+                  <Icon name="close" size={15} />
+                </IconBtn>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {dockTab === "files" ? <FilesPanel /> : <TerminalPanel />}
+              </div>
+            </div>
+          )}
         </div>
       )}
-      {away && leftTab === "chat" && (
-        <div className="pointer-events-none relative h-0">
-          <button
-            onClick={() => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }}
-            title="Jump to latest" aria-label="Jump to latest"
-            className="state pointer-events-auto absolute -top-12 left-1/2 grid size-9 -translate-x-1/2 place-items-center rounded-full border border-outline-variant bg-surface-container text-on-surface"
-          ><Icon name="arrow_downward" size={18} /></button>
-        </div>
-      )}
-      {leftTab !== "terminal" && <Composer />}
     </div>
   );
 }
