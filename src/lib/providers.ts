@@ -76,6 +76,15 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
+    id: "vlmrun", name: "VLM Run Gateway", tagline: "DiffusionGemma 26B VL · Qwen 3.5 VL · GLM-OCR · zero-key", speed: "~155 tok/s", color: "#0ca678", icon: "visibility",
+    contextWindow: 131072,
+    models: [
+      { id: "google/diffusiongemma-26b-a4b-it", label: "DiffusionGemma 26B A4B VL", note: "128k ctx · Google 26B MoE multimodal vision & UI coder", reasoning: false, vision: true, contextWindow: 131072, maxOutput: 16384 },
+      { id: "qwen/qwen3.5-0.8b", label: "Qwen 3.5 0.8B VL", note: "128k ctx · Ultra-fast multimodal vision & layout", reasoning: false, vision: true, contextWindow: 131072, maxOutput: 8192 },
+      { id: "zai-org/glm-ocr", label: "GLM-OCR Vision", note: "64k ctx · Z.ai visual UI & document screenshot parser", reasoning: false, vision: true, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
     id: "together2api", name: "Together Frontier", tagline: "GLM 5.3 · Kimi K3 · Muse Glimmer · zero-key", speed: "~145 tok/s", color: "#e67700", icon: "hub",
     contextWindow: 131072,
     models: [

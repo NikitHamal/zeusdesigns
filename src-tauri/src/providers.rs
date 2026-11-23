@@ -437,6 +437,36 @@ pub fn catalog() -> Vec<ProviderInfo> {
             ],
         },
         ProviderInfo {
+            id: "vlmrun".to_string(),
+            name: "VLM Run Gateway".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~155 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "google/diffusiongemma-26b-a4b-it".to_string(),
+                    label: "DiffusionGemma 26B A4B VL".to_string(),
+                    note: Some("128k ctx · Google 26B MoE multimodal vision & UI coder".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen/qwen3.5-0.8b".to_string(),
+                    label: "Qwen 3.5 0.8B VL".to_string(),
+                    note: Some("128k ctx · Ultra-fast multimodal vision & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "zai-org/glm-ocr".to_string(),
+                    label: "GLM-OCR Vision".to_string(),
+                    note: Some("64k ctx · Z.ai visual UI & document screenshot parser".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+            ],
+        },
+        ProviderInfo {
             id: "together2api".to_string(),
             name: "Together Frontier".to_string(),
             kind: "keyless".to_string(),
@@ -3524,6 +3554,129 @@ where
     }
 }
 
+/// Stream from VLM Run Gateway (`https://gateway.vlm.run/v1/openai/chat/completions`, zero-key DiffusionGemma 26B A4B VL / Qwen 3.5 VL / GLM-OCR).
+pub fn stream_vlmrun<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+    let eff_model = match model {
+        "google/diffusiongemma-26b-a4b-it" | "qwen/qwen3.5-0.8b" => model,
+        "zai-org/glm-ocr" if has_images => "zai-org/glm-ocr",
+        _ => "google/diffusiongemma-26b-a4b-it",
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() && eff_model != "zai-org/glm-ocr" {
+        let sys_safe: String = system.chars().take(24000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        } else {
+            let mut parts = vec![json!({ "type": "text", "text": m.content })];
+            for img in imgs {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": { "url": img.data_url }
+                }));
+            }
+            oai_msgs.push(json!({ "role": m.role, "content": parts }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 8192,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://gateway.vlm.run/v1/openai/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("VLM Run request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("VLM Run HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("VLM Run stream ended without output".to_string())
+    }
+}
+
 /// Stream from Together Frontier (`https://lolmaobruhhh-test.hf.space/v1/chat/completions`, zero-key GLM 5.3 / Kimi K3 / Muse Glimmer 30B / GPT-OSS 120B).
 pub fn stream_together2api<F>(
     model: &str,
@@ -4054,6 +4207,8 @@ where
                         .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", &req.system, &req.messages, cancel, &mut on_delta))
                 }
             }),
+        "vlmrun" => stream_vlmrun(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_vlmrun("qwen/qwen3.5-0.8b", &req.system, &req.messages, cancel, &mut on_delta)),
         "together2api" => stream_together2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta)),
         "aihorde" => stream_aihorde(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -4115,9 +4270,9 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["ptero", "kilo", "ovhcloud", "blockrun", "qwen"]
+        &["ptero", "kilo", "ovhcloud", "vlmrun", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "blockrun", "ovhcloud", "together2api", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -4146,6 +4301,7 @@ where
                 cancel,
                 &mut on_delta,
             ).is_ok(),
+            "vlmrun" => stream_vlmrun("google/diffusiongemma-26b-a4b-it", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "together2api" => stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "aihorde" => stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "apisfreellm" => stream_apisfreellm("free-ai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
