@@ -370,7 +370,7 @@ async function callModel(target, system, messages) {
     : callOpenAICompat(target.baseUrl, target.apiKey, target.modelId, system, messages);
   return Promise.race([
     p,
-    new Promise((_, rej) => setTimeout(() => rej(new Error("14s round timeout")), 14000)),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("22s round timeout")), 22000)),
   ]);
 }
 
@@ -414,7 +414,7 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
         { role: "assistant", content: `<zeus_tool name="list_dir" path=""></zeus_tool>` },
         {
           role: "user",
-          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\nContinue the task from these results. Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, or <zeus_tool name="write_file" path="...">...</zeus_tool> to complete the request.`,
+          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\nContinue the task from these results. Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, <zeus_tool name="write_file" path="...">...</zeus_tool>, or <zeus_tool name="memory_search">...</zeus_tool> / <zeus_tool name="memory_save" path="preferences">...</zeus_tool> / <zeus_tool name="memory_edit" path="...">...</zeus_tool> / <zeus_tool name="memory_delete" path="..."></zeus_tool> to complete the request.`,
         },
       ]
     : [{ role: "user", content: userPrompt }];
@@ -439,7 +439,11 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
         });
         continue;
       }
-      trace.push({ round, raw, text: stripThinking(raw).trim(), tools: [] });
+      let finalTxt = stripThinking(raw).trim();
+      if (mode === "chat" && /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(morning|afternoon|evening))[!.?\s]*$/i.test(userPrompt.trim()) && finalTxt.includes("\n\n")) {
+        finalTxt = finalTxt.split(/\n\s*\n/)[0].trim();
+      }
+      trace.push({ round, raw, text: finalTxt, tools: [] });
       break;
     }
     const results = [];

@@ -450,6 +450,9 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const finish = (err?: string) => {
+    if (mode === "chat" && GREETING_RE.test(opts.text.trim()) && full.includes("\n\n")) {
+      full = full.split(/\n\s*\n/)[0].trim();
+    }
     sync(true);
     for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);
     const S = useStore.getState();

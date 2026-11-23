@@ -429,6 +429,61 @@ fn parse_inline_invocations_segment(
         }
     }
 
+    // 3. Also support direct shorthand XML tags (`<bash>...</bash>`, `<python>...</python>`, `<memory_search>...</memory_search>`, etc.)
+    // when a model emits `<bash>` instead of `<zeus_tool name="bash">`
+    if list.is_empty() {
+        for tag_name in [
+            "bash",
+            "shell",
+            "python",
+            "memory_search",
+            "memory_save",
+            "memory_edit",
+            "memory_delete",
+        ] {
+            let open_pat = format!("<{}", tag_name);
+            let close_pat = format!("</{}>", tag_name);
+            let mut from = 0;
+            while let Some(rel_s) = clean_text[from..].find(&open_pat) {
+                let start = from + rel_s;
+                let rest = &clean_text[start..];
+                let Some(gt) = rest.find('>') else { break };
+                let header = &rest[open_pat.len()..gt];
+                if !header.is_empty()
+                    && !header.starts_with(char::is_whitespace)
+                    && !header.starts_with('/')
+                {
+                    from = start + gt + 1;
+                    continue;
+                }
+                let self_closing = header.trim_end().ends_with('/');
+                let (body, next_pos) = if self_closing {
+                    ("", start + gt + 1)
+                } else if let Some(end_rel) = rest.find(&close_pat) {
+                    (rest[gt + 1..end_rel].trim(), start + end_rel + close_pat.len())
+                } else {
+                    break;
+                };
+                from = next_pos;
+                let path_arg = extract_attr(header, "path")
+                    .or_else(|| extract_attr(header, "id"))
+                    .or_else(|| extract_attr(header, "category"))
+                    .unwrap_or_default();
+                if strict_placeholder_filter && is_template_placeholder(&path_arg, body) {
+                    continue;
+                }
+                list.push(InlineToolInvocation {
+                    name: tag_name.to_string(),
+                    path: path_arg,
+                    start_line: None,
+                    end_line: None,
+                    body: body.to_string(),
+                    offset: start,
+                });
+            }
+        }
+    }
+
     list.sort_by_key(|x| x.offset);
     list
 }

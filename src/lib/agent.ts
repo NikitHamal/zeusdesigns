@@ -111,7 +111,7 @@ export function buildPlainContext(opts: {
         { role: "assistant", content: `<zeus_tool name="list_dir" path=""></zeus_tool>`, attachments: [] },
         {
           role: "user",
-          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\nContinue the task from these results. Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, or <zeus_tool name="write_file" path="...">...</zeus_tool> to complete the request.`,
+          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\nContinue the task from these results. Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, <zeus_tool name="write_file" path="...">...</zeus_tool>, or <zeus_tool name="memory_search">...</zeus_tool> / <zeus_tool name="memory_save" path="preferences">...</zeus_tool> / <zeus_tool name="memory_edit" path="...">...</zeus_tool> / <zeus_tool name="memory_delete" path="..."></zeus_tool> to complete the request.`,
           attachments: [],
         }
       );
