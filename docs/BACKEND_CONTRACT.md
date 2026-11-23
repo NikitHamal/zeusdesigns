@@ -69,9 +69,9 @@ The shell is Rust (Tauri 2 / WebView2). The native C++ engine plugs in through a
 4. Register the commands in `lib.rs` (`invoke_handler`). The UI flips to the native path automatically as soon as
    `providers_list` resolves (`ui.nativeReady`), no UI change needed.
 
-Provider slugs sent by the UI: `mercury3`, `kilo`, `blockrun`, `ovhcloud`, `freecc`, `vlmrun`, `together2api`, `hfcluster`, `aihorde`, `apisfreellm`, `qwen`, `ptero`, `unikey`, `llm7`, `pollinations`, `yqcloud`, `deepai`, `k2horizon`, `motif`, `longcat`, `geminiweb`, `chatjimmy`, `custom`.
+Provider slugs sent by the UI: `mercury3`, `kilo`, `zencloud`, `gemma4pro`, `frontierlab`, `liquidai`, `claudebridge`, `koboldcloud`, `blockrun`, `ovhcloud`, `freecc`, `vlmrun`, `together2api`, `hfcluster`, `aihorde`, `apisfreellm`, `qwen`, `ptero`, `unikey`, `llm7`, `pollinations`, `yqcloud`, `deepai`, `k2horizon`, `motif`, `longcat`, `geminiweb`, `chatjimmy`, `custom`.
 Unknown model ids must fall back to the provider's default model.
-Multimodal image/file attachments (`messages[*].attachments`) are supported natively across `kilo` (`image_url`), `blockrun` (`image_url`), `ovhcloud` (`image_url`), `freecc` (Anthropic `/v1/messages` `image` base64), `vlmrun` (`image_url`), `qwen` (`/api/v2/files/getstsToken` + `OSS4-HMAC-SHA256` OSS PUT + `files`), `deepai` (`generateIslandKey` + `/chat_attachments/upload` + `attachment_uuids`), `ptero` (`attachments`), and `custom` (OpenAI `image_url` / Anthropic `image` base64).
+Multimodal image/file attachments (`messages[*].attachments`) are supported natively across `kilo` (`image_url`), `gemma4pro` (`image_url`), `claudebridge` (Anthropic `/v1/messages` `image` base64), `blockrun` (`image_url`), `ovhcloud` (`image_url`), `freecc` (Anthropic `/v1/messages` `image` base64), `vlmrun` (`image_url`), `qwen` (`/api/v2/files/getstsToken` + `OSS4-HMAC-SHA256` OSS PUT + `files`), `deepai` (`generateIslandKey` + `/chat_attachments/upload` + `attachment_uuids`), `ptero` (`attachments`), and `custom` (OpenAI `image_url` / Anthropic `image` base64).
 
 ## Updater
 - `update_check() -> { current, latest, available, pageUrl, publishedAt, installerUrl, installerName, size }` reads `releases/latest` of `NikitHamal/zeusdesigns`; `available` needs a newer tag and a `*setup.exe` asset.
