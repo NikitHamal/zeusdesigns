@@ -82,15 +82,28 @@ async function walk(h: DirHandle, base: string, depth: number): Promise<FileNode
   return out.sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name));
 }
 
-const TREE_DEPTH = 2;
+const TREE_DEPTH = 1;
 const errMsg = (e: unknown) => (typeof e === "string" ? e : e instanceof Error ? e.message : "Could not open that folder.");
 
 export async function openWorkspace(): Promise<Workspace | null> {
   if (isNative) {
+    try {
+      const picked = await invoke<{ name: string; root: string; tree: FileNode[] } | null>("workspace_pick");
+      if (picked === null) return null;
+      if (picked && typeof picked.root === "string") {
+        return { name: picked.name || picked.root, root: picked.root, tree: Array.isArray(picked.tree) ? picked.tree : [] };
+      }
+    } catch (e) {
+      const msg = errMsg(e);
+      if (/drive root|system folder|does not exist/i.test(msg)) {
+        throw new Error(msg);
+      }
+    }
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const root = await open({ directory: true, multiple: false, title: "Open project folder" });
-    if (root === null) return null;
-    if (typeof root !== "string") return null;
+    const raw = await open({ directory: true, multiple: false, title: "Open project folder" });
+    if (raw === null) return null;
+    const root = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : (raw as { path?: string })?.path;
+    if (!root || typeof root !== "string") return null;
     try {
       await invoke("workspace_open", { path: root });
       const tree = await invoke<FileNode[]>("workspace_tree", { root, depth: TREE_DEPTH });

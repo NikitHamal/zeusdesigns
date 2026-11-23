@@ -1,24 +1,16 @@
-// Bundled design fonts. Latin variable subsets, inlined at build time so designs never fall back to a system font.
-import inter from "../assets/fonts/design/inter.woff2";
-import jakarta from "../assets/fonts/design/plus-jakarta-sans.woff2";
-import grotesk from "../assets/fonts/design/space-grotesk.woff2";
-import fraunces from "../assets/fonts/design/fraunces.woff2";
-import dmSans from "../assets/fonts/design/dm-sans.woff2";
-import manrope from "../assets/fonts/design/manrope.woff2";
-import jetbrains from "../assets/fonts/design/jetbrains-mono.woff2";
-import instrumentSerif from "../assets/fonts/design/instrument-serif.woff2";
-
+// Bundled design fonts served from `/fonts/design/*.woff2` so they are loaded on demand by the browser engine
+// rather than held permanently as base64 string literals inside the V8 JavaScript heap.
 export interface DesignFont { family: string; url: string; weights: string; kind: "sans" | "serif" | "mono"; feel: string; use: string }
 
 export const DESIGN_FONTS: DesignFont[] = [
-  { family: "Inter", url: inter, weights: "100 900", kind: "sans", feel: "neutral, precise, UI native", use: "dashboards, tools, settings, tables" },
-  { family: "Plus Jakarta Sans", url: jakarta, weights: "200 800", kind: "sans", feel: "friendly geometric, modern", use: "consumer apps, fintech, onboarding" },
-  { family: "DM Sans", url: dmSans, weights: "100 1000", kind: "sans", feel: "low contrast geometric, calm", use: "wellness, SaaS marketing, body text" },
-  { family: "Manrope", url: manrope, weights: "200 800", kind: "sans", feel: "semi rounded, technical", use: "crypto, analytics, product pages" },
-  { family: "Space Grotesk", url: grotesk, weights: "300 700", kind: "sans", feel: "quirky, techy, characterful", use: "startups, dev tools, brutalist" },
-  { family: "Fraunces", url: fraunces, weights: "100 900", kind: "serif", feel: "soft editorial serif, warm", use: "food, journals, boutique, headlines" },
-  { family: "Instrument Serif", url: instrumentSerif, weights: "400", kind: "serif", feel: "condensed elegant display", use: "hero headlines only, one weight (400)" },
-  { family: "JetBrains Mono", url: jetbrains, weights: "100 800", kind: "mono", feel: "developer mono", use: "code, numbers, labels, terminals" },
+  { family: "Inter", url: "./fonts/design/inter.woff2", weights: "100 900", kind: "sans", feel: "neutral, precise, UI native", use: "dashboards, tools, settings, tables" },
+  { family: "Plus Jakarta Sans", url: "./fonts/design/plus-jakarta-sans.woff2", weights: "200 800", kind: "sans", feel: "friendly geometric, modern", use: "consumer apps, fintech, onboarding" },
+  { family: "DM Sans", url: "./fonts/design/dm-sans.woff2", weights: "100 1000", kind: "sans", feel: "low contrast geometric, calm", use: "wellness, SaaS marketing, body text" },
+  { family: "Manrope", url: "./fonts/design/manrope.woff2", weights: "200 800", kind: "sans", feel: "semi rounded, technical", use: "crypto, analytics, product pages" },
+  { family: "Space Grotesk", url: "./fonts/design/space-grotesk.woff2", weights: "300 700", kind: "sans", feel: "quirky, techy, characterful", use: "startups, dev tools, brutalist" },
+  { family: "Fraunces", url: "./fonts/design/fraunces.woff2", weights: "100 900", kind: "serif", feel: "soft editorial serif, warm", use: "food, journals, boutique, headlines" },
+  { family: "Instrument Serif", url: "./fonts/design/instrument-serif.woff2", weights: "400", kind: "serif", feel: "condensed elegant display", use: "hero headlines only, one weight (400)" },
+  { family: "JetBrains Mono", url: "./fonts/design/jetbrains-mono.woff2", weights: "100 800", kind: "mono", feel: "developer mono", use: "code, numbers, labels, terminals" },
 ];
 
 /** @font-face rules for every bundled design font (or a subset). */

@@ -211,7 +211,7 @@ export const useStore = create<State>()(
           const ws = p.workspace;
           const projects = s.projects.map((proj) =>
             proj.id === s.activeProjectId
-              ? { ...proj, name: ws.name || proj.name, root: ws.root ?? proj.root, tree: ws.tree }
+              ? { ...proj, name: ws.name || proj.name, root: ws.root ?? proj.root, tree: undefined }
               : proj
           );
           return { ui: nextUi, projects };
@@ -232,7 +232,7 @@ export const useStore = create<State>()(
         );
         if (existing) {
           const updatedProjects = s.projects.map((p) =>
-            p.id === existing.id ? { ...p, name: ws.name, root: ws.root ?? p.root, tree: ws.tree, expanded: true, at: Date.now() } : p
+            p.id === existing.id ? { ...p, name: ws.name, root: ws.root ?? p.root, tree: undefined, expanded: true, at: Date.now() } : p
           );
           const projConvs = s.conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === existing.id);
           if (projConvs.length > 0) {
@@ -244,7 +244,7 @@ export const useStore = create<State>()(
               projectName: existing.name,
               activeConvId: targetConv.id,
               activePageId: nextPage,
-              ui: { ...s.ui, workspace: ws },
+              ui: { ...s.ui, workspace: ws, leftTab: "chat" },
             });
           } else {
             const nc = firstConv(existing.id);
@@ -258,7 +258,7 @@ export const useStore = create<State>()(
               pages: [...s.pages, np],
               activeConvId: nc.id,
               activePageId: np.id,
-              ui: { ...s.ui, workspace: ws, showCanvas: false },
+              ui: { ...s.ui, workspace: ws, showCanvas: false, leftTab: "chat" },
             });
           }
           return existing.id;
@@ -268,13 +268,13 @@ export const useStore = create<State>()(
         const def = s.projects.find((p) => p.id === DEFAULT_PROJECT_ID && !p.root && s.projects.length === 1);
         if (def) {
           const updatedProjects = s.projects.map((p) =>
-            p.id === DEFAULT_PROJECT_ID ? { ...p, name: ws.name, root: ws.root, tree: ws.tree, expanded: true, at: Date.now() } : p
+            p.id === DEFAULT_PROJECT_ID ? { ...p, name: ws.name, root: ws.root, tree: undefined, expanded: true, at: Date.now() } : p
           );
           set({
             projects: updatedProjects,
             activeProjectId: DEFAULT_PROJECT_ID,
             projectName: ws.name,
-            ui: { ...s.ui, workspace: ws },
+            ui: { ...s.ui, workspace: ws, leftTab: "chat" },
           });
           return DEFAULT_PROJECT_ID;
         }
@@ -283,7 +283,7 @@ export const useStore = create<State>()(
           id: uid(),
           name: ws.name,
           root: ws.root,
-          tree: ws.tree,
+          tree: undefined,
           expanded: true,
           at: Date.now(),
         };

@@ -100,8 +100,8 @@ export default function App() {
             )}
             <div className="min-w-0 flex-1 p-2 pl-0">{m3eOpen ? <M3ePane /> : <CanvasPane />}</div>
           </>
-        ) : hasMessages || leftTab !== "chat" ? (
-          <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full max-w-[860px]"><ChatPane /></div></div>
+        ) : hasMessages || leftTab !== "chat" || Boolean(activeRoot) ? (
+          <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full max-w-[1080px]"><ChatPane /></div></div>
         ) : (
           <Home />
         )}

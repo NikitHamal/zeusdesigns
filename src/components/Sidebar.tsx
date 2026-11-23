@@ -339,11 +339,11 @@ export function Sidebar() {
         if (rebindProjectId) {
           useStore.setState((s) => ({
             projects: s.projects.map((p) =>
-              p.id === rebindProjectId ? { ...p, name: w.name, root: w.root, tree: w.tree, expanded: true, at: Date.now() } : p
+              p.id === rebindProjectId ? { ...p, name: w.name, root: w.root, tree: undefined, expanded: true, at: Date.now() } : p
             ),
             activeProjectId: rebindProjectId,
             projectName: w.name,
-            ui: { ...s.ui, workspace: w },
+            ui: { ...s.ui, workspace: w, leftTab: "chat" },
           }));
           notify(`Opened project folder ${w.name}`);
           return;
