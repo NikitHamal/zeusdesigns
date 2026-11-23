@@ -76,7 +76,10 @@ impl MemoryStore {
         let q = query.trim().to_ascii_lowercase();
         let cat = category.map(|c| c.trim().to_ascii_lowercase()).unwrap_or_default();
         let proj = project.map(|p| p.trim().to_ascii_lowercase()).unwrap_or_default();
-        let terms: Vec<&str> = q.split_whitespace().filter(|w| !w.is_empty()).collect();
+        let terms: Vec<&str> = q
+            .split_whitespace()
+            .filter(|w| !w.is_empty() && !matches!(*w, "*" | ".*" | "all" | "everything"))
+            .collect();
 
         all.into_iter()
             .filter(|m| {
@@ -106,7 +109,9 @@ impl MemoryStore {
         };
         let trimmed = text.trim().to_string();
         if !trimmed.is_empty() && !guard.iter().any(|m| m.text.eq_ignore_ascii_case(&trimmed)) {
-            let id = format!("mem-{}-{}", now_ts(), guard.len() + 1);
+            static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+            let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let id = format!("mem-{}-{}", now_ts(), seq);
             guard.push(MemoryItem {
                 id,
                 text: trimmed,

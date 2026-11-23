@@ -280,6 +280,10 @@ fn parse_inline_invocations_segment(
         let name = extract_attr(header, "name").unwrap_or_default();
         let mut path_arg = extract_attr(header, "path")
             .or_else(|| extract_attr(header, "file"))
+            .or_else(|| extract_attr(header, "id"))
+            .or_else(|| extract_attr(header, "category"))
+            .or_else(|| extract_attr(header, "key"))
+            .or_else(|| extract_attr(header, "query"))
             .or_else(|| extract_attr(header, "cmd"))
             .or_else(|| extract_attr(header, "command"))
             .or_else(|| extract_attr(header, "url"))
@@ -296,6 +300,9 @@ fn parse_inline_invocations_segment(
                         .get("path")
                         .or_else(|| j.get("file"))
                         .or_else(|| j.get("filePath"))
+                        .or_else(|| j.get("id"))
+                        .or_else(|| j.get("category"))
+                        .or_else(|| j.get("key"))
                         .or_else(|| j.get("url"))
                         .and_then(|v| v.as_str())
                     {
@@ -304,6 +311,9 @@ fn parse_inline_invocations_segment(
                 }
                 if let Some(c) = j
                     .get("content")
+                    .or_else(|| j.get("text"))
+                    .or_else(|| j.get("fact"))
+                    .or_else(|| j.get("value"))
                     .or_else(|| j.get("command"))
                     .or_else(|| j.get("cmd"))
                     .or_else(|| j.get("script"))

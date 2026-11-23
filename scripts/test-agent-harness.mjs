@@ -66,6 +66,10 @@ const VALID_TOOLS = new Set([
   "shell", "bash", "sh", "cmd", "exec", "run_command",
   "python", "python3", "py", "python_exec",
   "web_fetch", "fetch", "memory",
+  "memory_search", "memory_list", "memory_get", "memory_read",
+  "memory_save", "memory_add", "memory_set",
+  "memory_edit", "memory_update",
+  "memory_delete", "memory_remove", "memory_forget",
 ]);
 
 const PLACEHOLDER_PATHS = new Set(["ARG", "relative/file", "relative/path", "subdir", "sub/dir", "filename"]);
@@ -92,7 +96,7 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
       from = idx + endRel + 12;
     }
     const name = extractAttr(header, "name");
-    let p = extractAttr(header, "path") || extractAttr(header, "file") || extractAttr(header, "cmd") || extractAttr(header, "command");
+    let p = extractAttr(header, "path") || extractAttr(header, "file") || extractAttr(header, "id") || extractAttr(header, "category") || extractAttr(header, "key") || extractAttr(header, "query") || extractAttr(header, "cmd") || extractAttr(header, "command");
     if (body.startsWith("{") && body.endsWith("}")) {
       try {
         const j = JSON.parse(body);
@@ -237,6 +241,48 @@ function executeToolInWorkspace(wsRoot, call) {
       const out = [r.stdout?.trimEnd(), r.stderr?.trimEnd() ? `[stderr]\n${r.stderr.trimEnd()}` : "", r.status !== 0 ? `[exit code: ${r.status}]` : ""].filter(Boolean).join("\n");
       return { ok: r.status === 0, output: out || `[exit ${r.status ?? 0}] (no output)` };
     }
+    case "memory_search":
+    case "memory_list":
+    case "memory_get":
+    case "memory_read": {
+      const memFile = `${wsRoot}.memory.json`;
+      const items = fs.existsSync(memFile) ? JSON.parse(fs.readFileSync(memFile, "utf8")) : [];
+      const q = (body || relPath || "").toLowerCase().trim();
+      const isWild = !q || ["*", ".*", "all", "everything"].includes(q);
+      const hits = items.filter((m) => isWild || m.category.toLowerCase() === q || m.text.toLowerCase().includes(q) || m.id.toLowerCase() === q);
+      return { ok: true, output: hits.length ? hits.map((m) => `${m.id} | [${m.category}] ${m.text}`).join("\n") : "No matching memory entries found." };
+    }
+    case "memory":
+    case "memory_save":
+    case "memory_add":
+    case "memory_set": {
+      const memFile = `${wsRoot}.memory.json`;
+      const items = fs.existsSync(memFile) ? JSON.parse(fs.readFileSync(memFile, "utf8")) : [];
+      const id = `mem-${Date.now()}-${items.length + 1}`;
+      items.push({ id, category: relPath || "preferences", text: body });
+      fs.writeFileSync(memFile, JSON.stringify(items, null, 2));
+      return { ok: true, output: `Saved memory ${id} (${items.length} total items)` };
+    }
+    case "memory_edit":
+    case "memory_update": {
+      const memFile = `${wsRoot}.memory.json`;
+      const items = fs.existsSync(memFile) ? JSON.parse(fs.readFileSync(memFile, "utf8")) : [];
+      const item = items.find((m) => m.id === relPath || m.text.toLowerCase().includes((relPath || "").toLowerCase()));
+      if (!item) return { ok: false, output: `Memory item '${relPath}' not found.` };
+      item.text = body;
+      fs.writeFileSync(memFile, JSON.stringify(items, null, 2));
+      return { ok: true, output: `Updated memory '${item.id}'` };
+    }
+    case "memory_delete":
+    case "memory_remove":
+    case "memory_forget": {
+      const memFile = `${wsRoot}.memory.json`;
+      const items = fs.existsSync(memFile) ? JSON.parse(fs.readFileSync(memFile, "utf8")) : [];
+      const target = relPath || body;
+      const filtered = items.filter((m) => m.id !== target && !m.text.toLowerCase().includes((target || "").toLowerCase()));
+      fs.writeFileSync(memFile, JSON.stringify(filtered, null, 2));
+      return { ok: true, output: `Removed memory '${target}' (${filtered.length} total items remaining)` };
+    }
     default:
       return { ok: false, output: `Unknown tool '${name}'` };
   }
@@ -328,7 +374,10 @@ async function callModel(target, system, messages) {
   ]);
 }
 
-function buildHarnessSystemPrompt(target, wsRoot, topEntries, mode = "code") {
+function buildHarnessSystemPrompt(target, wsRoot, topEntries, mode = "code", userPrompt = "") {
+  if (mode === "chat" && /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(morning|afternoon|evening))[!.?\s]*$/i.test(userPrompt.trim())) {
+    return "You are Zeus, a free general-purpose AI coding and design agent running inside the ZeusDesigns desktop app. Reply to the user's greeting in one plain, direct sentence (for example: \"Hello! What would you like to build or work on?\") with no tools, no files, no code blocks, no emojis, and no roleplay.";
+  }
   const topList = topEntries.length ? topEntries.join(", ") : "(empty directory — 0 files)";
   return [
     `You are Zeus, a free general-purpose AI coding & design agent running inside the ZeusDesigns desktop app. You talk, reason, write and edit code, execute bash and python scripts, research, and—only when asked—design interfaces. You work like a principal software engineer pairing with the user.`,
@@ -350,13 +399,14 @@ Emit tool blocks outside \`<think>\` and stop your turn after the closing tag so
 - \`<zeus_tool name="write_file" path="relative/file">complete file content</zeus_tool>\` — create or overwrite a file in 1 step
 - \`<zeus_tool name="edit_file" path="relative/file"><<<<<<< SEARCH\\nexisting lines\\n=======\\nreplacement lines\\n>>>>>>> REPLACE</zeus_tool>\` — surgical search/replace
 - \`<zeus_tool name="search_code">substring_or_symbol</zeus_tool>\` — fast workspace code search
-- \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\` — list a subdirectory tree`,
+- \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\` — list a subdirectory tree
+- \`<zeus_tool name="memory_search">query</zeus_tool>\` | \`<zeus_tool name="memory_save" path="preferences">durable fact</zeus_tool>\` | \`<zeus_tool name="memory_edit" path="mem-id">updated fact</zeus_tool>\` | \`<zeus_tool name="memory_delete" path="mem-id"></zeus_tool>\` — fetch, record, edit, or delete user memory on demand (memory is not preloaded in context)`,
   ].filter(Boolean).join("\n\n");
 }
 
 async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "code") {
   const topEntries = fs.readdirSync(wsRoot, { withFileTypes: true }).map((e) => e.isDirectory() ? `${e.name}/` : e.name);
-  const system = buildHarnessSystemPrompt(target, wsRoot, topEntries, mode);
+  const system = buildHarnessSystemPrompt(target, wsRoot, topEntries, mode, userPrompt);
   const dirListing = topEntries.length ? topEntries.join("\n") : "Directory is empty (0 files). Proceed directly without re-listing.";
   const messages = mode === "code"
     ? [
@@ -570,5 +620,41 @@ console.log("ALL_AUTH_ROUTER_TESTS_PASSED");\n`);
     fs.rmSync(ws5, { recursive: true, force: true });
   } catch (e) {
     console.log(`[Task 5: Greeting Restraint] ERROR: ${e.message}`);
+  }
+
+  // Task 6: On-Demand Memory Fetch, Edit, Save & Delete (No Whole-Memory Preload)
+  try {
+    const ws6 = fs.mkdtempSync(path.join(os.tmpdir(), "zeus-t6-"));
+    const memFile6 = `${ws6}.memory.json`;
+    fs.writeFileSync(
+      memFile6,
+      JSON.stringify(
+        [
+          { id: "mem-1", category: "preferences", text: "Database preference: SQLite 3" },
+          { id: "mem-2", category: "topics", text: "Legacy stack: jQuery 1.x" },
+        ],
+        null,
+        2
+      )
+    );
+    const t0 = Date.now();
+    const trace6 = await runAgentTask(
+      target,
+      ws6,
+      "Use memory_search to inspect my saved memories, then use memory_edit to update `mem-1` to `Database preference: PostgreSQL 17 with Drizzle ORM`, use memory_delete to remove `mem-2`, and use memory_save (category `preferences`) to record `Always keep RAM below 20MB`.",
+      5,
+      "code"
+    );
+    const toolsUsed = trace6.flatMap((r) => r.tools.map((t) => `${t.name}(${t.path || ""})[${t.ok ? "ok" : "ERR"}]`));
+    const finalMem = JSON.parse(fs.readFileSync(memFile6, "utf8"));
+    const hasUpdatedDb = finalMem.some((m) => m.id === "mem-1" && /postgresql/i.test(m.text));
+    const removedLegacy = !finalMem.some((m) => m.id === "mem-2");
+    const hasRamPref = finalMem.some((m) => /20\s*mb/i.test(m.text));
+    const passed = hasUpdatedDb && removedLegacy && hasRamPref;
+    console.log(`[Task 6: On-Demand Memory] ${passed ? "PASS" : "FAIL"} (${Date.now() - t0}ms) | steps: ${toolsUsed.length} [${toolsUsed.join(" -> ")}]`);
+    fs.rmSync(ws6, { recursive: true, force: true });
+    fs.rmSync(memFile6, { force: true });
+  } catch (e) {
+    console.log(`[Task 6: On-Demand Memory] ERROR: ${e.message}`);
   }
 }

@@ -52,7 +52,7 @@ export function agentPrompt(mode: Intent, userText = ""): string {
     mode === "code"
       ? profile.workflowDirective
       : `## Tools
-Use tools only when the task needs something you cannot know otherwise (a file in the project, a URL, a shell/python command result). Answer from your own knowledge first.`,
+Use tools when the task needs workspace files, shell/python execution, web pages, or user memory (\`memory_search\`, \`memory_save\`, \`memory_edit\`, \`memory_delete\`). User memory is never preloaded into the prompt—always emit \`<zeus_tool name="memory_search">...</zeus_tool>\` when asked what you remember or know about the user's preferences/projects, and emit \`memory_save\`, \`memory_edit\`, or \`memory_delete\` when asked to record, update, or forget durable facts.`,
     `## Artifacts
 When the user asks for a standalone visual deliverable (a page, a small game, a widget, a diagram, a prototype), emit it as one complete self-contained HTML document in <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard>. It opens next to the chat as a live preview. Inline CSS and JS only, no CDNs. Everything else (code, explanations, answers) stays in the chat or on disk in the user's project.`,
     spec.isKeylessScraper

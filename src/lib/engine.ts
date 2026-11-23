@@ -601,6 +601,13 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
                   import("./bridge").then(({ nativeMemory }) =>
                     nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: [...l].reverse() }))
                   ).catch(() => {});
+                } else if (/^(write_file|write|create_file|edit_file|edit|patch_file|shell|bash|python|python3)$/.test(t.name)) {
+                  const curWs = useStore.getState().ui.workspace;
+                  if (curWs) {
+                    import("./bridge").then(({ refreshTree }) =>
+                      refreshTree(curWs).then((tree) => useStore.getState().patchUI({ workspace: { ...curWs, tree } }))
+                    ).catch(() => {});
+                  }
                 }
               }
               sync();
