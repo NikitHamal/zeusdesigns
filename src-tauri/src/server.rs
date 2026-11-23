@@ -926,6 +926,35 @@ pub fn extract_tool_calls_from_text(
         cleaned.replace_range(start..remove_end, "");
     }
 
+    // 1c. Also parse `<function=...>`, `<function name="...">`, `<invoke name="...">`, and `<ifm|tool_call>` via the universal agent parser
+    if calls.is_empty() {
+        let fallback_invs = crate::agent::parse_inline_invocations_segment(&cleaned, true, false);
+        for inv in fallback_invs {
+            let arguments = if inv.body.starts_with('{') && inv.body.ends_with('}') {
+                inv.body.clone()
+            } else if matches!(inv.name.as_str(), "bash" | "shell" | "cmd" | "exec") {
+                json!({ "command": if !inv.body.is_empty() { &inv.body } else { &inv.path }, "description": "Execute command" }).to_string()
+            } else if matches!(inv.name.as_str(), "write" | "write_file") {
+                json!({ "filePath": inv.path, "path": inv.path, "content": inv.body }).to_string()
+            } else if matches!(inv.name.as_str(), "read" | "read_file") {
+                let p = if !inv.path.is_empty() { &inv.path } else { &inv.body };
+                json!({ "filePath": p, "path": p }).to_string()
+            } else if !inv.path.is_empty() {
+                json!({ "path": inv.path, "body": inv.body }).to_string()
+            } else {
+                json!({ "input": inv.body }).to_string()
+            };
+            calls.push(ParsedToolCall {
+                id: format!("call_{}", random_hex(12)),
+                name: inv.name,
+                arguments,
+            });
+        }
+        if !calls.is_empty() {
+            cleaned = strip_tool_xml_for_oc(&cleaned);
+        }
+    }
+
     // 2. Fallback: if tools were requested and no `<tool_call>` tag was used, check if the model emitted a standalone JSON tool call object
     if calls.is_empty() && !known_tool_names.is_empty() {
         let trimmed = cleaned

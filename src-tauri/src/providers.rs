@@ -3355,7 +3355,11 @@ where
     let thinking = (effort == "high" || effort == "max")
         && !qwen_model.contains("omni");
 
+    let wants_tools = is_agent_tool_request(system);
     let mut prompt = String::new();
+    if wants_tools {
+        prompt.push_str(&format!("{}\n\n", scraper_xml_dsl_banner()));
+    }
     if !system.trim().is_empty() {
         prompt.push_str(&format!("[System]\n{}\n\n", system));
     }
@@ -3368,7 +3372,11 @@ where
         prompt.push('\n');
     }
     if let Some(last) = messages.last() {
-        prompt.push_str(&format!("[User]\n{}", last.content));
+        if wants_tools && !last.content.contains("<tool_result") {
+            prompt.push_str(&format!("[User]\n{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a tool action is needed.)", last.content));
+        } else {
+            prompt.push_str(&format!("[User]\n{}", last.content));
+        }
     }
 
     let client = build_client(120)?;
@@ -3750,7 +3758,11 @@ where
         .unwrap_or_else(|| "boq_gemini-web-uiserver_20261117.01_p0".to_string());
     let snlm0e = extract_quoted_value(&html, "SNlM0e").unwrap_or_default();
 
+    let wants_tools = is_agent_tool_request(system);
     let mut prompt = String::new();
+    if wants_tools {
+        prompt.push_str(&format!("{}\n\n", scraper_xml_dsl_banner()));
+    }
     if !system.trim().is_empty() {
         let sys_safe: String = system.chars().take(16000).collect();
         prompt.push_str(&format!("{}\n\n", sys_safe));
@@ -3763,7 +3775,11 @@ where
         prompt.push('\n');
     }
     if let Some(last) = messages.last() {
-        prompt.push_str(&last.content);
+        if wants_tools && !last.content.contains("<tool_result") {
+            prompt.push_str(&format!("{}\n(Output ONLY the <zeus_tool> XML tag if a workspace action is needed.)", last.content));
+        } else {
+            prompt.push_str(&last.content);
+        }
     }
 
     let inner = json!([
