@@ -707,6 +707,24 @@ export function FilesPanel() {
               {activeFile.path}
               {activeFile.dirty ? " *" : ""}
             </span>
+            {/\.html?$/i.test(activeFile.path) && (
+              <button
+                onClick={() => {
+                  const st = useStore.getState();
+                  const ab = st.addArtboard({
+                    name: activeFile.path.split("/").pop() || activeFile.path,
+                    device: "web",
+                    html: activeFile.content,
+                    source: activeFile.path,
+                  });
+                  focusArtboard(ab.id);
+                  notify(`Opened ${activeFile.path} on canvas`);
+                }}
+                className="state h-7 rounded-lg bg-secondary-container px-2.5 text-[11.5px] font-semibold text-on-secondary-container"
+              >
+                Open in Canvas
+              </button>
+            )}
             <button
               onClick={() => {
                 window.dispatchEvent(
