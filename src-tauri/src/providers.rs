@@ -481,6 +481,345 @@ pub fn catalog() -> Vec<ProviderInfo> {
             }],
         },
         ProviderInfo {
+            id: "freellmhub".to_string(),
+            name: "FreeLLM Hub".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~120 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "qwen3-235b".to_string(),
+                    label: "Qwen3 235B".to_string(),
+                    note: Some("128k ctx · Alibaba 235B MoE flagship".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-5.3".to_string(),
+                    label: "GLM 5.3".to_string(),
+                    note: Some("128k ctx · Z.ai flagship agentic coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "mistral-large".to_string(),
+                    label: "Mistral Large".to_string(),
+                    note: Some("128k ctx · Mistral frontier generalist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "mistral-medium-3-5".to_string(),
+                    label: "Mistral Medium 3.5".to_string(),
+                    note: Some("128k ctx · Balanced fast reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "DeepSeek-V4.1-Flash".to_string(),
+                    label: "DeepSeek V4.1 Flash".to_string(),
+                    note: Some("1M ctx · Fast long-context reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "DeepSeek-V4-Flash".to_string(),
+                    label: "DeepSeek V4 Flash".to_string(),
+                    note: Some("1M ctx · Fast long-context coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "kimi-k2.6".to_string(),
+                    label: "Kimi K2.6".to_string(),
+                    note: Some("256k ctx · Moonshot agentic reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "zai-glm-4.7".to_string(),
+                    label: "GLM 4.7".to_string(),
+                    note: Some("128k ctx · Z.ai fast reasoning coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "tencent-hy3".to_string(),
+                    label: "Tencent HY3".to_string(),
+                    note: Some("256k ctx · Tencent Hunyuan 3 flagship".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Qwen3.8-27B".to_string(),
+                    label: "Qwen3.8 27B".to_string(),
+                    note: Some("262k ctx · Dense 27B UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-31b-it".to_string(),
+                    label: "Gemma 4 31B".to_string(),
+                    note: Some("128k ctx · Google open 31B".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "openai/gpt-4.1".to_string(),
+                    label: "GPT-4.1".to_string(),
+                    note: Some("1M ctx · OpenAI long-context generalist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "command-a-03-2025".to_string(),
+                    label: "Command A".to_string(),
+                    note: Some("256k ctx · Cohere agentic generalist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B".to_string(),
+                    note: Some("128k ctx · OpenAI open-weight reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "aibridge".to_string(),
+            name: "AI Bridge Gateway".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "gpt-6-luna".to_string(),
+                    label: "GPT-6 Luna".to_string(),
+                    note: Some("OpenAI GPT-6 fast flagship".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-haiku-5-5".to_string(),
+                    label: "Claude Haiku 5.5".to_string(),
+                    note: Some("Anthropic fast frontier".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-4.1".to_string(),
+                    label: "GPT-4.1".to_string(),
+                    note: Some("1M ctx · OpenAI long-context generalist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-4o".to_string(),
+                    label: "GPT-4o".to_string(),
+                    note: Some("OpenAI multimodal generalist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4-flash".to_string(),
+                    label: "DeepSeek V4 Flash".to_string(),
+                    note: Some("1M ctx · Fast coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "grok-4.20".to_string(),
+                    label: "Grok 4.20".to_string(),
+                    note: Some("xAI Grok frontier".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4-flash-vision-exp".to_string(),
+                    label: "DeepSeek V4 Flash Vision".to_string(),
+                    note: Some("Reasoning with vision experiments".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen3.5-flash".to_string(),
+                    label: "Qwen3.5 Flash".to_string(),
+                    note: Some("Alibaba fast reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "doubao-seed-2-0-mini-260428".to_string(),
+                    label: "Doubao Seed 2.0 Mini".to_string(),
+                    note: Some("ByteDance fast reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "supabase-qwen3.7-flash".to_string(),
+                    label: "Qwen3.7 Flash".to_string(),
+                    note: Some("Alibaba reasoning flash".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "hfrouter".to_string(),
+            name: "HF Router Hub".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~60 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "qwen3.8".to_string(),
+                    label: "Qwen3.8 2.4T A95B".to_string(),
+                    note: Some("Alibaba 2.4T MoE flagship".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4-pro".to_string(),
+                    label: "DeepSeek V4 Pro".to_string(),
+                    note: Some("DeepSeek V4 Pro frontier".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4-flash".to_string(),
+                    label: "DeepSeek V4 Flash".to_string(),
+                    note: Some("DeepSeek V4 Flash fast".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-5.3".to_string(),
+                    label: "GLM 5.3".to_string(),
+                    note: Some("Z.ai flagship agentic coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "minimax-m2.7".to_string(),
+                    label: "MiniMax M2.7".to_string(),
+                    note: Some("MiniMax agentic coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "kimi-k2".to_string(),
+                    label: "Kimi K2".to_string(),
+                    note: Some("Moonshot 1T MoE instruct".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B".to_string(),
+                    note: Some("OpenAI open-weight reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen3-coder-480b".to_string(),
+                    label: "Qwen3 Coder 480B".to_string(),
+                    note: Some("Alibaba 480B A35B coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen3-coder-next".to_string(),
+                    label: "Qwen3 Coder Next".to_string(),
+                    note: Some("Alibaba next-gen coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "litellmhub".to_string(),
+            name: "LiteLLM Frontier Hub".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~200 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "nvidia/nemotron-3-ultra-550b-a55b:free".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("550B MoE frontier reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "groq/gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B (LPU)".to_string(),
+                    note: Some("Ultra-fast open-weight reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "groq/qwen3.8-27b".to_string(),
+                    label: "Qwen3.8 27B (LPU)".to_string(),
+                    note: Some("Ultra-fast dense 27B".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4.1-flash-1017".to_string(),
+                    label: "DeepSeek V4.1 Flash".to_string(),
+                    note: Some("1M ctx · Fast reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-2.5-flash".to_string(),
+                    label: "Gemini 2.5 Flash".to_string(),
+                    note: Some("Google long-context flash".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "gemweb2api".to_string(),
+            name: "Gemini Web Gateway".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~60 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "gemini-3.1-pro".to_string(),
+                    label: "Gemini 3.1 Pro".to_string(),
+                    note: Some("Google frontier reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.5-flash".to_string(),
+                    label: "Gemini 3.5 Flash".to_string(),
+                    note: Some("Google fast multimodal flash".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.5-flash-thinking".to_string(),
+                    label: "Gemini 3.5 Flash Thinking".to_string(),
+                    note: Some("Google flash with thinking".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.6-flash".to_string(),
+                    label: "Gemini 3.6 Flash".to_string(),
+                    note: Some("Google latest flash".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
             id: "gemma4vl".to_string(),
             name: "Gemma 4 Vision & QAT Studio".to_string(),
             kind: "keyless".to_string(),
@@ -6123,6 +6462,25 @@ fn stream_oai_targets<F>(
 where
     F: FnMut(&str),
 {
+    stream_oai_targets_auth(provider_label, targets, system, messages, allow_vision, timeout_secs, true, cancel, on_delta)
+}
+
+/// Same streamer, with an explicit switch for the `Authorization` header. Some keyless gateways
+/// (FreeLLM Hub) reject any bearer token and only accept anonymous requests.
+fn stream_oai_targets_auth<F>(
+    provider_label: &str,
+    targets: &[(&str, &str)],
+    system: &str,
+    messages: &[ChatMessage],
+    allow_vision: bool,
+    timeout_secs: u64,
+    send_auth: bool,
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
     let norm_messages = normalize_multi_turn_messages(messages, 10, 3200, 22000);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
@@ -6163,13 +6521,14 @@ where
             "messages": oai_msgs
         });
 
-        let resp = match client
+        let mut rb = client
             .post(endpoint)
             .header("Content-Type", "application/json")
-            .header("Accept", "text/event-stream, application/json")
-            .header("Authorization", "Bearer free")
-            .json(&payload)
-            .send()
+            .header("Accept", "text/event-stream, application/json");
+        if send_auth {
+            rb = rb.header("Authorization", "Bearer free");
+        }
+        let resp = match rb.json(&payload).send()
         {
             Ok(r) if r.status().is_success() => r,
             _ => continue,
@@ -6251,6 +6610,112 @@ where
         }
     }
     Err(format!("{} stream ended without output", provider_label))
+}
+
+/// Stream from FreeLLM Hub (`bun008-freellmapi.hf.space`) with in-provider model failover.
+pub fn stream_freellmhub<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() { "glm-5.3" } else { model };
+    let targets: [(&str, &str); 5] = [
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", requested),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3"),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "qwen3-235b"),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "mistral-large"),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "DeepSeek-V4-Flash"),
+    ];
+    stream_oai_targets_auth("FreeLLM Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
+}
+
+/// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) with in-provider model failover.
+pub fn stream_aibridge<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() { "gpt-6-luna" } else { model };
+    let targets: [(&str, &str); 5] = [
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", requested),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-4.1"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "deepseek-v4-flash"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "claude-haiku-5-5"),
+    ];
+    stream_oai_targets_auth("AI Bridge Gateway", &targets, system, messages, false, 30, false, cancel, on_delta)
+}
+
+/// Stream from HF Router Hub (`cgjgj-ollamahftraemonitor.hf.space`) with in-provider model failover.
+pub fn stream_hfrouter<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() { "deepseek-v4-pro" } else { model };
+    let targets: [(&str, &str); 4] = [
+        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", requested),
+        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "deepseek-v4-flash"),
+        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "qwen3.8"),
+        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "glm-5.3"),
+    ];
+    stream_oai_targets_auth("HF Router Hub", &targets, system, messages, false, 90, false, cancel, on_delta)
+}
+
+/// Stream from LiteLLM Frontier Hub (`alchoholpad-litellm.hf.space`) with in-provider model failover.
+pub fn stream_litellmhub<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() { "nvidia/nemotron-3-ultra-550b-a55b:free" } else { model };
+    let targets: [(&str, &str); 4] = [
+        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", requested),
+        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/gpt-oss-120b"),
+        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
+        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/qwen3.8-27b"),
+    ];
+    stream_oai_targets_auth("LiteLLM Frontier Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
+}
+
+/// Stream from Gemini Web Gateway (`chenian233-gemini-web2api.hf.space`) with in-provider model failover.
+pub fn stream_gemweb2api<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() { "gemini-3.1-pro" } else { model };
+    let targets: [(&str, &str); 3] = [
+        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", requested),
+        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash-thinking"),
+        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash"),
+    ];
+    stream_oai_targets_auth("Gemini Web Gateway", &targets, system, messages, false, 90, false, cancel, on_delta)
 }
 
 /// Stream from NVIDIA NIM OpenAI Cloud (`garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
@@ -6790,6 +7255,11 @@ where
         "nimcloud" => stream_nimcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_nimcloud("nvidia/nemotron-3.5-bolt-e4b", &req.system, &req.messages, cancel, &mut on_delta)),
         "colibriqwen" => stream_colibriqwen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "freellmhub" => stream_freellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "aibridge" => stream_aibridge(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta)),
         "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -6896,7 +7366,7 @@ where
     let fallbacks: &[&str] = if has_attachments {
         &["freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "chatjimmy"]
+        &["mercury3", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -6908,6 +7378,11 @@ where
             "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "nimcloud" => stream_nimcloud("nvidia/nemotron-3.5-super-vl-120b-a12b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "colibriqwen" => stream_colibriqwen("Qwen3.6-35B-A3B", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "litellmhub" => stream_litellmhub("groq/gpt-oss-120b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "aibridge" => stream_aibridge("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "freellmhub" => stream_freellmhub("glm-5.3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "hfrouter" => stream_hfrouter("deepseek-v4-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "gemweb2api" => stream_gemweb2api("gemini-3.5-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemma4vl" => stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "phi4cloud" => stream_phi4cloud("phi-4-14b-gguf", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "llamacppcloud" => stream_llamacppcloud(
@@ -7025,6 +7500,11 @@ mod tests {
         assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"nimcloud"));
         assert!(ids.contains(&"colibriqwen"));
+        assert!(ids.contains(&"freellmhub"));
+        assert!(ids.contains(&"aibridge"));
+        assert!(ids.contains(&"hfrouter"));
+        assert!(ids.contains(&"litellmhub"));
+        assert!(ids.contains(&"gemweb2api"));
         assert!(ids.contains(&"gemma4vl"));
         assert!(ids.contains(&"phi4cloud"));
         assert!(ids.contains(&"llamacppcloud"));
