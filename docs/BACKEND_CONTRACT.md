@@ -13,8 +13,10 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `chat_stream` | `ChatRequest` | `{requestId}` – stream arrives as events |
 | `chat_cancel` | `{requestId}` | – |
 | `title_generate` | `{text}` | `string` (ChatJimmy micro-task: ≤6 word conversation title) |
+| `workspace_pick` | – | `{name, root, tree} \| null` (native Win32 STA `IFileOpenDialog` + depth-1 tree) |
 | `workspace_open` | `{path}` | `{root, name}` |
 | `workspace_tree` | `{root, depth?}` | `FileNode[]` (name, path, dir, children?) |
+| `workspace_list` | `{root, rel}` | `FileNode[]` (lazy 1-level directory expansion) |
 | `workspace_search` | `{root, query, limit?}` | `{path, line, snippet}[]` |
 | `fs_read` / `fs_write` | `{root, path, content?}` | `string` / `()` |
 | `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` |
