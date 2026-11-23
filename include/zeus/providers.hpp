@@ -9,23 +9,23 @@
 namespace zeus {
 
 enum class ProviderFormat {
-    SCRAPER_INCEPTION,   // Mercury 3 (chat.inceptionlabs.ai) 1,000-2,000+ tok/s diffusion LLM
     SCRAPER_CHATJIMMY,   // ChatJimmy (chatjimmy.ai) 20,000+ tok/s Llama 3.1 8B instant title & micro-task engine
     SCRAPER_MOTIF,       // Motif (chat.motiftech.io) Motif 3 102B / 12.7B Reasoning
     SCRAPER_K2HORIZON,   // K2Horizon (chat.ifm.ai) IFM/K2-Horizon-375B-A23B
     SCRAPER_QWEN,        // Qwen (chat.qwen.ai) Qwen4 Max / Qwen3.8 Max + OSS vision upload
     SCRAPER_DEEPAI,      // DeepAI (api.deepai.org) IslandKey + attachment upload
-    SCRAPER_LONGCAT,     // LongCat (longcat.chat) LongCat 2.5 1.6T MoE
-    SCRAPER_GEMINIWEB,   // Gemini Web (gemini.google.com/app) anonymous Flash-Lite StreamGenerate
     SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
-    SCRAPER_ZENCLOUD,    // Zen & NIM Multi-Cloud (yash030-claude-code-proxy.hf.space) Ring 2.6 1T, Qwen3 Coder 480B, Mistral Large 3 675B, Groq, Cerebras
-    SCRAPER_GEMMA4PRO,   // Gemma 4 Flagship Cluster (markpaulm-gemma-4-31b / 12b / shanghsin-gemma-4-12b / rikunarita-gemma-4-e4b)
+    SCRAPER_NIMCLOUD,    // NVIDIA NIM OpenAI Cloud (mmoranguito-openai-nim-proxy / garystu-openai-nim-proxy)
+    SCRAPER_COLIBRIQWEN, // Colibri Qwen 3.6 MoE Cloud (kartik1302-qwen-3-6-35b-a3b.hf.space)
+    SCRAPER_GEMMA4VL,    // Gemma 4 Vision & QAT Studio (will-resolute / titoo3 / hispa-nico / elseodelasgalletas / gefdsv)
+    SCRAPER_PHI4CLOUD,   // Phi-4 & Llama 3.1 Abliterated Cloud (5fp-phi-4-gguf / fggaerg / deleriousson)
+    SCRAPER_LLAMACPPCLOUD,// Llama.cpp LFM & SmolVLM Cloud (r1000th / ramedde / aliroohan179 / apathy-exe)
+    SCRAPER_OLLAMACLOUD, // Ollama Multi-Model Cloud (deepak7376 / qweret6565 / gentle-tech / amarbruhman / zurikoff / clarasu)
+    SCRAPER_GEMMA4PRO,   // Gemma 4 Flagship Cluster (rikunarita-gemma-4-e4b / hispa-nico-gemma4-e2b / ismizo-gemma4)
     SCRAPER_FRONTIERLAB, // Frontier Open-Weights Lab (bananamort-inkling-2-mini / apathy-exe-qwen3-8-flash-next / nanbeige4.3-33b / usermma-mellum2)
     SCRAPER_LIQUIDAI,    // Liquid AI LFM Gateway (apathy-exe-lfm2-5-24b-a2b / usermma-lfm2-5-8b-a1b / lfm3-1-7b)
-    SCRAPER_CLAUDEBRIDGE,// Claude & Gemini Bridge (hamdyahned-ree-claude-proxy.hf.space) Claude 4 Opus/Sonnet/Haiku Bridge
-    SCRAPER_GROQLPU,     // Groq LPU Anonymous Bridge (squirrelcoagent-llama-api-server.hf.space) Llama 3.3 70B & 3.1 8B Instant LPU
     SCRAPER_BONSAICLOUD, // Bonsai & Ternary Frontier (bananamort-ternary-bonsai-2-27b / mikeee-bonsai-8b / vibethinker-3b-q4)
-    SCRAPER_UNSLOTHCLOUD,// Unsloth Qwen 3.5 & Gemma 4 Cloud (bleak-openai-compatible-server / elseodelasgalletas-gemma4-e2b)
+    SCRAPER_UNSLOTHCLOUD,// Unsloth Gemma 4 Cloud (elseodelasgalletas-gemma4-e2b / bleak-openai-compatible-server-gemma4)
     SCRAPER_KOBOLDCLOUD, // KoboldAI Multi-Node Cloud (koboldai / nanoph / nxdev-org koboldcpp nodes)
     SCRAPER_PTERO,       // Ptero (ptero.pro/wp-json/mlp/v1/chat) GPT-6.1 Terra & GLM 5.3 Flash + vision
     SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3
