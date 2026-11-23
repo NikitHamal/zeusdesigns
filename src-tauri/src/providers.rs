@@ -235,6 +235,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "cohere/north-mini-code:free".to_string(),
+                    label: "Cohere North Mini Code".to_string(),
+                    note: Some("256k ctx · Cohere coding & UI specialist".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "kilo-auto/free".to_string(),
                     label: "Kilo Auto Free".to_string(),
                     note: Some("256k ctx · Fastest available free model".to_string()),
@@ -242,6 +249,206 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
             ],
+        },
+        ProviderInfo {
+            id: "blockrun".to_string(),
+            name: "BlockRun Gateway".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~165 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "nvidia/nemotron-3-super-120b".to_string(),
+                    label: "Nemotron 3.5 Super 120B".to_string(),
+                    note: Some("262k ctx · 120B MoE frontier UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning".to_string(),
+                    label: "Nemotron 3 Nano Omni VL".to_string(),
+                    note: Some("256k ctx · 30B Omni vision & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nvidia/minimax-m3.1-flash".to_string(),
+                    label: "MiniMax M3.1 Flash".to_string(),
+                    note: Some("1M ctx · MiniMax M3.1 fast UI & code engine".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3-ultra-550b".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("1M ctx · 550B MoE deep software engineering".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3.5-lightning".to_string(),
+                    label: "Nemotron 3.5 Lightning".to_string(),
+                    note: Some("262k ctx · High-speed MoE UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3.5-bolt".to_string(),
+                    label: "Nemotron 3.5 Bolt".to_string(),
+                    note: Some("262k ctx · Low-latency UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nvidia/muse-glimmer-30b".to_string(),
+                    label: "Muse Glimmer 30B".to_string(),
+                    note: Some("131k ctx · Expressive UI & design reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "poolside/laguna-xs-2.1".to_string(),
+                    label: "Poolside Laguna XS 2.1".to_string(),
+                    note: Some("128k ctx · Poolside code & layout specialist".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "cohere/north-mini-code".to_string(),
+                    label: "Cohere North Mini Code".to_string(),
+                    note: Some("256k ctx · Cohere frontend coding engine".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "ovhcloud".to_string(),
+            name: "OVHcloud AI".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "DeepSeek-V4.1-Flash-1017".to_string(),
+                    label: "DeepSeek V4.1 Flash".to_string(),
+                    note: Some("262k ctx · 284B MoE flagship coding & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Qwen3.8-27B".to_string(),
+                    label: "Qwen 3.8 27B VL".to_string(),
+                    note: Some("262k ctx · Alibaba newest 27B multimodal & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "Qwen3.5-397B-A17B".to_string(),
+                    label: "Qwen 3.5 397B MoE".to_string(),
+                    note: Some("262k ctx · 397B MoE frontier reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen3-vl-30b-a3b".to_string(),
+                    label: "Qwen 3 VL 30B".to_string(),
+                    note: Some("128k ctx · Multimodal vision & UI specialist".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nemotron3-omni-30b".to_string(),
+                    label: "Nemotron 3 Omni 30B VL".to_string(),
+                    note: Some("256k ctx · NVIDIA Omni vision & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "Qwen2.5-VL-72B-Instruct".to_string(),
+                    label: "Qwen 2.5 VL 72B".to_string(),
+                    note: Some("128k ctx · 72B multimodal vision & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "qwen3.6-35b-a3b".to_string(),
+                    label: "Qwen 3.6 35B MoE".to_string(),
+                    note: Some("262k ctx · Fast MoE frontend coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Qwen3.6-27B".to_string(),
+                    label: "Qwen 3.6 27B".to_string(),
+                    note: Some("262k ctx · Dense coding & layout engine".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-26b-a4b".to_string(),
+                    label: "Gemma 4 26B MoE".to_string(),
+                    note: Some("128k ctx · Google Gemma 4 A4B fast UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "laguna-xs-2.1".to_string(),
+                    label: "Poolside Laguna XS 2.1".to_string(),
+                    note: Some("128k ctx · Poolside agentic coding engine".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nemotron3-nano-30b".to_string(),
+                    label: "Nemotron 3 Nano 30B".to_string(),
+                    note: Some("256k ctx · NVIDIA fast reasoning MoE".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B".to_string(),
+                    note: Some("128k ctx · OpenAI 120B open-weights reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss-20b".to_string(),
+                    label: "GPT-OSS 20B".to_string(),
+                    note: Some("128k ctx · OpenAI 20B fast coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Meta-Llama-3_3-70B-Instruct".to_string(),
+                    label: "Llama 3.3 70B Instruct".to_string(),
+                    note: Some("128k ctx · Meta 70B instruction model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "Mistral-Small-3.2-24B-Instruct-2506".to_string(),
+                    label: "Mistral Small 3.2 24B".to_string(),
+                    note: Some("128k ctx · Mistral fast instruction coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "apisfreellm".to_string(),
+            name: "APIsFreeLLM".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~155 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "free-ai".to_string(),
+                label: "Free-AI 9B Uncensored".to_string(),
+                note: Some("32k ctx · 10,000 req/day zero-key fast stream".to_string()),
+                reasoning: false,
+                vision: false,
+            }],
         },
         ProviderInfo {
             id: "qwen".to_string(),
@@ -2844,6 +3051,370 @@ where
     }
 }
 
+/// Stream from BlockRun Gateway (`https://blockrun.ai/api/v1/chat/completions`, zero-key NVIDIA/MiniMax/Poolside/Cohere free pool).
+pub fn stream_blockrun<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+    let eff_model = if has_images {
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    } else {
+        match model {
+            "nvidia/nemotron-3-super-120b"
+            | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+            | "nvidia/minimax-m3.1-flash"
+            | "nvidia/nemotron-3-ultra-550b"
+            | "nvidia/nemotron-3.5-lightning"
+            | "nvidia/nemotron-3.5-bolt"
+            | "nvidia/muse-glimmer-30b"
+            | "poolside/laguna-xs-2.1"
+            | "cohere/north-mini-code" => model,
+            _ => "nvidia/nemotron-3-super-120b",
+        }
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(24000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        } else {
+            let mut parts = vec![json!({ "type": "text", "text": m.content })];
+            for img in imgs {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": { "url": img.data_url }
+                }));
+            }
+            oai_msgs.push(json!({ "role": m.role, "content": parts }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 16384,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://blockrun.ai/api/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("BlockRun request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("BlockRun HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut fallback_reason = String::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                            fallback_reason.push_str(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() {
+        on_delta(fallback_reason.trim());
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("BlockRun stream ended without output".to_string())
+    }
+}
+
+/// Stream from OVHcloud AI Endpoints (`https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions`, EU keyless frontier & vision models).
+pub fn stream_ovhcloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+    let eff_model = if has_images {
+        match model {
+            "Qwen3.8-27B" | "qwen3-vl-30b-a3b" | "nemotron3-omni-30b" | "Qwen2.5-VL-72B-Instruct" => model,
+            _ => "Qwen2.5-VL-72B-Instruct",
+        }
+    } else {
+        match model {
+            "DeepSeek-V4.1-Flash-1017"
+            | "Qwen3.8-27B"
+            | "Qwen3.5-397B-A17B"
+            | "qwen3-vl-30b-a3b"
+            | "nemotron3-omni-30b"
+            | "Qwen2.5-VL-72B-Instruct"
+            | "qwen3.6-35b-a3b"
+            | "Qwen3.6-27B"
+            | "gemma-4-26b-a4b"
+            | "laguna-xs-2.1"
+            | "nemotron3-nano-30b"
+            | "gpt-oss-120b"
+            | "gpt-oss-20b"
+            | "Meta-Llama-3_3-70B-Instruct"
+            | "Mistral-Small-3.2-24B-Instruct-2506" => model,
+            _ => "DeepSeek-V4.1-Flash-1017",
+        }
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(24000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        } else {
+            let mut parts = vec![json!({ "type": "text", "text": m.content })];
+            for img in imgs {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": { "url": img.data_url }
+                }));
+            }
+            oai_msgs.push(json!({ "role": m.role, "content": parts }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 16384,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("OVHcloud request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("OVHcloud HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut fallback_reason = String::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                            fallback_reason.push_str(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() {
+        on_delta(fallback_reason.trim());
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("OVHcloud stream ended without output".to_string())
+    }
+}
+
+/// Stream from APIsFreeLLM (`https://api.apisfreellm.com/v1/chat/completions`, 10,000 req/day zero-key OpenAI stream).
+pub fn stream_apisfreellm<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = if model.is_empty() { "free-ai" } else { model };
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(18000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://api.apisfreellm.com/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("APIsFreeLLM request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("APIsFreeLLM HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut saw_text = false;
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(text) = delta.and_then(|d| d.get("content")).and_then(|t| t.as_str()) {
+                        if !text.is_empty() {
+                            saw_text = true;
+                            on_delta(text);
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("APIsFreeLLM stream ended without output".to_string())
+    }
+}
+
 /// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).
 pub fn stream_yqcloud<F>(
     system: &str,
@@ -3175,6 +3746,25 @@ where
                     Err("kilo primary failed".to_string())
                 }
             }),
+        "blockrun" => stream_blockrun(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| {
+                if has_attachments {
+                    stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
+                } else {
+                    stream_blockrun("nvidia/nemotron-3.5-lightning", &req.system, &req.messages, cancel, &mut on_delta)
+                }
+            }),
+        "ovhcloud" => stream_ovhcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| {
+                if has_attachments {
+                    stream_ovhcloud("Qwen2.5-VL-72B-Instruct", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_ovhcloud("qwen3-vl-30b-a3b", &req.system, &req.messages, cancel, &mut on_delta))
+                } else {
+                    stream_ovhcloud("Qwen3.8-27B", &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", &req.system, &req.messages, cancel, &mut on_delta))
+                }
+            }),
+        "apisfreellm" => stream_apisfreellm(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "ptero" => stream_ptero(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "unikey" => stream_unikey(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "llm7" => stream_llm7(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
