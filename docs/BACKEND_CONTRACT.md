@@ -18,7 +18,7 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `workspace_search` | `{root, query, limit?}` | `{path, line, snippet}[]` |
 | `fs_read` / `fs_write` | `{root, path, content?}` | `string` / `()` |
 | `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` |
-| `memory_list` / `memory_add` / `memory_delete` | `{text}` / `{id}` | `MemoryItem[]` |
+| `memory_list` / `memory_search` / `memory_add` / `memory_update` / `memory_delete` | `{query?, category?, project?}` / `{text, category?, project?}` / `{id, text, category?}` / `{id}` | `MemoryItem[]` |
 | `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
 | `perf_stats` / `perf_trim` / `perf_set_auto` | – / – / `{enabled}` | `PerfStats` / `TrimReport` / `PerfStats` |
 | `server_status` / `server_start` / `server_stop` | – / `{port?}` / – | `ServerStatus` (`running`, `port`, `baseUrl`, `openaiBaseUrl`, `chatCompletionsUrl`, `modelsUrl`, `messagesUrl`, `opencodeConfigUrl`, `apiKey`, `requestCount`, `modelCount`, `lastModel`) |

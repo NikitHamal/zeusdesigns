@@ -450,8 +450,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const finish = (err?: string) => {
-    if (mode === "chat" && GREETING_RE.test(opts.text.trim()) && full.includes("\n\n")) {
-      full = full.split(/\n\s*\n/)[0].trim();
+    if (mode === "chat" && GREETING_RE.test(opts.text.trim())) {
+      if (full.includes("\n\n")) full = full.split(/\n\s*\n/)[0].trim();
+      if (/RECEIPT:|TIMESTAMP ACCEPTED|†\s*Footnote|<artboard|<!doctype/i.test(full) || full.length > 220) {
+        full = "Hello! What would you like to build, debug, or design?";
+      }
     }
     sync(true);
     for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);

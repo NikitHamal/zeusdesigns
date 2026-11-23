@@ -46,6 +46,12 @@ The Studio panel (`Studio` button in the canvas header, `I` in the bottom toolba
 - `Code`: Live HTML inspector and editor for the selected element.
 Edit mode injects `src/lib/editor.ts` into the artboard with on-canvas resize handles (`e`, `s`, `se`), `Shift+A` Auto-Layout wrapping, inline text editing, Undo/Redo (`Ctrl+Z` / `Ctrl+Shift+Z`), and version history recording.
 
+## Projects, Files, Terminal, Memory & Local Server
+- Conversations live inside local `ProjectFolder` entries (`src/store.ts`, `src/components/Sidebar.tsx`, `src/components/Chat.tsx`, `src/components/Home.tsx`). Switching projects or conversations binds `ui.workspace` to that project's local directory (`openWorkspaceByPath`).
+- `ChatPane` provides a 3-way workspace switcher (`Chat` | `Files` | `Terminal`): `FilesPanel` includes a live file tree filter, new-file creator, and inline monospace code editor (`Ctrl+S` writes via `writeWorkspaceFile`); `TerminalPanel` executes commands in the active project folder via `nativeShell.run` (`shell_run`) with history and 1-click `Ask Zeus` output forwarding.
+- The Local OpenAI & OpenCode Server (`127.0.0.1:11435`, `src-tauri/src/lib.rs`, `src-tauri/src/server.rs`) is OFF by default at launch. Users can start it in `Settings > Local server`, or `src/lib/opencode.ts` starts it on demand when the OpenCode runtime is used.
+- Never dump all saved memory items into the system prompt (`src/lib/memory.ts`, `src-tauri/src/agent.rs`). `memoryBlock()` emits only a compact count index; agents fetch, save, edit, and delete memories on demand using `<zeus_tool name="memory_search">`, `<zeus_tool name="memory_save" path="preferences">`, `<zeus_tool name="memory_edit" path="mem-id">`, and `<zeus_tool name="memory_delete" path="mem-id">`.
+
 ## Repo map
 - `src/App.tsx` shell: sidebar, home, workspace split.
 - `src/components/` UI. `src/lib/` engine bridge, prompts, design systems, skills, updater.

@@ -906,27 +906,44 @@ fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: u
     ))
 }
 
-/// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or JSON `oldString`/`newString` edits),
+fn find_marker_line(text: &str, ch: char) -> Option<(usize, usize)> {
+    let mut offset = 0usize;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim();
+        let count = trimmed.chars().take_while(|&c| c == ch).count();
+        if count >= 4 {
+            let suffix = trimmed[count..].trim().to_ascii_uppercase();
+            let valid = match ch {
+                '<' => suffix.is_empty() || suffix.starts_with("SEARCH") || suffix.starts_with("ORIGINAL") || suffix.starts_with("OLD") || suffix.starts_with("HEAD"),
+                '=' => suffix.is_empty(),
+                '>' => suffix.is_empty() || suffix.starts_with("REPLACE") || suffix.starts_with("UPDATED") || suffix.starts_with("NEW"),
+                _ => false,
+            };
+            if valid {
+                return Some((offset, offset + line.len()));
+            }
+        }
+        offset += line.len();
+    }
+    None
+}
+
+/// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or flexible 4..9 marker variants or JSON `oldString`/`newString` edits),
 /// with automatic line-trimmed fuzzy fallback when exact whitespace differs.
 fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
-    let s_tag = "<<<<<<< SEARCH";
-    let m_tag = "=======";
-    let r_tag = ">>>>>>> REPLACE";
     let mut out = content.to_string();
     let mut rest = body;
     let mut n = 0usize;
-    while let Some(si) = rest.find(s_tag) {
-        let after_s = &rest[si + s_tag.len()..];
-        let Some(mi) = after_s.find(m_tag) else {
+    while let Some((_s_start, s_end)) = find_marker_line(rest, '<') {
+        let after_s = &rest[s_end..];
+        let Some((m_start, m_end)) = find_marker_line(after_s, '=') else {
             return Err("edit_file: missing ======= divider".to_string());
         };
-        let search_raw = after_s[..mi].trim_matches(|c| c == '\n' || c == '\r');
-        let after_m = &after_s[mi + m_tag.len()..];
-        let Some(ri) = after_m.find(r_tag) else {
-            return Err("edit_file: missing >>>>>>> REPLACE".to_string());
-        };
-        let replace_raw = after_m[..ri].trim_matches(|c| c == '\n' || c == '\r');
-        rest = &after_m[ri + r_tag.len()..];
+        let search_raw = after_s[..m_start].trim_matches(|c| c == '\n' || c == '\r');
+        let after_m = &after_s[m_end..];
+        let (r_start, r_end) = find_marker_line(after_m, '>').unwrap_or((after_m.len(), after_m.len()));
+        let replace_raw = after_m[..r_start].trim_matches(|c| c == '\n' || c == '\r');
+        rest = &after_m[r_end..];
         if search_raw.is_empty() {
             return Err("edit_file: SEARCH block is empty".to_string());
         }

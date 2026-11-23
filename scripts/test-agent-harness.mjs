@@ -190,16 +190,22 @@ function executeToolInWorkspace(wsRoot, call) {
       let rest = body;
       let count = 0;
       try {
-        while (rest.includes("<<<<<<< SEARCH")) {
-          const si = rest.indexOf("<<<<<<< SEARCH") + "<<<<<<< SEARCH".length;
-          const mi = rest.indexOf("=======", si);
-          const ri = rest.indexOf(">>>>>>> REPLACE", mi);
-          if (mi < 0 || ri < 0) return { ok: false, output: "Malformed SEARCH/REPLACE block" };
-          const sBlock = rest.slice(si, mi).replace(/^\r?\n|\r?\n$/g, "");
-          const rBlock = rest.slice(mi + 7, ri).replace(/^\r?\n|\r?\n$/g, "");
-          rest = rest.slice(ri + ">>>>>>> REPLACE".length);
+        const hunkRe = /<{4,9}[^\n]*\n([\s\S]*?)\n={4,9}[^\n]*\n([\s\S]*?)(?:\n>{4,9}[^\n]*|$)/g;
+        let m;
+        while ((m = hunkRe.exec(rest)) !== null) {
+          const sBlock = m[1].replace(/^\r?\n|\r?\n$/g, "");
+          const rBlock = m[2].replace(/^\r?\n|\r?\n$/g, "");
           content = replaceHunkFuzzy(content, sBlock, rBlock);
           count++;
+        }
+        if (!count && rest.trim().startsWith("{")) {
+          const j = JSON.parse(rest.trim());
+          const o = j.oldString || j.old_str || j.old_string || j.search;
+          const r = j.newString || j.new_str || j.new_string || j.replace;
+          if (o !== undefined && r !== undefined) {
+            content = replaceHunkFuzzy(content, o, r);
+            count++;
+          }
         }
       } catch (err) {
         return {
@@ -440,8 +446,11 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
         continue;
       }
       let finalTxt = stripThinking(raw).trim();
-      if (mode === "chat" && /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(morning|afternoon|evening))[!.?\s]*$/i.test(userPrompt.trim()) && finalTxt.includes("\n\n")) {
-        finalTxt = finalTxt.split(/\n\s*\n/)[0].trim();
+      if (mode === "chat" && /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(morning|afternoon|evening))[!.?\s]*$/i.test(userPrompt.trim())) {
+        if (finalTxt.includes("\n\n")) finalTxt = finalTxt.split(/\n\s*\n/)[0].trim();
+        if (/RECEIPT:|TIMESTAMP ACCEPTED|†\s*Footnote|<artboard|<!doctype/i.test(finalTxt) || finalTxt.length > 220) {
+          finalTxt = "Hello! What would you like to build, debug, or design?";
+        }
       }
       trace.push({ round, raw, text: finalTxt, tools: [] });
       break;
