@@ -220,6 +220,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: true,
                 },
                 ModelSpec {
+                    id: "dots-studio/dots-3-note-preview:free".to_string(),
+                    label: "Dots 3 Note VL".to_string(),
+                    note: Some("262k ctx · Multimodal vision & UI notes".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "recursive/flint-v1.0:free".to_string(),
                     label: "Recursive Flint 1.0".to_string(),
                     note: Some("262k ctx · Fast code & UI synthesis".to_string()),
@@ -2162,6 +2169,7 @@ where
                 | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
                 | "inclusionai/ling-3.2-flash:free"
                 | "particle-ai/particle-1:free"
+                | "dots-studio/dots-3-note-preview:free"
                 | "openrouter/free"
         )
     {

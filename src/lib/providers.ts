@@ -33,6 +33,7 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "baidu/ernie-5.5-flash-preview:free", label: "ERNIE 5.5 Flash", note: "1M ctx · Flagship reasoning & layout", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "reflection/beam-free", label: "Reflection Beam 1.0", note: "1M ctx · 501B MoE software engineering", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "particle-ai/particle-1:free", label: "Particle-1 VL", note: "1M ctx · Multimodal design & reasoning", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
+      { id: "dots-studio/dots-3-note-preview:free", label: "Dots 3 Note VL", note: "262k ctx · Multimodal vision & UI notes", reasoning: true, vision: true, contextWindow: 262144, maxOutput: 16384 },
       { id: "recursive/flint-v1.0:free", label: "Recursive Flint 1.0", note: "262k ctx · Fast code & UI synthesis", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "kilo-auto/free", label: "Kilo Auto Free", note: "256k ctx · Fastest available free model", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
     ],
