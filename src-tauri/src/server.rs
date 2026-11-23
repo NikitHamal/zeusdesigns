@@ -540,7 +540,7 @@ pub fn build_opencode_tools_system_block(tools: &[Value], tool_choice: Option<&V
     }
 
     format!(
-        "\n\n## OpenCode / OpenAI Tool-Calling Protocol\nYou have access to the following tools:\n{}\n\nCRITICAL TOOL CALLING RULES:\n1. When you need to call a tool, output ONLY a `<tool_call>` XML block with a valid JSON object containing `\"name\"` and `\"arguments\"`:\n<tool_call>{{\"name\": \"tool_name\", \"arguments\": {{\"param\": \"value\"}}}}</tool_call>\n2. You may emit multiple `<tool_call>...</tool_call>` blocks if multiple independent tool actions are needed.\n3. When you emit a `<tool_call>`, stop immediately after `</tool_call>` and wait for the `<tool_response>` turn before continuing.\n4. When no tool is needed, respond normally without `<tool_call>` tags.",
+        "\n\n## OpenCode / OpenAI Tool-Calling Protocol\nYou have access to the following tools:\n{}\n\nCRITICAL TOOL CALLING RULES:\n1. When you need to call a tool, output a `<tool_call>` XML block OUTSIDE `<think>` with a valid JSON object containing the exact tool `\"name\"` from the list above and `\"arguments\"`:\n<tool_call>{{\"name\": \"bash\", \"arguments\": {{\"command\": \"git status -sb\", \"description\": \"Check repo status\"}}}}</tool_call>\n2. Never emit `<tool_call>` inside `<think>...</think>`, and never use a placeholder name.\n3. Prefer `bash` (including inline `python3 -c` or heredoc scripts) to combine search, inspection, multi-file edits, and test verification in minimal turns.\n4. You may emit multiple `<tool_call>...</tool_call>` blocks if multiple independent tool actions are needed.\n5. When you emit a `<tool_call>`, stop immediately after `</tool_call>` and wait for the `<tool_response>` turn before continuing.\n6. When no tool is needed, respond normally without `<tool_call>` tags.",
         defs.join("\n")
     )
 }
@@ -755,26 +755,31 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
     (system_parts.join("\n\n"), chat_msgs)
 }
 
-/// Split `<think>...</think>` blocks from raw model output into `(reasoning, answer)`.
+/// Split `<think>...</think>` and `<thinking>...</thinking>` blocks from raw model output into `(reasoning, answer)`.
 pub fn split_thinking_and_content(raw: &str) -> (String, String) {
     let mut reasoning = Vec::new();
     let mut rest = raw.to_string();
 
-    while let Some(start) = rest.find("<think>") {
-        if let Some(end_rel) = rest[start + 7..].find("</think>") {
-            let end = start + 7 + end_rel;
-            let thought = rest[start + 7..end].trim();
-            if !thought.is_empty() {
-                reasoning.push(thought.to_string());
+    for (open_tag, close_tag) in [("<think>", "</think>"), ("<thinking>", "</thinking>")] {
+        loop {
+            let lower = rest.to_ascii_lowercase();
+            let Some(start) = lower.find(open_tag) else { break };
+            let after_open = start + open_tag.len();
+            if let Some(end_rel) = lower[after_open..].find(close_tag) {
+                let end = after_open + end_rel;
+                let thought = rest[after_open..end].trim();
+                if !thought.is_empty() {
+                    reasoning.push(thought.to_string());
+                }
+                rest.replace_range(start..end + close_tag.len(), "");
+            } else {
+                let thought = rest[after_open..].trim();
+                if !thought.is_empty() {
+                    reasoning.push(thought.to_string());
+                }
+                rest.truncate(start);
+                break;
             }
-            rest.replace_range(start..end + 8, "");
-        } else {
-            let thought = rest[start + 7..].trim();
-            if !thought.is_empty() {
-                reasoning.push(thought.to_string());
-            }
-            rest.truncate(start);
-            break;
         }
     }
 
@@ -829,6 +834,15 @@ pub fn extract_tool_calls_from_text(
             .split("name=\"")
             .nth(1)
             .and_then(|s| s.split('"').next())
+            .or_else(|| header.split("name='").nth(1).and_then(|s| s.split('\'').next()))
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let path_attr = header
+            .split("path=\"")
+            .nth(1)
+            .and_then(|s| s.split('"').next())
+            .or_else(|| header.split("path='").nth(1).and_then(|s| s.split('\'').next()))
             .unwrap_or("")
             .trim()
             .to_string();
@@ -838,12 +852,23 @@ pub fn extract_tool_calls_from_text(
         } else {
             (after_gt, cleaned.len())
         };
-        if !name.is_empty() {
+        if !name.is_empty() && !matches!(name.as_str(), "TOOL" | "tool_name" | "NAME") {
             let args_trimmed = body.trim();
-            let arguments = if args_trimmed.is_empty() {
+            let arguments = if args_trimmed.starts_with('{') && args_trimmed.ends_with('}') {
+                args_trimmed.to_string()
+            } else if matches!(name.as_str(), "bash" | "shell" | "cmd" | "exec") {
+                json!({ "command": if !args_trimmed.is_empty() { args_trimmed } else { &path_attr }, "description": "Execute command" }).to_string()
+            } else if matches!(name.as_str(), "write" | "write_file") {
+                json!({ "filePath": path_attr, "path": path_attr, "content": args_trimmed }).to_string()
+            } else if matches!(name.as_str(), "read" | "read_file") {
+                let p = if !path_attr.is_empty() { path_attr } else { args_trimmed.to_string() };
+                json!({ "filePath": p, "path": p }).to_string()
+            } else if !path_attr.is_empty() {
+                json!({ "path": path_attr, "body": args_trimmed }).to_string()
+            } else if args_trimmed.is_empty() {
                 "{}".to_string()
             } else {
-                args_trimmed.to_string()
+                json!({ "input": args_trimmed }).to_string()
             };
             calls.push(ParsedToolCall {
                 id: format!("call_{}", random_hex(12)),
@@ -885,7 +910,7 @@ fn parse_single_tool_json(raw_json: &str) -> Option<ParsedToolCall> {
         .and_then(|n| n.as_str())?
         .trim()
         .to_string();
-    if name.is_empty() {
+    if name.is_empty() || matches!(name.as_str(), "tool_name" | "TOOL" | "NAME") {
         return None;
     }
     let args_val = v

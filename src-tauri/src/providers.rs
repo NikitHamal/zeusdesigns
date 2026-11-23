@@ -2363,6 +2363,7 @@ where
         if !system.trim().is_empty() {
             let sys_full: String = system.chars().take(24000).collect();
             let is_opencode = sys_full.contains("OpenCode / OpenAI Tool-Calling Protocol");
+            let is_design = sys_full.contains("## Current canvas page");
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": "user",
@@ -2372,9 +2373,11 @@ where
                 "id": random_hex(16),
                 "role": "assistant",
                 "parts": [{ "type": "text", "text": if is_opencode {
-                    "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> and wait for <tool_response>."
-                } else {
+                    "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
+                } else if is_design {
                     "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML."
+                } else {
+                    "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
                 } }]
             }));
         }
@@ -2834,6 +2837,7 @@ where
     if !system.trim().is_empty() {
         let sys_safe: String = system.chars().take(24000).collect();
         let is_opencode = sys_safe.contains("OpenCode / OpenAI Tool-Calling Protocol");
+        let is_design = sys_safe.contains("## Current canvas page");
         history.push(json!({
             "role": "user",
             "content": format!("[System Specification]\n{}", sys_safe)
@@ -2841,9 +2845,11 @@ where
         history.push(json!({
             "role": "assistant",
             "content": if is_opencode {
-                "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> and wait for <tool_response>."
-            } else {
+                "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
+            } else if is_design {
                 "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
+            } else {
+                "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
             }
         }));
     }
