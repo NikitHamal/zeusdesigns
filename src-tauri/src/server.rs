@@ -189,6 +189,60 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
             16384,
         ),
         (
+            "gemini-3.1-pro",
+            "gemweb2api",
+            "Gemini 3.1 Pro (Zeus Gemini Web)",
+            true,
+            false,
+            262144,
+            16384,
+        ),
+        (
+            "deepseek-v4-pro",
+            "hfrouter",
+            "DeepSeek V4 Pro (Zeus HF Router)",
+            true,
+            false,
+            262144,
+            16384,
+        ),
+        (
+            "qwen3-235b",
+            "freellmhub",
+            "Qwen3 235B (Zeus FreeLLM Hub)",
+            true,
+            false,
+            131072,
+            16384,
+        ),
+        (
+            "kimi-k2.6",
+            "freellmhub",
+            "Kimi K2.6 (Zeus FreeLLM Hub)",
+            true,
+            false,
+            131072,
+            16384,
+        ),
+        (
+            "grok-4.20",
+            "aibridge",
+            "Grok 4.20 (Zeus AI Bridge)",
+            true,
+            false,
+            131072,
+            16384,
+        ),
+        (
+            "nemotron-3-ultra-free",
+            "litellmhub",
+            "Nemotron 3 Ultra 550B (Zeus LiteLLM Hub)",
+            true,
+            false,
+            262144,
+            16384,
+        ),
+        (
             "Qwen3.6-35B-A3B",
             "colibriqwen",
             "Qwen 3.6 35B A3B MoE (Zeus Colibri)",
@@ -364,6 +418,11 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             ("qwen".to_string(), trimmed.to_string())
         }
         "Qwen3.6-35B-A3B" => ("colibriqwen".to_string(), "Qwen3.6-35B-A3B".to_string()),
+        "gemini-3.1-pro" => ("gemweb2api".to_string(), "gemini-3.1-pro".to_string()),
+        "deepseek-v4-pro" => ("hfrouter".to_string(), "deepseek-v4-pro".to_string()),
+        "qwen3-235b" | "kimi-k2.6" => ("freellmhub".to_string(), trimmed.to_string()),
+        "grok-4.20" => ("aibridge".to_string(), "grok-4.20".to_string()),
+        "nemotron-3-ultra-free" => ("litellmhub".to_string(), "nvidia/nemotron-3-ultra-550b-a55b:free".to_string()),
         "DeepSeek-V4.1-Flash-1017" | "Qwen3.8-27B" | "Qwen3.5-397B-A17B" | "Qwen2.5-VL-72B-Instruct" => {
             ("ovhcloud".to_string(), trimmed.to_string())
         }

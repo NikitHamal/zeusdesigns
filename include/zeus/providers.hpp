@@ -20,6 +20,11 @@ enum class ProviderFormat {
     SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
     SCRAPER_NIMCLOUD,    // NVIDIA NIM OpenAI Cloud (mmoranguito-openai-nim-proxy / garystu-openai-nim-proxy)
     SCRAPER_COLIBRIQWEN, // Colibri Qwen 3.6 MoE Cloud (kartik1302-qwen-3-6-35b-a3b.hf.space)
+    SCRAPER_FREELLMHUB, // FreeLLM Hub (bun008-freellmapi.hf.space)
+    SCRAPER_AIBRIDGE, // AI Bridge Gateway (w902287-ai-bridge.hf.space)
+    SCRAPER_HFROUTER, // HF Router Hub (cgjgj-ollamahftraemonitor.hf.space)
+    SCRAPER_LITELLMHUB, // LiteLLM Frontier Hub (alchoholpad-litellm.hf.space)
+    SCRAPER_GEMWEB2API, // Gemini Web Gateway (chenian233-gemini-web2api.hf.space)
     SCRAPER_GEMMA4VL,    // Gemma 4 Vision & QAT Studio (will-resolute / titoo3 / hispa-nico / elseodelasgalletas / gefdsv)
     SCRAPER_PHI4CLOUD,   // Phi-4 & Llama 3.1 Abliterated Cloud (5fp-phi-4-gguf / fggaerg / deleriousson)
     SCRAPER_LLAMACPPCLOUD,// Llama.cpp LFM & SmolVLM Cloud (r1000th / ramedde / aliroohan179 / apathy-exe)

@@ -276,6 +276,113 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~175 tok/s"
         },
         {
+            "freellmhub",
+            "FreeLLM Hub",
+            ProviderFormat::SCRAPER_FREELLMHUB,
+            "https://bun008-freellmapi.hf.space/v1",
+            "glm-5.3",
+            {
+                {"glm-5.3", "GLM 5.3", "Z.ai flagship agentic coder", true, false, false, 120},
+                {"qwen3-235b", "Qwen3 235B", "Alibaba 235B MoE flagship", true, false, false, 120},
+                {"mistral-large", "Mistral Large", "Mistral frontier generalist", false, false, false, 120},
+                {"mistral-medium-3-5", "Mistral Medium 3.5", "Balanced fast reasoning", true, false, false, 120},
+                {"DeepSeek-V4.1-Flash", "DeepSeek V4.1 Flash", "Fast long-context reasoning", true, false, false, 120},
+                {"DeepSeek-V4-Flash", "DeepSeek V4 Flash", "Fast long-context coder", true, false, false, 120},
+                {"kimi-k2.6", "Kimi K2.6", "Moonshot agentic reasoning", true, false, false, 120},
+                {"zai-glm-4.7", "GLM 4.7", "Z.ai fast reasoning coder", true, false, false, 120},
+                {"tencent-hy3", "Tencent HY3", "Tencent Hunyuan 3 flagship", false, false, false, 120},
+                {"Qwen3.8-27B", "Qwen3.8 27B", "Dense 27B UI coder", true, false, false, 120},
+                {"gemma-4-31b-it", "Gemma 4 31B", "Google open 31B", true, false, false, 120},
+                {"openai/gpt-4.1", "GPT-4.1", "OpenAI long-context generalist", false, false, false, 120},
+                {"command-a-03-2025", "Command A", "Cohere agentic generalist", false, false, false, 120},
+                {"gpt-oss-120b", "GPT-OSS 120B", "OpenAI open-weight reasoning", true, false, false, 120}
+            },
+            131072,
+            16384,
+            false,
+            "~120 tok/s"
+        },
+        {
+            "aibridge",
+            "AI Bridge Gateway",
+            ProviderFormat::SCRAPER_AIBRIDGE,
+            "https://w902287-ai-bridge.hf.space/v1",
+            "gpt-6-luna",
+            {
+                {"gpt-6-luna", "GPT-6 Luna", "OpenAI GPT-6 fast flagship", false, false, false, 150},
+                {"claude-haiku-5-5", "Claude Haiku 5.5", "Anthropic fast frontier", false, false, false, 150},
+                {"gpt-4.1", "GPT-4.1", "OpenAI long-context generalist", false, false, false, 150},
+                {"gpt-4o", "GPT-4o", "OpenAI multimodal generalist", false, false, false, 150},
+                {"deepseek-v4-flash", "DeepSeek V4 Flash", "Fast coder", false, false, false, 150},
+                {"grok-4.20", "Grok 4.20", "xAI Grok frontier", false, false, false, 150},
+                {"deepseek-v4-flash-vision-exp", "DeepSeek V4 Flash Vision", "Reasoning flash", true, false, false, 150},
+                {"qwen3.5-flash", "Qwen3.5 Flash", "Alibaba fast reasoning", true, false, false, 150},
+                {"doubao-seed-2-0-mini-260428", "Doubao Seed 2.0 Mini", "ByteDance fast reasoning", true, false, false, 150},
+                {"supabase-qwen3.7-flash", "Qwen3.7 Flash", "Alibaba reasoning flash", true, false, false, 150}
+            },
+            131072,
+            16384,
+            false,
+            "~150 tok/s"
+        },
+        {
+            "hfrouter",
+            "HF Router Hub",
+            ProviderFormat::SCRAPER_HFROUTER,
+            "https://cgjgj-ollamahftraemonitor.hf.space/v1",
+            "deepseek-v4-pro",
+            {
+                {"deepseek-v4-pro", "DeepSeek V4 Pro", "DeepSeek V4 Pro frontier", true, false, false, 60},
+                {"qwen3.8", "Qwen3.8 2.4T A95B", "Alibaba 2.4T MoE flagship", true, false, false, 60},
+                {"deepseek-v4-flash", "DeepSeek V4 Flash", "DeepSeek V4 Flash fast", true, false, false, 60},
+                {"glm-5.3", "GLM 5.3", "Z.ai flagship agentic coder", true, false, false, 60},
+                {"minimax-m2.7", "MiniMax M2.7", "MiniMax agentic coder", true, false, false, 60},
+                {"kimi-k2", "Kimi K2", "Moonshot 1T MoE instruct", false, false, false, 60},
+                {"gpt-oss-120b", "GPT-OSS 120B", "OpenAI open-weight reasoning", true, false, false, 60},
+                {"qwen3-coder-480b", "Qwen3 Coder 480B", "Alibaba 480B A35B coder", false, false, false, 60},
+                {"qwen3-coder-next", "Qwen3 Coder Next", "Alibaba next-gen coder", false, false, false, 60}
+            },
+            131072,
+            16384,
+            false,
+            "~60 tok/s"
+        },
+        {
+            "litellmhub",
+            "LiteLLM Frontier Hub",
+            ProviderFormat::SCRAPER_LITELLMHUB,
+            "https://alchoholpad-litellm.hf.space/v1",
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            {
+                {"nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra 550B", "550B MoE frontier reasoning", true, false, false, 200},
+                {"groq/gpt-oss-120b", "GPT-OSS 120B (LPU)", "Ultra-fast open-weight reasoning", true, false, false, 200},
+                {"groq/qwen3.8-27b", "Qwen3.8 27B (LPU)", "Ultra-fast dense 27B", false, false, false, 200},
+                {"deepseek-v4.1-flash-1017", "DeepSeek V4.1 Flash", "Fast long-context reasoning", true, false, false, 200},
+                {"gemini-2.5-flash", "Gemini 2.5 Flash", "Google long-context flash", true, false, false, 200}
+            },
+            131072,
+            16384,
+            false,
+            "~200 tok/s"
+        },
+        {
+            "gemweb2api",
+            "Gemini Web Gateway",
+            ProviderFormat::SCRAPER_GEMWEB2API,
+            "https://chenian233-gemini-web2api.hf.space/v1",
+            "gemini-3.1-pro",
+            {
+                {"gemini-3.1-pro", "Gemini 3.1 Pro", "Google frontier reasoning", true, false, false, 60},
+                {"gemini-3.5-flash", "Gemini 3.5 Flash", "Google fast flash", false, false, false, 60},
+                {"gemini-3.5-flash-thinking", "Gemini 3.5 Flash Thinking", "Google flash with thinking", true, false, false, 60},
+                {"gemini-3.6-flash", "Gemini 3.6 Flash", "Google latest flash", false, false, false, 60}
+            },
+            262144,
+            16384,
+            false,
+            "~60 tok/s"
+        },
+        {
             "gemma4vl",
             "Gemma 4 Vision & QAT Studio",
             ProviderFormat::SCRAPER_GEMMA4VL,
