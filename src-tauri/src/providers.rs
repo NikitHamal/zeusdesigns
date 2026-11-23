@@ -4528,31 +4528,40 @@ where
     }
 
     let sys_safe: String = system.chars().take(26000).collect();
-    let candidate_routes: Vec<(&str, &str)> = if eff_model.contains("gemini-4-hydrogen") {
-        vec![
-            ("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen"),
-            ("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"),
-            ("https://dherain24-claude-proxy.hf.space", "claude-3-freecc-no-thinking/nvidia_nim/mistralai/mistral-large-4-1t-a52b"),
-        ]
-    } else {
-        let mut r = Vec::new();
-        for &h in hosts {
-            r.push((h, eff_model));
-        }
-        r.push(("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"));
-        r.push(("https://dherain24-claude-proxy.hf.space", "claude-3-freecc-no-thinking/nvidia_nim/mistralai/mistral-large-4-1t-a52b"));
-        r
-    };
+    let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
+    for &h in hosts {
+        let t_secs = if eff_model.contains("/gemini/") || eff_model.contains("kimi-k3.1-pro") || eff_model.contains("step-5") {
+            8
+        } else {
+            22
+        };
+        candidate_routes.push((h, eff_model, t_secs));
+    }
+    candidate_routes.push((
+        "https://calkotter-free-claude-code.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        20,
+    ));
+    candidate_routes.push((
+        "https://calkotter-free-claude-code.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
+        18,
+    ));
+    candidate_routes.push((
+        "https://calkotter-free-claude-code.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
+        22,
+    ));
+    candidate_routes.push((
+        "https://dherain24-claude-proxy.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
+        18,
+    ));
 
-    let client = Client::builder()
-        .user_agent(CHROME_UA)
-        .cookie_store(true)
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(90))
-        .build()
-        .map_err(|e| format!("HTTP client init failed: {}", e))?;
-
-    for (host, route_model) in candidate_routes {
+    for (host, route_model, timeout_secs) in candidate_routes {
+        let Ok(client) = build_client(timeout_secs) else {
+            continue;
+        };
         let payload = json!({
             "model": route_model,
             "max_tokens": 16384,
@@ -5091,16 +5100,16 @@ where
     let targets: &[(&str, &str)] = if has_images || model == "gemma-4-e4b-ud-q5" {
         &[
             (
-                "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
-                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
-            ),
-            (
                 "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
                 "/models/gemma-4-E4B-it-Q4_K_M.gguf",
             ),
             (
-                "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions",
-                "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf",
+                "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
+                "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
+            ),
+            (
+                "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
+                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
             ),
         ]
     } else {
@@ -5111,32 +5120,22 @@ where
                     "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
                 ),
                 (
-                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
-                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
-                ),
-            ],
-            "gemma-4-ollama" => &[
-                (
-                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
-                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
-                ),
-                (
-                    "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
+                    "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                    "/models/gemma-4-E4B-it-Q4_K_M.gguf",
                 ),
             ],
             _ => &[
                 (
-                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
-                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
+                    "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                    "/models/gemma-4-E4B-it-Q4_K_M.gguf",
                 ),
                 (
                     "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
                     "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
                 ),
                 (
-                    "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
-                    "/models/gemma-4-E4B-it-Q4_K_M.gguf",
+                    "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
+                    "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
                 ),
             ],
         }
@@ -5169,7 +5168,7 @@ where
         }
     }
 
-    let client = build_client(180)?;
+    let client = build_client(22)?;
     for &(endpoint, upstream_model) in targets {
         let payload = json!({
             "model": upstream_model,
@@ -5589,7 +5588,7 @@ where
     Err("Liquid AI LFM Gateway stream ended without output".to_string())
 }
 
-/// Stream from KoboldAI Multi-Node Cloud (`koboldai-koboldcpp-tiefighter`, `nanoph-koboldcpp-tiefighter`, `nxdev-org-koboldcpp-tiefighter`).
+/// Stream from KoboldAI Multi-Node Cloud (`nxdev-org-koboldcpp-tiefighter`, `koboldai-koboldcpp-tiefighter`, `nanoph-koboldcpp-tiefighter`).
 pub fn stream_koboldcloud<F>(
     model: &str,
     system: &str,
@@ -5603,36 +5602,30 @@ where
     let targets: &[(&str, &str)] = match model {
         "koboldcpp/gemma-2-9b-it-Q5_K_M" => &[
             (
-                "https://nanoph-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/gemma-2-9b-it-Q5_K_M",
-            ),
-            (
-                "https://koboldai-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/Gemma4-E2B",
-            ),
-        ],
-        "koboldcpp/gemma-3n-E2B-it" => &[
-            (
                 "https://nxdev-org-koboldcpp-tiefighter.hf.space/v1/chat/completions",
                 "koboldcpp/gemma-3n-E2B-it",
             ),
             (
-                "https://koboldai-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/Gemma4-E2B",
+                "https://nanoph-koboldcpp-tiefighter.hf.space/v1/chat/completions",
+                "koboldcpp/gemma-2-9b-it-Q5_K_M",
+            ),
+            (
+                "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                "/models/gemma-4-E4B-it-Q4_K_M.gguf",
             ),
         ],
         _ => &[
             (
-                "https://koboldai-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/Gemma4-E2B",
-            ),
-            (
                 "https://nxdev-org-koboldcpp-tiefighter.hf.space/v1/chat/completions",
                 "koboldcpp/gemma-3n-E2B-it",
             ),
             (
-                "https://nanoph-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/gemma-2-9b-it-Q5_K_M",
+                "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                "/models/gemma-4-E4B-it-Q4_K_M.gguf",
+            ),
+            (
+                "https://koboldai-koboldcpp-tiefighter.hf.space/v1/chat/completions",
+                "koboldcpp/Gemma4-E2B",
             ),
         ],
     };
@@ -5648,7 +5641,7 @@ where
         }
     }
 
-    let client = build_client(180)?;
+    let client = build_client(20)?;
     for &(endpoint, upstream_model) in targets {
         let payload = json!({
             "model": upstream_model,
@@ -6151,26 +6144,22 @@ pub fn stream_nimcloud<F>(
 where
     F: FnMut(&str),
 {
-    let eff_model = match model {
-        "nvidia/nemotron-3.5-super-vl-120b-a12b"
-        | "nvidia/nemotron-3-ultra-550b-a55b"
-        | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
-        | "nvidia/nemotron-3.5-lightning-30b-a3b"
-        | "nvidia/nemotron-3.5-bolt-e4b"
-        | "mistralai/mistral-large-4-1t-a52b"
-        | "stepfun-ai/step-5-preview" => model,
-        _ => "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    let primary_alias = match model {
+        "nvidia/nemotron-3-ultra-550b-a55b" => "nemotron-550",
+        "nvidia/nemotron-3.5-bolt-e4b" => "nvidia/nemotron-3.5-bolt-e4b",
+        "nvidia/nemotron-3.5-lightning-30b-a3b" => "nvidia/nemotron-3.5-lightning-30b-a3b",
+        _ => "nvidia/nemotron-3.5-bolt-e4b",
     };
     let targets = [
-        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", eff_model),
-        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", eff_model),
-        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
-        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
+        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", primary_alias),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
+        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nemotron-550"),
     ];
-    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 90, cancel, on_delta)
+    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 16, cancel, on_delta)
+        .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", system, messages, cancel, on_delta))
 }
 
-/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space`).
+/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space` + `ovhcloud` `qwen3.6-35b-a3b` failover).
 pub fn stream_colibriqwen<F>(
     _model: &str,
     system: &str,
@@ -6185,7 +6174,8 @@ where
         ("https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "Qwen3.6-35B-A3B"),
         ("https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions", "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"),
     ];
-    stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 120, cancel, on_delta)
+    stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 14, cancel, on_delta)
+        .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", system, messages, cancel, on_delta))
 }
 
 /// Stream from Gemma 4 Vision & QAT Studio (`will-resolute-gemma4-vision-ui`, `titoo3-gemma-4-e4b`, `hispa-nico-gemma4-e2b-qat`, `elseodelasgalletas-gemma4-e2b-qat-mobile`, `gefdsv-gemma-4-e2b-it`).
