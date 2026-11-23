@@ -5,6 +5,7 @@ import { nativeAvailable, nativeMcp, nativeMemory } from "./lib/bridge";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { CanvasPane } from "./components/CanvasPane";
+import { M3ePane } from "./components/M3ePane";
 import { SettingsDialog } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { Home } from "./components/Home";
@@ -22,7 +23,8 @@ export default function App() {
   const patchUI = useStore((s) => s.patchUI);
   const [w, setW] = useState(() => Number(localStorage.getItem("zeus-chat-w")) || 440);
   const dragging = useRef(false);
-  const split = showCanvas;
+  const m3eOpen = useStore((s) => !!s.ui.m3e);
+  const split = showCanvas || m3eOpen;
 
   useLayoutEffect(() => {
     applyTheme(theme, hue);
@@ -84,7 +86,7 @@ export default function App() {
                 </div>
               </>
             )}
-            <div className="min-w-0 flex-1 p-2 pl-0"><CanvasPane /></div>
+            <div className="min-w-0 flex-1 p-2 pl-0">{m3eOpen ? <M3ePane /> : <CanvasPane />}</div>
           </>
         ) : hasMessages ? (
           <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full max-w-[860px]"><ChatPane /></div></div>

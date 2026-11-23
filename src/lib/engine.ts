@@ -508,7 +508,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const toolsText = nativeOn ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
   const system = mode === "design"
     ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
-    : [agentPrompt(mode), toolsText].filter(Boolean).join("\n\n");
+    : [agentPrompt(mode, opts.text), toolsText].filter(Boolean).join("\n\n");
   const req: ChatRequest = {
     requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId, effort: settings.effort,
     system, messages: history, workspaceRoot: st.ui.workspace?.root,

@@ -12,6 +12,7 @@ import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
 import { Collapse, LiveStatus, WorkLog } from "./Activity";
+import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
 /* ------------------------------------------------------------------ */
 /* Message bits                                                        */
@@ -31,6 +32,42 @@ function QuoteCard({ q, compact }: { q: Quote; compact?: boolean }) {
         </span>
         {q.text && <span className="mt-0.5 block truncate text-[13px] italic text-on-surface-variant">“{q.text}”</span>}
       </span>
+    </button>
+  );
+}
+
+const m3eOpened = new Set<string>();
+
+/** Card for an <m3e> artifact: builds the share link, opens M3E Canvas beside the chat once, reopens on click. */
+function M3eCard({ doc, id, streaming }: { doc: M3eDoc; id: string; streaming?: boolean }) {
+  const patchUI = useStore((s) => s.patchUI);
+  const active = useStore((s) => s.ui.m3e?.title === doc.title);
+  const [state, setState] = useState<{ link?: string; error?: string }>({});
+  const live = useRef(false);
+  if (streaming) live.current = true;
+  useEffect(() => {
+    if (!doc.complete || streaming) return;
+    let dead = false;
+    m3eLink(doc.json).then((link) => {
+      if (dead) return;
+      setState({ link });
+      if (live.current && !m3eOpened.has(id)) { m3eOpened.add(id); patchUI({ m3e: { title: doc.title, link }, showCanvas: false }); }
+    }).catch((e: unknown) => !dead && setState({ error: e instanceof Error ? e.message : "Invalid sketch" }));
+    return () => { dead = true; };
+  }, [doc.json, doc.complete, streaming, id]);
+  const busy = !state.link && !state.error;
+  return (
+    <button
+      disabled={!state.link}
+      onClick={() => state.link && patchUI({ m3e: { title: doc.title, link: state.link } })}
+      className={cn("flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors", active ? "border-primary bg-primary-container/40" : "border-outline-variant/60 bg-surface-low hover:bg-surface-high")}
+    >
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-container text-on-primary-container"><Icon name="design_services" size={18} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13.5px] font-medium">{doc.title}</span>
+        <span className={cn("block text-xs text-on-surface-variant", busy && "zshine")}>{state.error ?? (busy ? "Sketching screens" : "M3E Canvas")}</span>
+      </span>
+      {state.link && <Icon name="chevron_right" size={18} className="text-on-surface-variant" />}
     </button>
   );
 }
@@ -94,6 +131,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   if (m.compacted) {
     return <CompactedCard m={m} />;
   }
+  const shown = m.role === "assistant" ? splitM3e(m.text) : { text: m.text, docs: [] as M3eDoc[] };
   if (m.role === "user") {
     return (
       <div className="anim-pop ml-auto flex max-w-[92%] flex-col items-end gap-1.5">
@@ -114,7 +152,8 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   return (
     <div className="anim-pop group min-w-0 space-y-2.5">
       <WorkLog m={m} />
-      {m.text && <div className={cn(m.streaming && "caret")}><Markdown text={m.text} /></div>}
+      {shown.text && <div className={cn(m.streaming && "caret")}><Markdown text={shown.text} /></div>}
+      {shown.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${i}`} streaming={m.streaming} />)}
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
       {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}

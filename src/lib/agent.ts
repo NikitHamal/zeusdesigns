@@ -3,6 +3,7 @@ import type { Message, Quote, Artboard } from "../types";
 import { useStore } from "../store";
 import { memoryBlock } from "./memory";
 import { getProviderSpecialization } from "./context";
+import { M3E_GUIDE, M3E_TRIGGER } from "./m3e";
 
 export type Intent = "chat" | "code" | "design";
 
@@ -15,13 +16,14 @@ const NEW_SUBJECT = /\b(new|another|different|from scratch|start over)\b/i;
 export function classifyIntent(text: string, ctx: { boards: number; quote?: boolean; asVariant?: boolean; workspace?: boolean }): Intent {
   const t = text.trim();
   if (ctx.asVariant || ctx.quote) return "design";
+  if (M3E_TRIGGER.test(t)) return "chat";
   if (DESIGN_ASK.test(t)) return /\b(code|bug|refactor|compile|npm|git|function|repo|typescript|python|rust)\b/i.test(t) && !/\b(design|mock-?up|wireframe|landing page|screen|artboard|canvas)\b/i.test(t) ? "code" : "design";
   if (ctx.boards > 0 && EDIT_CANVAS.test(t) && !CODE_ASK.test(t.replace(EDIT_CANVAS, "")) && !NEW_SUBJECT.test(t)) return "design";
   if (CODE_ASK.test(t) || (ctx.workspace && t.split(/\s+/).length > 4)) return "code";
   return "chat";
 }
 
-export function agentPrompt(mode: Intent): string {
+export function agentPrompt(mode: Intent, userText = ""): string {
   const s = useStore.getState();
   const ws = s.ui.workspace;
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
@@ -45,6 +47,7 @@ Use tools only when the task needs something you cannot know otherwise (a file i
 When the user asks for a standalone visual deliverable (a page, a small game, a widget, a diagram, a prototype), emit it as one complete self-contained HTML document in <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard>. It opens next to the chat as a live preview. Inline CSS and JS only, no CDNs. Everything else (code, explanations, answers) stays in the chat or on disk in the user's project.`,
     spec.isKeylessScraper ? `Native tools are available through <zeus_tool> blocks (see Agent tools). Do not say you lack file or shell access when a project folder is open.` : "",
     ws ? `## Project\nOpen folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top level: ${ws.tree.slice(0, 40).map((n) => n.name + (n.dir ? "/" : "")).join(", ")}.` : (mode === "code" ? `## Project\nNo folder is open. You can still write and explain code in the chat; tell the user to open a project folder from the sidebar when you need to read or change files.` : ""),
+    M3E_TRIGGER.test(userText) ? M3E_GUIDE : "",
     memoryBlock(),
   ].filter(Boolean).join("\n\n");
 }

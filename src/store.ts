@@ -51,6 +51,7 @@ interface UI {
   chatCollapsed: boolean;
   sidebarOpen: boolean;
   showCanvas: boolean;
+  m3e: { title: string; link: string } | null;
   update: UpdateInfo | null;
   version: string;
 }
@@ -150,7 +151,7 @@ export const useStore = create<State>()(
       ui: {
         settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, editId: null, openPinId: null,
         focusArtboard: null, toast: null, workspace: null, nativeReady: false, chatCollapsed: false,
-        sidebarOpen: true, showCanvas: false, update: null, version: "",
+        sidebarOpen: true, showCanvas: false, m3e: null, update: null, version: "",
       },
 
       patchSettings: (p) => set((s) => {
