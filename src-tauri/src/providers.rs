@@ -135,6 +135,149 @@ fn build_client(timeout_secs: u64) -> Result<Client, String> {
         .map_err(|e| format!("HTTP client init failed: {}", e))
 }
 
+/// Cap a system prompt to `max_chars` by preserving both the head (tool schemas / core laws)
+/// and the tail (active canvas screen list / workspace / closing protocol).
+pub fn smart_cap_system(system: &str, max_chars: usize) -> String {
+    let total = system.chars().count();
+    if total <= max_chars {
+        return system.to_string();
+    }
+    let head_len = (max_chars * 7) / 10;
+    let tail_len = max_chars.saturating_sub(head_len);
+    let head: String = system.chars().take(head_len).collect();
+    let tail: String = system.chars().skip(total.saturating_sub(tail_len)).collect();
+    format!("{}\n\n{}\n", head.trim_end(), tail.trim_start())
+}
+
+/// Compact bulky `<artboard>` or `<tool_response>` bodies inside older history turns so 10+ turn
+/// conversations never overflow scraper or GGUF context windows while keeping the latest turn intact.
+fn compact_older_turn_content(content: &str, max_chars: usize) -> String {
+    let mut out = content.to_string();
+    // Replace full HTML bodies inside older `<artboard ...>...</artboard>` turns with a compact marker
+    while let Some(start) = out.find("<artboard") {
+        let Some(gt_rel) = out[start..].find('>') else {
+            break;
+        };
+        let open_end = start + gt_rel + 1;
+        if let Some(close_rel) = out[open_end..].find("</artboard>") {
+            let close_start = open_end + close_rel;
+            let inner_len = close_start.saturating_sub(open_end);
+            if inner_len > 360 {
+                let open_tag = &out[start..open_end];
+                let replacement = format!(
+                    "{}[/* screen HTML updated on canvas ({} chars) */]</artboard>",
+                    open_tag, inner_len
+                );
+                out.replace_range(start..close_start + 11, &replacement);
+                continue;
+            }
+        }
+        break;
+    }
+    let char_count = out.chars().count();
+    if char_count <= max_chars {
+        return out;
+    }
+    let head_len = (max_chars * 6) / 10;
+    let tail_len = max_chars.saturating_sub(head_len);
+    let head: String = out.chars().take(head_len).collect();
+    let tail: String = out.chars().skip(char_count.saturating_sub(tail_len)).collect();
+    format!("{}\n...[compacted earlier turn]...\n{}", head, tail)
+}
+
+/// Normalize multi-turn messages for any keyless provider, guaranteeing:
+/// 1. Strict `user` -> `assistant` -> `user` role alternation starting with `user`.
+/// 2. Compaction of older turns when `messages.len() > 2` so Turn 2..Turn 20+ never hit HTTP 400/413.
+/// 3. Full preservation of the final user turn (including `<canvas_state>` and `<tool_response>`).
+pub fn normalize_multi_turn_messages(
+    messages: &[ChatMessage],
+    max_history_turns: usize,
+    max_older_turn_chars: usize,
+    max_last_user_chars: usize,
+) -> Vec<ChatMessage> {
+    if messages.is_empty() {
+        return vec![ChatMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+            attachments: Vec::new(),
+        }];
+    }
+
+    let len = messages.len();
+    let last_idx = len - 1;
+    let keep_from = if len > max_history_turns + 1 {
+        len.saturating_sub(max_history_turns)
+    } else {
+        0
+    };
+
+    let mut normalized: Vec<ChatMessage> = Vec::new();
+
+    for (idx, m) in messages.iter().enumerate() {
+        if idx > 0 && idx < keep_from {
+            continue;
+        }
+        let role = if m.role == "assistant" {
+            "assistant".to_string()
+        } else {
+            "user".to_string()
+        };
+        let raw_content = m.content.trim();
+        if raw_content.is_empty() && m.attachments.is_empty() {
+            continue;
+        }
+        let content = if idx == last_idx {
+            let c_len = raw_content.chars().count();
+            if c_len <= max_last_user_chars {
+                raw_content.to_string()
+            } else {
+                let head_len = (max_last_user_chars * 4) / 10;
+                let tail_len = max_last_user_chars.saturating_sub(head_len);
+                let head: String = raw_content.chars().take(head_len).collect();
+                let tail: String = raw_content.chars().skip(c_len.saturating_sub(tail_len)).collect();
+                format!("{}\n\n{}\n", head, tail)
+            }
+        } else {
+            compact_older_turn_content(raw_content, max_older_turn_chars)
+        };
+
+        if let Some(prev) = normalized.last_mut() {
+            if prev.role == role {
+                prev.content.push_str("\n\n");
+                prev.content.push_str(&content);
+                for att in &m.attachments {
+                    prev.attachments.push(att.clone());
+                }
+                continue;
+            }
+        }
+
+        if normalized.is_empty() && role == "assistant" {
+            normalized.push(ChatMessage {
+                role: "user".to_string(),
+                content: "Continue the session.".to_string(),
+                attachments: Vec::new(),
+            });
+        }
+
+        normalized.push(ChatMessage {
+            role,
+            content,
+            attachments: m.attachments.clone(),
+        });
+    }
+
+    if normalized.is_empty() {
+        normalized.push(ChatMessage {
+            role: "user".to_string(),
+            content: "Hello".to_string(),
+            attachments: Vec::new(),
+        });
+    }
+
+    normalized
+}
+
 pub fn catalog() -> Vec<ProviderInfo> {
     vec![
         ProviderInfo {
@@ -6008,12 +6151,13 @@ fn stream_oai_targets<F>(
 where
     F: FnMut(&str),
 {
+    let norm_messages = normalize_multi_turn_messages(messages, 10, 3200, 22000);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(20000).collect();
+        let sys_safe = smart_cap_system(system, 16000);
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
-    for m in messages {
+    for m in &norm_messages {
         let imgs: Vec<&AttachmentPayload> = if allow_vision {
             m.attachments
                 .iter()
@@ -6621,6 +6765,20 @@ pub fn dispatch_stream<F>(
 where
     F: FnMut(&str),
 {
+    let norm_msgs = normalize_multi_turn_messages(&req.messages, 14, 4800, 28000);
+    let norm_sys = smart_cap_system(&req.system, 24000);
+    let norm_req = ChatRequest {
+        request_id: req.request_id.clone(),
+        provider: req.provider.clone(),
+        model: req.model.clone(),
+        effort: req.effort.clone(),
+        system: norm_sys,
+        messages: norm_msgs,
+        workspace_root: req.workspace_root.clone(),
+        custom: req.custom.clone(),
+    };
+    let req = &norm_req;
+
     if let Some(custom) = &req.custom {
         return stream_custom_endpoint(
             custom,
@@ -6914,6 +7072,41 @@ mod tests {
     fn test_clean_chatjimmy_output_strips_stats_and_think() {
         let raw = "<|think|>internal<|/think|>Material 3 Dashboard<|stats|>{\"tps\":21500}<|/stats|>";
         assert_eq!(clean_chatjimmy_output(raw), "Material 3 Dashboard");
+    }
+
+    #[test]
+    fn test_normalize_multi_turn_messages_compacts_history_and_alternates_roles() {
+        let mut msgs = Vec::new();
+        for turn in 1..=10 {
+            msgs.push(ChatMessage {
+                role: "user".to_string(),
+                content: format!("Turn {} user request", turn),
+                attachments: Vec::new(),
+            });
+            msgs.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: format!(
+                    "Turn {} reply\n<artboard name=\"Home\" device=\"mobile\">{}</artboard>",
+                    turn,
+                    "<div>content</div>".repeat(60)
+                ),
+                attachments: Vec::new(),
+            });
+        }
+        msgs.push(ChatMessage {
+            role: "user".to_string(),
+            content: "Turn 11 follow-up with <canvas_state>live html</canvas_state>".to_string(),
+            attachments: Vec::new(),
+        });
+
+        let norm = normalize_multi_turn_messages(&msgs, 8, 1200, 16000);
+        assert!(norm.len() <= 11);
+        assert_eq!(norm.first().unwrap().role, "user");
+        assert_eq!(norm.last().unwrap().role, "user");
+        assert!(norm.last().unwrap().content.contains("<canvas_state>live html</canvas_state>"));
+        for w in norm.windows(2) {
+            assert_ne!(w[0].role, w[1].role);
+        }
     }
 
     #[test]
