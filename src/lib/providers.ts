@@ -76,7 +76,7 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
-    id: "apisfreellm", name: "APIsFreeLLM", tagline: "10,000 req/day · zero-key OpenAI stream", speed: "~155 tok/s", color: "#d9480f", icon: "Generating_tokens",
+    id: "apisfreellm", name: "APIsFreeLLM", tagline: "10,000 req/day · zero-key OpenAI stream", speed: "~155 tok/s", color: "#d9480f", icon: "terminal",
     contextWindow: 32768,
     models: [
       { id: "free-ai", label: "Free-AI 9B Uncensored", note: "32k ctx · 10,000 req/day zero-key fast stream", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 8192 },

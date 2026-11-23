@@ -20,6 +20,9 @@ enum class ProviderFormat {
     SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
     SCRAPER_PTERO,       // Ptero (ptero.pro/wp-json/mlp/v1/chat) GPT-6.1 Terra & GLM 5.3 Flash + vision
     SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3
+    SCRAPER_BLOCKRUN,    // BlockRun (blockrun.ai/api/v1) zero-key NVIDIA, MiniMax M3.1, Poolside, Cohere
+    SCRAPER_OVHCLOUD,    // OVHcloud AI (oai.endpoints.kepler.ai.cloud.ovh.net/v1) DeepSeek V4.1, Qwen 3.8 VL, Gemma 4
+    SCRAPER_APISFREELLM, // APIsFreeLLM (api.apisfreellm.com/v1) 10,000 req/day zero-key stream
     SCRAPER_LLM7,        // LLM7 (api.llm7.io/v1) Codestral Latest, Gemma 3 27B, GPT-OSS 20B
     SCRAPER_POLLINATIONS,// Pollinations (text.pollinations.ai/openai) OpenAI reasoning stream
     SCRAPER_YQCLOUD,     // YQCloud (api.binjie.fun/api/generateStream) zero-auth fast stream

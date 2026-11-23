@@ -233,12 +233,77 @@ KeylessProviderEngine::KeylessProviderEngine() {
                 {"particle-ai/particle-1:free", "Particle-1 VL", "1M ctx Multimodal design & reasoning", true, false, true, 135},
                 {"dots-studio/dots-3-note-preview:free", "Dots 3 Note VL", "262k ctx Multimodal vision & UI notes", true, false, true, 140},
                 {"recursive/flint-v1.0:free", "Recursive Flint 1.0", "262k ctx Fast code & UI synthesis", true, false, false, 150},
+                {"cohere/north-mini-code:free", "Cohere North Mini Code", "256k ctx Cohere coding & UI specialist", true, false, false, 145},
                 {"kilo-auto/free", "Kilo Auto Free", "256k ctx Fastest available free model", true, false, false, 150}
             },
             262144,
             16384,
             false,
             "~140 tok/s"
+        },
+        {
+            "blockrun",
+            "BlockRun Gateway",
+            ProviderFormat::SCRAPER_BLOCKRUN,
+            "https://blockrun.ai/api/v1",
+            "nvidia/nemotron-3-super-120b",
+            {
+                {"nvidia/nemotron-3-super-120b", "Nemotron 3.5 Super 120B", "262k ctx 120B MoE frontier UI architect", true, false, false, 165},
+                {"nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni VL", "256k ctx 30B Omni vision & reasoning", true, false, true, 160},
+                {"nvidia/minimax-m3.1-flash", "MiniMax M3.1 Flash", "1M ctx MiniMax M3.1 fast UI & code engine", true, false, false, 175},
+                {"nvidia/nemotron-3-ultra-550b", "Nemotron 3 Ultra 550B", "1M ctx 550B MoE deep software engineering", true, false, false, 130},
+                {"nvidia/nemotron-3.5-lightning", "Nemotron 3.5 Lightning", "262k ctx High-speed MoE UI coder", true, false, false, 185},
+                {"nvidia/nemotron-3.5-bolt", "Nemotron 3.5 Bolt", "262k ctx Low-latency UI synthesis", true, false, false, 190},
+                {"nvidia/muse-glimmer-30b", "Muse Glimmer 30B", "131k ctx Expressive UI & design reasoning", true, false, false, 155},
+                {"poolside/laguna-xs-2.1", "Poolside Laguna XS 2.1", "128k ctx Poolside code & layout specialist", true, false, false, 160},
+                {"cohere/north-mini-code", "Cohere North Mini Code", "256k ctx Cohere frontend coding engine", true, false, false, 155}
+            },
+            262144,
+            16384,
+            false,
+            "~165 tok/s"
+        },
+        {
+            "ovhcloud",
+            "OVHcloud AI",
+            ProviderFormat::SCRAPER_OVHCLOUD,
+            "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+            "DeepSeek-V4.1-Flash-1017",
+            {
+                {"DeepSeek-V4.1-Flash-1017", "DeepSeek V4.1 Flash", "262k ctx 284B MoE flagship coding & UI architect", true, false, false, 160},
+                {"Qwen3.8-27B", "Qwen 3.8 27B VL", "262k ctx Alibaba newest 27B multimodal & reasoning", true, false, true, 145},
+                {"Qwen3.5-397B-A17B", "Qwen 3.5 397B MoE", "262k ctx 397B MoE frontier reasoning & code", true, false, false, 130},
+                {"qwen3-vl-30b-a3b", "Qwen 3 VL 30B", "128k ctx Multimodal vision & UI specialist", true, false, true, 145},
+                {"nemotron3-omni-30b", "Nemotron 3 Omni 30B VL", "256k ctx NVIDIA Omni vision & reasoning", true, false, true, 150},
+                {"Qwen2.5-VL-72B-Instruct", "Qwen 2.5 VL 72B", "128k ctx 72B multimodal vision & layout", false, false, true, 125},
+                {"qwen3.6-35b-a3b", "Qwen 3.6 35B MoE", "262k ctx Fast MoE frontend coder", true, false, false, 155},
+                {"Qwen3.6-27B", "Qwen 3.6 27B", "262k ctx Dense coding & layout engine", true, false, false, 145},
+                {"gemma-4-26b-a4b", "Gemma 4 26B MoE", "128k ctx Google Gemma 4 A4B fast UI coder", true, false, false, 165},
+                {"laguna-xs-2.1", "Poolside Laguna XS 2.1", "128k ctx Poolside agentic coding engine", false, false, false, 155},
+                {"nemotron3-nano-30b", "Nemotron 3 Nano 30B", "256k ctx NVIDIA fast reasoning MoE", true, false, false, 165},
+                {"gpt-oss-120b", "GPT-OSS 120B", "128k ctx OpenAI 120B open-weights reasoning", true, false, false, 150},
+                {"gpt-oss-20b", "GPT-OSS 20B", "128k ctx OpenAI 20B fast coder", true, false, false, 175},
+                {"Meta-Llama-3_3-70B-Instruct", "Llama 3.3 70B Instruct", "128k ctx Meta 70B instruction model", false, false, false, 140},
+                {"Mistral-Small-3.2-24B-Instruct-2506", "Mistral Small 3.2 24B", "128k ctx Mistral fast instruction coder", false, false, false, 160}
+            },
+            262144,
+            16384,
+            false,
+            "~150 tok/s"
+        },
+        {
+            "apisfreellm",
+            "APIsFreeLLM",
+            ProviderFormat::SCRAPER_APISFREELLM,
+            "https://api.apisfreellm.com/v1",
+            "free-ai",
+            {
+                {"free-ai", "Free-AI 9B Uncensored", "32k ctx 10,000 req/day zero-key fast stream", false, false, false, 155}
+            },
+            32768,
+            8192,
+            false,
+            "~155 tok/s"
         },
         {
             "ptero",
