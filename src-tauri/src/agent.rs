@@ -559,7 +559,7 @@ fn execute_inline_workspace_tools(
     let eff_root = resolve_workspace_root(workspace_root);
     for inv in invocations {
         let name = inv.name.trim().to_string();
-        let path_arg = inv.path;
+        let path_arg = inv.path.clone();
         let body = inv.body.trim();
 
         // Ignore literal syntax examples if a model ever echoes a template placeholder
