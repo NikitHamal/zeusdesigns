@@ -634,22 +634,59 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "zencloud", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "groqlpu", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+    } else if (["kilo", "nimcloud", "colibriqwen", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
-        zencloud: { baseUrl: "https://yash030-claude-code-proxy.hf.space", apiKey: "free", format: "anthropic" },
+        nimcloud: { baseUrl: "https://mmoranguito-openai-nim-proxy.hf.space/v1", apiKey: "free" },
+        colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free" },
+        gemma4vl: {
+          baseUrl: settings.modelId === "gemma-4-e2b-q6k-aggressive"
+            ? "https://titoo3-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1"
+            : settings.modelId === "gemma-4-e2b-qat-q4"
+            ? "https://hispa-nico-gemma4-e2b-qat.hf.space/v1"
+            : settings.modelId === "gemma-4-e2b-qat-mobile"
+            ? "https://elseodelasgalletas-gemma4-e2b-qat-mobile.hf.space/v1"
+            : settings.modelId === "gemma-4-e2b-it-fast"
+            ? "https://gefdsv-gemma-4-e2b-it.hf.space/v1"
+            : "https://will-resolute-gemma4-vision-ui.hf.space/v1",
+          apiKey: "",
+        },
+        phi4cloud: {
+          baseUrl: settings.modelId === "llama-3.1-8b-abliterated"
+            ? "https://fggaerg-llama-abliterated-api.hf.space/v1"
+            : settings.modelId === "llama-cpp-fast"
+            ? "https://deleriousson-llama-cpp.hf.space/v1"
+            : "https://5fp-phi-4-gguf.hf.space/v1",
+          apiKey: "",
+        },
+        llamacppcloud: {
+          baseUrl: settings.modelId === "lfm3-1.7b-gguf"
+            ? "https://ramedde-gemma4cpu.hf.space/v1"
+            : settings.modelId === "smolvlm-500m-instruct"
+            ? "https://aliroohan179-llama-server.hf.space/v1"
+            : settings.modelId === "lfm2.5-230m-instant"
+            ? "https://apathy-exe-lfm2-5-230m.hf.space/v1"
+            : "https://r1000th-llama-cpp.hf.space/v1",
+          apiKey: "",
+        },
+        ollamacloud: {
+          baseUrl: settings.modelId === "gemma:7b-instruct"
+            ? "https://qweret6565-ollama-server.hf.space/v1"
+            : settings.modelId === "qwen2.5:1.5b"
+            ? "https://gentle-tech-ollama-server.hf.space/v1"
+            : settings.modelId === "qwen-coder-0.5b"
+            ? "https://amarbruhman-ollama-server.hf.space/v1"
+            : settings.modelId === "moondream:latest"
+            ? "https://clarasu-ollama-server.hf.space/v1"
+            : "https://deepak7376-ollama-server.hf.space/v1",
+          apiKey: "",
+        },
         gemma4pro: {
-          baseUrl: settings.modelId === "gemma-4-12b-it"
-            ? "https://markpaulm-gemma-4-12b-abliterated.hf.space/v1"
-            : settings.modelId === "gemma-4-12b-coding"
-            ? "https://shanghsin-gemma-4-12b.hf.space/v1"
-            : settings.modelId === "gemma-4-e4b-ud-q5"
-            ? "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1"
-            : settings.modelId === "gemma-4-e4b-qat"
+          baseUrl: settings.modelId === "gemma-4-e4b-qat"
             ? "https://hispa-nico-gemma4-e2b.hf.space/v1"
             : settings.modelId === "gemma-4-ollama"
             ? "https://ismizo-gemma4.hf.space/v1"
-            : "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1",
+            : "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1",
           apiKey: "",
         },
         frontierlab: {
@@ -680,8 +717,6 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             : "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1",
           apiKey: "",
         },
-        claudebridge: { baseUrl: "https://hamdyahned-ree-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
-        groqlpu: { baseUrl: "https://squirrelcoagent-llama-api-server.hf.space/v1", apiKey: "free" },
         bonsaicloud: {
           baseUrl: settings.modelId === "bonsai-8b"
             ? "https://mikeee-bonsai-8b.hf.space/v1"
@@ -740,18 +775,36 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             : settings.modelId === "gemma-4-e4b-q5"
             ? "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf"
             : "/root/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf"
+          : settings.providerId === "gemma4vl"
+          ? settings.modelId === "gemma-4-e2b-q6k-aggressive"
+            ? "/app/Gemma-4-E2B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf"
+            : settings.modelId === "gemma-4-e2b-qat-q4"
+            ? "huihui-ai/Huihui-gemma-4-E2B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0"
+            : settings.modelId === "gemma-4-e2b-qat-mobile"
+            ? "unsloth/gemma-4-E2B-it-qat-mobile-GGUF:UD-Q2_K_XL"
+            : settings.modelId === "gemma-4-e2b-it-fast"
+            ? "model.gguf"
+            : "/models/gemma-4-E4B-it-Q4_K_M.gguf"
+          : settings.providerId === "phi4cloud"
+          ? settings.modelId === "llama-3.1-8b-abliterated"
+            ? "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"
+            : settings.modelId === "llama-cpp-fast"
+            ? "model.gguf"
+            : "/data/model.gguf"
+          : settings.providerId === "llamacppcloud"
+          ? settings.modelId === "lfm3-1.7b-gguf"
+            ? "ngquocvinh/LFM3-1.7B-GGUF"
+            : settings.modelId === "smolvlm-500m-instruct"
+            ? "/home/brewuser/.cache/llama.cpp/ggml-org_SmolVLM-500M-Instruct-GGUF_SmolVLM-500M-Instruct-Q8_0.gguf"
+            : settings.modelId === "lfm2.5-230m-instant"
+            ? "/model.gguf"
+            : "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"
           : settings.providerId === "gemma4pro"
-          ? settings.modelId === "gemma-4-12b-it"
-            ? "huihui-ai/Huihui-gemma-4-12B-it-abliterated"
-            : settings.modelId === "gemma-4-12b-coding"
-            ? "gemma4-coding-Q2_K.gguf"
-            : settings.modelId === "gemma-4-e4b-ud-q5"
-            ? "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf"
-            : settings.modelId === "gemma-4-e4b-qat"
+          ? settings.modelId === "gemma-4-e4b-qat"
             ? "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0"
             : settings.modelId === "gemma-4-ollama"
             ? "gemma4:latest"
-            : "huihui-ai/Huihui-gemma-4-31B-it-abliterated"
+            : "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf"
           : settings.providerId === "frontierlab"
           ? settings.modelId === "inkling-2-mini"
             ? "/root/.cache/huggingface/hub/models--unsloth--Inkling-2-Mini-GGUF/snapshots/45fd08764f2b0bf16b03a5483a80e5c7aaec8772/Inkling-2-Mini-UD-Q4_K_XL.gguf"
