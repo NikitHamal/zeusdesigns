@@ -437,6 +437,115 @@ pub fn catalog() -> Vec<ProviderInfo> {
             ],
         },
         ProviderInfo {
+            id: "together2api".to_string(),
+            name: "Together Frontier".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~145 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "glm-5.3".to_string(),
+                    label: "GLM 5.3".to_string(),
+                    note: Some("128k ctx · Z.ai flagship reasoning & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-5.3-flash".to_string(),
+                    label: "GLM 5.3 Flash".to_string(),
+                    note: Some("128k ctx · Z.ai 320B MoE fast reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "kimi-k3".to_string(),
+                    label: "Kimi K3 2.8T".to_string(),
+                    note: Some("128k ctx · Moonshot 2.8T MoE frontier coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "muse-glimmer-30b".to_string(),
+                    label: "Muse Glimmer 30B".to_string(),
+                    note: Some("128k ctx · Meta expressive UI & design reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-oss-120b".to_string(),
+                    label: "GPT-OSS 120B".to_string(),
+                    note: Some("128k ctx · OpenAI 120B open-weights reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-5.2".to_string(),
+                    label: "GLM 5.2".to_string(),
+                    note: Some("128k ctx · Z.ai multi-step reasoning coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen3.5-9b".to_string(),
+                    label: "Qwen 3.5 9B".to_string(),
+                    note: Some("128k ctx · Alibaba compact fast UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "aihorde".to_string(),
+            name: "AI Horde".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~95 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "Qwen/Qwen3.8-Flash-Next".to_string(),
+                    label: "Qwen 3.8 Flash Next".to_string(),
+                    note: Some("32k ctx · Alibaba Qwen 3.8 Flash distributed worker".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "koboldcpp/Qwen/Qwen3.8-27B".to_string(),
+                    label: "Qwen 3.8 27B".to_string(),
+                    note: Some("32k ctx · Alibaba 27B dense coding & UI worker".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "llamacpp/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive".to_string(),
+                    label: "Qwen 3.6 35B MoE".to_string(),
+                    note: Some("32k ctx · 35B A3B fast frontend coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "koboldcpp/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q2_K_P".to_string(),
+                    label: "Gemma 4 E4B".to_string(),
+                    note: Some("32k ctx · Google Gemma 4 compact UI generator".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "koboldcpp/Cydonia-24B-v4zg-Q4_K_M".to_string(),
+                    label: "Cydonia 24B".to_string(),
+                    note: Some("32k ctx · 24B creative & copywriting model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "koboldcpp/Llama-3.2-3B-Instruct".to_string(),
+                    label: "Llama 3.2 3B Instruct".to_string(),
+                    note: Some("32k ctx · Fast lightweight instruction model".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
             id: "apisfreellm".to_string(),
             name: "APIsFreeLLM".to_string(),
             kind: "keyless".to_string(),
@@ -3415,6 +3524,187 @@ where
     }
 }
 
+/// Stream from Together Frontier (`https://lolmaobruhhh-test.hf.space/v1/chat/completions`, zero-key GLM 5.3 / Kimi K3 / Muse Glimmer 30B / GPT-OSS 120B).
+pub fn stream_together2api<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "glm-5.3" | "glm-5.3-flash" | "kimi-k3" | "muse-glimmer-30b" | "gpt-oss-120b" | "glm-5.2" | "qwen3.5-9b" => model,
+        _ => "glm-5.3",
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(24000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 16384,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(180)?;
+    let resp = client
+        .post("https://lolmaobruhhh-test.hf.space/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Together Frontier request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Together Frontier HTTP {}", resp.status()));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut fallback_reason = String::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        if let Some(raw) = line.trim().strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                            fallback_reason.push_str(r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if text.contains("[proxy error:") {
+                                return Err("Together Frontier upstream model unavailable".to_string());
+                            }
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() {
+        on_delta(fallback_reason.trim());
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("Together Frontier stream ended without output".to_string())
+    }
+}
+
+/// Stream from AI Horde (`https://oai.aihorde.net/v1/chat/completions`, anonymous `0000000000` bearer distributed worker pool).
+pub fn stream_aihorde<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = if model.trim().is_empty() {
+        "Qwen/Qwen3.8-Flash-Next"
+    } else {
+        model
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(16000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let payload = json!({
+        "model": eff_model,
+        "max_tokens": 4096,
+        "messages": oai_msgs
+    });
+
+    let client = build_client(120)?;
+    let resp = client
+        .post("https://oai.aihorde.net/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer 0000000000")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("AI Horde request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("AI Horde HTTP {}", resp.status()));
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+
+    let data: Value = resp
+        .json()
+        .map_err(|e| format!("AI Horde JSON decode error: {}", e))?;
+    let text = data
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c0| c0.get("message"))
+        .and_then(|m| m.get("content"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("")
+        .trim();
+
+    if text.is_empty() {
+        return Err("AI Horde returned empty completion".to_string());
+    }
+    on_delta(text);
+    Ok(())
+}
+
 /// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).
 pub fn stream_yqcloud<F>(
     system: &str,
@@ -3764,6 +4054,10 @@ where
                         .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", &req.system, &req.messages, cancel, &mut on_delta))
                 }
             }),
+        "together2api" => stream_together2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta)),
+        "aihorde" => stream_aihorde(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta)),
         "apisfreellm" => stream_apisfreellm(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "ptero" => stream_ptero(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "unikey" => stream_unikey(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -3823,7 +4117,7 @@ where
     let fallbacks: &[&str] = if has_attachments {
         &["ptero", "kilo", "ovhcloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "blockrun", "ovhcloud", "unikey", "llm7", "pollinations", "apisfreellm", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "kilo", "blockrun", "ovhcloud", "together2api", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -3852,6 +4146,8 @@ where
                 cancel,
                 &mut on_delta,
             ).is_ok(),
+            "together2api" => stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "aihorde" => stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "apisfreellm" => stream_apisfreellm("free-ai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "ptero" => stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "unikey" => stream_unikey("moonshotai/kimi-k3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
