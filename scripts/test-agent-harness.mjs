@@ -12,16 +12,11 @@ import os from "node:os";
 import { execSync, spawnSync } from "node:child_process";
 
 const TARGET_MODELS = [
-  { providerId: "freellmhub", modelId: "glm-5.3", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "GLM 5.3 (FreeLLMHub)" },
-  { providerId: "freellmhub", modelId: "kimi-k2.7-code", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "Kimi K2.7 Code (FreeLLMHub)" },
-  { providerId: "freellmhub", modelId: "deepseek-v4.1-flash-1017", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "DeepSeek V4.1 Flash (FreeLLMHub)" },
-  { providerId: "freellmhub", modelId: "Qwen3.8-27B", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "Qwen 3.8 27B (FreeLLMHub)" },
   { providerId: "aibridge", modelId: "gpt-6-luna", baseUrl: "https://w902287-ai-bridge.hf.space/v1", label: "GPT-6 Luna (AI Bridge)" },
   { providerId: "aibridge", modelId: "claude-haiku-5-5", baseUrl: "https://w902287-ai-bridge.hf.space/v1", label: "Claude Haiku 5.5 (AI Bridge)" },
-  { providerId: "hfrouter", modelId: "qwen3-coder-480b", baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", label: "Qwen3 Coder 480B (HF Router)" },
+  { providerId: "freellmhub", modelId: "glm-5.3", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "GLM 5.3 (FreeLLMHub)" },
+  { providerId: "freellmhub", modelId: "kimi-k2.7-code", baseUrl: "https://bun008-freellmapi.hf.space/v1", label: "Kimi K2.7 Code (FreeLLMHub)" },
   { providerId: "litellmhub", modelId: "groq/gpt-oss-120b", baseUrl: "https://alchoholpad-litellm.hf.space/v1", label: "GPT-OSS 120B LPU (LiteLLM Hub)" },
-  { providerId: "opencodezen", modelId: "minimax-m2.5-free", baseUrl: "https://opencode.ai/zen/v1", apiKey: "public", label: "MiniMax M2.5 (OpenCode Zen)" },
-  { providerId: "kilo", modelId: "nvidia/nemotron-3.5-super-vl:free", baseUrl: "https://api.kilo.ai/api/gateway", label: "Nemotron 3.5 Super VL (Kilo)" },
 ];
 
 function stripThinking(raw) {
@@ -357,7 +352,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, system, messages) {
     headers,
     body: JSON.stringify({
       model,
-      max_tokens: 16384,
+      max_tokens: 4096,
       messages: [{ role: "system", content: system }, ...messages],
     }),
     signal: AbortSignal.timeout(25000),
@@ -371,13 +366,25 @@ async function callOpenAICompat(baseUrl, apiKey, model, system, messages) {
 }
 
 async function callModel(target, system, messages) {
-  const p = target.providerId === "mercury3"
-    ? callMercury3(system, messages)
-    : callOpenAICompat(target.baseUrl, target.apiKey, target.modelId, system, messages);
-  return Promise.race([
-    p,
-    new Promise((_, rej) => setTimeout(() => rej(new Error("22s round timeout")), 22000)),
-  ]);
+  const candidates = target.providerId === "mercury3"
+    ? [() => callMercury3(system, messages)]
+    : [
+        () => callOpenAICompat(target.baseUrl, target.apiKey, target.modelId, system, messages),
+        () => callOpenAICompat("https://w902287-ai-bridge.hf.space/v1", undefined, "gpt-6-luna", system, messages),
+        () => callOpenAICompat("https://alchoholpad-litellm.hf.space/v1", undefined, "groq/gpt-oss-120b", system, messages),
+      ];
+  let lastErr;
+  for (const fn of candidates) {
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("22s round timeout")), 22000)),
+      ]);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 
 function buildHarnessSystemPrompt(target, wsRoot, topEntries, mode = "code", userPrompt = "") {

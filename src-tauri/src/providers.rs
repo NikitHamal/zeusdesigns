@@ -6675,10 +6675,17 @@ where
 
     let client = build_client(timeout_secs)?;
     for &(endpoint, upstream_model) in targets {
+        let max_tok = if deep {
+            16384
+        } else if endpoint.contains("bun008-freellmapi") {
+            4096
+        } else {
+            8192
+        };
         let payload = json!({
             "model": upstream_model,
             "stream": true,
-            "max_tokens": if deep { 16384 } else { 8192 },
+            "max_tokens": max_tok,
             "messages": oai_msgs
         });
 
@@ -6785,12 +6792,14 @@ where
     F: FnMut(&str),
 {
     let requested = if model.trim().is_empty() { "glm-5.3" } else { model };
-    let targets: [(&str, &str); 5] = [
+    let targets: [(&str, &str); 7] = [
         ("https://bun008-freellmapi.hf.space/v1/chat/completions", requested),
         ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3"),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "kimi-k2.7-code"),
         ("https://bun008-freellmapi.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "kimi-k2.6"),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "gpt-oss-120b"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "claude-haiku-5-5"),
+        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/gpt-oss-120b"),
     ];
     stream_oai_targets_auth("FreeLLM Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
 }

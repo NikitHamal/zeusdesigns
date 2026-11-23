@@ -429,7 +429,57 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
-    // 3. Also support direct shorthand XML tags (`<bash>...</bash>`, `<python>...</python>`, `<memory_search>...</memory_search>`, etc.)
+    // 3. Support `<function name="..."><param name="path">...</param>...</function>` and `<invoke name="...">` XML formats
+    if list.is_empty() {
+        for (open_tag, close_tag) in [("<function", "</function>"), ("<invoke", "</invoke>")] {
+            let mut from = 0;
+            while let Some(rel_s) = clean_text[from..].find(open_tag) {
+                let start = from + rel_s;
+                let rest = &clean_text[start..];
+                let Some(gt) = rest.find('>') else { break };
+                let header = &rest[open_tag.len()..gt];
+                let Some(end_rel) = rest.find(close_tag) else { break };
+                let inner = rest[gt + 1..end_rel].trim();
+                from = start + end_rel + close_tag.len();
+                let name = extract_attr(header, "name").unwrap_or_default();
+                if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
+                    continue;
+                }
+                let mut path_arg = extract_attr(header, "path").unwrap_or_default();
+                let mut body_out = inner.to_string();
+                for ptag in ["param", "parameter"] {
+                    let p_open = format!("<{}", ptag);
+                    let p_close = format!("</{}>", ptag);
+                    let mut pfrom = 0;
+                    while let Some(ps) = inner[pfrom..].find(&p_open) {
+                        let pstart = pfrom + ps;
+                        let prest = &inner[pstart..];
+                        let Some(pgt) = prest.find('>') else { break };
+                        let phead = &prest[p_open.len()..pgt];
+                        let Some(pend) = prest.find(&p_close) else { break };
+                        let pval = prest[pgt + 1..pend].trim();
+                        let pname = extract_attr(phead, "name").unwrap_or_default();
+                        if matches!(pname.as_str(), "path" | "file" | "id" | "category") && path_arg.is_empty() {
+                            path_arg = pval.to_string();
+                        } else if matches!(pname.as_str(), "content" | "body" | "command" | "cmd" | "script" | "query" | "text") {
+                            body_out = pval.to_string();
+                        }
+                        pfrom = pstart + pend + p_close.len();
+                    }
+                }
+                list.push(InlineToolInvocation {
+                    name,
+                    path: path_arg,
+                    start_line: None,
+                    end_line: None,
+                    body: body_out,
+                    offset: start,
+                });
+            }
+        }
+    }
+
+    // 4. Also support direct shorthand XML tags (`<bash>...</bash>`, `<python>...</python>`, `<memory_search>...</memory_search>`, etc.)
     // when a model emits `<bash>` instead of `<zeus_tool name="bash">`
     if list.is_empty() {
         for tag_name in [
