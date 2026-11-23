@@ -68,8 +68,30 @@ export interface Message {
   at: number;
 }
 
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  root?: string;
+  tree?: FileNode[];
+  expanded?: boolean;
+  at: number;
+}
+
+export interface TerminalRun {
+  id: string;
+  projectId: string;
+  cmd: string;
+  cwd?: string;
+  stdout: string;
+  stderr: string;
+  code: number;
+  at: number;
+  running?: boolean;
+}
+
 export interface Conversation {
   id: string;
+  projectId?: string;
   title: string;
   messages: Message[];
   at: number;

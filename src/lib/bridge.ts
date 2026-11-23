@@ -134,6 +134,40 @@ export async function refreshTree(ws: Workspace): Promise<FileNode[]> {
   return dirHandle ? walk(dirHandle, "", 3) : ws.tree;
 }
 
+export async function openWorkspaceByPath(root: string, fallbackName?: string): Promise<Workspace | null> {
+  const trimmed = root.trim();
+  if (!trimmed) return null;
+  const name = fallbackName || trimmed.split(/[\\/]/).filter(Boolean).pop() || trimmed;
+  if (isNative) {
+    try {
+      const tree = await invoke<FileNode[]>("workspace_tree", { root: trimmed, depth: 3 });
+      await invoke("workspace_open", { path: trimmed }).catch(() => {});
+      return { name, root: trimmed, tree };
+    } catch {
+      return { name, root: trimmed, tree: [] };
+    }
+  }
+  return { name, root: trimmed, tree: [] };
+}
+
+export interface ShellResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+export const nativeShell = {
+  run: async (root: string | undefined, cmd: string): Promise<ShellResult> => {
+    const r = await tryInvoke<ShellResult>("shell_run", { root: root ?? "", cmd });
+    if (r) return r;
+    return {
+      code: 0,
+      stdout: `[browser preview] $ ${cmd}\nConnect in the native Windows app for live shell execution in ${root || "."}.`,
+      stderr: "",
+    };
+  },
+};
+
 /* ---------------- file downloads / clipboard ---------------- */
 export function download(name: string, content: string | Blob, mime = "text/plain") {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });

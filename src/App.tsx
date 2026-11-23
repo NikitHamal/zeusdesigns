@@ -18,6 +18,7 @@ export default function App() {
   const collapsed = useStore((s) => s.ui.chatCollapsed);
   const sidebarOpen = useStore((s) => s.ui.sidebarOpen);
   const showCanvas = useStore((s) => s.ui.showCanvas);
+  const leftTab = useStore((s) => s.ui.leftTab);
   const toast = useStore((s) => s.ui.toast);
   const hasMessages = useStore((s) => activeConv(s).messages.length > 0);
   const patchUI = useStore((s) => s.patchUI);
@@ -88,7 +89,7 @@ export default function App() {
             )}
             <div className="min-w-0 flex-1 p-2 pl-0">{m3eOpen ? <M3ePane /> : <CanvasPane />}</div>
           </>
-        ) : hasMessages ? (
+        ) : hasMessages || leftTab !== "chat" ? (
           <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full max-w-[860px]"><ChatPane /></div></div>
         ) : (
           <Home />

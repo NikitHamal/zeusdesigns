@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   Artboard, CanvasEl, MemoryCategory, Comment, Conversation, CustomProvider, Effort, McpServer, MemoryItem, Message, Page, Pin,
-  ShapeKind, Tool, ViewMode,
+  ProjectFolder, ShapeKind, TerminalRun, Tool, ViewMode,
 } from "./types";
 import { DEVICE_SIZE } from "./types";
 import { DESIGN_SYSTEMS, getDS } from "./lib/designSystems";
@@ -14,6 +14,8 @@ import type { Workspace } from "./lib/bridge";
 import type { UpdateInfo } from "./lib/updater";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
+
+export const DEFAULT_PROJECT_ID = "proj-default";
 
 export interface Settings {
   theme: "light" | "dark" | "system";
@@ -39,7 +41,7 @@ export interface Viewport { x: number; y: number; z: number }
 interface UI {
   settingsOpen: boolean;
   settingsTab: string;
-  leftTab: "chat" | "files";
+  leftTab: "chat" | "files" | "terminal";
   compare: string[] | null;
   interactId: string | null;
   editId: string | null;
@@ -58,6 +60,9 @@ interface UI {
 
 interface State {
   projectName: string;
+  projects: ProjectFolder[];
+  activeProjectId: string;
+  terminalHistory: TerminalRun[];
   pages: Page[];
   activePageId: string;
   artboards: Artboard[];
@@ -78,6 +83,14 @@ interface State {
   patchUI: (p: Partial<UI>) => void;
   notify: (m: string) => void;
   setProjectName: (n: string) => void;
+  addOrSelectProject: (ws: Workspace) => string;
+  setActiveProject: (projectId: string) => void;
+  toggleProjectExpanded: (projectId: string) => void;
+  renameProject: (projectId: string, name: string) => void;
+  removeProject: (projectId: string) => void;
+  addTerminalRun: (run: TerminalRun) => void;
+  patchTerminalRun: (id: string, p: Partial<TerminalRun>) => void;
+  clearTerminal: (projectId?: string) => void;
   setTool: (t: Tool) => void;
   setShape: (s: ShapeKind) => void;
   setView: (v: ViewMode) => void;
@@ -102,7 +115,7 @@ interface State {
   updatePin: (id: string, p: Partial<Pin>) => void;
   addComment: (pinId: string, c: Omit<Comment, "id" | "at">) => void;
   removePin: (id: string) => void;
-  newConversation: () => string;
+  newConversation: (projectId?: string) => string;
   setActiveConv: (id: string) => void;
   deleteConv: (id: string) => void;
   setTitle: (id: string, t: string) => void;
@@ -113,10 +126,29 @@ interface State {
   setBusy: (b: boolean) => void;
 }
 
-const firstConv = (): Conversation => ({ id: uid(), title: "New chat", messages: [], at: Date.now() });
-const conv0 = firstConv();
+const defaultProject: ProjectFolder = {
+  id: DEFAULT_PROJECT_ID,
+  name: "Workspace",
+  expanded: true,
+  at: Date.now(),
+};
+
+const firstConv = (projectId = DEFAULT_PROJECT_ID): Conversation => ({
+  id: uid(),
+  projectId,
+  title: "New chat",
+  messages: [],
+  at: Date.now(),
+});
+const conv0 = firstConv(DEFAULT_PROJECT_ID);
 const firstPage: Page = { id: "p1", name: "Page 1", convId: conv0.id };
 conv0.activePageId = firstPage.id;
+
+function projectToWorkspace(proj?: ProjectFolder): Workspace | null {
+  if (!proj) return null;
+  if (!proj.root && (!proj.tree || proj.tree.length === 0)) return null;
+  return { name: proj.name, root: proj.root, tree: proj.tree ?? [] };
+}
 
 // Debounced localStorage so drags / pans don't serialize the whole project every frame.
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -129,7 +161,10 @@ const debouncedStorage = createJSONStorage(() => ({
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
-      projectName: "Untitled project",
+      projectName: "Workspace",
+      projects: [defaultProject],
+      activeProjectId: defaultProject.id,
+      terminalHistory: [],
       pages: [firstPage],
       activePageId: firstPage.id,
       artboards: [],
@@ -170,12 +205,205 @@ export const useStore = create<State>()(
         }
         return { settings: nextSettings };
       }),
-      patchUI: (p) => set((s) => ({ ui: { ...s.ui, ...p } })),
+      patchUI: (p) => set((s) => {
+        const nextUi = { ...s.ui, ...p };
+        if (p.workspace !== undefined && p.workspace !== null) {
+          const ws = p.workspace;
+          const projects = s.projects.map((proj) =>
+            proj.id === s.activeProjectId
+              ? { ...proj, name: ws.name || proj.name, root: ws.root ?? proj.root, tree: ws.tree }
+              : proj
+          );
+          return { ui: nextUi, projects };
+        }
+        return { ui: nextUi };
+      }),
       notify: (m) => {
         set((s) => ({ ui: { ...s.ui, toast: m } }));
         setTimeout(() => set((s) => (s.ui.toast === m ? { ui: { ...s.ui, toast: null } } : s)), 2600);
       },
       setProjectName: (n) => set({ projectName: n }),
+
+      addOrSelectProject: (ws) => {
+        const s = get();
+        const normRoot = ws.root?.replace(/[\\/]+$/, "").toLowerCase();
+        const existing = s.projects.find((p) =>
+          normRoot ? p.root?.replace(/[\\/]+$/, "").toLowerCase() === normRoot : p.name.toLowerCase() === ws.name.toLowerCase() && !p.root
+        );
+        if (existing) {
+          const updatedProjects = s.projects.map((p) =>
+            p.id === existing.id ? { ...p, name: ws.name, root: ws.root ?? p.root, tree: ws.tree, expanded: true, at: Date.now() } : p
+          );
+          const projConvs = s.conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === existing.id);
+          if (projConvs.length > 0) {
+            const targetConv = projConvs.find((c) => c.id === s.activeConvId) ?? projConvs[0];
+            const nextPage = targetConv.activePageId ?? s.activePageId;
+            set({
+              projects: updatedProjects,
+              activeProjectId: existing.id,
+              projectName: existing.name,
+              activeConvId: targetConv.id,
+              activePageId: nextPage,
+              ui: { ...s.ui, workspace: ws },
+            });
+          } else {
+            const nc = firstConv(existing.id);
+            const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
+            nc.activePageId = np.id;
+            set({
+              projects: updatedProjects,
+              activeProjectId: existing.id,
+              projectName: existing.name,
+              conversations: [nc, ...s.conversations],
+              pages: [...s.pages, np],
+              activeConvId: nc.id,
+              activePageId: np.id,
+              ui: { ...s.ui, workspace: ws, showCanvas: false },
+            });
+          }
+          return existing.id;
+        }
+
+        // If the default project has no root path yet, bind this first local folder directly to it so current chats stay in it
+        const def = s.projects.find((p) => p.id === DEFAULT_PROJECT_ID && !p.root && s.projects.length === 1);
+        if (def) {
+          const updatedProjects = s.projects.map((p) =>
+            p.id === DEFAULT_PROJECT_ID ? { ...p, name: ws.name, root: ws.root, tree: ws.tree, expanded: true, at: Date.now() } : p
+          );
+          set({
+            projects: updatedProjects,
+            activeProjectId: DEFAULT_PROJECT_ID,
+            projectName: ws.name,
+            ui: { ...s.ui, workspace: ws },
+          });
+          return DEFAULT_PROJECT_ID;
+        }
+
+        const newProj: ProjectFolder = {
+          id: uid(),
+          name: ws.name,
+          root: ws.root,
+          tree: ws.tree,
+          expanded: true,
+          at: Date.now(),
+        };
+        const nc = firstConv(newProj.id);
+        const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
+        nc.activePageId = np.id;
+        set({
+          projects: [newProj, ...s.projects],
+          activeProjectId: newProj.id,
+          projectName: newProj.name,
+          conversations: [nc, ...s.conversations],
+          pages: [...s.pages, np],
+          activeConvId: nc.id,
+          activePageId: np.id,
+          sel: [],
+          ui: { ...s.ui, workspace: ws, showCanvas: false, editId: null, interactId: null, openPinId: null },
+        });
+        return newProj.id;
+      },
+
+      setActiveProject: (projectId) => set((s) => {
+        const proj = s.projects.find((p) => p.id === projectId);
+        if (!proj) return s;
+        const projects = s.projects.map((p) => (p.id === projectId ? { ...p, expanded: true } : p));
+        const projConvs = s.conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === projectId);
+        const ws = projectToWorkspace(proj);
+        if (projConvs.length > 0) {
+          const nextConv = projConvs.find((c) => c.id === s.activeConvId) ?? projConvs[0];
+          const mine = s.pages.filter((p) => p.convId === nextConv.id);
+          const nextPageId = (nextConv.activePageId && mine.some((p) => p.id === nextConv.activePageId))
+            ? nextConv.activePageId
+            : (mine[0]?.id ?? s.activePageId);
+          return {
+            projects,
+            activeProjectId: projectId,
+            projectName: proj.name,
+            activeConvId: nextConv.id,
+            activePageId: nextPageId,
+            sel: [],
+            ui: { ...s.ui, workspace: ws, showCanvas: convArtifactCount(s, nextConv.id) > 0, editId: null, interactId: null, openPinId: null },
+          };
+        }
+        const nc = firstConv(projectId);
+        const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
+        nc.activePageId = np.id;
+        return {
+          projects,
+          activeProjectId: projectId,
+          projectName: proj.name,
+          conversations: [nc, ...s.conversations],
+          pages: [...s.pages, np],
+          activeConvId: nc.id,
+          activePageId: np.id,
+          sel: [],
+          ui: { ...s.ui, workspace: ws, showCanvas: false, editId: null, interactId: null, openPinId: null },
+        };
+      }),
+
+      toggleProjectExpanded: (projectId) => set((s) => ({
+        projects: s.projects.map((p) => (p.id === projectId ? { ...p, expanded: !(p.expanded ?? true) } : p)),
+      })),
+
+      renameProject: (projectId, name) => set((s) => {
+        const trimmed = name.trim();
+        if (!trimmed) return s;
+        return {
+          projects: s.projects.map((p) => (p.id === projectId ? { ...p, name: trimmed } : p)),
+          projectName: s.activeProjectId === projectId ? trimmed : s.projectName,
+          ui: s.activeProjectId === projectId && s.ui.workspace ? { ...s.ui, workspace: { ...s.ui.workspace, name: trimmed } } : s.ui,
+        };
+      }),
+
+      removeProject: (projectId) => set((s) => {
+        let projects = s.projects.filter((p) => p.id !== projectId);
+        if (!projects.length) {
+          projects = [{ id: DEFAULT_PROJECT_ID, name: "Workspace", expanded: true, at: Date.now() }];
+        }
+        const deadConvIds = new Set(s.conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === projectId).map((c) => c.id));
+        const deadPageIds = new Set(s.pages.filter((p) => p.convId && deadConvIds.has(p.convId)).map((p) => p.id));
+        let conversations = s.conversations.filter((c) => !deadConvIds.has(c.id));
+        let pages = s.pages.filter((p) => !deadPageIds.has(p.id));
+        const nextProj = s.activeProjectId === projectId ? projects[0] : (projects.find((p) => p.id === s.activeProjectId) ?? projects[0]);
+        let nextProjConvs = conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === nextProj.id);
+        if (!nextProjConvs.length) {
+          const nc = firstConv(nextProj.id);
+          const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
+          nc.activePageId = np.id;
+          conversations = [nc, ...conversations];
+          pages = [...pages, np];
+          nextProjConvs = [nc];
+        }
+        const nextConv = nextProjConvs[0];
+        const nextPageId = nextConv.activePageId ?? pages[0]?.id ?? "p1";
+        return {
+          projects,
+          activeProjectId: nextProj.id,
+          projectName: nextProj.name,
+          conversations,
+          pages,
+          activeConvId: nextConv.id,
+          activePageId: nextPageId,
+          artboards: s.artboards.filter((a) => !deadPageIds.has(a.pageId)),
+          elements: s.elements.filter((e) => !deadPageIds.has(e.pageId)),
+          pins: s.pins.filter((p) => !deadPageIds.has(p.pageId)),
+          terminalHistory: s.terminalHistory.filter((t) => t.projectId !== projectId),
+          sel: [],
+          ui: { ...s.ui, workspace: projectToWorkspace(nextProj), showCanvas: false },
+        };
+      }),
+
+      addTerminalRun: (run) => set((s) => ({
+        terminalHistory: [...s.terminalHistory.slice(-49), run],
+      })),
+      patchTerminalRun: (id, p) => set((s) => ({
+        terminalHistory: s.terminalHistory.map((r) => (r.id === id ? { ...r, ...p } : r)),
+      })),
+      clearTerminal: (projectId) => set((s) => ({
+        terminalHistory: projectId ? s.terminalHistory.filter((r) => r.projectId !== projectId) : [],
+      })),
+
       setTool: (t) => set({ tool: t }),
       setShape: (s) => set({ shape: s, tool: "shape" }),
       setView: (v) => set({ view: v }),
@@ -292,22 +520,50 @@ export const useStore = create<State>()(
       })),
       removePin: (id) => set((s) => ({ pins: s.pins.filter((p) => p.id !== id), ui: { ...s.ui, openPinId: null } })),
 
-      newConversation: () => {
-        const c = firstConv();
+      newConversation: (projectId) => {
+        const s = get();
+        const targetProjId = projectId ?? s.activeProjectId ?? s.projects[0]?.id ?? DEFAULT_PROJECT_ID;
+        const proj = s.projects.find((p) => p.id === targetProjId) ?? s.projects[0];
+        // If there's already an empty untitled conversation in this project, reuse it
+        const existingEmpty = s.conversations.find(
+          (c) => (c.projectId ?? DEFAULT_PROJECT_ID) === targetProjId && c.messages.length === 0
+        );
+        if (existingEmpty) {
+          const mine = s.pages.filter((p) => p.convId === existingEmpty.id);
+          const pageId = existingEmpty.activePageId ?? mine[0]?.id ?? s.activePageId;
+          set({
+            activeProjectId: targetProjId,
+            projectName: proj?.name ?? s.projectName,
+            projects: s.projects.map((p) => (p.id === targetProjId ? { ...p, expanded: true } : p)),
+            activeConvId: existingEmpty.id,
+            activePageId: pageId,
+            sel: [],
+            ui: { ...s.ui, workspace: projectToWorkspace(proj), editId: null, interactId: null, openPinId: null, showCanvas: false, leftTab: "chat" },
+          });
+          return existingEmpty.id;
+        }
+        const c = firstConv(targetProjId);
         const p: Page = { id: uid(), name: "Page 1", convId: c.id };
         c.activePageId = p.id;
-        set((s) => ({
-          conversations: [c, ...s.conversations],
-          pages: [...s.pages, p],
+        set((st) => ({
+          activeProjectId: targetProjId,
+          projectName: proj?.name ?? st.projectName,
+          projects: st.projects.map((pr) => (pr.id === targetProjId ? { ...pr, expanded: true } : pr)),
+          conversations: [c, ...st.conversations],
+          pages: [...st.pages, p],
           activeConvId: c.id,
           activePageId: p.id,
           sel: [],
-          ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+          ui: { ...st.ui, workspace: projectToWorkspace(proj), editId: null, interactId: null, openPinId: null, showCanvas: false, leftTab: "chat" },
         }));
         return c.id;
       },
       setActiveConv: (id) => set((s) => {
         const targetConv = s.conversations.find((c) => c.id === id);
+        const targetProjId = targetConv?.projectId ?? s.activeProjectId ?? DEFAULT_PROJECT_ID;
+        const proj = s.projects.find((p) => p.id === targetProjId);
+        const ws = proj ? projectToWorkspace(proj) : s.ui.workspace;
+        const projects = s.projects.map((p) => (p.id === targetProjId ? { ...p, expanded: true } : p));
         let mine = s.pages.filter((p) => p.convId === id);
         if (!mine.length) {
           const legacy = s.pages.filter((p) => !p.convId);
@@ -316,12 +572,15 @@ export const useStore = create<State>()(
           } else {
             const np: Page = { id: uid(), name: "Page 1", convId: id };
             return {
+              projects,
+              activeProjectId: targetProjId,
+              projectName: proj?.name ?? s.projectName,
               activeConvId: id,
               pages: [...s.pages, np],
               activePageId: np.id,
-              conversations: s.conversations.map((c) => (c.id === id ? { ...c, activePageId: np.id } : c)),
+              conversations: s.conversations.map((c) => (c.id === id ? { ...c, activePageId: np.id, projectId: targetProjId } : c)),
               sel: [],
-              ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+              ui: { ...s.ui, workspace: ws, editId: null, interactId: null, openPinId: null },
             };
           }
         }
@@ -329,24 +588,32 @@ export const useStore = create<State>()(
           ? targetConv.activePageId
           : mine[0].id;
         return {
+          projects,
+          activeProjectId: targetProjId,
+          projectName: proj?.name ?? s.projectName,
           activeConvId: id,
           activePageId: nextPage,
           sel: [],
-          ui: { ...s.ui, editId: null, interactId: null, openPinId: null },
+          ui: { ...s.ui, workspace: ws, editId: null, interactId: null, openPinId: null },
         };
       }),
       deleteConv: (id) => set((s) => {
+        const targetConv = s.conversations.find((c) => c.id === id);
+        const targetProjId = targetConv?.projectId ?? s.activeProjectId ?? DEFAULT_PROJECT_ID;
         const deadPageIds = new Set(s.pages.filter((p) => p.convId === id).map((p) => p.id));
         let pages = s.pages.filter((p) => p.convId !== id);
         let conversations = s.conversations.filter((c) => c.id !== id);
-        if (!conversations.length) {
-          const nc = firstConv();
+        const sameProjConvs = conversations.filter((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === targetProjId);
+        if (!sameProjConvs.length) {
+          const nc = firstConv(targetProjId);
           const np: Page = { id: uid(), name: "Page 1", convId: nc.id };
           nc.activePageId = np.id;
-          conversations = [nc];
+          conversations = [nc, ...conversations];
           pages = [...pages, np];
         }
-        const nextConv = s.activeConvId === id ? conversations[0] : (conversations.find((c) => c.id === s.activeConvId) ?? conversations[0]);
+        const nextConv = s.activeConvId === id
+          ? (conversations.find((c) => (c.projectId ?? DEFAULT_PROJECT_ID) === targetProjId) ?? conversations[0])
+          : (conversations.find((c) => c.id === s.activeConvId) ?? conversations[0]);
         let nextPages = pages.filter((p) => p.convId === nextConv.id || !p.convId);
         if (!nextPages.length) {
           const np: Page = { id: uid(), name: "Page 1", convId: nextConv.id };
@@ -366,7 +633,7 @@ export const useStore = create<State>()(
         };
       }),
       setTitle: (id, t) => set((s) => ({ conversations: s.conversations.map((c) => (c.id === id ? { ...c, title: t, titled: true } : c)) })),
-      addMessage: (convId, m) => set((s) => ({ conversations: s.conversations.map((c) => (c.id === convId ? { ...c, messages: [...c.messages, m] } : c)) })),
+      addMessage: (convId, m) => set((s) => ({ conversations: s.conversations.map((c) => (c.id === convId ? { ...c, at: Date.now(), messages: [...c.messages, m] } : c)) })),
       patchMessage: (convId, id, p) => set((s) => ({
         conversations: s.conversations.map((c) => (c.id === convId ? { ...c, messages: c.messages.map((m) => (m.id === id ? { ...m, ...p } : m)) } : c)),
       })),
@@ -378,15 +645,25 @@ export const useStore = create<State>()(
       name: "zeusdesigns-v1",
       storage: debouncedStorage,
       partialize: (s) => ({
-        projectName: s.projectName, pages: s.pages, activePageId: s.activePageId, artboards: s.artboards.map((a) => ({ ...a, loading: false })),
-        elements: s.elements, pins: s.pins,
+        projectName: s.projectName,
+        projects: s.projects,
+        activeProjectId: s.activeProjectId,
+        terminalHistory: s.terminalHistory.map((t) => ({ ...t, running: false })).slice(-30),
+        pages: s.pages,
+        activePageId: s.activePageId,
+        artboards: s.artboards.map((a) => ({ ...a, loading: false })),
+        elements: s.elements,
+        pins: s.pins,
         conversations: s.conversations.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m, streaming: false })) })),
-        activeConvId: s.activeConvId, viewport: s.viewport, view: s.view, settings: s.settings,
+        activeConvId: s.activeConvId,
+        viewport: s.viewport,
+        view: s.view,
+        settings: s.settings,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const settings = { ...current.settings, ...(p.settings ?? {}) };
-        if (settings.hue === 258 || settings.hue === 216 || !Number.isFinite(settings.hue)) settings.hue = 17; // retired blue/violet seeds
+        if (settings.hue === 258 || settings.hue === 216 || !Number.isFinite(settings.hue)) settings.hue = 17;
         if (!settings.providerId.startsWith("custom:")) {
           const deadProviders = new Set(["zencloud", "claudebridge", "groqlpu"]);
           if (deadProviders.has(settings.providerId)) {
@@ -409,13 +686,32 @@ export const useStore = create<State>()(
               history: Array.isArray(a.history) ? a.history.slice(-6).map(cleanSavedHtml) : [],
             }))
           : current.artboards;
-        return { ...current, ...p, artboards, settings };
+        const projects: ProjectFolder[] = Array.isArray(p.projects) && p.projects.length > 0
+          ? p.projects
+          : [{ id: DEFAULT_PROJECT_ID, name: p.projectName || "Workspace", expanded: true, at: Date.now() }];
+        const activeProjectId = p.activeProjectId && projects.some((pr) => pr.id === p.activeProjectId)
+          ? p.activeProjectId
+          : projects[0].id;
+        const fallbackProjId = projects[0].id;
+        const conversations = Array.isArray(p.conversations) && p.conversations.length > 0
+          ? p.conversations.map((c) => ({
+              ...c,
+              projectId: c.projectId && projects.some((pr) => pr.id === c.projectId) ? c.projectId : fallbackProjId,
+            }))
+          : current.conversations;
+        const activeProj = projects.find((pr) => pr.id === activeProjectId) ?? projects[0];
+        const ui = {
+          ...current.ui,
+          workspace: projectToWorkspace(activeProj),
+        };
+        return { ...current, ...p, projects, activeProjectId, conversations, artboards, settings, ui };
       },
     },
   ),
 );
 
 export const activeConv = (s: State) => s.conversations.find((c) => c.id === s.activeConvId) ?? s.conversations[0];
+export const activeProject = (s: State) => s.projects.find((p) => p.id === s.activeProjectId) ?? s.projects[0];
 export { DESIGN_SYSTEMS };
 
 /** Artifacts (canvas screens) that belong to a conversation. */

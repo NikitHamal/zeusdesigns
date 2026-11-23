@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { activeConv, convArtifactCount, useStore } from "../store";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { activeConv, activeProject, convArtifactCount, uid, useStore } from "../store";
 import type { Attachment, FileNode, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
@@ -7,7 +7,15 @@ import { supportsAttachments } from "../lib/providers";
 import { ModelPicker } from "./ModelPicker";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
-import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
+import {
+  nativeMemory,
+  nativeShell,
+  openWorkspace,
+  openWorkspaceByPath,
+  readWorkspaceFile,
+  refreshTree,
+  writeWorkspaceFile,
+} from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
@@ -54,7 +62,7 @@ function M3eCard({ doc, id, streaming }: { doc: M3eDoc; id: string; streaming?: 
       if (live.current && !m3eOpened.has(id)) { m3eOpened.add(id); patchUI({ m3e: { title: doc.title, link }, showCanvas: false }); }
     }).catch((e: unknown) => !dead && setState({ error: e instanceof Error ? e.message : "Invalid sketch" }));
     return () => { dead = true; };
-  }, [doc.json, doc.complete, streaming, id]);
+  }, [doc.json, doc.complete, streaming, id, patchUI]);
   const busy = !state.link && !state.error;
   return (
     <button
@@ -199,7 +207,6 @@ function fmtTok(n: number): string {
 }
 
 function ContextWindowPill() {
-  // Subscribe to store slices that affect context window calculation
   useStore((s) => s.activeConvId);
   useStore((s) => s.conversations);
   useStore((s) => s.artboards);
@@ -220,7 +227,7 @@ function ContextWindowPill() {
           open && "bg-surface-high text-on-surface"
         )}
       >
-        <span className="h-1.5 w-8 overflow-hidden rounded-full bg-surface-highest">
+        <span className="h-1.5 w-7 overflow-hidden rounded-full bg-surface-highest">
           <i
             style={{ width: `${Math.max(8, stats.percentOfBudget)}%` }}
             className={cn("block h-full rounded-full transition-all", stats.needsCompaction ? "bg-error" : "bg-primary")}
@@ -257,7 +264,7 @@ function ContextWindowPill() {
               <span className="font-mono text-on-surface">{fmtTok(stats.historyTokens)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Memory & Studio MCP</span>
+              <span>Memory Index & Studio MCP</span>
               <span className="font-mono text-on-surface">{fmtTok(stats.memoryTokens)}</span>
             </div>
           </div>
@@ -273,7 +280,7 @@ function ContextWindowPill() {
                 await compactConversation({ manual: true });
                 close();
               }}
-              className="state flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 font-semibold text-on-primary disabled: bg-surface-high disabled:text-on-surface-variant/50"
+              className="state flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 font-semibold text-on-primary disabled:bg-surface-high disabled:text-on-surface-variant/50"
             >
               <Icon name="inventory_2" size={14} />
               Compact Context (/compact)
@@ -326,7 +333,7 @@ const normalizeImageDataUrl = (rawUrl: string, mime: string): Promise<string> =>
 const readFile = (f: File): Promise<Attachment> => new Promise((res) => {
   const r = new FileReader();
   const isImg = f.type.startsWith("image/") || IMAGE_EXT.test(f.name);
-  const inferredMime = f.type || ( isImg ? "image/png" : "text/plain" );
+  const inferredMime = f.type || (isImg ? "image/png" : "text/plain");
   const base = { id: Math.random().toString(36).slice(2), name: f.name || "image.png", mime: inferredMime, size: f.size };
   if (isImg) {
     r.onload = async () => {
@@ -367,11 +374,10 @@ export function Composer({ hero }: { hero?: boolean }) {
   }, [canAttach, atts.length]);
 
   useEffect(() => {
-    if (!hero) return;
     const f = (e: Event) => { setText((e as CustomEvent<string>).detail); ta.current?.focus(); };
     window.addEventListener("zeus:prefill", f);
     return () => window.removeEventListener("zeus:prefill", f);
-  }, [hero]);
+  }, []);
   useEffect(() => {
     const h = (e: Event) => { setQuote((e as CustomEvent<Quote>).detail); ta.current?.focus(); };
     window.addEventListener("zeus:quote", h);
@@ -379,12 +385,13 @@ export function Composer({ hero }: { hero?: boolean }) {
   }, []);
   useEffect(() => {
     const h = (e: Event) => {
+      const detail = (e as CustomEvent<Attachment>).detail;
       const st = useStore.getState();
-      if (!supportsAttachments(st.settings.providerId, st.settings.modelId)) {
-        st.notify("Select a vision-capable model (Kilo, Qwen, or Ptero) to attach images or files");
+      if (detail.dataUrl && !supportsAttachments(st.settings.providerId, st.settings.modelId)) {
+        st.notify("Select a vision-capable model (Kilo, Qwen, or Ptero) to attach images");
         return;
       }
-      setAtts((a) => [...a, (e as CustomEvent<Attachment>).detail]);
+      setAtts((a) => [...a, detail]);
     };
     window.addEventListener("zeus:attach", h);
     return () => window.removeEventListener("zeus:attach", h);
@@ -406,7 +413,7 @@ export function Composer({ hero }: { hero?: boolean }) {
     if (busy || !text.trim()) return;
     if (hero) useStore.getState().patchUI({ showCanvas: false });
     const q = quote ?? (selected ? ({ kind: "artboard", artboardId: selected.id, label: selected.name } as Quote) : undefined);
-    sendMessage({ text, attachments: canAttach ? atts : [], quote: q });
+    sendMessage({ text, attachments: atts, quote: q });
     setText(""); setAtts([]); setQuote(null);
   };
 
@@ -427,7 +434,7 @@ export function Composer({ hero }: { hero?: boolean }) {
             </div>
           </div>
         )}
-        {canAttach && atts.length > 0 && (
+        {atts.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
             {atts.map((a) => (
               <span key={a.id} className="anim-pop flex items-center gap-1.5 rounded-full bg-surface-high py-1 pl-2.5 pr-1 text-xs font-medium">
@@ -442,7 +449,7 @@ export function Composer({ hero }: { hero?: boolean }) {
           ref={ta} value={text} rows={1} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
           onPaste={(e) => { const f = Array.from(e.clipboardData.files); if (f.length) { e.preventDefault(); addFiles(f); } }}
-          placeholder={hero ? "How can I help you design today?" : selected ? `Reply about “${selected.name}”` : "Reply"}
+          placeholder={hero ? "Ask Zeus to build, debug, refactor, or design in your project…" : selected ? `Reply about “${selected.name}”` : "Reply or ask Zeus to edit code, run bash/python, or design…"}
           className={hero ? "block max-h-[260px] min-h-[84px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-[16px] text-on-surface outline-none placeholder:text-on-surface-variant/60" : "block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60"}
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pb-2">
@@ -454,7 +461,7 @@ export function Composer({ hero }: { hero?: boolean }) {
                   <>
                     <MenuItem icon={<Icon name="image" size={16} />} label="Add reference screenshot" onClick={() => { fileRef.current?.click(); close(); }} />
                     <MenuItem icon={<Icon name="attach_file" size={16} />} label="Attach files" onClick={() => { fileRef.current?.click(); close(); }} />
-                    <MenuItem icon={<Icon name="folder_open" size={16} />} label={ws ? `Project: ${ws.name}` : "Open project folder…"} onClick={() => { patchUI({ leftTab: "files" }); close(); if (!ws) openWorkspace().then((w) => w && patchUI({ workspace: w })).catch((e) => useStore.getState().notify(e.message)); }} />
+                    <MenuItem icon={<Icon name="folder_open" size={16} />} label={ws ? `Project: ${ws.name}` : "Open project folder…"} onClick={() => { patchUI({ leftTab: "files" }); close(); if (!ws) openWorkspace().then((w) => w && useStore.getState().addOrSelectProject(w)).catch((e) => useStore.getState().notify(e.message)); }} />
                   </>
                 )}
               </Dropdown>
@@ -489,56 +496,471 @@ export function Composer({ hero }: { hero?: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Files (workspace) panel                                             */
+/* Files (workspace explorer + inline code viewer & editor)            */
 /* ------------------------------------------------------------------ */
-function Tree({ nodes, depth = 0, onPick }: { nodes: FileNode[]; depth?: number; onPick: (n: FileNode) => void }) {
+function filterTree(nodes: FileNode[], q: string): FileNode[] {
+  if (!q.trim()) return nodes;
+  const k = q.trim().toLowerCase();
+  const out: FileNode[] = [];
+  for (const n of nodes) {
+    if (n.dir) {
+      const children = filterTree(n.children ?? [], k);
+      if (children.length > 0 || n.name.toLowerCase().includes(k)) {
+        out.push({ ...n, children });
+      }
+    } else if (n.name.toLowerCase().includes(k) || n.path.toLowerCase().includes(k)) {
+      out.push(n);
+    }
+  }
+  return out;
+}
+
+function Tree({
+  nodes,
+  depth = 0,
+  selectedPath,
+  forceOpen,
+  onPick,
+}: {
+  nodes: FileNode[];
+  depth?: number;
+  selectedPath?: string;
+  forceOpen?: boolean;
+  onPick: (n: FileNode) => void;
+}) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
     <div>
-      {nodes.map((n) => (
-        <div key={n.path}>
-          <button
-            onClick={() => (n.dir ? setOpen((o) => ({ ...o, [n.path]: !o[n.path] })) : onPick(n))}
-            className="state flex w-full items-center gap-2 rounded-xl py-1.5 pr-2 text-left text-[13px] text-on-surface"
-            style={{ paddingLeft: 8 + depth * 14 }}
-          >
-            {n.dir ? <Icon name="folder" size={15} className="shrink-0 text-primary" /> : <Icon name="description" size={15} className="shrink-0 text-on-surface-variant" />}
-            <span className="truncate">{n.name}</span>
-          </button>
-          {n.dir && open[n.path] && n.children && <Tree nodes={n.children} depth={depth + 1} onPick={onPick} />}
-        </div>
-      ))}
+      {nodes.map((n) => {
+        const isOpen = forceOpen || open[n.path];
+        const isSel = selectedPath === n.path;
+        return (
+          <div key={n.path}>
+            <button
+              onClick={() => (n.dir ? setOpen((o) => ({ ...o, [n.path]: !o[n.path] })) : onPick(n))}
+              className={cn(
+                "state flex w-full items-center gap-2 rounded-lg py-1.5 pr-2 text-left text-[12.5px] text-on-surface",
+                isSel && "bg-primary-container/50 font-medium text-on-primary-container"
+              )}
+              style={{ paddingLeft: 8 + depth * 13 }}
+            >
+              {n.dir ? (
+                <Icon name={isOpen ? "folder_open" : "folder"} size={15} className="shrink-0 text-primary" />
+              ) : (
+                <Icon name="code" size={14} className="shrink-0 text-on-surface-variant" />
+              )}
+              <span className="truncate">{n.name}</span>
+            </button>
+            {n.dir && isOpen && n.children && (
+              <Tree nodes={n.children} depth={depth + 1} selectedPath={selectedPath} forceOpen={forceOpen} onPick={onPick} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function FilesPanel() {
   const ws = useStore((s) => s.ui.workspace);
+  const curProject = useStore(activeProject);
   const patchUI = useStore((s) => s.patchUI);
   const notify = useStore((s) => s.notify);
-  const open = () => openWorkspace().then((w) => w && patchUI({ workspace: w })).catch((e) => notify(e.message));
+  const addOrSelectProject = useStore((s) => s.addOrSelectProject);
+  const [q, setQ] = useState("");
+  const [activeFile, setActiveFile] = useState<{ path: string; content: string; dirty: boolean } | null>(null);
+  const [creatingFile, setCreatingFile] = useState(false);
+  const [newFilePath, setNewFilePath] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const openFolder = () =>
+    openWorkspace()
+      .then((w) => {
+        if (w) {
+          addOrSelectProject(w);
+          setActiveFile(null);
+          notify(`Opened ${w.name}`);
+        }
+      })
+      .catch((e) => notify(e.message));
+
+  const reloadTree = async () => {
+    if (!ws) return;
+    const tree = await refreshTree(ws);
+    patchUI({ workspace: { ...ws, tree } });
+    notify("Refreshed file tree");
+  };
+
+  const openFile = async (path: string) => {
+    if (!ws) return;
+    try {
+      const content = await readWorkspaceFile(ws, path);
+      setActiveFile({ path, content, dirty: false });
+    } catch {
+      notify(`Could not read ${path}`);
+    }
+  };
+
+  const saveActiveFile = async () => {
+    if (!ws || !activeFile) return;
+    setSaving(true);
+    try {
+      await writeWorkspaceFile(ws, activeFile.path, activeFile.content);
+      const tree = await refreshTree(ws);
+      patchUI({ workspace: { ...ws, tree } });
+      setActiveFile({ ...activeFile, dirty: false });
+      notify(`Saved ${activeFile.path}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to save file");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createNewFile = async () => {
+    const p = newFilePath.trim().replace(/^[\\/]+/, "");
+    if (!ws || !p) return;
+    try {
+      await writeWorkspaceFile(ws, p, "");
+      const tree = await refreshTree(ws);
+      patchUI({ workspace: { ...ws, tree } });
+      setCreatingFile(false);
+      setNewFilePath("");
+      setActiveFile({ path: p, content: "", dirty: false });
+      notify(`Created ${p}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to create file");
+    }
+  };
+
+  const filteredTree = useMemo(() => (ws ? filterTree(ws.tree, q) : []), [ws, q]);
+
   if (!ws) {
     return (
-      <div className="grid flex-1 place-items-center p-8 text-center">
-        <button onClick={open} className="state morph inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 font-medium text-on-primary"><Icon name="folder_open" size={20} /> Open folder</button>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="grid size-12 place-items-center rounded-2xl bg-surface-container text-primary">
+          <Icon name="folder_open" size={24} />
+        </div>
+        <div className="text-base font-semibold text-on-surface">
+          {curProject?.name ? `Bind a local folder to “${curProject.name}”` : "Open a local project folder"}
+        </div>
+        <button onClick={openFolder} className="state morph inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-on-primary">
+          <Icon name="folder_open" size={18} /> Pick project folder
+        </button>
       </div>
     );
   }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 px-4 py-2">
-        <Icon name="folder_open" size={18} className="text-primary" /><span className="flex-1 truncate text-sm font-medium">{ws.name}</span>
-        <IconBtn label="Open another folder" size={32} onClick={open}><Icon name="add" size={18} /></IconBtn>
-        <IconBtn label="Disconnect" size={32} onClick={() => patchUI({ workspace: null })}><Icon name="close" size={18} /></IconBtn>
+      <div className="flex items-center gap-1.5 border-b border-outline-variant/60 px-3 py-2">
+        <Icon name="folder_open" size={17} className="shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-semibold text-on-surface">{ws.name}</div>
+          {ws.root && <div className="truncate font-mono text-[10.5px] text-on-surface-variant">{ws.root}</div>}
+        </div>
+        <IconBtn label="New file" size={28} onClick={() => setCreatingFile(!creatingFile)}><Icon name="add" size={16} /></IconBtn>
+        <IconBtn label="Refresh files" size={28} onClick={reloadTree}><Icon name="refresh" size={15} /></IconBtn>
+        <IconBtn label="Open another folder" size={28} onClick={openFolder}><Icon name="create_new_folder" size={15} /></IconBtn>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-        <Tree nodes={ws.tree} onPick={async (n) => {
-          try {
-            const text = await readWorkspaceFile(ws, n.path);
-            window.dispatchEvent(new CustomEvent("zeus:attach", { detail: { id: n.path, name: n.path, mime: "text/plain", size: text.length, text } }));
-            patchUI({ leftTab: "chat" }); notify(`Attached ${n.name}`);
-          } catch { notify("Can't read that file"); }
-        }} />
+
+      {creatingFile && (
+        <div className="flex items-center gap-1.5 border-b border-outline-variant/60 bg-surface-low px-3 py-2">
+          <input
+            autoFocus
+            value={newFilePath}
+            onChange={(e) => setNewFilePath(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void createNewFile();
+              if (e.key === "Escape") setCreatingFile(false);
+            }}
+            placeholder="path/to/file.ts"
+            className="h-8 flex-1 rounded-lg border border-outline-variant bg-surface px-2.5 font-mono text-xs outline-none focus:border-primary"
+          />
+          <button onClick={createNewFile} className="state h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-on-primary">Create</button>
+        </div>
+      )}
+
+      <div className="border-b border-outline-variant/50 px-3 py-1.5">
+        <div className="relative flex items-center">
+          <Icon name="search" size={14} className="absolute left-2.5 text-on-surface-variant" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Filter files…"
+            className="h-7.5 w-full rounded-lg bg-surface-container pl-8 pr-2.5 text-xs outline-none placeholder:text-on-surface-variant/60"
+          />
+        </div>
+      </div>
+
+      {activeFile ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex items-center gap-1.5 border-b border-outline-variant/60 bg-surface-low px-3 py-1.5">
+            <button
+              onClick={() => setActiveFile(null)}
+              className="state inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-on-surface-variant hover:text-on-surface"
+            >
+              <Icon name="arrow_back" size={14} />
+              Tree
+            </button>
+            <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium text-on-surface">
+              {activeFile.path}
+              {activeFile.dirty ? " *" : ""}
+            </span>
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("zeus:attach", {
+                    detail: {
+                      id: activeFile.path,
+                      name: activeFile.path,
+                      mime: "text/plain",
+                      size: activeFile.content.length,
+                      text: activeFile.content,
+                    },
+                  })
+                );
+                patchUI({ leftTab: "chat" });
+                notify(`Attached ${activeFile.path}`);
+              }}
+              className="state h-7 rounded-lg bg-surface-high px-2.5 text-[11.5px] font-medium text-on-surface"
+            >
+              Attach to chat
+            </button>
+            <button
+              disabled={!activeFile.dirty || saving}
+              onClick={saveActiveFile}
+              className="state inline-flex h-7 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11.5px] font-semibold text-on-primary disabled:opacity-40"
+            >
+              <Icon name="save" size={13} />
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+          <textarea
+            value={activeFile.content}
+            spellCheck={false}
+            onChange={(e) => setActiveFile({ ...activeFile, content: e.target.value, dirty: true })}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+                e.preventDefault();
+                void saveActiveFile();
+              }
+            }}
+            className="min-h-0 flex-1 resize-none bg-surface-dim p-3 font-mono text-[12px] leading-relaxed text-on-surface outline-none"
+          />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
+          {filteredTree.length === 0 ? (
+            <div className="py-10 text-center text-xs text-on-surface-variant">No matching files</div>
+          ) : (
+            <Tree
+              nodes={filteredTree}
+              forceOpen={Boolean(q.trim())}
+              onPick={(n) => void openFile(n.path)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Interactive Project Terminal Panel                                  */
+/* ------------------------------------------------------------------ */
+const QUICK_COMMANDS = [
+  "git status -sb",
+  "npm test",
+  "npm run build",
+  "python3 --version",
+];
+
+export function TerminalPanel() {
+  const curProject = useStore(activeProject);
+  const ws = useStore((s) => s.ui.workspace);
+  const allRuns = useStore((s) => s.terminalHistory);
+  const { addTerminalRun, patchTerminalRun, clearTerminal, patchUI, notify } = useStore.getState();
+  const [cmd, setCmd] = useState("");
+  const [histIdx, setHistIdx] = useState(-1);
+  const [running, setRunning] = useState(false);
+  const outRef = useRef<HTMLDivElement>(null);
+
+  const projId = curProject?.id ?? "proj-default";
+  const cwd = ws?.root ?? curProject?.root ?? "";
+  const runs = useMemo(() => allRuns.filter((r) => r.projectId === projId), [allRuns, projId]);
+
+  useEffect(() => {
+    if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight;
+  }, [runs.length, running]);
+
+  const execCommand = async (commandToRun?: string) => {
+    const line = (commandToRun ?? cmd).trim();
+    if (!line || running) return;
+    if (!commandToRun) setCmd("");
+    setHistIdx(-1);
+    const id = uid();
+    setRunning(true);
+    addTerminalRun({
+      id,
+      projectId: projId,
+      cmd: line,
+      cwd: cwd || ".",
+      stdout: "",
+      stderr: "",
+      code: 0,
+      at: Date.now(),
+      running: true,
+    });
+    try {
+      const res = await nativeShell.run(cwd, line);
+      patchTerminalRun(id, {
+        stdout: res.stdout,
+        stderr: res.stderr,
+        code: res.code,
+        running: false,
+      });
+      if (ws) {
+        refreshTree(ws).then((tree) => patchUI({ workspace: { ...ws, tree } })).catch(() => {});
+      }
+    } catch (e) {
+      patchTerminalRun(id, {
+        stderr: e instanceof Error ? e.message : String(e),
+        code: 1,
+        running: false,
+      });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const sendOutputToChat = (r: { cmd: string; stdout: string; stderr: string; code: number }) => {
+    const out = [r.stdout.trim(), r.stderr.trim()].filter(Boolean).join("\n").slice(0, 8000);
+    const snippet = `Terminal command \`${r.cmd}\` (exit ${r.code}):\n\`\`\`\n${out || "(no output)"}\n\`\`\`\n`;
+    patchUI({ leftTab: "chat" });
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: snippet }));
+    }, 30);
+    notify("Sent terminal output to chat composer");
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-dim">
+      <div className="flex items-center justify-between gap-2 border-b border-outline-variant/60 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Icon name="terminal" size={16} className="shrink-0 text-primary" />
+          <span className="truncate font-mono text-xs font-medium text-on-surface">
+            {curProject?.name ?? "Workspace"}
+          </span>
+          {cwd && <span className="truncate font-mono text-[10.5px] text-on-surface-variant">· {cwd}</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {runs.length > 0 && (
+            <IconBtn label="Clear terminal" size={28} onClick={() => clearTerminal(projId)}>
+              <Icon name="delete_sweep" size={15} />
+            </IconBtn>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 border-b border-outline-variant/40 px-3 py-1.5">
+        {QUICK_COMMANDS.map((qCmd) => (
+          <button
+            key={qCmd}
+            disabled={running}
+            onClick={() => void execCommand(qCmd)}
+            className="state rounded-md bg-surface-container px-2 py-0.5 font-mono text-[11px] text-on-surface-variant hover:text-on-surface disabled:opacity-50"
+          >
+            $ {qCmd}
+          </button>
+        ))}
+      </div>
+
+      <div ref={outRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3 font-mono text-[12px]">
+        {runs.length === 0 && (
+          <div className="py-8 text-center font-sans text-xs text-on-surface-variant">
+            Run bash, git, test, or python commands in <span className="font-mono text-on-surface">{cwd || "."}</span>
+          </div>
+        )}
+        {runs.map((r) => (
+          <div key={r.id} className="rounded-xl border border-outline-variant/50 bg-surface-container p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="text-primary">$</span>
+                <span className="truncate font-semibold text-on-surface">{r.cmd}</span>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {r.running ? (
+                  <span className="zshine text-[11px]">Running…</span>
+                ) : (
+                  <>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                        r.code === 0 ? "bg-surface-high text-on-surface-variant" : "bg-error-container text-on-error-container"
+                      )}
+                    >
+                      exit {r.code}
+                    </span>
+                    <button
+                      onClick={() => sendOutputToChat(r)}
+                      title="Send output to chat"
+                      className="state rounded bg-surface-high px-1.5 py-0.5 font-sans text-[10.5px] font-medium text-on-surface"
+                    >
+                      Ask Zeus
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {(r.stdout || r.stderr) && (
+              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words border-t border-outline-variant/40 pt-2 text-[11.5px] leading-relaxed text-on-surface-variant select-text">
+                {r.stdout}
+                {r.stderr ? (r.stdout ? `\n${r.stderr}` : r.stderr) : ""}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-outline-variant/60 bg-surface p-2">
+        <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3 py-1.5 focus-within:border-primary">
+          <span className="font-mono text-xs font-bold text-primary">$</span>
+          <input
+            value={cmd}
+            onChange={(e) => setCmd(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void execCommand();
+              } else if (e.key === "ArrowUp" && runs.length > 0) {
+                e.preventDefault();
+                const nextIdx = histIdx < 0 ? runs.length - 1 : Math.max(0, histIdx - 1);
+                setHistIdx(nextIdx);
+                setCmd(runs[nextIdx].cmd);
+              } else if (e.key === "ArrowDown" && histIdx >= 0) {
+                e.preventDefault();
+                const nextIdx = histIdx + 1;
+                if (nextIdx >= runs.length) {
+                  setHistIdx(-1);
+                  setCmd("");
+                } else {
+                  setHistIdx(nextIdx);
+                  setCmd(runs[nextIdx].cmd);
+                }
+              }
+            }}
+            placeholder={`Run command in ${curProject?.name ?? "project"}…`}
+            className="h-7 flex-1 bg-transparent font-mono text-xs text-on-surface outline-none placeholder:text-on-surface-variant/60"
+          />
+          <button
+            disabled={!cmd.trim() || running}
+            onClick={() => void execCommand()}
+            className="state grid size-7 place-items-center rounded-lg bg-primary text-on-primary disabled:opacity-40"
+          >
+            <Icon name="play_arrow" size={15} fill />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -549,6 +971,8 @@ export function FilesPanel() {
 /* ------------------------------------------------------------------ */
 export function ChatPane() {
   const conv = useStore(activeConv);
+  const curProject = useStore(activeProject);
+  const projects = useStore((s) => s.projects);
   const leftTab = useStore((s) => s.ui.leftTab);
   const patchUI = useStore((s) => s.patchUI);
   const setTitle = useStore((s) => s.setTitle);
@@ -564,36 +988,126 @@ export function ChatPane() {
     if (stick.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [conv.messages.length, last?.text, last?.artboardIds?.length]);
 
+  const switchProject = (projectId: string) => {
+    const st = useStore.getState();
+    const proj = st.projects.find((p) => p.id === projectId);
+    st.setActiveProject(projectId);
+    if (proj?.root) {
+      openWorkspaceByPath(proj.root, proj.name)
+        .then((ws) => ws && useStore.getState().patchUI({ workspace: ws }))
+        .catch(() => {});
+    }
+  };
+
+  const openNewFolder = () => {
+    openWorkspace()
+      .then((w) => {
+        if (w) {
+          useStore.getState().addOrSelectProject(w);
+          useStore.getState().notify(`Opened project ${w.name}`);
+        }
+      })
+      .catch((e) => useStore.getState().notify(e.message));
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface">
-      <div className="flex h-14 shrink-0 items-center gap-1 px-3">
+      <div className="flex h-14 shrink-0 items-center gap-1.5 border-b border-outline-variant/40 px-3">
+        <Dropdown width={240} trigger={({ toggle, open }) => (
+          <button
+            onClick={toggle}
+            title={curProject?.root ? `${curProject.name} (${curProject.root})` : "Switch or open project folder"}
+            className={cn(
+              "state flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-surface-container px-2.5 text-xs font-semibold text-on-surface",
+              open && "bg-surface-high"
+            )}
+          >
+            <Icon name="folder_open" size={15} className="text-primary" />
+            <span className="max-w-[110px] truncate">{curProject?.name ?? "Workspace"}</span>
+            <Icon name="expand_more" size={14} className="text-on-surface-variant" />
+          </button>
+        )}>
+          {(close) => (
+            <>
+              <MenuLabel>Projects</MenuLabel>
+              {projects.map((p) => (
+                <MenuItem
+                  key={p.id}
+                  icon={<Icon name={p.id === curProject?.id ? "folder_open" : "folder"} size={16} />}
+                  label={p.name}
+                  active={p.id === curProject?.id}
+                  onClick={() => { close(); switchProject(p.id); }}
+                />
+              ))}
+              <div className="my-1 border-t border-outline-variant/60" />
+              <MenuItem
+                icon={<Icon name="create_new_folder" size={16} />}
+                label="Open project folder…"
+                onClick={() => { close(); openNewFolder(); }}
+              />
+            </>
+          )}
+        </Dropdown>
+
+        <span className="text-on-surface-variant/50">/</span>
+
         {editing ? (
           <input
             autoFocus defaultValue={conv.title} spellCheck={false}
             onBlur={(e) => { if (e.target.value.trim()) setTitle(conv.id, e.target.value.trim()); setEditing(false); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
-            className="h-9 min-w-0 flex-1 rounded-xl bg-surface-container px-3 font-display text-[16px] font-medium outline-none ring-2 ring-primary/50"
+            className="h-8 min-w-0 flex-1 rounded-lg bg-surface-container px-2.5 font-display text-[14.5px] font-medium outline-none ring-2 ring-primary/50"
           />
         ) : (
-          <button onClick={() => setEditing(true)} title="Rename" className="state flex min-w-0 items-center gap-1.5 rounded-xl px-3 py-1.5">
-            <span className="truncate font-display text-[16px] font-medium text-on-surface">{conv.title}</span>
-            <Icon name="edit" size={15} className="shrink-0 text-on-surface-variant" />
+          <button onClick={() => setEditing(true)} title="Rename chat" className="state flex min-w-0 items-center gap-1 rounded-lg px-2 py-1">
+            <span className="truncate font-display text-[14.5px] font-medium text-on-surface">{conv.title}</span>
+            <Icon name="edit" size={13} className="shrink-0 text-on-surface-variant/70" />
           </button>
         )}
+
         <span className="flex-1" />
+
+        <div className="flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5">
+          {([
+            ["chat", "chat_bubble", "Chat"],
+            ["files", "account_tree", "Files"],
+            ["terminal", "terminal", "Terminal"],
+          ] as const).map(([id, icon, label]) => {
+            const on = leftTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => patchUI({ leftTab: id })}
+                title={label}
+                className={cn(
+                  "state flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium transition-colors",
+                  on ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                <Icon name={icon} size={14} />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <ContextWindowPill />
         {(artifacts > 0 || showCanvas) && (
-          <IconBtn label={showCanvas ? "Close canvas" : "Open canvas"} size={36} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="dashboard" size={20} /></IconBtn>
+          <IconBtn label={showCanvas ? "Close canvas" : "Open canvas"} size={34} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="dashboard" size={19} /></IconBtn>
         )}
-        <IconBtn label={leftTab === "files" ? "Back to chat" : "Project files"} size={36} active={leftTab === "files"} onClick={() => patchUI({ leftTab: leftTab === "files" ? "chat" : "files" })}><Icon name="account_tree" size={20} /></IconBtn>
-        {showCanvas && <IconBtn label="Hide chat" size={36} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={20} /></IconBtn>}
+        {showCanvas && <IconBtn label="Hide chat" size={34} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={19} /></IconBtn>}
       </div>
-      {leftTab === "files" ? <FilesPanel /> : (
+
+      {leftTab === "files" ? (
+        <FilesPanel />
+      ) : leftTab === "terminal" ? (
+        <TerminalPanel />
+      ) : (
         <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">
           {conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)}
         </div>
       )}
-      {away && leftTab !== "files" && (
+      {away && leftTab === "chat" && (
         <div className="pointer-events-none relative h-0">
           <button
             onClick={() => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }}
@@ -602,7 +1116,7 @@ export function ChatPane() {
           ><Icon name="arrow_downward" size={18} /></button>
         </div>
       )}
-      <Composer />
+      {leftTab !== "terminal" && <Composer />}
     </div>
   );
 }
