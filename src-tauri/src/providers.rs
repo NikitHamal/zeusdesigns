@@ -137,20 +137,6 @@ fn build_client(timeout_secs: u64) -> Result<Client, String> {
 pub fn catalog() -> Vec<ProviderInfo> {
     vec![
         ProviderInfo {
-            id: "mercury3".to_string(),
-            name: "Mercury 3 (Inception Diffusion)".to_string(),
-            kind: "keyless".to_string(),
-            speed: "1,000–2,000+ tok/s".to_string(),
-            status: "ready".to_string(),
-            models: vec![ModelSpec {
-                id: "mercury-3".to_string(),
-                label: "Mercury 3".to_string(),
-                note: Some("Diffusion LLM · 1,000–2,000+ tok/s".to_string()),
-                reasoning: true,
-                vision: false,
-            }],
-        },
-        ProviderInfo {
             id: "kilo".to_string(),
             name: "Kilo Gateway".to_string(),
             kind: "keyless".to_string(),
@@ -214,13 +200,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "particle-ai/particle-1:free".to_string(),
-                    label: "Particle-1 VL".to_string(),
-                    note: Some("1M ctx · Multimodal design & reasoning".to_string()),
-                    reasoning: true,
-                    vision: true,
-                },
-                ModelSpec {
                     id: "dots-studio/dots-3-note-preview:free".to_string(),
                     label: "Dots 3 Note VL".to_string(),
                     note: Some("262k ctx · Multimodal vision & UI notes".to_string()),
@@ -235,146 +214,238 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "cohere/north-mini-code:free".to_string(),
-                    label: "Cohere North Mini Code".to_string(),
-                    note: Some("256k ctx · Cohere coding & UI specialist".to_string()),
-                    reasoning: true,
+                    id: "liquid/lfm-3-1.7b:free".to_string(),
+                    label: "Liquid LFM 3 1.7B".to_string(),
+                    note: Some("128k ctx · Fast state-space UI & code generator".to_string()),
+                    reasoning: false,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "kilo-auto/free".to_string(),
-                    label: "Kilo Auto Free".to_string(),
-                    note: Some("256k ctx · Fastest available free model".to_string()),
+                    id: "stealth/glyph-cluster".to_string(),
+                    label: "Stealth Glyph Cluster".to_string(),
+                    note: Some("256k ctx · Stealth frontier UI & code model".to_string()),
                     reasoning: true,
                     vision: false,
                 },
             ],
         },
         ProviderInfo {
-            id: "zencloud".to_string(),
-            name: "Zen & NIM Multi-Cloud".to_string(),
+            id: "nimcloud".to_string(),
+            name: "NVIDIA NIM OpenAI Cloud".to_string(),
             kind: "keyless".to_string(),
-            speed: "~220 tok/s".to_string(),
+            speed: "~185 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
                 ModelSpec {
-                    id: "anthropic/zen/ring-2.6-1t-free".to_string(),
-                    label: "Ring 2.6 1T MoE".to_string(),
-                    note: Some("262k ctx · 1T MoE frontier reasoning & UI architect".to_string()),
+                    id: "nvidia/nemotron-3.5-super-vl-120b-a12b".to_string(),
+                    label: "Nemotron 3.5 Super VL 120B".to_string(),
+                    note: Some("262k ctx · NVIDIA 120B MoE vision & UI architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3-ultra-550b-a55b".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("262k ctx · 550B MoE frontier reasoning".to_string()),
                     reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/nvidia_nim/qwen/qwen3-coder-480b-a35b-instruct".to_string(),
-                    label: "Qwen 3 Coder 480B A35B".to_string(),
-                    note: Some("262k ctx · Alibaba 480B MoE flagship frontend & code architect".to_string()),
+                    id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning".to_string(),
+                    label: "Nemotron 3 Nano Omni 30B VL".to_string(),
+                    note: Some("256k ctx · 30B Omni vision & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nvidia/nemotron-3.5-lightning-30b-a3b".to_string(),
+                    label: "Nemotron 3.5 Lightning 30B".to_string(),
+                    note: Some("262k ctx · High-speed MoE UI coder".to_string()),
                     reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512".to_string(),
-                    label: "Mistral Large 3 675B".to_string(),
-                    note: Some("262k ctx · Mistral 675B flagship instruction & UI synthesis".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/zen/nemotron-3-super-free".to_string(),
-                    label: "Nemotron 3 Super Free".to_string(),
-                    note: Some("262k ctx · NVIDIA 120B MoE reasoning & UI architect".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/nvidia_nim/stepfun-ai/step-3.5-flash".to_string(),
-                    label: "StepFun Step 3.5 Flash".to_string(),
-                    note: Some("128k ctx · StepFun fast reasoning & frontend coder".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/nvidia_nim/z-ai/glm4.7".to_string(),
-                    label: "GLM 4.7 (NIM)".to_string(),
-                    note: Some("128k ctx · Z.ai reasoning & UI coder".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/nvidia_nim/minimaxai/minimax-m2.7".to_string(),
-                    label: "MiniMax M2.7 (NIM)".to_string(),
-                    note: Some("256k ctx · MiniMax agentic UI & code generator".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/zen/minimax-m2.5-free".to_string(),
-                    label: "MiniMax M2.5 Free".to_string(),
-                    note: Some("256k ctx · OpenCode Zen fast UI generator".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/zen/big-pickle".to_string(),
-                    label: "Zen Big Pickle".to_string(),
-                    note: Some("256k ctx · OpenCode Zen stealth frontier coder".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/silicon/deepseek-ai/DeepSeek-V3".to_string(),
-                    label: "DeepSeek V3 671B".to_string(),
-                    note: Some("128k ctx · SiliconFlow 671B MoE coding & layout specialist".to_string()),
+                    id: "nvidia/nemotron-3.5-bolt-e4b".to_string(),
+                    label: "Nemotron 3.5 Bolt E4B".to_string(),
+                    note: Some("262k ctx · Low-latency UI synthesis".to_string()),
                     reasoning: false,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/silicon/Qwen/Qwen3-Coder-30B-A3B-Instruct".to_string(),
-                    label: "Qwen 3 Coder 30B".to_string(),
-                    note: Some("128k ctx · SiliconFlow 30B A3B fast frontend coder".to_string()),
-                    reasoning: false,
+                    id: "stepfun-ai/step-5-preview".to_string(),
+                    label: "StepFun Step 5 Preview".to_string(),
+                    note: Some("256k ctx · StepFun Step 5 frontier reasoning & code".to_string()),
+                    reasoning: true,
                     vision: false,
                 },
+            ],
+        },
+        ProviderInfo {
+            id: "colibriqwen".to_string(),
+            name: "Colibri Qwen 3.6 MoE Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~175 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "Qwen3.6-35B-A3B".to_string(),
+                label: "Qwen 3.6 35B A3B MoE".to_string(),
+                note: Some("128k ctx · Alibaba 35B A3B fast MoE frontend & UI architect".to_string()),
+                reasoning: true,
+                vision: false,
+            }],
+        },
+        ProviderInfo {
+            id: "gemma4vl".to_string(),
+            name: "Gemma 4 Vision & QAT Studio".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~160 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
                 ModelSpec {
-                    id: "anthropic/silicon/Qwen/Qwen3.6-35B-A3B".to_string(),
-                    label: "Qwen 3.6 35B MoE".to_string(),
-                    note: Some("128k ctx · SiliconFlow 35B A3B UI coder".to_string()),
+                    id: "gemma-4-e4b-vision-q4".to_string(),
+                    label: "Gemma 4 E4B Vision UI (Q4_K_M)".to_string(),
+                    note: Some("64k ctx · Multimodal vision & UI layout architect".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemma-4-e2b-q6k-aggressive".to_string(),
+                    label: "Gemma 4 E2B Uncensored (Q6_K_P)".to_string(),
+                    note: Some("64k ctx · High-precision Q6_K_P uncensored UI coder".to_string()),
                     reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/silicon/Qwen/Qwen2.5-72B-Instruct".to_string(),
-                    label: "Qwen 2.5 72B Instruct".to_string(),
-                    note: Some("128k ctx · Dense 72B instruction & code".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/groq/llama-3.3-70b-versatile".to_string(),
-                    label: "Groq Llama 3.3 70B LPU".to_string(),
-                    note: Some("128k ctx · Groq LPU ultra-fast 70B coder".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "anthropic/groq/qwen3-32b".to_string(),
-                    label: "Groq Qwen 3 32B LPU".to_string(),
-                    note: Some("128k ctx · Groq LPU fast reasoning & UI".to_string()),
+                    id: "gemma-4-e2b-qat-q4".to_string(),
+                    label: "Gemma 4 E2B QAT (Q4_0)".to_string(),
+                    note: Some("64k ctx · Quantization-aware fast reasoning & code".to_string()),
                     reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/cerebras/llama3.1-8b".to_string(),
-                    label: "Cerebras Llama 3.1 8B".to_string(),
-                    note: Some("64k ctx · Wafer-scale 2,000+ tok/s instant coder".to_string()),
+                    id: "gemma-4-e2b-qat-mobile".to_string(),
+                    label: "Gemma 4 E2B QAT Mobile (UD-Q2_K_XL)".to_string(),
+                    note: Some("64k ctx · Unsloth Dynamic ultra-fast stream".to_string()),
                     reasoning: false,
                     vision: false,
                 },
                 ModelSpec {
-                    id: "anthropic/auto".to_string(),
-                    label: "Zen & NIM Auto Router".to_string(),
-                    note: Some("256k ctx · Fastest available multi-cloud route".to_string()),
+                    id: "gemma-4-e2b-it-fast".to_string(),
+                    label: "Gemma 4 E2B IT Fast".to_string(),
+                    note: Some("64k ctx · Low-latency Gemma 4 instruction node".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "phi4cloud".to_string(),
+            name: "Phi-4 & Llama 3.1 Abliterated Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~150 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "phi-4-14b-gguf".to_string(),
+                    label: "Microsoft Phi-4 14B".to_string(),
+                    note: Some("64k ctx · Microsoft 14B dense reasoning & frontend coder".to_string()),
                     reasoning: true,
                     vision: false,
+                },
+                ModelSpec {
+                    id: "llama-3.1-8b-abliterated".to_string(),
+                    label: "Llama 3.1 8B Abliterated (Q4_K_M)".to_string(),
+                    note: Some("64k ctx · Bartowski Q4_K_M fast instruction & UI coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "llama-cpp-fast".to_string(),
+                    label: "Llama.cpp Fast GGUF".to_string(),
+                    note: Some("64k ctx · Dedicated llama.cpp fast UI & copy node".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "llamacppcloud".to_string(),
+            name: "Llama.cpp LFM & SmolVLM Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~180 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "lfm2.5-2.6b-uncensored".to_string(),
+                    label: "Liquid LFM 2.5 2.6B Uncensored".to_string(),
+                    note: Some("64k ctx · Uncensored state-space UI & code generator".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "lfm3-1.7b-gguf".to_string(),
+                    label: "Liquid LFM 3 1.7B GGUF".to_string(),
+                    note: Some("64k ctx · Next-gen LFM 3 reasoning & layout stream".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "smolvlm-500m-instruct".to_string(),
+                    label: "SmolVLM 500M Vision (Q8_0)".to_string(),
+                    note: Some("32k ctx · High-speed Q8_0 multimodal vision & UI parser".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "lfm2.5-230m-instant".to_string(),
+                    label: "Liquid LFM 2.5 230M Instant".to_string(),
+                    note: Some("32k ctx · Ultra-low-latency micro-task & copy engine".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "ollamacloud".to_string(),
+            name: "Ollama Multi-Model Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~155 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "deepseek-r1:1.5b".to_string(),
+                    label: "DeepSeek R1 1.5B Reasoning".to_string(),
+                    note: Some("64k ctx · DeepSeek chain-of-thought reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma:7b-instruct".to_string(),
+                    label: "Google Gemma 7B Instruct".to_string(),
+                    note: Some("64k ctx · Dense 7B instruction & layout generator".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen2.5:1.5b".to_string(),
+                    label: "Qwen 2.5 1.5B Instruct".to_string(),
+                    note: Some("64k ctx · Fast instruction & UI synthesis".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "qwen-coder-0.5b".to_string(),
+                    label: "Qwen 2.5 Coder Fast".to_string(),
+                    note: Some("32k ctx · Ultra-fast HTML/CSS & code stream".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "moondream:latest".to_string(),
+                    label: "Moondream 2 Vision".to_string(),
+                    note: Some("32k ctx · Multimodal vision & screenshot parser".to_string()),
+                    reasoning: false,
+                    vision: true,
                 },
             ],
         },
@@ -385,27 +456,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
             speed: "~155 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
-                ModelSpec {
-                    id: "gemma-4-31b-it".to_string(),
-                    label: "Gemma 4 31B IT Flagship".to_string(),
-                    note: Some("128k ctx · Google largest 31B dense Gemma 4 UI architect".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "gemma-4-12b-it".to_string(),
-                    label: "Gemma 4 12B IT".to_string(),
-                    note: Some("128k ctx · Google 12B dense instruction & UI model".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "gemma-4-12b-coding".to_string(),
-                    label: "Gemma 4 12B Coding".to_string(),
-                    note: Some("128k ctx · Specialized Gemma 4 frontend coding fine-tune".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
                 ModelSpec {
                     id: "gemma-4-e4b-ud-q5".to_string(),
                     label: "Gemma 4 E4B VL (UD-Q5_K_XL)".to_string(),
@@ -532,66 +582,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
             ],
         },
         ProviderInfo {
-            id: "claudebridge".to_string(),
-            name: "Claude & Gemini Bridge".to_string(),
-            kind: "keyless".to_string(),
-            speed: "~160 tok/s".to_string(),
-            status: "ready".to_string(),
-            models: vec![
-                ModelSpec {
-                    id: "claude-opus-4-20250514".to_string(),
-                    label: "Claude Opus 4 Bridge".to_string(),
-                    note: Some("200k ctx · Multimodal UI architecture & deep layout synthesis".to_string()),
-                    reasoning: true,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "claude-sonnet-4-20250514".to_string(),
-                    label: "Claude Sonnet 4 Bridge".to_string(),
-                    note: Some("200k ctx · Balanced frontend code & multimodal vision".to_string()),
-                    reasoning: true,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "claude-haiku-4-20250514".to_string(),
-                    label: "Claude Haiku 4 Bridge".to_string(),
-                    note: Some("200k ctx · High-speed UI & component synthesis".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "claude-3-5-sonnet-20241022".to_string(),
-                    label: "Claude 3.5 Sonnet Bridge".to_string(),
-                    note: Some("200k ctx · Precision HTML/CSS & interactive screen builder".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-            ],
-        },
-        ProviderInfo {
-            id: "groqlpu".to_string(),
-            name: "Groq LPU Anonymous Bridge".to_string(),
-            kind: "keyless".to_string(),
-            speed: "350–850 tok/s".to_string(),
-            status: "ready".to_string(),
-            models: vec![
-                ModelSpec {
-                    id: "llama-3.3-70b-versatile".to_string(),
-                    label: "Llama 3.3 70B Versatile LPU".to_string(),
-                    note: Some("128k ctx · Groq LPU ultra-fast 70B UI & frontend coder".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "llama-3.1-8b-instant".to_string(),
-                    label: "Llama 3.1 8B Instant LPU".to_string(),
-                    note: Some("128k ctx · Groq LPU 850+ tok/s low-latency layout & copy".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-            ],
-        },
-        ProviderInfo {
             id: "bonsaicloud".to_string(),
             name: "Bonsai & Ternary Frontier".to_string(),
             kind: "keyless".to_string(),
@@ -623,18 +613,11 @@ pub fn catalog() -> Vec<ProviderInfo> {
         },
         ProviderInfo {
             id: "unslothcloud".to_string(),
-            name: "Unsloth Qwen 3.5 & Gemma 4 Cloud".to_string(),
+            name: "Unsloth Gemma 4 Cloud".to_string(),
             kind: "keyless".to_string(),
             speed: "~165 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
-                ModelSpec {
-                    id: "qwen3.5-4b-q6".to_string(),
-                    label: "Qwen 3.5 4B (Q6_K)".to_string(),
-                    note: Some("64k ctx · Unsloth high-precision Q6_K fast UI & code generator".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
                 ModelSpec {
                     id: "gemma-4-e2b-ud-q4".to_string(),
                     label: "Gemma 4 E2B IT (UD-Q4_K_XL)".to_string(),
@@ -720,13 +703,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "nvidia/gpt-oss-120b".to_string(),
                     label: "GPT-OSS 120B (NVIDIA)".to_string(),
                     note: Some("131k ctx · OpenAI 120B open-weights reasoning workhorse".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "nvidia/step-3.7-flash".to_string(),
-                    label: "StepFun Step 3.7 Flash".to_string(),
-                    note: Some("131k ctx · StepFun fast reasoning & UI synthesis".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -873,13 +849,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "gpt-oss-120b".to_string(),
-                    label: "GPT-OSS 120B".to_string(),
-                    note: Some("128k ctx · OpenAI 120B open-weights reasoning".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
                     id: "gpt-oss-20b".to_string(),
                     label: "GPT-OSS 20B".to_string(),
                     note: Some("128k ctx · OpenAI 20B fast coder".to_string()),
@@ -890,13 +859,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "Meta-Llama-3_3-70B-Instruct".to_string(),
                     label: "Llama 3.3 70B Instruct".to_string(),
                     note: Some("128k ctx · Meta 70B instruction model".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "Mistral-Small-3.2-24B-Instruct-2506".to_string(),
-                    label: "Mistral Small 3.2 24B".to_string(),
-                    note: Some("128k ctx · Mistral fast instruction coder".to_string()),
                     reasoning: false,
                     vision: false,
                 },
@@ -924,20 +886,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite".to_string(),
-                    label: "Gemini 3.1 Flash Lite VL".to_string(),
-                    note: Some("1M ctx · Low-latency multimodal vision & layout".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro".to_string(),
-                    label: "Kimi K3.1 Pro".to_string(),
-                    note: Some("256k ctx · Moonshot K3.1 Pro flagship software engineer".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
                     id: "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview".to_string(),
                     label: "StepFun Step 5 Preview".to_string(),
                     note: Some("256k ctx · StepFun Step 5 frontier reasoning & code".to_string()),
@@ -948,6 +896,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b".to_string(),
                     label: "Nemotron 3.5 Super VL 120B".to_string(),
                     note: Some("262k ctx · NVIDIA 120B MoE vision & UI architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning".to_string(),
+                    label: "Nemotron 3 Nano Omni 30B VL".to_string(),
+                    note: Some("256k ctx · NVIDIA 30B Omni reasoning & vision".to_string()),
                     reasoning: true,
                     vision: true,
                 },
@@ -999,13 +954,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "qwen/qwen3.5-0.8b".to_string(),
                     label: "Qwen 3.5 0.8B VL".to_string(),
                     note: Some("128k ctx · Ultra-fast multimodal vision & layout".to_string()),
-                    reasoning: false,
-                    vision: true,
-                },
-                ModelSpec {
-                    id: "zai-org/glm-ocr".to_string(),
-                    label: "GLM-OCR Vision".to_string(),
-                    note: Some("64k ctx · Z.ai visual UI & document screenshot parser".to_string()),
                     reasoning: false,
                     vision: true,
                 },
@@ -1219,16 +1167,9 @@ pub fn catalog() -> Vec<ProviderInfo> {
             id: "ptero".to_string(),
             name: "Ptero Frontier".to_string(),
             kind: "keyless".to_string(),
-            speed: "~120 tok/s".to_string(),
+            speed: "~140 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
-                ModelSpec {
-                    id: "gpt-6.1-terra:voyage".to_string(),
-                    label: "GPT-6.1 Terra".to_string(),
-                    note: Some("Frontier multimodal vision & UI architect".to_string()),
-                    reasoning: true,
-                    vision: true,
-                },
                 ModelSpec {
                     id: "agnes-2.5-flash:agnes".to_string(),
                     label: "Agnes 2.5 Flash VL".to_string(),
@@ -1244,10 +1185,10 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "glm-5.3-flash".to_string(),
-                    label: "GLM 5.3 Flash (Ptero)".to_string(),
-                    note: Some("Z.ai 320B MoE fast UI coder".to_string()),
-                    reasoning: false,
+                    id: "ising-calibration-1.5-31b:bluesminds".to_string(),
+                    label: "Ising Calibration 1.5 31B".to_string(),
+                    note: Some("31B dense code & UI synthesis".to_string()),
+                    reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
@@ -1258,9 +1199,9 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
-                    id: "kimi-k3:apinex".to_string(),
-                    label: "Kimi K3 (Ptero)".to_string(),
-                    note: Some("Moonshot 2.8T MoE".to_string()),
+                    id: "glm-5.3-flash".to_string(),
+                    label: "GLM 5.3 Flash (Ptero)".to_string(),
+                    note: Some("Z.ai 320B MoE fast UI coder".to_string()),
                     reasoning: false,
                     vision: false,
                 },
@@ -1270,9 +1211,44 @@ pub fn catalog() -> Vec<ProviderInfo> {
             id: "unikey".to_string(),
             name: "Unikey Anonymous".to_string(),
             kind: "keyless".to_string(),
-            speed: "~125 tok/s".to_string(),
+            speed: "~145 tok/s".to_string(),
             status: "ready".to_string(),
             models: vec![
+                ModelSpec {
+                    id: "claude-opus-5-5".to_string(),
+                    label: "Claude Opus 5.5".to_string(),
+                    note: Some("200k ctx · Anthropic flagship agentic coding & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-6.1-sol".to_string(),
+                    label: "GPT-6.1 Sol".to_string(),
+                    note: Some("200k ctx · OpenAI deep reasoning & software engineering".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-6-astra".to_string(),
+                    label: "GPT-6 Astra".to_string(),
+                    note: Some("200k ctx · OpenAI flagship reasoning & layout synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gpt-6-luna".to_string(),
+                    label: "GPT-6 Luna".to_string(),
+                    note: Some("128k ctx · OpenAI high-speed UI & frontend coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "deepseek-v4-flash".to_string(),
+                    label: "DeepSeek V4 Flash".to_string(),
+                    note: Some("128k ctx · DeepSeek V4 fast coding & UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
                 ModelSpec {
                     id: "moonshotai/kimi-k3".to_string(),
                     label: "Kimi K3 2.8T".to_string(),
@@ -1310,27 +1286,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     reasoning: false,
                     vision: false,
                 },
-                ModelSpec {
-                    id: "gemma-3-27b".to_string(),
-                    label: "Gemma 3 27B".to_string(),
-                    note: Some("Google 27B open instruction model".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "gpt-oss:20b".to_string(),
-                    label: "GPT-OSS 20B".to_string(),
-                    note: Some("OpenAI open-weights fast coder".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "default".to_string(),
-                    label: "LLM7 Auto Router".to_string(),
-                    note: Some("400k ctx anonymous router".to_string()),
-                    reasoning: false,
-                    vision: false,
-                },
             ],
         },
         ProviderInfo {
@@ -1344,13 +1299,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "openai".to_string(),
                     label: "OpenAI Fast Reasoning".to_string(),
                     note: Some("Zero-key reasoning & UI generator".to_string()),
-                    reasoning: true,
-                    vision: false,
-                },
-                ModelSpec {
-                    id: "openai-fast".to_string(),
-                    label: "OpenAI Turbo".to_string(),
-                    note: Some("Low-latency UI & copy engine".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -1464,34 +1412,6 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
             ],
-        },
-        ProviderInfo {
-            id: "longcat".to_string(),
-            name: "LongCat".to_string(),
-            kind: "keyless".to_string(),
-            speed: "~100 tok/s".to_string(),
-            status: "ready".to_string(),
-            models: vec![ModelSpec {
-                id: "longcat-2.5".to_string(),
-                label: "LongCat 2.5".to_string(),
-                note: Some("1.6T MoE oversea-V2".to_string()),
-                reasoning: true,
-                vision: false,
-            }],
-        },
-        ProviderInfo {
-            id: "geminiweb".to_string(),
-            name: "Gemini Web".to_string(),
-            kind: "keyless".to_string(),
-            speed: "~150 tok/s".to_string(),
-            status: "ready".to_string(),
-            models: vec![ModelSpec {
-                id: "gemini-flash-lite".to_string(),
-                label: "Gemini Flash-Lite".to_string(),
-                note: Some("Anonymous StreamGenerate session".to_string()),
-                reasoning: false,
-                vision: false,
-            }],
         },
         ProviderInfo {
             id: "chatjimmy".to_string(),
@@ -3282,26 +3202,20 @@ where
         }
     }
 
-    // On Ptero, gpt-6.1-terra:voyage and agnes-2.5-flash:agnes are the free models in freeVisionModelIds
     let eff_model = if !attachments.is_empty() {
-        match model {
-            "gpt-6.1-terra:voyage" | "agnes-2.5-flash:agnes" => model,
-            _ => "gpt-6.1-terra:voyage",
-        }
+        "agnes-2.5-flash:agnes"
     } else {
         match model {
-            "gpt-6.1-terra:voyage"
-            | "agnes-2.5-flash:agnes"
+            "agnes-2.5-flash:agnes"
             | "agnes-3.0-flash:agnes"
-            | "glm-5.3-flash"
+            | "ising-calibration-1.5-31b:bluesminds"
             | "mimo-v2.6-flash:tokenharbor"
-            | "qwen3.7-flash:minirouter"
-            | "kimi-k3:apinex" => model,
-            _ => "gpt-6.1-terra:voyage",
+            | "glm-5.3-flash" => model,
+            _ => "agnes-2.5-flash:agnes",
         }
     };
 
-    let client = build_client(180)?;
+    let client = build_client(90)?;
     let warm_html = client
         .get("https://ptero.pro/")
         .header("Accept", "text/html")
@@ -3343,7 +3257,7 @@ where
         "attachments": attachments,
         "github_repo": "",
         "lang": "en",
-        "mode": "smart"
+        "mode": "quick"
     });
 
     let guest_token = random_hex(32);
@@ -3471,8 +3385,15 @@ where
     F: FnMut(&str),
 {
     let eff_model = match model {
-        "moonshotai/kimi-k3" | "moonshotai/kimi-k2.7-code" | "x-ai/grok-4.3" => model,
-        _ => "moonshotai/kimi-k3",
+        "claude-opus-5-5"
+        | "gpt-6.1-sol"
+        | "gpt-6-astra"
+        | "gpt-6-luna"
+        | "deepseek-v4-flash"
+        | "moonshotai/kimi-k3"
+        | "moonshotai/kimi-k2.7-code"
+        | "x-ai/grok-4.3" => model,
+        _ => "claude-opus-5-5",
     };
 
     let mut convo = Vec::new();
@@ -4162,12 +4083,13 @@ where
         }
     } else {
         match model {
+            "gemini-4-hydrogen" => "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
+            "gemini-3-flash-preview" => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
             "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
             | "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen"
-            | "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite"
-            | "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro"
             | "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b"
@@ -4236,7 +4158,8 @@ where
         "messages": anth_msgs
     });
 
-    let client = build_client(180)?;
+    let timeout_secs = if eff_model.contains("gemini-4-hydrogen") { 15 } else { 90 };
+    let client = build_client(timeout_secs)?;
     for &host in hosts {
         let resp = match client
             .post(format!("{}/v1/messages", host))
@@ -6013,6 +5936,349 @@ where
     Err("Unsloth Qwen 3.5 & Gemma 4 Cloud stream ended without output".to_string())
 }
 
+/// Helper to detect fake 200 error strings returned inside SSE text deltas by broken proxy servers.
+fn is_upstream_error_text(s: &str) -> bool {
+    let t = s.trim();
+    t.starts_with("Provider API request failed.")
+        || t.starts_with("Provider authentication failed.")
+        || t.starts_with("API Error: 401")
+        || t.starts_with("API Error: 402")
+        || t.starts_with("API Error: 403")
+        || t.starts_with("API Error: 404")
+        || t.starts_with("Error code: 401")
+        || t.starts_with("Error code: 402")
+        || t.starts_with("Error code: 403")
+        || t.starts_with("Error code: 404")
+        || t.starts_with("Error code: 410")
+        || t.starts_with("Service error, please try again later")
+}
+
+/// Shared OpenAI-compatible multi-target SSE/JSON streamer with multimodal vision (`image_url`) and `<think>` extraction.
+fn stream_oai_targets<F>(
+    provider_label: &str,
+    targets: &[(&str, &str)],
+    system: &str,
+    messages: &[ChatMessage],
+    allow_vision: bool,
+    timeout_secs: u64,
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(20000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = if allow_vision {
+            m.attachments
+                .iter()
+                .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        if imgs.is_empty() {
+            if !m.content.trim().is_empty() {
+                oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            }
+        } else {
+            let mut parts = vec![json!({ "type": "text", "text": m.content })];
+            for img in imgs {
+                parts.push(json!({
+                    "type": "image_url",
+                    "image_url": { "url": img.data_url }
+                }));
+            }
+            oai_msgs.push(json!({ "role": m.role, "content": parts }));
+        }
+    }
+
+    let client = build_client(timeout_secs)?;
+    for &(endpoint, upstream_model) in targets {
+        let payload = json!({
+            "model": upstream_model,
+            "stream": true,
+            "max_tokens": 8192,
+            "messages": oai_msgs
+        });
+
+        let resp = match client
+            .post(endpoint)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .header("Authorization", "Bearer free")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut fallback_reason = String::new();
+        let mut first_text_check = String::new();
+        let mut rejected_error = false;
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            let trimmed = line.trim();
+            let raw_opt = trimmed
+                .strip_prefix("data:")
+                .map(|s| s.trim())
+                .or_else(|| if trimmed.starts_with('{') { Some(trimmed) } else { None });
+            if let Some(raw) = raw_opt {
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(d) = delta {
+                            let r_text = d
+                                .get("reasoning_content")
+                                .or_else(|| d.get("reasoning"))
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("");
+                            if !r_text.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(r_text);
+                                fallback_reason.push_str(r_text);
+                            }
+                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if first_text_check.len() < 120 {
+                                        first_text_check.push_str(text);
+                                        if is_upstream_error_text(&first_text_check) {
+                                            rejected_error = true;
+                                            break;
+                                        }
+                                    }
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if rejected_error {
+            continue;
+        }
+        if !saw_text && !fallback_reason.trim().is_empty() && !is_upstream_error_text(&fallback_reason) {
+            on_delta(fallback_reason.trim());
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+    Err(format!("{} stream ended without output", provider_label))
+}
+
+/// Stream from NVIDIA NIM OpenAI Cloud (`mmoranguito-openai-nim-proxy.hf.space` + `garystu-openai-nim-proxy.hf.space`).
+pub fn stream_nimcloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "nvidia/nemotron-3.5-super-vl-120b-a12b"
+        | "nvidia/nemotron-3-ultra-550b-a55b"
+        | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+        | "nvidia/nemotron-3.5-lightning-30b-a3b"
+        | "nvidia/nemotron-3.5-bolt-e4b"
+        | "stepfun-ai/step-5-preview" => model,
+        _ => "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    };
+    let targets = [
+        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", eff_model),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", eff_model),
+        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
+    ];
+    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 120, cancel, on_delta)
+}
+
+/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space`).
+pub fn stream_colibriqwen<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets = [
+        ("https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "Qwen3.6-35B-A3B"),
+        ("https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions", "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"),
+    ];
+    stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 120, cancel, on_delta)
+}
+
+/// Stream from Gemma 4 Vision & QAT Studio (`will-resolute-gemma4-vision-ui`, `titoo3-gemma-4-e4b`, `hispa-nico-gemma4-e2b-qat`, `elseodelasgalletas-gemma4-e2b-qat-mobile`, `gefdsv-gemma-4-e2b-it`).
+pub fn stream_gemma4vl<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "gemma-4-e2b-q6k-aggressive" => &[
+            ("https://titoo3-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions", "/app/Gemma-4-E2B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf"),
+            ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+        ],
+        "gemma-4-e2b-qat-q4" => &[
+            ("https://hispa-nico-gemma4-e2b-qat.hf.space/v1/chat/completions", "huihui-ai/Huihui-gemma-4-E2B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0"),
+            ("https://elseodelasgalletas-gemma4-e2b-qat-mobile.hf.space/v1/chat/completions", "unsloth/gemma-4-E2B-it-qat-mobile-GGUF:UD-Q2_K_XL"),
+        ],
+        "gemma-4-e2b-qat-mobile" => &[
+            ("https://elseodelasgalletas-gemma4-e2b-qat-mobile.hf.space/v1/chat/completions", "unsloth/gemma-4-E2B-it-qat-mobile-GGUF:UD-Q2_K_XL"),
+            ("https://hispa-nico-gemma4-e2b-qat.hf.space/v1/chat/completions", "huihui-ai/Huihui-gemma-4-E2B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0"),
+        ],
+        "gemma-4-e2b-it-fast" => &[
+            ("https://gefdsv-gemma-4-e2b-it.hf.space/v1/chat/completions", "model.gguf"),
+            ("https://elseodelasgalletas-gemma4-e2b-qat-mobile.hf.space/v1/chat/completions", "unsloth/gemma-4-E2B-it-qat-mobile-GGUF:UD-Q2_K_XL"),
+        ],
+        _ => &[
+            ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+            ("https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions", "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf"),
+            ("https://titoo3-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions", "/app/Gemma-4-E2B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf"),
+        ],
+    };
+    stream_oai_targets("Gemma 4 Vision & QAT Studio", targets, system, messages, true, 120, cancel, on_delta)
+}
+
+/// Stream from Phi-4 & Llama 3.1 Abliterated Cloud (`5fp-phi-4-gguf`, `fggaerg-llama-abliterated-api`, `deleriousson-llama-cpp`).
+pub fn stream_phi4cloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "llama-3.1-8b-abliterated" => &[
+            ("https://fggaerg-llama-abliterated-api.hf.space/v1/chat/completions", "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"),
+            ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
+        ],
+        "llama-cpp-fast" => &[
+            ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
+            ("https://5fp-phi-4-gguf.hf.space/v1/chat/completions", "/data/model.gguf"),
+        ],
+        _ => &[
+            ("https://5fp-phi-4-gguf.hf.space/v1/chat/completions", "/data/model.gguf"),
+            ("https://fggaerg-llama-abliterated-api.hf.space/v1/chat/completions", "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"),
+            ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
+        ],
+    };
+    stream_oai_targets("Phi-4 & Llama 3.1 Abliterated Cloud", targets, system, messages, false, 120, cancel, on_delta)
+}
+
+/// Stream from Llama.cpp LFM & SmolVLM Cloud (`r1000th-llama-cpp`, `ramedde-gemma4cpu`, `aliroohan179-llama-server`, `apathy-exe-lfm2-5-230m`).
+pub fn stream_llamacppcloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "lfm3-1.7b-gguf" => &[
+            ("https://ramedde-gemma4cpu.hf.space/v1/chat/completions", "ngquocvinh/LFM3-1.7B-GGUF"),
+            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
+        ],
+        "smolvlm-500m-instruct" => &[
+            ("https://aliroohan179-llama-server.hf.space/v1/chat/completions", "/home/brewuser/.cache/llama.cpp/ggml-org_SmolVLM-500M-Instruct-GGUF_SmolVLM-500M-Instruct-Q8_0.gguf"),
+            ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+        ],
+        "lfm2.5-230m-instant" => &[
+            ("https://apathy-exe-lfm2-5-230m.hf.space/v1/chat/completions", "/model.gguf"),
+            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
+        ],
+        _ => &[
+            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
+            ("https://ramedde-gemma4cpu.hf.space/v1/chat/completions", "ngquocvinh/LFM3-1.7B-GGUF"),
+            ("https://apathy-exe-lfm2-5-230m.hf.space/v1/chat/completions", "/model.gguf"),
+        ],
+    };
+    stream_oai_targets("Llama.cpp LFM & SmolVLM Cloud", targets, system, messages, true, 120, cancel, on_delta)
+}
+
+/// Stream from Ollama Multi-Model Cloud (`deepak7376`, `qweret6565`, `gentle-tech`, `amarbruhman`, `zurikoff`, `clarasu`).
+pub fn stream_ollamacloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "gemma:7b-instruct" => &[
+            ("https://qweret6565-ollama-server.hf.space/v1/chat/completions", "gemma:7b-instruct"),
+            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
+        ],
+        "qwen2.5:1.5b" => &[
+            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
+            ("https://clarasu-ollama-server.hf.space/v1/chat/completions", "qwen2.5:0.5b"),
+        ],
+        "qwen-coder-0.5b" => &[
+            ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
+            ("https://zurikoff-ollama-server.hf.space/v1/chat/completions", "qwen2.5-coder:0.5b"),
+        ],
+        "moondream:latest" => &[
+            ("https://clarasu-ollama-server.hf.space/v1/chat/completions", "moondream:latest"),
+            ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+        ],
+        _ => &[
+            ("https://deepak7376-ollama-server.hf.space/v1/chat/completions", "deepseek-r1:1.5b"),
+            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
+            ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
+        ],
+    };
+    stream_oai_targets("Ollama Multi-Model Cloud", targets, system, messages, true, 120, cancel, on_delta)
+}
+
 /// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).
 pub fn stream_yqcloud<F>(
     system: &str,
@@ -6326,40 +6592,36 @@ where
         .any(|m| !m.attachments.is_empty());
     let primary = req.provider.as_str();
     let res = match primary {
-        "mercury3" => {
-            if has_attachments {
-                stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
-                    .or_else(|_| stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta))
-                    .or_else(|_| stream_qwen_app(engine, "qwen4-max", &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
-            } else {
-                stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
-            }
-        }
         "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| {
                 if has_attachments {
                     stream_kilo("openrouter/free", &req.system, &req.messages, cancel, &mut on_delta)
                         .or_else(|_| stream_kilo("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", &req.system, &req.messages, cancel, &mut on_delta))
                 } else {
-                    Err("kilo primary failed".to_string())
+                    stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta)
                 }
             }),
-        "zencloud" => stream_zencloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
-            .or_else(|_| stream_zencloud("anthropic/zen/ring-2.6-1t-free", &req.system, &req.messages, cancel, &mut on_delta)),
+        "nimcloud" => stream_nimcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_nimcloud("nvidia/nemotron-3.5-bolt-e4b", &req.system, &req.messages, cancel, &mut on_delta)),
+        "colibriqwen" => stream_colibriqwen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta)),
+        "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_phi4cloud("phi-4-14b-gguf", &req.system, &req.messages, cancel, &mut on_delta)),
+        "llamacppcloud" => stream_llamacppcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_llamacppcloud("lfm2.5-2.6b-uncensored", &req.system, &req.messages, cancel, &mut on_delta)),
+        "ollamacloud" => stream_ollamacloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_ollamacloud("deepseek-r1:1.5b", &req.system, &req.messages, cancel, &mut on_delta)),
         "gemma4pro" => stream_gemma4pro(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
-            .or_else(|_| stream_gemma4pro("gemma-4-31b-it", &req.system, &req.messages, cancel, &mut on_delta)),
+            .or_else(|_| stream_gemma4pro("gemma-4-e4b-ud-q5", &req.system, &req.messages, cancel, &mut on_delta)),
         "frontierlab" => stream_frontierlab(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_frontierlab("qwen3.8-flash-next", &req.system, &req.messages, cancel, &mut on_delta)),
         "liquidai" => stream_liquidai(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_liquidai("lfm2.5-24b-a2b", &req.system, &req.messages, cancel, &mut on_delta)),
-        "claudebridge" => stream_claudebridge(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
-            .or_else(|_| stream_claudebridge("claude-opus-4-20250514", &req.system, &req.messages, cancel, &mut on_delta)),
-        "groqlpu" => stream_groqlpu(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
-            .or_else(|_| stream_groqlpu("llama-3.3-70b-versatile", &req.system, &req.messages, cancel, &mut on_delta)),
         "bonsaicloud" => stream_bonsaicloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_bonsaicloud("ternary-bonsai-2-27b", &req.system, &req.messages, cancel, &mut on_delta)),
         "unslothcloud" => stream_unslothcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
-            .or_else(|_| stream_unslothcloud("qwen3.5-4b-q6", &req.system, &req.messages, cancel, &mut on_delta)),
+            .or_else(|_| stream_unslothcloud("gemma-4-e2b-ud-q4", &req.system, &req.messages, cancel, &mut on_delta)),
         "koboldcloud" => stream_koboldcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_koboldcloud("koboldcpp/Gemma4-E2B", &req.system, &req.messages, cancel, &mut on_delta)),
         "blockrun" => stream_blockrun(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -6409,7 +6671,7 @@ where
         ),
         "deepai" => {
             if has_attachments {
-                stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta)
+                stream_ptero("agnes-2.5-flash:agnes", &req.system, &req.messages, cancel, &mut on_delta)
                     .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta))
                     .or_else(|_| stream_qwen_app(engine, "qwen4-max", &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
             } else {
@@ -6419,15 +6681,13 @@ where
         "qwen" => stream_qwen_app(engine, &req.model, &req.system, &req.messages, &req.effort, cancel, &mut on_delta)
             .or_else(|_| {
                 if has_attachments {
-                    stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta)
+                    stream_ptero("agnes-2.5-flash:agnes", &req.system, &req.messages, cancel, &mut on_delta)
                         .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta))
                 } else {
                     stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta)
-                        .or_else(|_| stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta))
+                        .or_else(|_| stream_colibriqwen("Qwen3.6-35B-A3B", &req.system, &req.messages, cancel, &mut on_delta))
                 }
             }),
-        "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
-        "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),
         "chatjimmy" => {
             let user_prompt = req
                 .messages
@@ -6439,7 +6699,7 @@ where
             on_delta(&text);
             Ok(())
         }
-        _ => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
+        _ => stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta),
     };
 
     if res.is_ok() || cancel.load(Ordering::Relaxed) {
@@ -6448,30 +6708,38 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["freecc", "claudebridge", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "blockrun", "qwen"]
+        &["freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "zencloud", "groqlpu", "freecc", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "bonsaicloud", "unslothcloud", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["kilo", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
             continue;
         }
         let ok = match fb {
-            "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
-            "zencloud" => stream_zencloud("anthropic/zen/ring-2.6-1t-free", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "groqlpu" => stream_groqlpu("llama-3.3-70b-versatile", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "gemma4pro" => stream_gemma4pro(
-                if has_attachments { "gemma-4-e4b-ud-q5" } else { "gemma-4-31b-it" },
+            "nimcloud" => stream_nimcloud("nvidia/nemotron-3.5-super-vl-120b-a12b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "colibriqwen" => stream_colibriqwen("Qwen3.6-35B-A3B", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "gemma4vl" => stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "phi4cloud" => stream_phi4cloud("phi-4-14b-gguf", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "llamacppcloud" => stream_llamacppcloud(
+                if has_attachments { "smolvlm-500m-instruct" } else { "lfm2.5-2.6b-uncensored" },
                 &req.system,
                 &req.messages,
                 cancel,
                 &mut on_delta,
             ).is_ok(),
+            "ollamacloud" => stream_ollamacloud(
+                if has_attachments { "moondream:latest" } else { "deepseek-r1:1.5b" },
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
+            "gemma4pro" => stream_gemma4pro("gemma-4-e4b-ud-q5", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "frontierlab" => stream_frontierlab("qwen3.8-flash-next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "liquidai" => stream_liquidai("lfm2.5-24b-a2b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "claudebridge" => stream_claudebridge("claude-opus-4-20250514", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "bonsaicloud" => stream_bonsaicloud("ternary-bonsai-2-27b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "unslothcloud" => stream_unslothcloud("qwen3.5-4b-q6", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "unslothcloud" => stream_unslothcloud("gemma-4-e2b-ud-q4", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "koboldcloud" => stream_koboldcloud("koboldcpp/Gemma4-E2B", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "freecc" => stream_freecc(
                 "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
@@ -6481,7 +6749,7 @@ where
                 &mut on_delta,
             ).is_ok(),
             "kilo" => stream_kilo(
-                if has_attachments { "nvidia/nemotron-3.5-super-vl:free" } else { "kilo-auto/free" },
+                "nvidia/nemotron-3.5-super-vl:free",
                 &req.system,
                 &req.messages,
                 cancel,
@@ -6506,8 +6774,8 @@ where
             "hfcluster" => stream_hfcluster("qwen3.8-27b-q8", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "aihorde" => stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "apisfreellm" => stream_apisfreellm("free-ai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "ptero" => stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
-            "unikey" => stream_unikey("moonshotai/kimi-k3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "ptero" => stream_ptero("agnes-2.5-flash:agnes", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "unikey" => stream_unikey("claude-opus-5-5", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "llm7" => stream_llm7("codestral-latest", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "pollinations" => stream_pollinations("openai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "yqcloud" => stream_yqcloud(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -6562,14 +6830,16 @@ mod tests {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(cat.len(), 31);
-        assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"kilo"));
-        assert!(ids.contains(&"zencloud"));
+        assert!(ids.contains(&"nimcloud"));
+        assert!(ids.contains(&"colibriqwen"));
+        assert!(ids.contains(&"gemma4vl"));
+        assert!(ids.contains(&"phi4cloud"));
+        assert!(ids.contains(&"llamacppcloud"));
+        assert!(ids.contains(&"ollamacloud"));
         assert!(ids.contains(&"gemma4pro"));
         assert!(ids.contains(&"frontierlab"));
         assert!(ids.contains(&"liquidai"));
-        assert!(ids.contains(&"claudebridge"));
-        assert!(ids.contains(&"groqlpu"));
         assert!(ids.contains(&"bonsaicloud"));
         assert!(ids.contains(&"unslothcloud"));
         assert!(ids.contains(&"koboldcloud"));
@@ -6590,8 +6860,6 @@ mod tests {
         assert!(ids.contains(&"deepai"));
         assert!(ids.contains(&"k2horizon"));
         assert!(ids.contains(&"motif"));
-        assert!(ids.contains(&"longcat"));
-        assert!(ids.contains(&"geminiweb"));
         assert!(ids.contains(&"chatjimmy"));
     }
 
