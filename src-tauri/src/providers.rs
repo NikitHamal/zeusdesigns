@@ -2040,14 +2040,19 @@ where
 
     let mut history = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(20000).collect();
+        let sys_safe: String = system.chars().take(24000).collect();
+        let is_opencode = sys_safe.contains("OpenCode / OpenAI Tool-Calling Protocol");
         history.push(json!({
             "role": "user",
-            "content": format!("[Zeus Desktop Harness & Design System Specification]\n{}", sys_safe)
+            "content": format!("[System Specification]\n{}", sys_safe)
         }));
         history.push(json!({
             "role": "assistant",
-            "content": "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
+            "content": if is_opencode {
+                "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> and wait for <tool_response>."
+            } else {
+                "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
+            }
         }));
     }
     for m in messages {
@@ -4149,18 +4154,39 @@ where
         }
     }
 
-    let sys_safe: String = system.chars().take(24000).collect();
-    let payload = json!({
-        "model": eff_model,
-        "max_tokens": 16384,
-        "stream": true,
-        "system": sys_safe,
-        "messages": anth_msgs
-    });
+    let sys_safe: String = system.chars().take(26000).collect();
+    let candidate_routes: Vec<(&str, &str)> = if eff_model.contains("gemini-4-hydrogen") {
+        vec![
+            ("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen"),
+            ("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"),
+            ("https://dherain24-claude-proxy.hf.space", "claude-3-freecc-no-thinking/nvidia_nim/mistralai/mistral-large-4-1t-a52b"),
+        ]
+    } else {
+        let mut r = Vec::new();
+        for &h in hosts {
+            r.push((h, eff_model));
+        }
+        r.push(("https://calkotter-free-claude-code.hf.space", "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"));
+        r.push(("https://dherain24-claude-proxy.hf.space", "claude-3-freecc-no-thinking/nvidia_nim/mistralai/mistral-large-4-1t-a52b"));
+        r
+    };
 
-    let timeout_secs = if eff_model.contains("gemini-4-hydrogen") { 15 } else { 90 };
-    let client = build_client(timeout_secs)?;
-    for &host in hosts {
+    let client = Client::builder()
+        .user_agent(CHROME_UA)
+        .cookie_store(true)
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(90))
+        .build()
+        .map_err(|e| format!("HTTP client init failed: {}", e))?;
+
+    for (host, route_model) in candidate_routes {
+        let payload = json!({
+            "model": route_model,
+            "max_tokens": 16384,
+            "stream": true,
+            "system": sys_safe,
+            "messages": anth_msgs
+        });
         let resp = match client
             .post(format!("{}/v1/messages", host))
             .header("Content-Type", "application/json")
@@ -4529,7 +4555,13 @@ where
         .map_err(|e| format!("Together Frontier request failed: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("Together Frontier HTTP {}", resp.status()));
+        return match eff_model {
+            "kimi-k3" => stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta),
+            "muse-glimmer-30b" => stream_frontierlab("muse-glimmer-30b", system, messages, cancel, on_delta),
+            "gpt-oss-120b" => stream_ovhcloud("gpt-oss-120b", system, messages, cancel, on_delta),
+            _ => stream_ptero("glm-5.3-flash", system, messages, cancel, on_delta)
+                .or_else(|_| stream_deepai("glm-5.3-flash", system, messages, cancel, on_delta)),
+        };
     }
 
     let mut reader = BufReader::new(resp);
@@ -6329,7 +6361,7 @@ where
     }
 
     let mut buf = [0u8; 2048];
-    let mut saw_text = false;
+    let mut collected = String::new();
     loop {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -6339,18 +6371,22 @@ where
             Ok(n) => {
                 let chunk = String::from_utf8_lossy(&buf[..n]);
                 if !chunk.is_empty() {
-                    saw_text = true;
-                    on_delta(&chunk);
+                    collected.push_str(&chunk);
                 }
             }
             Err(_) => break,
         }
     }
-    if saw_text {
-        Ok(())
-    } else {
-        Err("YQCloud stream ended without output".to_string())
+    if collected.contains("接上级主管部门通知")
+        || collected.contains("完全下架")
+        || collected.contains("aichatos")
+        || collected.trim().is_empty()
+    {
+        return stream_unikey("gpt-6-luna", system, messages, cancel, on_delta)
+            .or_else(|_| stream_pollinations("openai", system, messages, cancel, on_delta));
     }
+    on_delta(&collected);
+    Ok(())
 }
 
 /// Stream from custom OpenAI-compatible or Anthropic endpoint (including multimodal image attachments).
