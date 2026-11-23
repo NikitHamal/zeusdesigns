@@ -18,6 +18,12 @@ enum class ProviderFormat {
     SCRAPER_LONGCAT,     // LongCat (longcat.chat) LongCat 2.5 1.6T MoE
     SCRAPER_GEMINIWEB,   // Gemini Web (gemini.google.com/app) anonymous Flash-Lite StreamGenerate
     SCRAPER_KILO,        // Kilo Gateway (api.kilo.ai/api/gateway) free frontier & VL models
+    SCRAPER_ZENCLOUD,    // Zen & NIM Multi-Cloud (yash030-claude-code-proxy.hf.space) Ring 2.6 1T, Qwen3 Coder 480B, Mistral Large 3 675B, Groq, Cerebras
+    SCRAPER_GEMMA4PRO,   // Gemma 4 Flagship Cluster (markpaulm-gemma-4-31b / 12b / shanghsin-gemma-4-12b / rikunarita-gemma-4-e4b)
+    SCRAPER_FRONTIERLAB, // Frontier Open-Weights Lab (bananamort-inkling-2-mini / apathy-exe-qwen3-8-flash-next / nanbeige4.3-33b / usermma-mellum2)
+    SCRAPER_LIQUIDAI,    // Liquid AI LFM Gateway (apathy-exe-lfm2-5-24b-a2b / lfm3-1-7b / l0d0v1c-lfm3-1-7b)
+    SCRAPER_CLAUDEBRIDGE,// Claude & Gemini Bridge (hamdyahned-ree-claude-proxy.hf.space) Claude 4 Opus/Sonnet/Haiku Bridge
+    SCRAPER_KOBOLDCLOUD, // KoboldAI Multi-Node Cloud (koboldai / nanoph / nxdev-org koboldcpp nodes)
     SCRAPER_PTERO,       // Ptero (ptero.pro/wp-json/mlp/v1/chat) GPT-6.1 Terra & GLM 5.3 Flash + vision
     SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3
     SCRAPER_BLOCKRUN,    // BlockRun (blockrun.ai/api/v1) zero-key NVIDIA, MiniMax M3.1, Poolside, Cohere

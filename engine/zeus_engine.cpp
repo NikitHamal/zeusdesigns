@@ -242,6 +242,124 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~140 tok/s"
         },
         {
+            "zencloud",
+            "Zen & NIM Multi-Cloud",
+            ProviderFormat::SCRAPER_ZENCLOUD,
+            "https://yash030-claude-code-proxy.hf.space",
+            "anthropic/zen/ring-2.6-1t-free",
+            {
+                {"anthropic/zen/ring-2.6-1t-free", "Ring 2.6 1T MoE", "262k ctx 1T MoE frontier reasoning & UI architect", true, false, false, 210},
+                {"anthropic/nvidia_nim/qwen/qwen3-coder-480b-a35b-instruct", "Qwen 3 Coder 480B A35B", "262k ctx Alibaba 480B MoE flagship frontend & code architect", true, false, false, 185},
+                {"anthropic/nvidia_nim/mistralai/mistral-large-3-675b-instruct-2512", "Mistral Large 3 675B", "262k ctx Mistral 675B flagship instruction & UI synthesis", true, false, false, 170},
+                {"anthropic/zen/nemotron-3-super-free", "Nemotron 3 Super Free", "262k ctx NVIDIA 120B MoE reasoning & UI architect", true, false, false, 195},
+                {"anthropic/nvidia_nim/stepfun-ai/step-3.5-flash", "StepFun Step 3.5 Flash", "128k ctx StepFun fast reasoning & frontend coder", true, false, false, 200},
+                {"anthropic/nvidia_nim/z-ai/glm4.7", "GLM 4.7 (NIM)", "128k ctx Z.ai reasoning & UI coder", true, false, false, 180},
+                {"anthropic/nvidia_nim/minimaxai/minimax-m2.7", "MiniMax M2.7 (NIM)", "256k ctx MiniMax agentic UI & code generator", true, false, false, 185},
+                {"anthropic/zen/minimax-m2.5-free", "MiniMax M2.5 Free", "256k ctx OpenCode Zen fast UI generator", true, false, false, 210},
+                {"anthropic/zen/big-pickle", "Zen Big Pickle", "256k ctx OpenCode Zen stealth frontier coder", true, false, false, 200},
+                {"anthropic/silicon/deepseek-ai/DeepSeek-V3", "DeepSeek V3 671B", "128k ctx SiliconFlow 671B MoE coding & layout specialist", false, false, false, 175},
+                {"anthropic/silicon/Qwen/Qwen3-Coder-30B-A3B-Instruct", "Qwen 3 Coder 30B", "128k ctx SiliconFlow 30B A3B fast frontend coder", false, false, false, 195},
+                {"anthropic/silicon/Qwen/Qwen3.6-35B-A3B", "Qwen 3.6 35B MoE", "128k ctx SiliconFlow 35B A3B UI coder", true, false, false, 190},
+                {"anthropic/silicon/Qwen/Qwen2.5-72B-Instruct", "Qwen 2.5 72B Instruct", "128k ctx Dense 72B instruction & code", false, false, false, 165},
+                {"anthropic/groq/llama-3.3-70b-versatile", "Groq Llama 3.3 70B LPU", "128k ctx Groq LPU ultra-fast 70B coder", false, false, false, 320},
+                {"anthropic/groq/qwen3-32b", "Groq Qwen 3 32B LPU", "128k ctx Groq LPU fast reasoning & UI", true, false, false, 340},
+                {"anthropic/cerebras/llama3.1-8b", "Cerebras Llama 3.1 8B", "64k ctx Wafer-scale 2,000+ tok/s instant coder", false, false, false, 2000},
+                {"anthropic/auto", "Zen & NIM Auto Router", "256k ctx Fastest available multi-cloud route", true, false, false, 220}
+            },
+            262144,
+            16384,
+            false,
+            "~220 tok/s"
+        },
+        {
+            "gemma4pro",
+            "Gemma 4 Flagship Cluster",
+            ProviderFormat::SCRAPER_GEMMA4PRO,
+            "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1",
+            "gemma-4-31b-it",
+            {
+                {"gemma-4-31b-it", "Gemma 4 31B IT Flagship", "128k ctx Google largest 31B dense Gemma 4 UI architect", true, false, false, 145},
+                {"gemma-4-12b-it", "Gemma 4 12B IT", "128k ctx Google 12B dense instruction & UI model", true, false, false, 160},
+                {"gemma-4-12b-coding", "Gemma 4 12B Coding", "128k ctx Specialized Gemma 4 frontend coding fine-tune", true, false, false, 165},
+                {"gemma-4-e4b-ud-q5", "Gemma 4 E4B VL (UD-Q5_K_XL)", "64k ctx High-precision UD-Q5_K_XL multimodal vision & code", false, false, true, 155},
+                {"gemma-4-e4b-qat", "Gemma 4 E4B QAT", "64k ctx Quantization-aware fast UI coder", false, false, false, 170},
+                {"gemma-4-ollama", "Gemma 4 Latest", "64k ctx Ollama fast Gemma 4 stream", false, false, false, 165}
+            },
+            131072,
+            16384,
+            false,
+            "~155 tok/s"
+        },
+        {
+            "frontierlab",
+            "Frontier Open-Weights Lab",
+            ProviderFormat::SCRAPER_FRONTIERLAB,
+            "https://apathy-exe-qwen3-8-flash-next.hf.space/v1",
+            "inkling-2-mini",
+            {
+                {"inkling-2-mini", "Inkling 2 Mini (UD-Q4_K_XL)", "128k ctx Thinking Machines Inkling 2 Mini reasoning & UI", true, false, false, 145},
+                {"qwen3.8-flash-next", "Qwen 3.8 Flash Next", "128k ctx Alibaba Qwen 3.8 Flash Next high-speed UI coder", true, false, false, 160},
+                {"nanbeige4.3-33b", "Nanbeige 4.3 33B", "128k ctx 33B deep reasoning & software engineering flagship", true, false, false, 135},
+                {"muse-glimmer-30b", "Meta Muse Glimmer 30B", "128k ctx Meta Superintelligence Labs 30B expressive UI designer", true, false, false, 140},
+                {"xing4.0-29b-a4b", "Xing 4.0 29B A4B MoE", "128k ctx XingChen AGI 29B A4B fast reasoning & code", true, false, false, 155},
+                {"mellum2-12b-thinking", "JetBrains Mellum 2 12B Thinking", "64k ctx JetBrains 12B A2.5B Thinking code & UI specialist", true, false, false, 165},
+                {"minicpm5-1b", "OpenBMB MiniCPM 5", "64k ctx Ultra-fast lightweight instruction & code model", false, false, false, 190}
+            },
+            131072,
+            12288,
+            false,
+            "~145 tok/s"
+        },
+        {
+            "liquidai",
+            "Liquid AI LFM Gateway",
+            ProviderFormat::SCRAPER_LIQUIDAI,
+            "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1",
+            "lfm2.5-24b-a2b",
+            {
+                {"lfm2.5-24b-a2b", "Liquid LFM 2.5 24B A2B (Q8_0)", "128k ctx Liquid AI 24B A2B MoE flagship in 8-bit Q8_0", true, false, false, 165},
+                {"lfm3-1.7b", "Liquid LFM 3 1.7B", "64k ctx Next-gen LFM 3 ultra-low-latency UI & copy engine", false, false, false, 195},
+                {"lfm2.5-2.6b", "Liquid LFM 2.5 2.6B", "64k ctx Compact state-space code & layout generator", false, false, false, 185}
+            },
+            131072,
+            12288,
+            false,
+            "~175 tok/s"
+        },
+        {
+            "claudebridge",
+            "Claude & Gemini Bridge",
+            ProviderFormat::SCRAPER_CLAUDEBRIDGE,
+            "https://hamdyahned-ree-claude-proxy.hf.space",
+            "claude-opus-4-20250514",
+            {
+                {"claude-opus-4-20250514", "Claude Opus 4 Bridge", "200k ctx Multimodal UI architecture & deep layout synthesis", true, false, true, 155},
+                {"claude-sonnet-4-20250514", "Claude Sonnet 4 Bridge", "200k ctx Balanced frontend code & multimodal vision", true, false, true, 165},
+                {"claude-haiku-4-20250514", "Claude Haiku 4 Bridge", "200k ctx High-speed UI & component synthesis", false, false, true, 180},
+                {"claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet Bridge", "200k ctx Precision HTML/CSS & interactive screen builder", false, false, true, 165}
+            },
+            200000,
+            16384,
+            false,
+            "~160 tok/s"
+        },
+        {
+            "koboldcloud",
+            "KoboldAI Multi-Node Cloud",
+            ProviderFormat::SCRAPER_KOBOLDCLOUD,
+            "https://koboldai-koboldcpp-tiefighter.hf.space/v1",
+            "koboldcpp/Gemma4-E2B",
+            {
+                {"koboldcpp/Gemma4-E2B", "Gemma 4 E2B (Official KoboldAI)", "32k ctx Dedicated KoboldAI Gemma 4 E2B fast stream", false, false, false, 140},
+                {"koboldcpp/gemma-2-9b-it-Q5_K_M", "Gemma 2 9B IT (Q5_K_M)", "32k ctx Google Gemma 2 9B Q5_K_M instruction node", false, false, false, 125},
+                {"koboldcpp/gemma-3n-E2B-it", "Gemma 3n E2B IT", "32k ctx Google Gemma 3n E2B fast node", false, false, false, 135}
+            },
+            32768,
+            4096,
+            false,
+            "~130 tok/s"
+        },
+        {
             "blockrun",
             "BlockRun Gateway",
             ProviderFormat::SCRAPER_BLOCKRUN,
@@ -250,11 +368,15 @@ KeylessProviderEngine::KeylessProviderEngine() {
             {
                 {"nvidia/nemotron-3-super-120b", "Nemotron 3.5 Super 120B", "262k ctx 120B MoE frontier UI architect", true, false, false, 165},
                 {"nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni VL", "256k ctx 30B Omni vision & reasoning", true, false, true, 160},
+                {"nvidia/nemotron-nano-12b-v2-vl", "Nemotron Nano 12B V2 VL", "131k ctx NVIDIA 12B multimodal vision & UI parser", false, false, true, 170},
+                {"nvidia/gpt-oss-120b", "GPT-OSS 120B (NVIDIA)", "131k ctx OpenAI 120B open-weights reasoning workhorse", true, false, false, 175},
+                {"nvidia/step-3.7-flash", "StepFun Step 3.7 Flash", "131k ctx StepFun fast reasoning & UI synthesis", true, false, false, 180},
                 {"nvidia/minimax-m3.1-flash", "MiniMax M3.1 Flash", "1M ctx MiniMax M3.1 fast UI & code engine", true, false, false, 175},
                 {"nvidia/nemotron-3-ultra-550b", "Nemotron 3 Ultra 550B", "1M ctx 550B MoE deep software engineering", true, false, false, 130},
                 {"nvidia/nemotron-3.5-lightning", "Nemotron 3.5 Lightning", "262k ctx High-speed MoE UI coder", true, false, false, 185},
                 {"nvidia/nemotron-3.5-bolt", "Nemotron 3.5 Bolt", "262k ctx Low-latency UI synthesis", true, false, false, 190},
                 {"nvidia/muse-glimmer-30b", "Muse Glimmer 30B", "131k ctx Expressive UI & design reasoning", true, false, false, 155},
+                {"nvidia/mistral-nemotron", "Mistral Nemotron", "131k ctx Mistral x NVIDIA fast general & UI coder", false, false, false, 175},
                 {"poolside/laguna-xs-2.1", "Poolside Laguna XS 2.1", "128k ctx Poolside code & layout specialist", true, false, false, 160},
                 {"cohere/north-mini-code", "Cohere North Mini Code", "256k ctx Cohere frontend coding engine", true, false, false, 155}
             },
