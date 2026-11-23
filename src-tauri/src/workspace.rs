@@ -48,6 +48,28 @@ fn ignored_dirs() -> HashSet<&'static str> {
         "venv",
         ".turbo",
         "coverage",
+        "appdata",
+        "$recycle.bin",
+        "system volume information",
+        ".cache",
+        ".cargo",
+        ".rustup",
+        ".npm",
+        ".pnpm-store",
+        ".yarn",
+        ".gradle",
+        ".m2",
+        "obj",
+        ".dart_tool",
+        "pods",
+        "deriveddata",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".svelte-kit",
+        ".nuxt",
+        ".parcel-cache",
+        "site-packages",
+        "windows",
     ]
     .into_iter()
     .collect()
@@ -88,66 +110,128 @@ fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
     Ok(candidate)
 }
 
-pub fn walk_workspace(base_root: &Path, current: &Path, depth: usize) -> Vec<FileNode> {
-    let skip = ignored_dirs();
+const MAX_NODES: usize = 700;
+const MAX_PER_DIR: usize = 250;
+
+fn is_link_or_hidden_system(entry: &fs::DirEntry) -> bool {
+    let ft = match entry.file_type() {
+        Ok(t) => t,
+        Err(_) => return true,
+    };
+    if ft.is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if let Ok(m) = entry.metadata() {
+            // REPARSE_POINT (junctions) | SYSTEM
+            if m.file_attributes() & (0x400 | 0x4) != 0 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Refuses folders that would drag the whole machine into memory (drive roots, home, system dirs).
+pub fn check_project_root(root: &Path) -> Result<(), String> {
+    let canon = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    if canon.parent().is_none() {
+        return Err("That is a drive root. Pick a project folder inside it.".into());
+    }
+    let s = canon.to_string_lossy().replace('\\', "/").trim_start_matches("//?/").trim_end_matches('/').to_lowercase();
+    let parts: Vec<&str> = s.split('/').filter(|p| !p.is_empty()).collect();
+    let is_home = |p: &[&str]| {
+        (p.len() == 2 && (p[0] == "users" || p[0] == "home"))
+            || (p.len() == 3 && p[1] == "users")
+            || (p.len() == 1 && p[0] == "root")
+    };
+    if is_home(&parts) {
+        return Err("That is your home folder. Pick a project folder inside it.".into());
+    }
+    if parts.len() <= 2 && parts.iter().any(|p| matches!(*p, "windows" | "program files" | "program files (x86)" | "programdata" | "system32")) {
+        return Err("System folders cannot be opened as a project.".into());
+    }
+    Ok(())
+}
+
+struct Budget {
+    left: usize,
+    truncated: bool,
+}
+
+fn walk_budget(base_root: &Path, current: &Path, depth: usize, skip: &HashSet<&'static str>, budget: &mut Budget) -> Vec<FileNode> {
     let mut nodes = Vec::new();
     let entries = match fs::read_dir(current) {
         Ok(e) => e,
         Err(_) => return nodes,
     };
-
+    let mut dirs: Vec<(String, PathBuf)> = Vec::new();
+    let mut files: Vec<(String, PathBuf, u64)> = Vec::new();
+    let mut seen = 0usize;
     for entry in entries.flatten() {
+        seen += 1;
+        if seen > MAX_PER_DIR * 8 {
+            budget.truncated = true;
+            break;
+        }
         let file_name = entry.file_name().to_string_lossy().to_string();
-        if file_name.starts_with(".DS_Store") || skip.contains(file_name.as_str()) {
+        if skip.contains(file_name.as_str()) || file_name.starts_with(".DS_Store") {
+            continue;
+        }
+        if file_name.starts_with('.') && !matches!(file_name.as_str(), ".github" | ".env.example" | ".gitignore" | ".zeusdesigns" | ".eslintrc" | ".prettierrc") {
+            continue;
+        }
+        if is_link_or_hidden_system(&entry) {
             continue;
         }
         let path = entry.path();
-        let rel = path
-            .strip_prefix(base_root)
-            .unwrap_or(&path)
-            .to_string_lossy()
-            .replace('\\', "/");
-        let meta = entry.metadata().ok();
-        let is_dir = meta.as_ref().map(|m| m.is_dir()).unwrap_or(false);
-
-        if is_dir {
-            let children = if depth > 0 {
-                walk_workspace(base_root, &path, depth - 1)
-            } else {
-                Vec::new()
-            };
-            nodes.push(FileNode {
-                name: file_name,
-                path: rel,
-                dir: true,
-                children: Some(children),
-                size: None,
-                language: None,
-                is_ui_component: None,
-            });
+        if path.is_dir() {
+            dirs.push((file_name, path));
         } else {
-            let ext = path
-                .extension()
-                .map(|e| e.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let (lang, is_ui) = detect_language(&ext);
-            nodes.push(FileNode {
-                name: file_name,
-                path: rel,
-                dir: false,
-                children: None,
-                size: meta.map(|m| m.len()),
-                language: Some(lang.to_string()),
-                is_ui_component: Some(is_ui),
-            });
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            files.push((file_name, path, size));
         }
     }
+    dirs.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    files.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    let mut in_dir = 0usize;
+    for (name, path) in dirs {
+        if budget.left == 0 || in_dir >= MAX_PER_DIR {
+            budget.truncated = true;
+            break;
+        }
+        budget.left -= 1;
+        in_dir += 1;
+        let rel = path.strip_prefix(base_root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+        let children = if depth > 0 { walk_budget(base_root, &path, depth - 1, skip, budget) } else { Vec::new() };
+        nodes.push(FileNode { name, path: rel, dir: true, children: Some(children), size: None, language: None, is_ui_component: None });
+    }
+    for (name, path, size) in files {
+        if budget.left == 0 || in_dir >= MAX_PER_DIR {
+            budget.truncated = true;
+            break;
+        }
+        budget.left -= 1;
+        in_dir += 1;
+        let rel = path.strip_prefix(base_root).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+        let ext = path.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
+        let (lang, is_ui) = detect_language(&ext);
+        nodes.push(FileNode { name, path: rel, dir: false, children: None, size: Some(size), language: Some(lang.to_string()), is_ui_component: Some(is_ui) });
+    }
+    nodes
+}
 
-    nodes.sort_by(|a, b| {
-        b.dir
-            .cmp(&a.dir)
-            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
+pub fn walk_workspace(base_root: &Path, current: &Path, depth: usize) -> Vec<FileNode> {
+    walk_workspace_n(base_root, current, depth, MAX_NODES)
+}
+
+pub fn walk_workspace_n(base_root: &Path, current: &Path, depth: usize, max_nodes: usize) -> Vec<FileNode> {
+    let skip = ignored_dirs();
+    let mut budget = Budget { left: max_nodes, truncated: false };
+    let nodes = walk_budget(base_root, current, depth, &skip, &mut budget);
+    let _ = budget.truncated;
     nodes
 }
 
@@ -160,6 +244,7 @@ pub fn workspace_open(
     if !p.exists() || !p.is_dir() {
         return Err(format!("Directory does not exist: {}", path));
     }
+    check_project_root(p)?;
     let name = p
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
@@ -179,8 +264,17 @@ pub fn workspace_tree(root: String, depth: Option<usize>) -> Result<Vec<FileNode
     if !root_path.exists() {
         return Err(format!("Workspace root not found: {}", root));
     }
-    let max_depth = depth.unwrap_or(3).min(8);
+    check_project_root(root_path)?;
+    let max_depth = depth.unwrap_or(2).min(4);
     Ok(walk_workspace(root_path, root_path, max_depth))
+}
+
+/// Lazy directory expansion: one level of `rel` under `root`.
+#[tauri::command(async)]
+pub fn workspace_list(root: String, rel: String) -> Result<Vec<FileNode>, String> {
+    let dir = safe_join(&root, &rel)?;
+    let base = Path::new(&root).canonicalize().unwrap_or_else(|_| PathBuf::from(&root));
+    Ok(walk_workspace(&base, &dir, 0))
 }
 
 #[tauri::command(async)]
@@ -301,7 +395,7 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
         return matches;
     }
     let needle = query.to_lowercase();
-    let nodes = walk_workspace(root_path, root_path, 4);
+    let nodes = walk_workspace_n(root_path, root_path, 6, 6000);
 
     fn visit(
         base: &Path,

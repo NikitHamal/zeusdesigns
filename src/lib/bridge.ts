@@ -69,8 +69,10 @@ const SKIP = new Set(["node_modules", ".git", "dist", "build", "target", ".next"
 
 async function walk(h: DirHandle, base: string, depth: number): Promise<FileNode[]> {
   const out: FileNode[] = [];
+  let n = 0;
   // @ts-expect-error async iterator on directory handles
   for await (const [name, entry] of h.entries()) {
+    if (++n > 400) break;
     if (SKIP.has(name) || name.startsWith(".DS")) continue;
     const path = base ? `${base}/${name}` : name;
     if (entry.kind === "directory") {
@@ -80,25 +82,39 @@ async function walk(h: DirHandle, base: string, depth: number): Promise<FileNode
   return out.sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name));
 }
 
+const TREE_DEPTH = 2;
+const errMsg = (e: unknown) => (typeof e === "string" ? e : e instanceof Error ? e.message : "Could not open that folder.");
+
 export async function openWorkspace(): Promise<Workspace | null> {
   if (isNative) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const root = await open({ directory: true, multiple: false, title: "Open project folder" });
+    if (root === null) return null;
+    if (typeof root !== "string") return null;
     try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const root = await open({ directory: true, multiple: false, title: "Open project folder" });
-      if (typeof root === "string") {
-        try {
-          const tree = await invoke<FileNode[]>("workspace_tree", { root, depth: 3 });
-          const name = root.split(/[\\/]/).filter(Boolean).pop() ?? root;
-          await invoke("workspace_open", { path: root }).catch(() => {});
-          return { name, root, tree };
-        } catch { /* engine not ready → FS Access fallback below */ }
-      } else if (root === null) return null;
-    } catch { /* ignore */ }
+      await invoke("workspace_open", { path: root });
+      const tree = await invoke<FileNode[]>("workspace_tree", { root, depth: TREE_DEPTH });
+      const name = root.split(/[\\/]/).filter(Boolean).pop() ?? root;
+      return { name, root, tree };
+    } catch (e) {
+      throw new Error(errMsg(e));
+    }
   }
   const w = window as unknown as { showDirectoryPicker?: (o?: object) => Promise<DirHandle> };
   if (!w.showDirectoryPicker) throw new Error("Folder access is not supported in this browser.");
   dirHandle = await w.showDirectoryPicker({ mode: "readwrite" });
-  return { name: dirHandle.name, tree: await walk(dirHandle, "", 3) };
+  return { name: dirHandle.name, tree: await walk(dirHandle, "", TREE_DEPTH) };
+}
+
+/** Lazily list one directory level (used when expanding folders in the file tree). */
+export async function listWorkspaceDir(ws: Workspace, rel: string): Promise<FileNode[]> {
+  if (ws.root && isNative) {
+    try { return await invoke<FileNode[]>("workspace_list", { root: ws.root, rel }); } catch { return []; }
+  }
+  if (!dirHandle) return [];
+  let d = dirHandle;
+  try { for (const p of rel.split("/").filter(Boolean)) d = await d.getDirectoryHandle(p); } catch { return []; }
+  return walk(d, rel, 0);
 }
 
 async function resolveFile(path: string, create: boolean) {
@@ -129,9 +145,9 @@ export async function writeWorkspaceFile(ws: Workspace, path: string, content: s
 
 export async function refreshTree(ws: Workspace): Promise<FileNode[]> {
   if (ws.root && isNative) {
-    try { return await invoke<FileNode[]>("workspace_tree", { root: ws.root, depth: 3 }); } catch { /* fallback */ }
+    try { return await invoke<FileNode[]>("workspace_tree", { root: ws.root, depth: TREE_DEPTH }); } catch { return ws.tree; }
   }
-  return dirHandle ? walk(dirHandle, "", 3) : ws.tree;
+  return dirHandle ? walk(dirHandle, "", TREE_DEPTH) : ws.tree;
 }
 
 export async function openWorkspaceByPath(root: string, fallbackName?: string): Promise<Workspace | null> {
@@ -140,8 +156,8 @@ export async function openWorkspaceByPath(root: string, fallbackName?: string): 
   const name = fallbackName || trimmed.split(/[\\/]/).filter(Boolean).pop() || trimmed;
   if (isNative) {
     try {
-      const tree = await invoke<FileNode[]>("workspace_tree", { root: trimmed, depth: 3 });
-      await invoke("workspace_open", { path: trimmed }).catch(() => {});
+      await invoke("workspace_open", { path: trimmed });
+      const tree = await invoke<FileNode[]>("workspace_tree", { root: trimmed, depth: TREE_DEPTH });
       return { name, root: trimmed, tree };
     } catch {
       return { name, root: trimmed, tree: [] };

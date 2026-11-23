@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
-import { nativeAvailable, nativeMcp, nativeMemory } from "./lib/bridge";
+import { nativeAvailable, nativeMcp, nativeMemory, openWorkspaceByPath } from "./lib/bridge";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { CanvasPane } from "./components/CanvasPane";
@@ -56,6 +56,17 @@ export default function App() {
     const every = setInterval(check, 6 * 60 * 60 * 1000);
     return () => { clearTimeout(first); clearInterval(every); };
   }, [patchUI]);
+  // Trees are never persisted; rebuild the active project's tree (bounded) whenever the project changes.
+  const activeRoot = useStore((s) => (s.projects.find((p) => p.id === s.activeProjectId) ?? s.projects[0])?.root);
+  const activeName = useStore((s) => (s.projects.find((p) => p.id === s.activeProjectId) ?? s.projects[0])?.name);
+  useEffect(() => {
+    if (!activeRoot) return;
+    let live = true;
+    openWorkspaceByPath(activeRoot, activeName).then((ws) => {
+      if (live && ws) useStore.getState().patchUI({ workspace: ws });
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [activeRoot, activeName]);
   useEffect(() => { localStorage.setItem("zeus-chat-w", String(w)); }, [w]);
 
   const startDrag = (e: React.PointerEvent) => {

@@ -9,6 +9,7 @@ import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
 import {
   nativeMemory,
+  listWorkspaceDir,
   nativeShell,
   openWorkspace,
   openWorkspaceByPath,
@@ -529,6 +530,15 @@ function Tree({
   onPick: (n: FileNode) => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [lazy, setLazy] = useState<Record<string, FileNode[]>>({});
+  const toggleDir = (n: FileNode) => {
+    const willOpen = !open[n.path];
+    setOpen((o) => ({ ...o, [n.path]: willOpen }));
+    const ws = useStore.getState().ui.workspace;
+    if (willOpen && ws && (!n.children || n.children.length === 0) && !lazy[n.path]) {
+      void listWorkspaceDir(ws, n.path).then((c) => setLazy((l) => ({ ...l, [n.path]: c })));
+    }
+  };
   return (
     <div>
       {nodes.map((n) => {
@@ -537,7 +547,7 @@ function Tree({
         return (
           <div key={n.path}>
             <button
-              onClick={() => (n.dir ? setOpen((o) => ({ ...o, [n.path]: !o[n.path] })) : onPick(n))}
+              onClick={() => (n.dir ? toggleDir(n) : onPick(n))}
               className={cn(
                 "state flex w-full items-center gap-2 rounded-lg py-1.5 pr-2 text-left text-[12.5px] text-on-surface",
                 isSel && "bg-primary-container/50 font-medium text-on-primary-container"
@@ -551,8 +561,8 @@ function Tree({
               )}
               <span className="truncate">{n.name}</span>
             </button>
-            {n.dir && isOpen && n.children && (
-              <Tree nodes={n.children} depth={depth + 1} selectedPath={selectedPath} forceOpen={forceOpen} onPick={onPick} />
+            {n.dir && isOpen && (lazy[n.path] ?? n.children) && (
+              <Tree nodes={lazy[n.path] ?? n.children ?? []} depth={depth + 1} selectedPath={selectedPath} forceOpen={forceOpen} onPick={onPick} />
             )}
           </div>
         );

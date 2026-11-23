@@ -646,7 +646,7 @@ export const useStore = create<State>()(
       storage: debouncedStorage,
       partialize: (s) => ({
         projectName: s.projectName,
-        projects: s.projects,
+        projects: s.projects.map((p) => ({ ...p, tree: undefined })),
         activeProjectId: s.activeProjectId,
         terminalHistory: s.terminalHistory.map((t) => ({ ...t, running: false })).slice(-30),
         pages: s.pages,
