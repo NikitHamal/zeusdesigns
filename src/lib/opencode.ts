@@ -27,8 +27,17 @@ export function ocModel(providerId: string, modelId: string): { providerID: stri
 
 async function buildConfig(providerId: string, modelId: string): Promise<Record<string, unknown>> {
   let cfg: Record<string, any> = {};
-  try { cfg = await (await fetch(`${GATEWAY}/v1/opencode.json`, { signal: AbortSignal.timeout(4000) })).json(); }
-  catch { throw new Error("Local server is off. Start it in Settings, Local server."); }
+  try {
+    cfg = await (await fetch(`${GATEWAY}/v1/opencode.json`, { signal: AbortSignal.timeout(2000) })).json();
+  } catch {
+    const { nativeServer } = await import("./bridge");
+    await nativeServer.start();
+    try {
+      cfg = await (await fetch(`${GATEWAY}/v1/opencode.json`, { signal: AbortSignal.timeout(4000) })).json();
+    } catch {
+      throw new Error("Local server is off. Start it in Settings, Local server.");
+    }
+  }
   const m = ocModel(providerId, modelId);
   if (m.providerID === "zeusdesigns") {
     const models = (cfg.provider ??= {}).zeusdesigns?.models;

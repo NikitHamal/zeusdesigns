@@ -46,12 +46,8 @@ pub fn run() {
     let provider_engine = Arc::new(providers::ProviderEngine::default());
     let local_server_state = Arc::new(server::LocalServerState::default());
 
-    // Auto-start the local OpenAI & OpenCode server on 127.0.0.1:11435 at launch
-    let _ = server::start_local_server(
-        provider_engine.clone(),
-        local_server_state.clone(),
-        Some(server::DEFAULT_SERVER_PORT),
-    );
+    // Local OpenAI & OpenCode server is off by default; users can start it from Settings > Local server
+    // or on demand when launching the OpenCode runtime.
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -93,7 +89,9 @@ pub fn run() {
             workspace::opencode_start,
             workspace::opencode_stop,
             memory::memory_list,
+            memory::memory_search,
             memory::memory_add,
+            memory::memory_update,
             memory::memory_delete,
             mcp::mcp_list,
             mcp::mcp_add,

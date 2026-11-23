@@ -178,7 +178,12 @@ const toItems = (l: NativeMem[] | null): MemoryItem[] | null =>
   })) : null;
 export const nativeMemory = {
   list: async () => toItems(await tryInvoke<NativeMem[]>("memory_list")),
-  add: async (text: string, category = "preferences") => toItems(await tryInvoke<NativeMem[]>("memory_add", { text, category })),
+  search: async (query = "", category?: string, project?: string) =>
+    toItems(await tryInvoke<NativeMem[]>("memory_search", { query, category, project })),
+  add: async (text: string, category = "preferences", project?: string) =>
+    toItems(await tryInvoke<NativeMem[]>("memory_add", { text, category, project })),
+  update: async (id: string, text: string, category?: string) =>
+    toItems(await tryInvoke<NativeMem[]>("memory_update", { id, text, category })),
   remove: async (id: string) => toItems(await tryInvoke<NativeMem[]>("memory_delete", { id })),
 };
 
@@ -262,7 +267,7 @@ export interface ServerStatus {
   lastModel: string;
 }
 
-let fallbackServerRunning = true;
+let fallbackServerRunning = false;
 let fallbackServerPort = 11435;
 
 function buildFallbackServerStatus(): ServerStatus {

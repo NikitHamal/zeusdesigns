@@ -217,6 +217,18 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "curl"
             | "webfetch"
             | "memory"
+            | "memory_search"
+            | "memory_list"
+            | "memory_get"
+            | "memory_read"
+            | "memory_save"
+            | "memory_add"
+            | "memory_set"
+            | "memory_edit"
+            | "memory_update"
+            | "memory_delete"
+            | "memory_remove"
+            | "memory_forget"
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
@@ -618,12 +630,83 @@ fn execute_inline_workspace_tools(
                     Err(e) => (false, format!("web_fetch failed: {}", e)),
                 }
             }
-            "memory" => {
+            "memory_search" | "memory_list" | "memory_get" | "memory_read" => {
                 let store = crate::memory::MemoryStore::default();
-                let items = store.add(body.to_string(), Some("agent".to_string()));
+                let cat = if matches!(
+                    path_arg.as_str(),
+                    "preferences" | "profile" | "topics" | "areas" | "all"
+                ) {
+                    Some(path_arg.as_str())
+                } else {
+                    None
+                };
+                let query = if !body.is_empty() {
+                    body
+                } else if cat.is_none() {
+                    path_arg.as_str()
+                } else {
+                    ""
+                };
+                let hits = store.search(query, cat, None);
+                if hits.is_empty() {
+                    (true, "No matching memory entries found.".to_string())
+                } else {
+                    let formatted = hits
+                        .iter()
+                        .take(30)
+                        .map(|m| format!("{} | [{}] {}", m.id, m.category, m.text))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    (true, formatted)
+                }
+            }
+            "memory" | "memory_save" | "memory_add" | "memory_set" => {
+                let store = crate::memory::MemoryStore::default();
+                let cat = if !path_arg.is_empty() {
+                    Some(path_arg.clone())
+                } else {
+                    Some("preferences".to_string())
+                };
+                let items = store.add(body.to_string(), cat, None);
+                let latest_id = items.last().map(|m| m.id.as_str()).unwrap_or("mem");
                 (
                     true,
-                    format!("Saved to persistent memory ({} total items)", items.len()),
+                    format!(
+                        "Saved memory {} ({} total items)",
+                        latest_id,
+                        items.len()
+                    ),
+                )
+            }
+            "memory_edit" | "memory_update" => {
+                let store = crate::memory::MemoryStore::default();
+                match store.update(&path_arg, body.to_string(), None) {
+                    Ok(items) => (
+                        true,
+                        format!(
+                            "Updated memory '{}' ({} total items)",
+                            path_arg,
+                            items.len()
+                        ),
+                    ),
+                    Err(e) => (false, e),
+                }
+            }
+            "memory_delete" | "memory_remove" | "memory_forget" => {
+                let store = crate::memory::MemoryStore::default();
+                let target = if !path_arg.is_empty() {
+                    path_arg.as_str()
+                } else {
+                    body
+                };
+                let items = store.remove(target);
+                (
+                    true,
+                    format!(
+                        "Removed memory '{}' ({} total items remaining)",
+                        target,
+                        items.len()
+                    ),
                 )
             }
             other if other.starts_with("mcp:") => {
@@ -633,7 +716,7 @@ fn execute_inline_workspace_tools(
             _ => (
                 false,
                 format!(
-                    "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory.",
+                    "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete.",
                     name
                 ),
             ),
@@ -849,15 +932,8 @@ pub fn chat_stream(
         let mut accumulated = String::new();
         let mut executed_tools = std::collections::HashSet::new();
 
-        // Inject persistent memory items and workspace/MCP agent tool instructions
+        // Never dump whole memory into the prompt; the agent fetches/records/edits memory on demand via memory_* tools.
         let mut enriched_req = req.clone();
-        let mem_items = crate::memory::MemoryStore::default().list();
-        if !mem_items.is_empty() {
-            enriched_req.system.push_str("\n\n## Persistent User & Design Memory\n");
-            for m in mem_items.iter().take(20) {
-                enriched_req.system.push_str(&format!("- [{}] {}\n", m.category, m.text));
-            }
-        }
         if let Some(root) = &req.workspace_root {
             if !root.trim().is_empty() && !enriched_req.system.contains("## Agent tools") {
                 enriched_req.system.push_str(

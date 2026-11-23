@@ -57,7 +57,7 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
     "## Agent tools",
     "Emit tool blocks outside `<think>` and stop your turn after the closing tag so the harness can execute and return `<tool_result>`. Never emit a placeholder tool name.",
     ws || !opts.design ? profile.toolExamples : "",
-    "- `<zeus_tool name=\"web_fetch\" path=\"https://...\"></zeus_tool>` | `<zeus_tool name=\"memory\">one durable fact worth keeping</zeus_tool>`",
+    "- `<zeus_tool name=\"web_fetch\" path=\"https://example.com\"></zeus_tool>` | `<zeus_tool name=\"memory_search\">query</zeus_tool>` | `<zeus_tool name=\"memory_save\" path=\"preferences\">durable fact</zeus_tool>` | `<zeus_tool name=\"memory_edit\" path=\"mem-id\">updated fact</zeus_tool>` | `<zeus_tool name=\"memory_delete\" path=\"mem-id\"></zeus_tool>`",
     opts.design ? studioToolsPrompt() : "",
     ...(mcp.length ? ["MCP tools, BODY is a JSON object of arguments:", ...mcp.map((t) => `- name="mcp:${t.server_id}:${t.name}" ${sig(t.input_schema)} ${t.description.replace(/\s+/g, " ").slice(0, 110)}`)] : []),
   ];

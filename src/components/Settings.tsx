@@ -424,14 +424,14 @@ function ServerTab() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-outline-variant bg-surface-container p-4">
         <div className="flex items-center gap-3">
-          <span className={cn("grid size-10 shrink-0 place-items-center rounded-[14px]", status?.running !== false ? "bg-primary text-on-primary" : "bg-surface-high text-on-surface-variant")}>
+          <span className={cn("grid size-10 shrink-0 place-items-center rounded-[14px]", status?.running === true ? "bg-primary text-on-primary" : "bg-surface-high text-on-surface-variant")}>
             <Icon name="dns" size={20} />
           </span>
           <div>
             <div className="flex items-center gap-2 font-semibold text-on-surface">
               <span>OpenAI &amp; OpenCode Local Gateway</span>
               <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-xs text-on-surface-variant">
-                {status?.running !== false ? `127.0.0.1:${status?.port ?? 11435}` : "Stopped"}
+                {status?.running === true ? `127.0.0.1:${status?.port ?? 11435}` : "Off by default"}
               </span>
             </div>
             <div className="text-xs text-on-surface-variant">
@@ -453,7 +453,7 @@ function ServerTab() {
           >
             Bind port
           </button>
-          <Toggle on={status?.running !== false} onChange={toggleServer} />
+          <Toggle on={status?.running === true} onChange={toggleServer} />
         </div>
       </div>
 

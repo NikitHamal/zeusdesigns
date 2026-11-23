@@ -31,6 +31,11 @@ export async function updateMemory(id: string, text: string) {
   const cur = items().find((m) => m.id === id);
   const t = text.trim();
   if (!cur || !t || t === cur.text) return;
+  const updated = await nativeMemory.update(id, t, cur.category ?? "preferences");
+  if (updated) {
+    setList([...updated].reverse());
+    return;
+  }
   await removeMemory(id);
   await addMemory(t, cur.category ?? "preferences");
 }
@@ -39,16 +44,19 @@ export async function clearMemory() {
   for (const m of [...items()]) await removeMemory(m.id);
 }
 
-/** Prompt section: memory grouped by bucket. */
+/**
+ * Compact memory index & agent tool protocol (never dumps full memory into every prompt).
+ * Agents fetch, record, edit, and delete memory entries on demand via `<zeus_tool name="memory_*">`.
+ */
 export function memoryBlock(): string {
   const { memory, memoryOn } = useStore.getState().settings;
-  if (!memoryOn || !memory.length) return "";
-  const out = ["## Memory (what you know about this user; apply it silently, never mention it unless asked)"];
-  for (const c of CATEGORIES) {
-    const l = memory.filter((m) => (m.category ?? "preferences") === c.id);
-    if (l.length) out.push(`### ${c.label}\n${l.map((m) => `- ${m.text}`).join("\n")}`);
-  }
-  return out.join("\n");
+  if (!memoryOn) return "";
+  const counts = CATEGORIES.map((c) => {
+    const n = memory.filter((m) => (m.category ?? "preferences") === c.id).length;
+    return n > 0 ? `${c.id}: ${n}` : "";
+  }).filter(Boolean).join(", ");
+  const summary = memory.length > 0 ? `${memory.length} saved (${counts})` : "0 saved";
+  return `## Memory (${summary} — not preloaded into context)\nFetch what you need on demand with \`<zeus_tool name="memory_search">query</zeus_tool>\` (or \`path="preferences|profile|topics|areas"\`), record important facts with \`<zeus_tool name="memory_save" path="preferences">fact</zeus_tool>\`, update an entry with \`<zeus_tool name="memory_edit" path="mem-id">updated fact</zeus_tool>\`, or delete obsolete entries with \`<zeus_tool name="memory_delete" path="mem-id"></zeus_tool>\`.`;
 }
 
 /** Pulls <remember category="...">fact</remember> tags the model wrote and returns the text without them. */

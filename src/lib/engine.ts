@@ -594,7 +594,15 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             else if (e.type === "tool_result") {
               if (studioRuns.has(e.id)) return; // built-in Zeus Studio tools are answered locally
               const t = tools.find((x) => x.id === e.id);
-              if (t) { t.status = e.ok ? "ok" : "error"; t.output = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output; }
+              if (t) {
+                t.status = e.ok ? "ok" : "error";
+                t.output = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output;
+                if (t.name.startsWith("memory")) {
+                  import("./bridge").then(({ nativeMemory }) =>
+                    nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: [...l].reverse() }))
+                  ).catch(() => {});
+                }
+              }
               sync();
             }
             else if (e.type === "error") reject(new Error(e.message));
