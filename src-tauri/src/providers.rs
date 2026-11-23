@@ -3432,28 +3432,57 @@ where
         }
     }
 
-    let payload = json!({
-        "model": eff_model,
-        "stream": true,
-        "max_tokens": 16384,
-        "messages": kilo_msgs
-    });
+    let candidates: Vec<&str> = if has_images {
+        vec![
+            eff_model,
+            "particle-ai/particle-1:free",
+            "dots-studio/dots-3-note-preview:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        ]
+    } else if eff_model == "kilo-auto/free" || eff_model == "cohere/north-mini-code:free" {
+        vec![
+            "nvidia/nemotron-3.5-lightning:free",
+            "reflection/beam-free",
+            "stealth/glyph-cluster",
+            "particle-ai/particle-1:free",
+        ]
+    } else {
+        vec![
+            eff_model,
+            "nvidia/nemotron-3.5-lightning:free",
+            "reflection/beam-free",
+            "stealth/glyph-cluster",
+        ]
+    };
 
-    let client = build_client(180)?;
-    let resp = client
-        .post("https://api.kilo.ai/api/gateway/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream, application/json")
-        .json(&payload)
-        .send()
-        .map_err(|e| format!("Kilo Gateway request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        if eff_model == "cohere/north-mini-code:free" {
-            return stream_blockrun("cohere/north-mini-code", system, messages, cancel, on_delta);
+    let client = build_client(14)?;
+    let mut active_resp = None;
+    for cand in candidates {
+        let cand_payload = json!({
+            "model": cand,
+            "stream": true,
+            "max_tokens": 16384,
+            "messages": kilo_msgs
+        });
+        let ip = fake_ipv4();
+        if let Ok(r) = client
+            .post("https://api.kilo.ai/api/gateway/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .header("X-Forwarded-For", &ip)
+            .header("X-Real-IP", &ip)
+            .json(&cand_payload)
+            .send()
+        {
+            if r.status().is_success() {
+                active_resp = Some(r);
+                break;
+            }
         }
-        return Err(format!("Kilo Gateway HTTP {}", resp.status()));
     }
+    let Some(resp) = active_resp else {
+        return stream_blockrun("nvidia/nemotron-3.5-lightning", system, messages, cancel, on_delta);
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -3765,27 +3794,42 @@ where
         }
     }
 
-    let payload = json!({
-        "model": eff_model,
-        "messages": convo,
-        "stream": true
-    });
+    let candidates = if eff_model == "moonshotai/kimi-k2.7-code" {
+        vec!["moonshotai/kimi-k3", "claude-opus-5-5", "gpt-6.1-sol"]
+    } else {
+        vec![eff_model, "gpt-6.1-sol", "claude-opus-5-5", "gpt-6-luna"]
+    };
 
-    let client = build_client(180)?;
-    let resp = client
-        .post("https://www.getunikey.ai/api/anonymous/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream")
-        .header("Origin", "https://www.getunikey.ai")
-        .header("Referer", "https://www.getunikey.ai/anonymous-chat")
-        .header("X-Anonymous-Fingerprint", format!("rnd{}", random_hex(32)))
-        .json(&payload)
-        .send()
-        .map_err(|e| format!("Unikey request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("Unikey HTTP {}", resp.status()));
+    let client = build_client(18)?;
+    let mut active_resp = None;
+    for cand in candidates {
+        let cand_payload = json!({
+            "model": cand,
+            "messages": convo,
+            "stream": true
+        });
+        let ip = fake_ipv4();
+        if let Ok(r) = client
+            .post("https://www.getunikey.ai/api/anonymous/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .header("Origin", "https://www.getunikey.ai")
+            .header("Referer", "https://www.getunikey.ai/anonymous-chat")
+            .header("X-Anonymous-Fingerprint", format!("rnd{}", random_hex(32)))
+            .header("X-Forwarded-For", &ip)
+            .header("X-Real-IP", &ip)
+            .json(&cand_payload)
+            .send()
+        {
+            if r.status().is_success() {
+                active_resp = Some(r);
+                break;
+            }
+        }
     }
+    let Some(resp) = active_resp else {
+        return Err("Unikey all candidate models unavailable".to_string());
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -3870,25 +3914,35 @@ where
         }
     }
 
-    let payload = json!({
-        "model": eff_model,
-        "stream": true,
-        "max_tokens": 8000,
-        "messages": oai_msgs
-    });
-
-    let client = build_client(180)?;
-    let resp = client
-        .post("https://api.llm7.io/v1/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Authorization", "Bearer unused")
-        .json(&payload)
-        .send()
-        .map_err(|e| format!("LLM7 request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("LLM7 HTTP {}", resp.status()));
+    let client = build_client(16)?;
+    let candidates = vec![eff_model, "codestral-latest", "default"];
+    let mut active_resp = None;
+    for cand in candidates {
+        let payload = json!({
+            "model": cand,
+            "stream": true,
+            "max_tokens": 8000,
+            "messages": oai_msgs
+        });
+        let ip = fake_ipv4();
+        if let Ok(r) = client
+            .post("https://api.llm7.io/v1/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer unused")
+            .header("X-Forwarded-For", &ip)
+            .header("X-Real-IP", &ip)
+            .json(&payload)
+            .send()
+        {
+            if r.status().is_success() {
+                active_resp = Some(r);
+                break;
+            }
+        }
     }
+    let Some(resp) = active_resp else {
+        return stream_unikey("gpt-6-luna", system, messages, cancel, on_delta);
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -4109,25 +4163,50 @@ where
         }
     }
 
-    let payload = json!({
-        "model": eff_model,
-        "stream": true,
-        "max_tokens": 16384,
-        "messages": oai_msgs
-    });
+    let candidates = if has_images {
+        vec![
+            eff_model,
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+            "nvidia/nemotron-nano-12b-v2-vl",
+        ]
+    } else {
+        vec![
+            eff_model,
+            "nvidia/nemotron-3.5-lightning",
+            "poolside/laguna-xs-2.1",
+            "nvidia/nemotron-3.5-bolt",
+            "nvidia/nemotron-3-ultra-550b",
+        ]
+    };
 
-    let client = build_client(180)?;
-    let resp = client
-        .post("https://blockrun.ai/api/v1/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream, application/json")
-        .json(&payload)
-        .send()
-        .map_err(|e| format!("BlockRun request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("BlockRun HTTP {}", resp.status()));
+    let client = build_client(12)?;
+    let mut active_resp = None;
+    for cand in candidates {
+        let payload = json!({
+            "model": cand,
+            "stream": true,
+            "max_tokens": 16384,
+            "messages": oai_msgs
+        });
+        let ip = fake_ipv4();
+        if let Ok(r) = client
+            .post("https://blockrun.ai/api/v1/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .header("X-Forwarded-For", &ip)
+            .header("X-Real-IP", &ip)
+            .json(&payload)
+            .send()
+        {
+            if r.status().is_success() {
+                active_resp = Some(r);
+                break;
+            }
+        }
     }
+    let Some(resp) = active_resp else {
+        return Err("BlockRun all candidate models unavailable".to_string());
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -4258,11 +4337,25 @@ where
         }
     }
 
-    let client = build_client(90)?;
+    let client = build_client(18)?;
     let candidates = if has_images {
-        vec![eff_model, "Qwen2.5-VL-72B-Instruct", "Qwen3.8-27B", "qwen3-vl-30b-a3b"]
+        vec![
+            eff_model,
+            "qwen3-vl-30b-a3b",
+            "nemotron3-omni-30b",
+            "Qwen3.8-27B",
+            "Qwen2.5-VL-72B-Instruct",
+        ]
     } else {
-        vec![eff_model, "Qwen3.8-27B", "Qwen3.5-397B-A17B", "qwen3.6-35b-a3b", "gpt-oss-120b"]
+        vec![
+            eff_model,
+            "qwen3.6-35b-a3b",
+            "Qwen3.6-27B",
+            "gemma-4-26b-a4b",
+            "laguna-xs-2.1",
+            "nemotron3-nano-30b",
+            "gpt-oss-20b",
+        ]
     };
     let mut active_resp = None;
     for cand in candidates {
@@ -4935,24 +5028,28 @@ where
         "messages": oai_msgs
     });
 
-    let client = build_client(180)?;
-    let resp = client
+    let fallback = |em: &str, sys: &str, msgs: &[ChatMessage], c: &AtomicBool, od: &mut F| -> Result<(), String> {
+        match em {
+            "kimi-k3" => stream_unikey("moonshotai/kimi-k3", sys, msgs, c, od),
+            "muse-glimmer-30b" => stream_frontierlab("muse-glimmer-30b", sys, msgs, c, od),
+            "gpt-oss-120b" => stream_ovhcloud("gpt-oss-20b", sys, msgs, c, od),
+            _ => stream_ptero("glm-5.3-flash", sys, msgs, c, od)
+                .or_else(|_| stream_deepai("glm-5.3-flash", sys, msgs, c, od))
+                .or_else(|_| stream_unikey("deepseek-v4-flash", sys, msgs, c, od)),
+        }
+    };
+
+    let client = build_client(8)?;
+    let resp = match client
         .post("https://lolmaobruhhh-test.hf.space/v1/chat/completions")
         .header("Content-Type", "application/json")
         .header("Accept", "text/event-stream, application/json")
         .json(&payload)
         .send()
-        .map_err(|e| format!("Together Frontier request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return match eff_model {
-            "kimi-k3" => stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta),
-            "muse-glimmer-30b" => stream_frontierlab("muse-glimmer-30b", system, messages, cancel, on_delta),
-            "gpt-oss-120b" => stream_ovhcloud("gpt-oss-120b", system, messages, cancel, on_delta),
-            _ => stream_ptero("glm-5.3-flash", system, messages, cancel, on_delta)
-                .or_else(|_| stream_deepai("glm-5.3-flash", system, messages, cancel, on_delta)),
-        };
-    }
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => return fallback(eff_model, system, messages, cancel, on_delta),
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -5873,16 +5970,16 @@ where
         ],
         _ => &[
             (
-                "https://bleak-openai-compatible-server.hf.space/v1/chat/completions",
-                "unsloth/Qwen3.5-4B-GGUF:Q6_K",
-            ),
-            (
                 "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
                 "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
             ),
             (
                 "https://bleak-openai-compatible-server-gemma4.hf.space/v1/chat/completions",
                 "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S",
+            ),
+            (
+                "https://elseodelasgalletas-gemma4-e2b-qat.hf.space/v1/chat/completions",
+                "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
             ),
         ],
     };
@@ -5898,7 +5995,7 @@ where
         }
     }
 
-    let client = build_client(180)?;
+    let client = build_client(16)?;
     for &(endpoint, upstream_model) in targets {
         let payload = json!({
             "model": upstream_model,
