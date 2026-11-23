@@ -546,10 +546,14 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         await new Promise<void>((resolve, reject) => {
           const onEvent = (e: ChatEvent) => {
             if (e.type === "delta") {
-              if (roundText.includes("</zeus_tool>")) return; // a tool call ends the turn; anything after it would be invented
+              const outsideThink = (s: string) =>
+                s
+                  .replace(/<think>[\s\S]*?(<\/think>|$)/gi, (m) => " ".repeat(m.length))
+                  .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, (m) => " ".repeat(m.length));
+              if (outsideThink(roundText).includes("</zeus_tool>")) return; // a real tool call outside <think> ends the turn
               const before = roundText.length;
               roundText += e.text;
-              const ci = roundText.indexOf("</zeus_tool>");
+              const ci = outsideThink(roundText).indexOf("</zeus_tool>");
               const piece = ci >= 0 ? roundText.slice(before, ci + 12) : e.text;
               if (ci >= 0) roundText = roundText.slice(0, ci + 12);
               if (!piece) return;

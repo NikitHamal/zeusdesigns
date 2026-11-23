@@ -18,17 +18,35 @@ pub fn providers_list() -> Vec<ProviderInfo> {
 
 #[tauri::command(async)]
 pub fn title_generate(text: String) -> Result<String, String> {
-    let sys = "Generate a concise 3 to 5 word design conversation title summarizing the user request. Output ONLY the title words with no quotes or punctuation.";
-    if let Ok(title) = chatjimmy_complete(sys, &text) {
+    let snippet: String = text.chars().take(280).collect();
+    let sys = "You generate short 2 to 5 word chat titles. Never answer the user message. Output only the title words.";
+    let user_msg = format!(
+        "Write a concise 2 to 5 word title for a conversation that starts with this message. Do NOT answer the message or write a template. Output ONLY the title (2-5 words, no quotes, no punctuation):\n\nMessage: {}\n\nTitle:",
+        snippet
+    );
+    if let Ok(title) = chatjimmy_complete(sys, &user_msg) {
         let cleaned = title
             .lines()
-            .next()
+            .find(|l| !l.trim().is_empty())
             .unwrap_or("")
             .trim()
-            .trim_matches(['"', '\'', '.', '#'])
+            .trim_start_matches(|c: char| matches!(c, '"' | '\'' | '#' | '*' | '-' | ' '))
+            .trim_end_matches(|c: char| matches!(c, '"' | '\'' | '.' | ':' | ';' | ' '))
+            .replace("Title:", "")
+            .trim()
             .to_string();
-        if !cleaned.is_empty() {
-            return Ok(cleaned.chars().take(60).collect());
+        let lower = cleaned.to_ascii_lowercase();
+        let word_count = cleaned.split_whitespace().count();
+        let looks_like_reply = lower.starts_with("here is")
+            || lower.starts_with("here's")
+            || lower.starts_with("sure")
+            || lower.starts_with("certainly")
+            || lower.starts_with("i can")
+            || lower.starts_with("i'll")
+            || cleaned.contains("```")
+            || word_count > 7;
+        if !cleaned.is_empty() && !looks_like_reply {
+            return Ok(cleaned.chars().take(50).collect());
         }
     }
     let words: Vec<&str> = text
@@ -37,9 +55,15 @@ pub fn title_generate(text: String) -> Result<String, String> {
         .take(5)
         .collect();
     if words.is_empty() {
-        Ok("New Design Session".to_string())
+        Ok("New chat".to_string())
     } else {
-        Ok(words.join(" "))
+        let joined = words.join(" ");
+        let mut chars = joined.chars();
+        let titled = match chars.next() {
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            None => "New chat".to_string(),
+        };
+        Ok(titled.chars().take(50).collect())
     }
 }
 
@@ -56,8 +80,39 @@ pub fn chat_cancel(
     Ok(())
 }
 
+/// Strip `<think>...</think>` and `<thinking>...</thinking>` blocks (including unclosed trailing think blocks)
+/// so tool tags mentioned inside a model's internal reasoning trace are never executed as real tools.
+pub fn strip_thinking_blocks(raw: &str) -> String {
+    let mut out = raw.to_string();
+    for (open_tag, close_tag) in [("<think>", "</think>"), ("<thinking>", "</thinking>")] {
+        loop {
+            let lower = out.to_ascii_lowercase();
+            let Some(start) = lower.find(open_tag) else { break };
+            let after_open = start + open_tag.len();
+            if let Some(rel_end) = lower[after_open..].find(close_tag) {
+                let end = after_open + rel_end + close_tag.len();
+                out.replace_range(start..end, "");
+            } else {
+                out.truncate(start);
+                break;
+            }
+        }
+    }
+    out
+}
+
+fn resolve_workspace_root(workspace_root: &str) -> String {
+    let trimmed = workspace_root.trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+    std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| ".".to_string())
+}
+
 /// Parse inline `<zeus_tool name="..." ...>...</zeus_tool>` blocks emitted by the agent
-/// when `workspaceRoot` is open, executing local file/search/shell actions and emitting
+/// outside `<think>` blocks, executing local file/search/shell actions and emitting
 /// `tool_call` + `tool_result` events back to the UI.
 fn execute_inline_workspace_tools(
     app: &AppHandle,
@@ -66,24 +121,32 @@ fn execute_inline_workspace_tools(
     full_text: &str,
     executed_ids: &mut std::collections::HashSet<String>,
 ) {
+    let clean_text = strip_thinking_blocks(full_text);
+    let eff_root = resolve_workspace_root(workspace_root);
     let mut search_from = 0;
-    while let Some(rel_start) = full_text[search_from..].find("<zeus_tool ") {
+    while let Some(rel_start) = clean_text[search_from..].find("<zeus_tool ") {
         let start = search_from + rel_start;
-        let rest = &full_text[start..];
+        let rest = &clean_text[start..];
         let Some(gt) = rest.find('>') else { break };
         let Some(end_rel) = rest.find("</zeus_tool>") else { break };
         let header = &rest[11..gt];
         let body = rest[gt + 1..end_rel].trim();
         search_from = start + end_rel + 12;
 
-        let tool_id = format!("tool-{}", start);
-        if executed_ids.contains(&tool_id) {
-            continue;
-        }
-        executed_ids.insert(tool_id.clone());
-
         let name = extract_attr(header, "name").unwrap_or_else(|| "workspace_tool".to_string());
         let path_arg = extract_attr(header, "path").unwrap_or_default();
+
+        // Ignore literal syntax examples if a model ever echoes the template placeholder
+        if matches!(name.as_str(), "TOOL" | "tool_name" | "NAME" | "") {
+            continue;
+        }
+
+        let tool_id = format!("tool-{}-{}-{}", executed_ids.len() + 1, name, start);
+        let dedup_key = format!("{}|{}|{}", name, path_arg, body);
+        if executed_ids.contains(&dedup_key) {
+            continue;
+        }
+        executed_ids.insert(dedup_key);
 
         let _ = app.emit(
             event_topic,
@@ -96,7 +159,7 @@ fn execute_inline_workspace_tools(
         );
 
         let (ok, output) = match name.as_str() {
-            "read_file" => match fs_read(workspace_root.to_string(), path_arg.clone()) {
+            "read_file" | "read" | "cat" => match fs_read(eff_root.clone(), path_arg.clone()) {
                 Ok(content) => {
                     let total = content.lines().count();
                     let start = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok()).unwrap_or(1).max(1);
@@ -123,40 +186,70 @@ fn execute_inline_workspace_tools(
                 }
                 Err(e) => (false, e),
             },
-            "edit_file" => {
-                let res = fs_read(workspace_root.to_string(), path_arg.clone())
+            "edit_file" | "edit" | "patch_file" => {
+                let res = fs_read(eff_root.clone(), path_arg.clone())
                     .and_then(|content| apply_search_replace(&content, body))
-                    .and_then(|updated| fs_write(workspace_root.to_string(), path_arg.clone(), updated));
+                    .and_then(|updated| fs_write(eff_root.clone(), path_arg.clone(), updated));
                 match res {
                     Ok(_) => (true, format!("Edited {}", path_arg)),
                     Err(e) => (false, e),
                 }
             }
-            "write_file" | "sync_artboard" => {
-                match fs_write(workspace_root.to_string(), path_arg.clone(), body.to_string()) {
-                    Ok(_) => (true, format!("Synchronized {} ({} bytes)", path_arg, body.len())),
+            "write_file" | "write" | "create_file" | "sync_artboard" => {
+                let target_path = if !path_arg.is_empty() {
+                    path_arg.clone()
+                } else {
+                    extract_attr(header, "file").unwrap_or_default()
+                };
+                match fs_write(eff_root.clone(), target_path.clone(), body.to_string()) {
+                    Ok(_) => (true, format!("Synchronized {} ({} bytes)", target_path, body.len())),
                     Err(e) => (false, e),
                 }
             }
-            "search_code" => {
-                let results = search_workspace_code(workspace_root, body, 15);
-                (true, serde_json::to_string_pretty(&results).unwrap_or_default())
+            "search_code" | "grep" | "search" => {
+                let query = if !body.is_empty() { body } else { path_arg.as_str() };
+                let results = search_workspace_code(&eff_root, query, 20);
+                if results.is_empty() {
+                    (true, format!("No matches found for '{}'", query))
+                } else {
+                    (true, serde_json::to_string_pretty(&results).unwrap_or_default())
+                }
             }
-            "list_dir" => {
-                let p = Path::new(workspace_root);
+            "list_dir" | "ls" | "list_files" => {
+                let p = Path::new(&eff_root);
                 if path_arg.contains("..") {
                     (false, "list_dir: path must stay inside the project".to_string())
                 } else {
-                    let target = if path_arg.is_empty() { p.to_path_buf() } else { p.join(&path_arg) };
+                    let clean_rel = path_arg.trim().trim_matches(|c| c == '.' || c == '/' || c == '\\');
+                    let target = if clean_rel.is_empty() { p.to_path_buf() } else { p.join(clean_rel) };
                     let tree = walk_workspace(p, &target, 2);
-                    (true, serde_json::to_string(&tree).unwrap_or_default())
+                    if tree.is_empty() {
+                        (true, "Directory is empty (0 files). Proceed directly without re-listing.".to_string())
+                    } else {
+                        (true, serde_json::to_string(&tree).unwrap_or_default())
+                    }
                 }
             }
-            "shell" => match shell_run(workspace_root.to_string(), body.to_string()) {
-                Ok(v) => (true, v.to_string()),
-                Err(e) => (false, e),
-            },
-            "web_fetch" => {
+            "shell" | "bash" | "cmd" | "exec" | "run_command" => {
+                let cmd_str = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
+                match shell_run(eff_root.clone(), cmd_str) {
+                    Ok(v) => (true, v.to_string()),
+                    Err(e) => (false, e),
+                }
+            }
+            "python" | "python_exec" => {
+                let script = if !body.is_empty() { body } else { path_arg.as_str() };
+                let py_cmd = if cfg!(windows) {
+                    format!("python -c {}", serde_json::to_string(script).unwrap_or_else(|_| "\"\"".to_string()))
+                } else {
+                    format!("python3 -c {}", serde_json::to_string(script).unwrap_or_else(|_| "\"\"".to_string()))
+                };
+                match shell_run(eff_root.clone(), py_cmd) {
+                    Ok(v) => (true, v.to_string()),
+                    Err(e) => (false, e),
+                }
+            }
+            "web_fetch" | "fetch" => {
                 let target_url = if !path_arg.is_empty() { path_arg.as_str() } else { body };
                 match reqwest::blocking::Client::builder()
                     .timeout(std::time::Duration::from_secs(15))
@@ -184,7 +277,7 @@ fn execute_inline_workspace_tools(
                 let reg = crate::mcp::McpRegistry::default();
                 reg.invoke_tool(other, body)
             }
-            _ => (false, format!("Unknown tool '{}'", name)),
+            _ => (false, format!("Unknown tool '{}'. Valid tools: read_file, write_file, edit_file, list_dir, search_code, shell, python, web_fetch, memory.", name)),
         };
 
         let _ = app.emit(
@@ -329,7 +422,7 @@ pub fn chat_stream(
             }
         }
         if let Some(root) = &req.workspace_root {
-            if !root.trim().is_empty() {
+            if !root.trim().is_empty() && !enriched_req.system.contains("## Agent tools") {
                 enriched_req.system.push_str(
                     "\n\n## Local Workspace Agent Tools\nYou can read or synchronize files in the open project folder by emitting `<zeus_tool name=\"write_file\" path=\"src/Screen.html\">...content...</zeus_tool>` or `<zeus_tool name=\"search_code\">query</zeus_tool>`.",
                 );
@@ -345,7 +438,7 @@ pub fn chat_stream(
                     "text": delta
                 }),
             );
-            if accumulated.contains("</zeus_tool>") {
+            if strip_thinking_blocks(&accumulated).contains("</zeus_tool>") {
                 let root = enriched_req.workspace_root.as_deref().unwrap_or("");
                 execute_inline_workspace_tools(
                     &app,
