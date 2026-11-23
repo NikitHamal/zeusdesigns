@@ -76,6 +76,31 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
+    id: "together2api", name: "Together Frontier", tagline: "GLM 5.3 · Kimi K3 · Muse Glimmer · zero-key", speed: "~145 tok/s", color: "#e67700", icon: "hub",
+    contextWindow: 131072,
+    models: [
+      { id: "glm-5.3", label: "GLM 5.3", note: "128k ctx · Z.ai flagship reasoning & UI architect", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "glm-5.3-flash", label: "GLM 5.3 Flash", note: "128k ctx · Z.ai 320B MoE fast reasoning & code", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "kimi-k3", label: "Kimi K3 2.8T", note: "128k ctx · Moonshot 2.8T MoE frontier coder", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "muse-glimmer-30b", label: "Muse Glimmer 30B", note: "128k ctx · Meta expressive UI & design reasoning", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "gpt-oss-120b", label: "GPT-OSS 120B", note: "128k ctx · OpenAI 120B open-weights reasoning", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "glm-5.2", label: "GLM 5.2", note: "128k ctx · Z.ai multi-step reasoning coder", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "qwen3.5-9b", label: "Qwen 3.5 9B", note: "128k ctx · Alibaba compact fast UI coder", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "aihorde", name: "AI Horde", tagline: "Qwen 3.8 · Gemma 4 · zero-key distributed pool", speed: "~95 tok/s", color: "#5c940d", icon: "dns",
+    contextWindow: 32768,
+    models: [
+      { id: "Qwen/Qwen3.8-Flash-Next", label: "Qwen 3.8 Flash Next", note: "32k ctx · Alibaba Qwen 3.8 Flash distributed worker", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+      { id: "koboldcpp/Qwen/Qwen3.8-27B", label: "Qwen 3.8 27B", note: "32k ctx · Alibaba 27B dense coding & UI worker", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+      { id: "llamacpp/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive", label: "Qwen 3.6 35B MoE", note: "32k ctx · 35B A3B fast frontend coder", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+      { id: "koboldcpp/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q2_K_P", label: "Gemma 4 E4B", note: "32k ctx · Google Gemma 4 compact UI generator", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+      { id: "koboldcpp/Cydonia-24B-v4zg-Q4_K_M", label: "Cydonia 24B", note: "32k ctx · 24B creative & copywriting model", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+      { id: "koboldcpp/Llama-3.2-3B-Instruct", label: "Llama 3.2 3B Instruct", note: "32k ctx · Fast lightweight instruction model", reasoning: false, vision: false, contextWindow: 32768, maxOutput: 4096 },
+    ],
+  },
+  {
     id: "apisfreellm", name: "APIsFreeLLM", tagline: "10,000 req/day · zero-key OpenAI stream", speed: "~155 tok/s", color: "#d9480f", icon: "terminal",
     contextWindow: 32768,
     models: [
