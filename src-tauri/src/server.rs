@@ -309,11 +309,11 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
         ),
         (
             "glm-5.3",
-            "together2api",
-            "GLM 5.3 Flagship (Zeus Together)",
+            "freellmhub",
+            "GLM 5.3 Flagship (Zeus FreeLLM Hub)",
             true,
             false,
-            131072,
+            262144,
             16384,
         ),
         (
@@ -473,7 +473,7 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
         "DeepSeek-V4.1-Flash-1017" | "Qwen3.8-27B" | "Qwen3.5-397B-A17B" | "Qwen2.5-VL-72B-Instruct" => {
             ("ovhcloud".to_string(), trimmed.to_string())
         }
-        "glm-5.3" | "glm-5.3-flash" => ("together2api".to_string(), trimmed.to_string()),
+        "glm-5.3" | "glm-5.3-flash" => ("freellmhub".to_string(), trimmed.to_string()),
         "kimi-k3" => ("unikey".to_string(), "moonshotai/kimi-k3".to_string()),
         "nemotron-3.5-super-vl" => (
             "kilo".to_string(),

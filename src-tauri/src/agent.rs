@@ -573,6 +573,66 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
+    // 5. Support K2-Horizon `<ifm|tool_call>NAME\n<ifm|arg_key>...</ifm|arg_key>\n<ifm|arg_value>...</ifm|arg_value>\n</ifm|tool_call>`
+    if list.is_empty() {
+        let open_pat = "<ifm|tool_call>";
+        let close_pat = "</ifm|tool_call>";
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find(open_pat) {
+            let start = from + rel_s;
+            let after_open = start + open_pat.len();
+            let Some(rel_end) = clean_text[after_open..].find(close_pat) else { break };
+            let inner = &clean_text[after_open..after_open + rel_end];
+            from = after_open + rel_end + close_pat.len();
+            let name_end = inner.find('<').unwrap_or(inner.len());
+            let name = inner[..name_end].trim().to_string();
+            if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
+                continue;
+            }
+            let mut path_arg = String::new();
+            let mut start_line = None;
+            let mut end_line = None;
+            let mut body_out = String::new();
+            let mut afrom = name_end;
+            while let Some(ks) = inner[afrom..].find("<ifm|arg_key>") {
+                let kstart = afrom + ks + "<ifm|arg_key>".len();
+                let Some(ke) = inner[kstart..].find("</ifm|arg_key>") else { break };
+                let key = inner[kstart..kstart + ke].trim();
+                let after_k = kstart + ke + "</ifm|arg_key>".len();
+                let Some(vs) = inner[after_k..].find("<ifm|arg_value>") else { break };
+                let vstart = after_k + vs + "<ifm|arg_value>".len();
+                let Some(ve) = inner[vstart..].find("</ifm|arg_value>") else { break };
+                let val = inner[vstart..vstart + ve].trim();
+                afrom = vstart + ve + "</ifm|arg_value>".len();
+                if matches!(key, "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
+                    path_arg = val.to_string();
+                } else if key == "start" {
+                    start_line = val.parse::<usize>().ok();
+                } else if key == "end" {
+                    end_line = val.parse::<usize>().ok();
+                } else if matches!(key, "command" | "cmd" | "code" | "script" | "content" | "body" | "query" | "pattern" | "text") {
+                    body_out = val.to_string();
+                } else if body_out.is_empty() {
+                    body_out = val.to_string();
+                }
+            }
+            list.push(InlineToolInvocation {
+                name,
+                path: path_arg,
+                start_line,
+                end_line,
+                body: body_out,
+                offset: start,
+            });
+        }
+    }
+
+    // 6. Support GPT-OSS Harmony `<|channel|>commentary to=zeus_tool name="shell" >...</zeus_tool>` or `to=functions.NAME ...<|message|>{...}`
+    if list.is_empty() && clean_text.contains("to=zeus_tool") {
+        let normalized = clean_text.replace("to=zeus_tool", "<zeus_tool");
+        return parse_inline_invocations_segment(&normalized, allow_unclosed_tail, strict_placeholder_filter);
+    }
+
     list.sort_by_key(|x| x.offset);
     list
 }
@@ -1144,6 +1204,7 @@ pub fn chat_stream(
                 || stripped.contains("</memory_save>")
                 || stripped.contains("</memory_edit>")
                 || stripped.contains("</memory_delete>")
+                || stripped.contains("</ifm|tool_call>")
                 || (stripped.contains("<zeus_tool") && stripped.contains("/>"))
             {
                 let root = enriched_req.workspace_root.as_deref().unwrap_or("");
@@ -1160,10 +1221,12 @@ pub fn chat_stream(
 
         if res.is_ok()
             && (accumulated.contains("<zeus_tool")
+                || accumulated.contains("to=zeus_tool")
                 || accumulated.contains("<tool_call>")
                 || accumulated.contains("<function_call>")
                 || accumulated.contains("<function")
                 || accumulated.contains("<invoke")
+                || accumulated.contains("<ifm|tool_call>")
                 || accumulated.contains("<bash")
                 || accumulated.contains("<shell")
                 || accumulated.contains("<python")

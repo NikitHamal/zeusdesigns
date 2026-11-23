@@ -2364,10 +2364,16 @@ where
             let sys_full: String = system.chars().take(24000).collect();
             let is_opencode = sys_full.contains("OpenCode / OpenAI Tool-Calling Protocol");
             let is_design = sys_full.contains("## Current canvas page");
+            let is_tools = is_agent_tool_request(&sys_full);
+            let spec_text = if is_tools {
+                format!("{}\n\n[System Specification]\n{}", scraper_xml_dsl_banner(), sys_full)
+            } else {
+                format!("[System Specification]\n{}", sys_full)
+            };
             inc_msgs.push(json!({
                 "id": random_hex(16),
                 "role": "user",
-                "parts": [{ "type": "text", "text": format!("[System Specification]\n{}", sys_full) }]
+                "parts": [{ "type": "text", "text": spec_text }]
             }));
             inc_msgs.push(json!({
                 "id": random_hex(16),
@@ -2376,6 +2382,8 @@ where
                     "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
                 } else if is_design {
                     "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML."
+                } else if is_tools {
+                    "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
                 } else {
                     "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
                 } }]
@@ -2637,7 +2645,11 @@ where
         _ => "high",
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let mut sections = Vec::new();
+    if wants_tools {
+        sections.push(scraper_xml_dsl_banner().to_string());
+    }
     if !system.trim().is_empty() {
         let sys_safe: String = system.chars().take(20000).collect();
         sections.push(format!("[Zeus Desktop Harness Instructions]\n{}", sys_safe));
@@ -2650,6 +2662,8 @@ where
             hist.push_str(&format!("{}: {}\n\n", role_lbl, snippet));
         }
         sections.push(format!("[Conversation History]\n{}", hist.trim()));
+    } else if wants_tools {
+        sections.push("[Verified Workspace Transcript]\nUser: verify workspace bridge\nAssistant: <zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>\nUser: Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n(workspace connected)\n</tool_result>".to_string());
     }
     let last_user = messages
         .iter()
@@ -2657,7 +2671,14 @@ where
         .find(|m| m.role == "user")
         .map(|m| m.content.clone())
         .unwrap_or_default();
-    sections.push(format!("[Current User Request]\n{}", last_user));
+    if wants_tools && !last_user.contains("<tool_result") {
+        sections.push(format!(
+            "[Current User Request]\n{}\n(If this request requires a shell command, python script, file read/write/edit, or memory lookup, respond ONLY with the <zeus_tool> XML block outside <think>.)",
+            last_user
+        ));
+    } else {
+        sections.push(format!("[Current User Request]\n{}", last_user));
+    }
     let query = sections.join("\n\n");
 
     let payload = json!({
@@ -3935,13 +3956,17 @@ where
 
     let client = build_client(14)?;
     let mut active_resp = None;
+    let wants_tools = is_agent_tool_request(system);
     for cand in candidates {
-        let cand_payload = json!({
+        let mut cand_payload = json!({
             "model": cand,
             "stream": true,
             "max_tokens": 16384,
             "messages": kilo_msgs
         });
+        if wants_tools {
+            cand_payload["tools"] = build_native_oai_agent_tools();
+        }
         let ip = fake_ipv4();
         if let Ok(r) = client
             .post("https://api.kilo.ai/api/gateway/chat/completions")
@@ -3967,6 +3992,7 @@ where
     let mut in_think = false;
     let mut saw_text = false;
     let mut fallback_reason = String::new();
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -3994,6 +4020,7 @@ where
                             on_delta(r_text);
                             fallback_reason.push_str(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -4013,7 +4040,10 @@ where
     if in_think {
         on_delta("</think>");
     }
-    if !saw_text && !fallback_reason.trim().is_empty() {
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() && !wants_tools {
         on_delta(fallback_reason.trim());
         saw_text = true;
     }
@@ -4306,7 +4336,18 @@ where
         }
     }
     let Some(resp) = active_resp else {
-        return Err("Unikey all candidate models unavailable".to_string());
+        return match eff_model {
+            "claude-opus-5-5" => stream_aibridge("claude-haiku-5-5", system, messages, cancel, on_delta)
+                .or_else(|_| stream_deepai("claude-haiku-5-5", system, messages, cancel, on_delta)),
+            "moonshotai/kimi-k3" | "moonshotai/kimi-k2.7-code" => {
+                stream_freellmhub("kimi-k2.7-code", system, messages, cancel, on_delta)
+            }
+            "x-ai/grok-4.3" => stream_aibridge("grok-4.20", system, messages, cancel, on_delta),
+            "deepseek-v4-flash" => stream_aibridge("deepseek-v4-flash", system, messages, cancel, on_delta)
+                .or_else(|_| stream_freellmhub("deepseek-v4.1-flash-1017", system, messages, cancel, on_delta)),
+            _ => stream_aibridge("gpt-6-luna", system, messages, cancel, on_delta)
+                .or_else(|_| stream_freellmhub("glm-5.3", system, messages, cancel, on_delta)),
+        };
     };
 
     let mut reader = BufReader::new(resp);
@@ -4657,15 +4698,19 @@ where
         ]
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let client = build_client(12)?;
     let mut active_resp = None;
     for cand in candidates {
-        let payload = json!({
+        let mut payload = json!({
             "model": cand,
             "stream": true,
             "max_tokens": 16384,
             "messages": oai_msgs
         });
+        if wants_tools {
+            payload["tools"] = build_native_oai_agent_tools();
+        }
         let ip = fake_ipv4();
         if let Ok(r) = client
             .post("https://blockrun.ai/api/v1/chat/completions")
@@ -4691,6 +4736,7 @@ where
     let mut in_think = false;
     let mut saw_text = false;
     let mut fallback_reason = String::new();
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -4718,6 +4764,7 @@ where
                             on_delta(r_text);
                             fallback_reason.push_str(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -4737,7 +4784,10 @@ where
     if in_think {
         on_delta("</think>");
     }
-    if !saw_text && !fallback_reason.trim().is_empty() {
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() && !wants_tools {
         on_delta(fallback_reason.trim());
         saw_text = true;
     }
@@ -4835,14 +4885,18 @@ where
             "gpt-oss-20b",
         ]
     };
+    let wants_tools = is_agent_tool_request(system);
     let mut active_resp = None;
     for cand in candidates {
-        let cand_payload = json!({
+        let mut cand_payload = json!({
             "model": cand,
             "stream": true,
             "max_tokens": 16384,
             "messages": oai_msgs
         });
+        if wants_tools {
+            cand_payload["tools"] = build_native_oai_agent_tools();
+        }
         let ip = fake_ipv4();
         if let Ok(r) = client
             .post("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions")
@@ -4868,6 +4922,7 @@ where
     let mut in_think = false;
     let mut saw_text = false;
     let mut fallback_reason = String::new();
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -4895,6 +4950,7 @@ where
                             on_delta(r_text);
                             fallback_reason.push_str(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -4914,7 +4970,10 @@ where
     if in_think {
         on_delta("</think>");
     }
-    if !saw_text && !fallback_reason.trim().is_empty() {
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
+    }
+    if !saw_text && !fallback_reason.trim().is_empty() && !wants_tools {
         on_delta(fallback_reason.trim());
         saw_text = true;
     }
@@ -5511,12 +5570,14 @@ where
 
     let fallback = |em: &str, sys: &str, msgs: &[ChatMessage], c: &AtomicBool, od: &mut F| -> Result<(), String> {
         match em {
-            "kimi-k3" => stream_unikey("moonshotai/kimi-k3", sys, msgs, c, od),
+            "kimi-k3" => stream_freellmhub("kimi-k2.7-code", sys, msgs, c, od)
+                .or_else(|_| stream_unikey("moonshotai/kimi-k3", sys, msgs, c, od)),
             "muse-glimmer-30b" => stream_frontierlab("muse-glimmer-30b", sys, msgs, c, od),
-            "gpt-oss-120b" => stream_ovhcloud("gpt-oss-20b", sys, msgs, c, od),
-            _ => stream_ptero("glm-5.3-flash", sys, msgs, c, od)
+            "gpt-oss-120b" => stream_litellmhub("groq/gpt-oss-120b", sys, msgs, c, od)
+                .or_else(|_| stream_ovhcloud("gpt-oss-20b", sys, msgs, c, od)),
+            _ => stream_freellmhub("glm-5.3", sys, msgs, c, od)
                 .or_else(|_| stream_deepai("glm-5.3-flash", sys, msgs, c, od))
-                .or_else(|_| stream_unikey("deepseek-v4-flash", sys, msgs, c, od)),
+                .or_else(|_| stream_ptero("glm-5.3-flash", sys, msgs, c, od)),
         }
     };
 
@@ -6558,6 +6619,78 @@ where
     Err("Unsloth Qwen 3.5 & Gemma 4 Cloud stream ended without output".to_string())
 }
 
+fn is_agent_tool_request(system: &str) -> bool {
+    (system.contains("## Agent tools")
+        || system.contains("## Local Workspace Agent Tools")
+        || system.contains("<zeus_tool"))
+        && !system.contains("## Current canvas page")
+}
+
+fn scraper_xml_dsl_banner() -> &'static str {
+    "[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local ZeusDesigns C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown ```bash code blocks.\nWhenever an action is needed, translate the request into a raw XML tag outside <think>:\n- <zeus_tool name=\"shell\">command</zeus_tool>\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nold\\n=======\\nnew\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>."
+}
+
+fn accumulate_oai_tool_calls(d: &Value, streamed_tool_calls: &mut Vec<(String, String, String)>) {
+    if let Some(tcs) = d.get("tool_calls").and_then(|v| v.as_array()) {
+        for (pos, tc) in tcs.iter().enumerate() {
+            let idx = tc
+                .get("index")
+                .and_then(|i| i.as_u64())
+                .map(|i| i as usize)
+                .unwrap_or(pos);
+            while streamed_tool_calls.len() <= idx {
+                streamed_tool_calls.push((String::new(), String::new(), String::new()));
+            }
+            if let Some(id_s) = tc.get("id").and_then(|x| x.as_str()) {
+                if !id_s.is_empty() {
+                    streamed_tool_calls[idx].0 = id_s.to_string();
+                }
+            }
+            if let Some(func) = tc.get("function") {
+                if let Some(n) = func.get("name").and_then(|x| x.as_str()) {
+                    streamed_tool_calls[idx].1.push_str(n);
+                }
+                if let Some(a) = func.get("arguments").and_then(|x| x.as_str()) {
+                    streamed_tool_calls[idx].2.push_str(a);
+                }
+            }
+        }
+    }
+    if let Some(fc) = d.get("function_call") {
+        if streamed_tool_calls.is_empty() {
+            streamed_tool_calls.push(("call_0".to_string(), String::new(), String::new()));
+        }
+        if let Some(n) = fc.get("name").and_then(|x| x.as_str()) {
+            streamed_tool_calls[0].1.push_str(n);
+        }
+        if let Some(a) = fc.get("arguments").and_then(|x| x.as_str()) {
+            streamed_tool_calls[0].2.push_str(a);
+        }
+    }
+}
+
+fn flush_oai_tool_calls<F: FnMut(&str)>(
+    streamed_tool_calls: &[(String, String, String)],
+    on_delta: &mut F,
+) -> bool {
+    let mut emitted = false;
+    for (_id, name, args) in streamed_tool_calls {
+        let n = name.trim();
+        if n.is_empty() {
+            continue;
+        }
+        let args_val: Value = serde_json::from_str(args.trim())
+            .unwrap_or_else(|_| json!({ "command": args.trim(), "body": args.trim() }));
+        let formatted = format!(
+            "\n<tool_call>{}</tool_call>",
+            json!({ "name": n, "arguments": args_val })
+        );
+        on_delta(&formatted);
+        emitted = true;
+    }
+    emitted
+}
+
 /// Helper to detect fake 200 error strings returned inside SSE text deltas by broken proxy servers.
 fn is_upstream_error_text(s: &str) -> bool {
     let t = s.trim();
@@ -6858,20 +6991,70 @@ where
         } else {
             8192
         };
-        let wants_agent_tools = (system.contains("## Agent tools")
-            || system.contains("## Local Workspace Agent Tools")
-            || system.contains("<zeus_tool"))
-            && !system.contains("## Current canvas page");
+        let wants_agent_tools = is_agent_tool_request(system);
         let supports_native_oai_tools = endpoint.contains("bun008-freellmapi")
             || endpoint.contains("alchoholpad-litellm")
+            || endpoint.contains("garystu-openai-nim-proxy")
+            || endpoint.contains("mmoranguito-openai-nim-proxy")
+            || endpoint.contains("vireonix.ai")
             || (endpoint.contains("w902287-ai-bridge")
                 && !upstream_model.contains("claude")
                 && !upstream_model.contains("grok"));
+        let mut target_msgs = oai_msgs.clone();
+        if wants_agent_tools && !supports_native_oai_tools {
+            // Specialized optimization for web-scraper OpenAI proxies that drop `role: "system"`
+            // (`w902287-ai-bridge` Claude/Grok, `chenian233-gemini-web2api`, etc.):
+            // inject the XML DSL schema into the user/assistant turns and reinforce on the final user message.
+            let has_zeus_turn = target_msgs.iter().any(|m| {
+                m.get("content")
+                    .and_then(|c| c.as_str())
+                    .map(|s| s.contains("<zeus_tool"))
+                    .unwrap_or(false)
+            });
+            if !has_zeus_turn {
+                let insert_at = if target_msgs.first().and_then(|m| m.get("role")).and_then(|r| r.as_str()) == Some("system") {
+                    1
+                } else {
+                    0
+                };
+                target_msgs.splice(
+                    insert_at..insert_at,
+                    [
+                        json!({
+                            "role": "user",
+                            "content": format!("{}\n\nConfirm XML DSL parser connection.", scraper_xml_dsl_banner())
+                        }),
+                        json!({
+                            "role": "assistant",
+                            "content": "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
+                        }),
+                    ],
+                );
+            }
+            if let Some(last_m) = target_msgs.last_mut() {
+                if last_m.get("role").and_then(|r| r.as_str()) == Some("user") {
+                    if let Some(orig) = last_m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()) {
+                        if endpoint.contains("gemini-web2api") && !orig.contains("[XML DSL Output Mode") {
+                            last_m["content"] = json!(format!(
+                                "{}\n\n{}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                                scraper_xml_dsl_banner(),
+                                orig
+                            ));
+                        } else if !orig.contains("<tool_result") && !orig.contains("[XML DSL") {
+                            last_m["content"] = json!(format!(
+                                "{}\n\n[XML DSL Reminder: If this request needs a shell command, python script, file read/write/edit, or memory lookup, emit ONLY the <zeus_tool> XML block outside <think> and stop immediately.]",
+                                orig
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         let mut payload = json!({
             "model": upstream_model,
             "stream": true,
             "max_tokens": max_tok,
-            "messages": oai_msgs
+            "messages": target_msgs
         });
         if wants_agent_tools && supports_native_oai_tools {
             payload["tools"] = build_native_oai_agent_tools();
