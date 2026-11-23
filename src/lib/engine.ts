@@ -626,7 +626,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "zencloud", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+    } else if (["kilo", "zencloud", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "groqlpu", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
         zencloud: { baseUrl: "https://yash030-claude-code-proxy.hf.space", apiKey: "free", format: "anthropic" },
@@ -655,13 +655,17 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             ? "https://apathy-exe-xing4-0-29b-a4b.hf.space/v1"
             : settings.modelId === "mellum2-12b-thinking"
             ? "https://usermma-mellum2-12b-a2-5b-thinking-abliterated.hf.space/v1"
+            : settings.modelId === "nanbeige4.2-3b"
+            ? "https://apathy-exe-nanbeige4-2-3b.hf.space/v1"
             : settings.modelId === "minicpm5-1b"
             ? "https://usermma-minicpm5-abliterated-q3.hf.space/v1"
             : "https://apathy-exe-qwen3-8-flash-next.hf.space/v1",
           apiKey: "",
         },
         liquidai: {
-          baseUrl: settings.modelId === "lfm3-1.7b"
+          baseUrl: settings.modelId === "lfm2.5-8b-a1b"
+            ? "https://usermma-lfm2-5-8b-a1b-abliterated-q3.hf.space/v1"
+            : settings.modelId === "lfm3-1.7b"
             ? "https://apathy-exe-lfm3-1-7b.hf.space/v1"
             : settings.modelId === "lfm2.5-2.6b"
             ? "https://apathy-exe-lfm2-5-2-6b.hf.space/v1"
@@ -669,6 +673,25 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           apiKey: "",
         },
         claudebridge: { baseUrl: "https://hamdyahned-ree-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
+        groqlpu: { baseUrl: "https://squirrelcoagent-llama-api-server.hf.space/v1", apiKey: "free" },
+        bonsaicloud: {
+          baseUrl: settings.modelId === "bonsai-8b"
+            ? "https://mikeee-bonsai-8b.hf.space/v1"
+            : settings.modelId === "vibethinker-3b-q4"
+            ? "https://mikeee-llama-cpp-server.hf.space/v1"
+            : "https://bananamort-ternary-bonsai-2-27b.hf.space/v1",
+          apiKey: "",
+        },
+        unslothcloud: {
+          baseUrl: settings.modelId === "gemma-4-e2b-ud-q4"
+            ? "https://elseodelasgalletas-gemma4-e2b.hf.space/v1"
+            : settings.modelId === "gemma-4-e2b-qat-ud"
+            ? "https://elseodelasgalletas-gemma4-e2b-qat.hf.space/v1"
+            : settings.modelId === "gemma-4-e2b-q4ks"
+            ? "https://bleak-openai-compatible-server-gemma4.hf.space/v1"
+            : "https://bleak-openai-compatible-server.hf.space/v1",
+          apiKey: "",
+        },
         koboldcloud: {
           baseUrl: settings.modelId === "koboldcpp/gemma-2-9b-it-Q5_K_M"
             ? "https://nanoph-koboldcpp-tiefighter.hf.space/v1"
@@ -732,15 +755,33 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             ? "/root/.cache/huggingface/hub/models--XingChen-AGI--Xing4.0-29B-A4B-GGUF/snapshots/006904bc1d05ae2c37f938a4abdffee27e488544/xing4_0-29b-IQ4_NL.gguf"
             : settings.modelId === "mellum2-12b-thinking"
             ? "Mellum2-12B-A2.5B-Thinking-Abliterated-Q6_K.gguf"
+            : settings.modelId === "nanbeige4.2-3b"
+            ? "/app/nanbeige4.2-3b-Q4_K_M.gguf"
             : settings.modelId === "minicpm5-1b"
             ? "Huihui-MiniCPM5-1B-abliterated.Q3_K_L.gguf"
             : "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"
           : settings.providerId === "liquidai"
-          ? settings.modelId === "lfm3-1.7b"
+          ? settings.modelId === "lfm2.5-8b-a1b"
+            ? "Huihui-LFM2.5-8B-A1B-abliterated.Q4_K_M.gguf"
+            : settings.modelId === "lfm3-1.7b"
             ? "/root/.cache/huggingface/hub/models--LiquidAI--LFM3-1.7B-GGUF/snapshots/cd0c74c575b5c416f3011b5b4c298077f26ca8c2/LFM3-1.7B-QAD-Q4_0.gguf"
             : settings.modelId === "lfm2.5-2.6b"
             ? "/LFM2.5-2.6B-Q4_K_M.gguf"
             : "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf"
+          : settings.providerId === "bonsaicloud"
+          ? settings.modelId === "bonsai-8b"
+            ? "bonsai-8b"
+            : settings.modelId === "vibethinker-3b-q4"
+            ? "vibethinker-3b-q4"
+            : "/root/.cache/huggingface/hub/models--prism-ml--Ternary-Bonsai-2-27B-gguf/snapshots/839bd57023c1558945afea70a74fa83c054f35f9/Ternary-Bonsai-2-27B-PTQ1_0.gguf"
+          : settings.providerId === "unslothcloud"
+          ? settings.modelId === "gemma-4-e2b-ud-q4"
+            ? "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL"
+            : settings.modelId === "gemma-4-e2b-qat-ud"
+            ? "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL"
+            : settings.modelId === "gemma-4-e2b-q4ks"
+            ? "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S"
+            : "unsloth/Qwen3.5-4B-GGUF:Q6_K"
           : req.model;
       const browserCustom = { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, format: cfg.format ?? ("openai" as const) };
       try {

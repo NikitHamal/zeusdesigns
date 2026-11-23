@@ -84,14 +84,16 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "muse-glimmer-30b", label: "Meta Muse Glimmer 30B", note: "128k ctx · Meta Superintelligence Labs 30B expressive UI designer", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 12288 },
       { id: "xing4.0-29b-a4b", label: "Xing 4.0 29B A4B MoE", note: "128k ctx · XingChen AGI 29B A4B fast reasoning & code", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 12288 },
       { id: "mellum2-12b-thinking", label: "JetBrains Mellum 2 12B Thinking", note: "64k ctx · JetBrains 12B A2.5B Thinking code & UI specialist", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "nanbeige4.2-3b", label: "Nanbeige 4.2 3B", note: "64k ctx · Fast reasoning & frontend code synthesis", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "minicpm5-1b", label: "OpenBMB MiniCPM 5", note: "64k ctx · Ultra-fast lightweight instruction & code model", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
     ],
   },
   {
-    id: "liquidai", name: "Liquid AI LFM Gateway", tagline: "LFM 2.5 24B A2B Q8 · LFM 3 1.7B · state-space UI synthesis", speed: "~175 tok/s", color: "#0c8599", icon: "waves",
+    id: "liquidai", name: "Liquid AI LFM Gateway", tagline: "LFM 2.5 24B A2B Q8 · 8B A1B · LFM 3 1.7B · state-space UI synthesis", speed: "~175 tok/s", color: "#0c8599", icon: "waves",
     contextWindow: 131072,
     models: [
       { id: "lfm2.5-24b-a2b", label: "Liquid LFM 2.5 24B A2B (Q8_0)", note: "128k ctx · Liquid AI 24B A2B MoE flagship in 8-bit Q8_0", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 12288 },
+      { id: "lfm2.5-8b-a1b", label: "Liquid LFM 2.5 8B A1B (Q4_K_M)", note: "128k ctx · Liquid AI 8B A1B fast MoE UI & code architect", reasoning: true, vision: false, contextWindow: 131072, maxOutput: 12288 },
       { id: "lfm3-1.7b", label: "Liquid LFM 3 1.7B", note: "64k ctx · Next-gen LFM 3 ultra-low-latency UI & copy engine", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
       { id: "lfm2.5-2.6b", label: "Liquid LFM 2.5 2.6B", note: "64k ctx · Compact state-space code & layout generator", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
     ],
@@ -104,6 +106,33 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 Bridge", note: "200k ctx · Balanced frontend code & multimodal vision", reasoning: true, vision: true, contextWindow: 200000, maxOutput: 16384 },
       { id: "claude-haiku-4-20250514", label: "Claude Haiku 4 Bridge", note: "200k ctx · High-speed UI & component synthesis", reasoning: false, vision: true, contextWindow: 200000, maxOutput: 16384 },
       { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet Bridge", note: "200k ctx · Precision HTML/CSS & interactive screen builder", reasoning: false, vision: true, contextWindow: 200000, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "groqlpu", name: "Groq LPU Anonymous Bridge", tagline: "Llama 3.3 70B Versatile · Llama 3.1 8B Instant · LPU speed", speed: "350–850 tok/s", color: "#e8590c", icon: "bolt",
+    contextWindow: 131072,
+    models: [
+      { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile LPU", note: "128k ctx · Groq LPU ultra-fast 70B UI & frontend coder", reasoning: false, vision: false, contextWindow: 131072, maxOutput: 16384 },
+      { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B Instant LPU", note: "128k ctx · Groq LPU 850+ tok/s low-latency layout & copy", reasoning: false, vision: false, contextWindow: 131072, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "bonsaicloud", name: "Bonsai & Ternary Frontier", tagline: "Prism Ternary Bonsai 2 27B · Bonsai 8B · VibeThinker 3B", speed: "~150 tok/s", color: "#2f9e66", icon: "eco",
+    contextWindow: 65536,
+    models: [
+      { id: "ternary-bonsai-2-27b", label: "Ternary Bonsai 2 27B (PTQ1_0)", note: "64k ctx · Prism-ML 27B ternary reasoning & UI architect", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "bonsai-8b", label: "Ternary Bonsai 8B", note: "64k ctx · Fast 8B ternary code & UI generator", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "vibethinker-3b-q4", label: "VibeThinker 3B Reasoning", note: "32k ctx · Compact step-by-step UI & code thinker", reasoning: true, vision: false, contextWindow: 32768, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "unslothcloud", name: "Unsloth Qwen 3.5 & Gemma 4 Cloud", tagline: "Qwen 3.5 4B Q6_K · Gemma 4 UD-Q4_K_XL · QAT multi-node", speed: "~165 tok/s", color: "#12b886", icon: "memory",
+    contextWindow: 65536,
+    models: [
+      { id: "qwen3.5-4b-q6", label: "Qwen 3.5 4B (Q6_K)", note: "64k ctx · Unsloth high-precision Q6_K fast UI & code generator", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "gemma-4-e2b-ud-q4", label: "Gemma 4 E2B IT (UD-Q4_K_XL)", note: "64k ctx · Unsloth Dynamic Q4_K_XL Google Gemma 4 UI coder", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "gemma-4-e2b-qat-ud", label: "Gemma 4 E2B QAT (UD-Q4_K_XL)", note: "64k ctx · Quantization-aware Unsloth Dynamic Gemma 4 stream", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+      { id: "gemma-4-e2b-q4ks", label: "Gemma 4 E2B IT (Q4_K_S)", note: "64k ctx · Unsloth fast Gemma 4 E2B frontend node", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
     ],
   },
   {
