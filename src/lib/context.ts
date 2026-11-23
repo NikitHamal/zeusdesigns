@@ -27,6 +27,12 @@ export interface ProviderSpecialization {
 const SCRAPER_PROVIDERS = new Set([
   "mercury3",
   "kilo",
+  "zencloud",
+  "gemma4pro",
+  "frontierlab",
+  "liquidai",
+  "claudebridge",
+  "koboldcloud",
   "blockrun",
   "ovhcloud",
   "freecc",

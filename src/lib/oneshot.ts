@@ -10,6 +10,12 @@ export function activeCustom() {
 
 const BROWSER_KEYLESS: Record<string, { baseUrl: string; apiKey: string; format: "openai" | "anthropic" }> = {
   kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "", format: "openai" },
+  zencloud: { baseUrl: "https://yash030-claude-code-proxy.hf.space", apiKey: "free", format: "anthropic" },
+  gemma4pro: { baseUrl: "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1", apiKey: "free", format: "openai" },
+  frontierlab: { baseUrl: "https://apathy-exe-qwen3-8-flash-next.hf.space/v1", apiKey: "free", format: "openai" },
+  liquidai: { baseUrl: "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1", apiKey: "free", format: "openai" },
+  claudebridge: { baseUrl: "https://hamdyahned-ree-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
+  koboldcloud: { baseUrl: "https://koboldai-koboldcpp-tiefighter.hf.space/v1", apiKey: "free", format: "openai" },
   blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "", format: "openai" },
   ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "", format: "openai" },
   freecc: { baseUrl: "https://calkotter-free-claude-code.hf.space", apiKey: "free", format: "anthropic" },

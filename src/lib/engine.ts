@@ -626,9 +626,57 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+    } else if (["kilo", "zencloud", "gemma4pro", "frontierlab", "liquidai", "claudebridge", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
+        zencloud: { baseUrl: "https://yash030-claude-code-proxy.hf.space", apiKey: "free", format: "anthropic" },
+        gemma4pro: {
+          baseUrl: settings.modelId === "gemma-4-12b-it"
+            ? "https://markpaulm-gemma-4-12b-abliterated.hf.space/v1"
+            : settings.modelId === "gemma-4-12b-coding"
+            ? "https://shanghsin-gemma-4-12b.hf.space/v1"
+            : settings.modelId === "gemma-4-e4b-ud-q5"
+            ? "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1"
+            : settings.modelId === "gemma-4-e4b-qat"
+            ? "https://hispa-nico-gemma4-e2b.hf.space/v1"
+            : settings.modelId === "gemma-4-ollama"
+            ? "https://ismizo-gemma4.hf.space/v1"
+            : "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1",
+          apiKey: "",
+        },
+        frontierlab: {
+          baseUrl: settings.modelId === "inkling-2-mini"
+            ? "https://bananamort-inkling-2-mini.hf.space/v1"
+            : settings.modelId === "nanbeige4.3-33b"
+            ? "https://apathy-exe-nanbeige4-3-33b.hf.space/v1"
+            : settings.modelId === "muse-glimmer-30b"
+            ? "https://apathy-exe-muse-glimmer-30b.hf.space/v1"
+            : settings.modelId === "xing4.0-29b-a4b"
+            ? "https://apathy-exe-xing4-0-29b-a4b.hf.space/v1"
+            : settings.modelId === "mellum2-12b-thinking"
+            ? "https://usermma-mellum2-12b-a2-5b-thinking-abliterated.hf.space/v1"
+            : settings.modelId === "minicpm5-1b"
+            ? "https://usermma-minicpm5-abliterated-q3.hf.space/v1"
+            : "https://apathy-exe-qwen3-8-flash-next.hf.space/v1",
+          apiKey: "",
+        },
+        liquidai: {
+          baseUrl: settings.modelId === "lfm3-1.7b"
+            ? "https://apathy-exe-lfm3-1-7b.hf.space/v1"
+            : settings.modelId === "lfm2.5-2.6b"
+            ? "https://apathy-exe-lfm2-5-2-6b.hf.space/v1"
+            : "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1",
+          apiKey: "",
+        },
+        claudebridge: { baseUrl: "https://hamdyahned-ree-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
+        koboldcloud: {
+          baseUrl: settings.modelId === "koboldcpp/gemma-2-9b-it-Q5_K_M"
+            ? "https://nanoph-koboldcpp-tiefighter.hf.space/v1"
+            : settings.modelId === "koboldcpp/gemma-3n-E2B-it"
+            ? "https://nxdev-org-koboldcpp-tiefighter.hf.space/v1"
+            : "https://koboldai-koboldcpp-tiefighter.hf.space/v1",
+          apiKey: "",
+        },
         blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "" },
         ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "" },
         freecc: {
@@ -661,6 +709,38 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             : settings.modelId === "gemma-4-e4b-q5"
             ? "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf"
             : "/root/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf"
+          : settings.providerId === "gemma4pro"
+          ? settings.modelId === "gemma-4-12b-it"
+            ? "huihui-ai/Huihui-gemma-4-12B-it-abliterated"
+            : settings.modelId === "gemma-4-12b-coding"
+            ? "gemma4-coding-Q2_K.gguf"
+            : settings.modelId === "gemma-4-e4b-ud-q5"
+            ? "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf"
+            : settings.modelId === "gemma-4-e4b-qat"
+            ? "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0"
+            : settings.modelId === "gemma-4-ollama"
+            ? "gemma4:latest"
+            : "huihui-ai/Huihui-gemma-4-31B-it-abliterated"
+          : settings.providerId === "frontierlab"
+          ? settings.modelId === "inkling-2-mini"
+            ? "/root/.cache/huggingface/hub/models--unsloth--Inkling-2-Mini-GGUF/snapshots/45fd08764f2b0bf16b03a5483a80e5c7aaec8772/Inkling-2-Mini-UD-Q4_K_XL.gguf"
+            : settings.modelId === "nanbeige4.3-33b"
+            ? "/root/.cache/huggingface/hub/models--bartowski--Nanbeige_Nanbeige4.3-33B-GGUF/snapshots/9beb68421fdf7be095093a6888325fa2c83ddd38/Nanbeige_Nanbeige4.3-33B-Q4_K_M.gguf"
+            : settings.modelId === "muse-glimmer-30b"
+            ? "/root/.cache/huggingface/hub/models--meta-models--Muse-Glimmer-30B-GGUF/snapshots/b44f1072cf75e918a1b82a3a17b45c4389b076e7/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf"
+            : settings.modelId === "xing4.0-29b-a4b"
+            ? "/root/.cache/huggingface/hub/models--XingChen-AGI--Xing4.0-29B-A4B-GGUF/snapshots/006904bc1d05ae2c37f938a4abdffee27e488544/xing4_0-29b-IQ4_NL.gguf"
+            : settings.modelId === "mellum2-12b-thinking"
+            ? "Mellum2-12B-A2.5B-Thinking-Abliterated-Q6_K.gguf"
+            : settings.modelId === "minicpm5-1b"
+            ? "Huihui-MiniCPM5-1B-abliterated.Q3_K_L.gguf"
+            : "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"
+          : settings.providerId === "liquidai"
+          ? settings.modelId === "lfm3-1.7b"
+            ? "/root/.cache/huggingface/hub/models--LiquidAI--LFM3-1.7B-GGUF/snapshots/cd0c74c575b5c416f3011b5b4c298077f26ca8c2/LFM3-1.7B-QAD-Q4_0.gguf"
+            : settings.modelId === "lfm2.5-2.6b"
+            ? "/LFM2.5-2.6B-Q4_K_M.gguf"
+            : "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf"
           : req.model;
       const browserCustom = { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, format: cfg.format ?? ("openai" as const) };
       try {
