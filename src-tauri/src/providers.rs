@@ -3821,9 +3821,9 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["ptero", "kilo", "qwen"]
+        &["ptero", "kilo", "ovhcloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "unikey", "llm7", "pollinations", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "kilo", "blockrun", "ovhcloud", "unikey", "llm7", "pollinations", "apisfreellm", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -3838,6 +3838,21 @@ where
                 cancel,
                 &mut on_delta,
             ).is_ok(),
+            "blockrun" => stream_blockrun(
+                if has_attachments { "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning" } else { "nvidia/nemotron-3-super-120b" },
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
+            "ovhcloud" => stream_ovhcloud(
+                if has_attachments { "Qwen2.5-VL-72B-Instruct" } else { "DeepSeek-V4.1-Flash-1017" },
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
+            "apisfreellm" => stream_apisfreellm("free-ai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "ptero" => stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "unikey" => stream_unikey("moonshotai/kimi-k3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "llm7" => stream_llm7("codestral-latest", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -3895,6 +3910,9 @@ mod tests {
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"kilo"));
+        assert!(ids.contains(&"blockrun"));
+        assert!(ids.contains(&"ovhcloud"));
+        assert!(ids.contains(&"apisfreellm"));
         assert!(ids.contains(&"qwen"));
         assert!(ids.contains(&"ptero"));
         assert!(ids.contains(&"unikey"));
