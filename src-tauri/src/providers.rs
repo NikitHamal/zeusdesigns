@@ -4553,16 +4553,19 @@ where
 
     let eff_model = if has_images {
         match model {
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash"
+            | "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
             | "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b" => model,
-            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
         }
     } else {
         match model {
             "gemini-4-hydrogen" => "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
+            "gemini-3.5-flash" => "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
             "gemini-3-flash-preview" => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash"
+            | "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
             | "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen"
             | "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
@@ -4571,7 +4574,7 @@ where
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
             | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b"
             | "claude-3-freecc-no-thinking/nvidia_nim/poolside/laguna-xs-2.1" => model,
-            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
         }
     };
 

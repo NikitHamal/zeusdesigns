@@ -346,6 +346,10 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             "freecc".to_string(),
             "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen".to_string(),
         ),
+        "gemini-3.5-flash" | "gemini/models/gemini-3.5-flash" => (
+            "freecc".to_string(),
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash".to_string(),
+        ),
         "gemini-3-flash-preview" | "gemini-3-flash" | "gemini/models/gemini-3-flash-preview" => (
             "freecc".to_string(),
             "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview".to_string(),
