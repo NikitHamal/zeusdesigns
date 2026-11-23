@@ -292,6 +292,45 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~150 tok/s"
         },
         {
+            "together2api",
+            "Together Frontier",
+            ProviderFormat::SCRAPER_TOGETHER2API,
+            "https://lolmaobruhhh-test.hf.space/v1",
+            "glm-5.3",
+            {
+                {"glm-5.3", "GLM 5.3", "128k ctx Z.ai flagship reasoning & UI architect", true, false, false, 145},
+                {"glm-5.3-flash", "GLM 5.3 Flash", "128k ctx Z.ai 320B MoE fast reasoning & code", true, false, false, 165},
+                {"kimi-k3", "Kimi K3 2.8T", "128k ctx Moonshot 2.8T MoE frontier coder", true, false, false, 130},
+                {"muse-glimmer-30b", "Muse Glimmer 30B", "128k ctx Meta expressive UI & design reasoning", true, false, false, 150},
+                {"gpt-oss-120b", "GPT-OSS 120B", "128k ctx OpenAI 120B open-weights reasoning", true, false, false, 150},
+                {"glm-5.2", "GLM 5.2", "128k ctx Z.ai multi-step reasoning coder", true, false, false, 140},
+                {"qwen3.5-9b", "Qwen 3.5 9B", "128k ctx Alibaba compact fast UI coder", true, false, false, 175}
+            },
+            131072,
+            16384,
+            false,
+            "~145 tok/s"
+        },
+        {
+            "aihorde",
+            "AI Horde",
+            ProviderFormat::SCRAPER_AIHORDE,
+            "https://oai.aihorde.net/v1",
+            "Qwen/Qwen3.8-Flash-Next",
+            {
+                {"Qwen/Qwen3.8-Flash-Next", "Qwen 3.8 Flash Next", "32k ctx Alibaba Qwen 3.8 Flash distributed worker", false, false, false, 95},
+                {"koboldcpp/Qwen/Qwen3.8-27B", "Qwen 3.8 27B", "32k ctx Alibaba 27B dense coding & UI worker", false, false, false, 85},
+                {"llamacpp/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive", "Qwen 3.6 35B MoE", "32k ctx 35B A3B fast frontend coder", false, false, false, 90},
+                {"koboldcpp/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q2_K_P", "Gemma 4 E4B", "32k ctx Google Gemma 4 compact UI generator", false, false, false, 110},
+                {"koboldcpp/Cydonia-24B-v4zg-Q4_K_M", "Cydonia 24B", "32k ctx 24B creative & copywriting model", false, false, false, 85},
+                {"koboldcpp/Llama-3.2-3B-Instruct", "Llama 3.2 3B Instruct", "32k ctx Fast lightweight instruction model", false, false, false, 120}
+            },
+            32768,
+            4096,
+            false,
+            "~95 tok/s"
+        },
+        {
             "apisfreellm",
             "APIsFreeLLM",
             ProviderFormat::SCRAPER_APISFREELLM,
