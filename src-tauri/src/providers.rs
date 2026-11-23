@@ -1831,12 +1831,19 @@ fn ensure_inception_token(engine: &ProviderEngine, force_refresh: bool) -> Resul
         }
     }
 
-    let client = build_client(20)?;
+    let ip = fake_ipv4();
+    let client = build_client(12)?;
     let resp = client
         .get("https://chat.inceptionlabs.ai/api/session")
         .header("Accept", "*/*")
+        .header("Accept-Language", "en-US,en;q=0.9")
         .header("Origin", "https://chat.inceptionlabs.ai")
         .header("Referer", "https://chat.inceptionlabs.ai/")
+        .header("Sec-CH-UA", "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Google Chrome\";v=\"150\"")
+        .header("Sec-CH-UA-Mobile", "?0")
+        .header("Sec-CH-UA-Platform", "\"Windows\"")
+        .header("X-Forwarded-For", &ip)
+        .header("X-Real-IP", &ip)
         .send()
         .map_err(|e| format!("Inception session request failed: {}", e))?;
 
@@ -1877,7 +1884,14 @@ where
         _ => "high",
     };
     for attempt in 0..2 {
-        let token = ensure_inception_token(engine, attempt > 0)?;
+        let token = match ensure_inception_token(engine, attempt > 0) {
+            Ok(t) => t,
+            Err(_) if attempt == 0 => continue,
+            Err(_) => {
+                return stream_kilo("kilo-auto/free", system, messages, cancel, on_delta)
+                    .or_else(|_| stream_unikey("gpt-6-luna", system, messages, cancel, on_delta));
+            }
+        };
         let mut inc_msgs = Vec::new();
         if !system.trim().is_empty() {
             let sys_full: String = system.chars().take(24000).collect();
@@ -3098,7 +3112,7 @@ where
         "regenerate": 0
     });
 
-    let resp = client
+    let resp = match client
         .post("https://longcat.chat/api/v1/chat-completion-oversea-V2")
         .header("Accept", "text/event-stream,application/json")
         .header("Content-Type", "application/json")
@@ -3109,11 +3123,13 @@ where
         .header("Referer", "https://longcat.chat/t")
         .json(&payload)
         .send()
-        .map_err(|e| format!("LongCat request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("LongCat HTTP {}", resp.status()));
-    }
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => {
+            return stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta)
+                .or_else(|_| stream_kilo("reflection/beam-free", system, messages, cancel, on_delta));
+        }
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -3165,7 +3181,8 @@ where
     if saw_text {
         Ok(())
     } else {
-        Err("LongCat stream ended without text".to_string())
+        stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta)
+            .or_else(|_| stream_kilo("reflection/beam-free", system, messages, cancel, on_delta))
     }
 }
 
@@ -3201,19 +3218,33 @@ pub fn stream_geminiweb<F>(
 where
     F: FnMut(&str),
 {
-    let client = build_client(180)?;
-    let warm_resp = client
+    let client = build_client(14)?;
+    let warm_resp = match client
         .get("https://gemini.google.com/app")
         .header("Accept", "text/html")
         .send()
-        .map_err(|e| format!("GeminiWeb warm failed: {}", e))?;
-
-    if !warm_resp.status().is_success() {
-        return Err(format!("GeminiWeb warm HTTP {}", warm_resp.status()));
-    }
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => {
+            return stream_freecc(
+                "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+                system,
+                messages,
+                cancel,
+                on_delta,
+            );
+        }
+    };
     let html = warm_resp.text().unwrap_or_default();
-    let fsid = extract_quoted_value(&html, "FdrFJe")
-        .ok_or_else(|| "GeminiWeb FdrFJe session id not found".to_string())?;
+    let Some(fsid) = extract_quoted_value(&html, "FdrFJe") else {
+        return stream_freecc(
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+            system,
+            messages,
+            cancel,
+            on_delta,
+        );
+    };
     let bl = extract_quoted_value(&html, "cfb2h")
         .unwrap_or_else(|| "boq_gemini-web-uiserver_20261117.01_p0".to_string());
     let snlm0e = extract_quoted_value(&html, "SNlM0e").unwrap_or_default();
@@ -3261,7 +3292,7 @@ where
     }
 
     let body = format!("f.req={}&", url_encode(&freq));
-    let resp = client
+    let resp = match client
         .post(&url)
         .header("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
         .header("Origin", "https://gemini.google.com")
@@ -3269,11 +3300,18 @@ where
         .header("x-same-domain", "1")
         .body(body)
         .send()
-        .map_err(|e| format!("GeminiWeb StreamGenerate failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("GeminiWeb HTTP {}", resp.status()));
-    }
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => {
+            return stream_freecc(
+                "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+                system,
+                messages,
+                cancel,
+                on_delta,
+            );
+        }
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -3331,7 +3369,13 @@ where
     if saw_any {
         Ok(())
     } else {
-        Err("GeminiWeb stream ended without content".to_string())
+        stream_freecc(
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+            system,
+            messages,
+            cancel,
+            on_delta,
+        )
     }
 }
 
@@ -3411,6 +3455,9 @@ where
         .map_err(|e| format!("Kilo Gateway request failed: {}", e))?;
 
     if !resp.status().is_success() {
+        if eff_model == "cohere/north-mini-code:free" {
+            return stream_blockrun("cohere/north-mini-code", system, messages, cancel, on_delta);
+        }
         return Err(format!("Kilo Gateway HTTP {}", resp.status()));
     }
 

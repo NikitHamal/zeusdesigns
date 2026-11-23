@@ -304,6 +304,7 @@ function UpdatesTab() {
 }
 
 const OPENCODE_FEATURED_MODELS = [
+  { id: "mercury-3", label: "Mercury 3 (2,000+ tok/s)", provider: "Mercury 3" },
   { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen", provider: "FreeClaude & Gemini 4" },
   { id: "gemini-3-flash-preview", label: "Gemini 3 Flash VL", provider: "FreeClaude & Gemini 4" },
   { id: "claude-opus-5-5", label: "Claude Opus 5.5", provider: "Unikey Anonymous" },
@@ -317,6 +318,8 @@ const OPENCODE_FEATURED_MODELS = [
   { id: "nemotron-3.5-super-vl", label: "Nemotron 3.5 Super VL 120B", provider: "Kilo / NIM" },
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", provider: "DeepAI" },
   { id: "k2-horizon", label: "K2-Horizon 375B", provider: "K2Horizon" },
+  { id: "longcat-2.5", label: "LongCat 2.5 (1.6T MoE)", provider: "LongCat" },
+  { id: "gemini-flash-lite", label: "Gemini Flash-Lite", provider: "Gemini Web" },
 ];
 
 function ServerTab() {

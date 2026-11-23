@@ -348,14 +348,17 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "Gemma 4 Flagship Cluster",
             ProviderFormat::SCRAPER_GEMMA4PRO,
             "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1",
-            "gemma-4-e4b-ud-q5",
+            "gemma-4-31b-it",
             {
+                {"gemma-4-31b-it", "Gemma 4 31B IT Flagship", "128k ctx Google largest 31B dense Gemma 4 UI architect", true, false, false, 145},
+                {"gemma-4-12b-it", "Gemma 4 12B IT", "128k ctx Google 12B dense instruction & UI model", true, false, false, 160},
+                {"gemma-4-12b-coding", "Gemma 4 12B Coding", "128k ctx Specialized Gemma 4 frontend coding fine-tune", true, false, false, 165},
                 {"gemma-4-e4b-ud-q5", "Gemma 4 E4B VL (UD-Q5_K_XL)", "64k ctx High-precision UD-Q5_K_XL multimodal vision & code", false, false, true, 155},
                 {"gemma-4-e4b-qat", "Gemma 4 E4B QAT", "64k ctx Quantization-aware fast UI coder", false, false, false, 170},
                 {"gemma-4-ollama", "Gemma 4 Latest", "64k ctx Ollama fast Gemma 4 stream", false, false, false, 165}
             },
-            65536,
-            8192,
+            131072,
+            16384,
             false,
             "~155 tok/s"
         },
