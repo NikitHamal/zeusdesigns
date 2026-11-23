@@ -532,7 +532,8 @@ export const STUDIO_TOOLS: StudioTool[] = [
       const st = useStore.getState();
       const src = board(a) ?? st.artboards.find((b) => b.pageId === st.activePageId);
       if (!src) return "No source screen found on the active page.";
-      const dup = st.duplicateArtboard(src.id);
+      const dupId = st.duplicateArtboard(src.id);
+      const dup = dupId ? useStore.getState().artboards.find((b) => b.id === dupId) : null;
       if (!dup) return "Could not duplicate screen.";
       const devRaw = str(a.device).toLowerCase();
       const nextDev: Device = devRaw === "web" ? "web" : devRaw === "tablet" ? "tablet" : devRaw === "mobile" ? "mobile" : dup.device;

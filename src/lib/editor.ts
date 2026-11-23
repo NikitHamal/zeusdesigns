@@ -98,6 +98,7 @@ export const editorBridge = {
 
 export const editor = {
   style: (style: Record<string, string>) => editorBridge.post({ op: "style", style }),
+  attr: (attrs: Record<string, string>) => editorBridge.post({ op: "attr", attrs }),
   text: (text: string) => editorBridge.post({ op: "text", text }),
   del: () => editorBridge.post({ op: "delete" }),
   duplicate: () => editorBridge.post({ op: "duplicate" }),
@@ -358,6 +359,7 @@ function run(d){
   }
   var el=sel;if(!el||!document.body.contains(el))return;
   if(d.op==="style"){for(var k in d.style){var v=d.style[k];if(v===""||v==null)el.style.removeProperty(k);else el.style.setProperty(k,v)}touched()}
+  else if(d.op==="attr"){var tImg=el.tagName.toLowerCase()==="img"?el:(el.querySelector&&el.querySelector("img"))||el;for(var ak in d.attrs){var av=d.attrs[ak];if(av===""||av==null)tImg.removeAttribute(ak);else tImg.setAttribute(ak,av)}touched()}
   else if(d.op==="text"){el.textContent=d.text;touched()}
   else if(d.op==="toggleClass"){
     if(Array.isArray(d.exclusiveGroup))d.exclusiveGroup.forEach(function(c){if(c)el.classList.remove(c)});

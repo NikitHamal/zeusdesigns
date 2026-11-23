@@ -757,6 +757,47 @@ export function Inspector() {
               </Section>
             )}
 
+            {/* Image Media Upload & Fit Controls */}
+            {(sel.tag === "img" || /<img\b/i.test(sel.html)) && (
+              <Section title="Image Media">
+                <div className="space-y-2">
+                  <label className="state flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-on-primary">
+                    <Icon name="image" size={14} />
+                    <span>Upload / Replace Image…</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const r = new FileReader();
+                        r.onload = () => {
+                          const raw = String(r.result || "");
+                          if (!raw) return;
+                          editor.attr({ src: raw, alt: f.name });
+                          useStore.getState().notify(`Updated image to ${f.name}`);
+                        };
+                        r.readAsDataURL(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-low p-1 text-[11px] font-semibold">
+                    {(["cover", "contain", "fill"] as const).map((fit) => (
+                      <button
+                        key={fit}
+                        onClick={() => editor.style({ "object-fit": fit, width: "100%", display: "block" })}
+                        className="state h-6 rounded-lg capitalize text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
+                      >
+                        {fit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+            )}
+
             {/* Interactive Material Symbol Icon Swapper */}
             {sel.hasIcon && (
               <Section title="Swap Icon">

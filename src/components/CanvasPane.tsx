@@ -23,7 +23,7 @@ const QUICK_PRIMITIVES = [
   { id: "card_surface", label: "Card", icon: "crop_landscape" },
   { id: "heading_block", label: "Heading", icon: "text_fields" },
   { id: "button_primary", label: "Button", icon: "ads_click" },
-  { id: "input_field", label: "Input", icon: "edit" },
+  { id: "image_media", label: "Image", icon: "image" },
   { id: "chart_area", label: "Chart", icon: "bar_chart" },
 ] as const;
 

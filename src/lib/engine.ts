@@ -7,7 +7,7 @@ import { detectArchetype, renderScreen, VARIANT_NAMES } from "./templates";
 import { generateTitle, isNative, nativeChat, nativePerf, ChatEvent, ChatRequest } from "./bridge";
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
-import { harden, harnessPrompt, stripKitBoilerplate } from "./harness";
+import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
 import { auditHtml, patchFor } from "./audit";

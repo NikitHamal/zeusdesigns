@@ -94,6 +94,7 @@ pub struct ProviderSessionState {
     pub motif_conversation_id: Option<String>,
     pub gemini_session: Option<GeminiWarmSession>,
     pub qwen_accounts: Vec<QwenAppAccount>,
+    pub qwen_provision_failed_until: u64,
     pub active_cancels: HashMap<String, Arc<AtomicBool>>,
 }
 
@@ -1473,9 +1474,20 @@ fn acquire_qwen_account(engine: &ProviderEngine) -> Result<QwenAppAccount, Strin
         {
             return Ok(acct);
         }
+        if guard.qwen_provision_failed_until > now {
+            return Err("Qwen provisioning temporarily in cooldown".to_string());
+        }
     }
 
-    let fresh = provision_qwen_account()?;
+    let fresh = match provision_qwen_account() {
+        Ok(a) => a,
+        Err(e) => {
+            if let Ok(mut guard) = engine.state.lock() {
+                guard.qwen_provision_failed_until = now_secs() + 300;
+            }
+            return Err(e);
+        }
+    };
     if let Ok(mut guard) = engine.state.lock() {
         guard.qwen_accounts.push(fresh.clone());
         if guard.qwen_accounts.len() > 8 {
@@ -1728,7 +1740,6 @@ where
         .ok_or_else(|| "Qwen chats/new missing id".to_string())?
         .to_string();
 
-    let ts = now_secs();
     let _ = thinking;
     let mut user_msg = json!({
         "fid": uuid_v4(),
@@ -1737,11 +1748,12 @@ where
         "chat_type": "t2t",
         "content": prompt,
         "role": "user",
-        "timestamp": ts,
+        "timestamp": now_ms,
         "sub_chat_type": "t2t",
         "models": [qwen_model],
         "user_action": "chat",
         "files": uploaded_files,
+        "safety": { "enabled": false },
         "extra": {
             "meta": { "subChatType": "t2t" },
             "disable_recitation_policy": true,
@@ -1766,7 +1778,7 @@ where
         "model": qwen_model,
         "parent_id": Value::Null,
         "version": "2.1",
-        "timestamp": ts,
+        "timestamp": now_ms,
         "share_id": "",
         "origin_branch_message_id": "",
         "messages": [user_msg]

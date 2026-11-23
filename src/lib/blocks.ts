@@ -141,13 +141,21 @@ export const UI_BLOCKS: UIBlock[] = [
     desc: "Section heading with trailing action",
     html: () => `<div class="z-row z-between"><h2 class="z-h2">Recent activity</h2><span class="z-small z-primary">View all</span></div>`,
   },
-  {
+    {
     id: "button_primary",
     name: "Primary Button",
     category: "primitives",
     icon: "ads_click",
     desc: "Filled primary action button",
     html: () => `<button class="z-btn"><i data-i="bolt" class="sm"></i>Continue</button>`,
+  },
+  {
+    id: "image_media",
+    name: "Image / Cover Media",
+    category: "primitives",
+    icon: "image",
+    desc: "Responsive media frame — click in Design tab to upload any PNG/JPG/SVG",
+    html: () => `<div class="z-card bleed"><img src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='320' viewBox='0 0 640 320'%3E%3Crect width='640' height='320' fill='%23262322'/%3E%3Ccircle cx='210' cy='120' r='28' fill='%23d97757' opacity='0.75'/%3E%3Cpath d='M80 270 L230 150 L350 240 L450 165 L570 270 Z' fill='%233b3532'/%3E%3C/svg%3E" alt="Media cover" style="width:100%;height:168px;object-fit:cover;display:block;border-radius:var(--r-md)" /></div>`,
   },
   {
     id: "button_tonal",

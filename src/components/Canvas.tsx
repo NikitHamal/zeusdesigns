@@ -254,14 +254,43 @@ function ArtboardView({ a, z, selected, interacting, editing, culled, tool, onMo
       className="group absolute"
       style={{ left: a.x, top: a.y, width: a.w, pointerEvents: selectable ? "auto" : "none" }}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-zeus-block")) {
+        if (e.dataTransfer.types.includes("application/x-zeus-block") || e.dataTransfer.types.includes("Files")) {
           e.preventDefault();
           e.stopPropagation();
           setDropOver(true);
         }
       }}
       onDragLeave={() => setDropOver(false)}
-      onDrop={onDropBlock}
+      onDrop={(e) => {
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const imgFile = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(f.name));
+          if (imgFile) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDropOver(false);
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = String(reader.result || "");
+              if (!dataUrl) return;
+              const imgHtml = `<div class="z-card bleed"><img src="${dataUrl}" alt="${imgFile.name.replace(/"/g, "")}" style="width:100%;max-height:220px;object-fit:cover;display:block;border-radius:var(--r-md)" /></div>`;
+              const st = useStore.getState();
+              if (editing) {
+                editor.insertHtml(imgHtml, useEditor.getState().sel ? "after" : "append");
+              } else {
+                const nextHtml = a.html.includes("</div></div></body>")
+                  ? a.html.replace("</div></div></body>", `${imgHtml}</div></div></body>`)
+                  : a.html.replace("</body>", `${imgHtml}</body>`);
+                st.reviseArtboard(a.id, nextHtml);
+              }
+              st.setSel([a.id]);
+              st.notify(`Inserted ${imgFile.name} into ${a.name}`);
+            };
+            reader.readAsDataURL(imgFile);
+            return;
+          }
+        }
+        onDropBlock(e);
+      }}
     >
       {/* header */}
       <div

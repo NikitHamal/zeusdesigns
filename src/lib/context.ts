@@ -2,7 +2,7 @@
 // Real Context Window Tracker, Auto/Manual Compactor, and Continuation Engine.
 
 import { activeConv, uid, useStore } from "../store";
-import type { Artboard, Device, Message, Quote } from "../types";
+import type { Artboard, Message, Quote } from "../types";
 import { getDS, tokensCss } from "./designSystems";
 import { stripKitBoilerplate } from "./harness";
 import { memoryBlock } from "./memory";
