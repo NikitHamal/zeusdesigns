@@ -424,8 +424,9 @@ fn execute_inline_workspace_tools(
 ) {
     let clean_text = strip_thinking_blocks(full_text);
     let mut invocations = parse_inline_invocations_segment(&clean_text, stream_ended, true);
-    if invocations.is_empty() && stream_ended {
+    if invocations.is_empty() && stream_ended && clean_text.trim().len() < 80 {
         // Fallback when an upstream gateway routes the model's <zeus_tool> call into reasoning_content (<think>)
+        // and leaves the visible content empty or minimal.
         invocations = parse_inline_invocations_segment(full_text, false, true);
     }
     let eff_root = resolve_workspace_root(workspace_root);
@@ -495,11 +496,23 @@ fn execute_inline_workspace_tools(
                 }
             }
             "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" => {
-                let res = fs_read(eff_root.clone(), path_arg.clone())
-                    .and_then(|content| apply_search_replace(&content, body))
-                    .and_then(|updated| fs_write(eff_root.clone(), path_arg.clone(), updated));
-                match res {
-                    Ok(_) => (true, format!("Edited {}", path_arg)),
+                match fs_read(eff_root.clone(), path_arg.clone()) {
+                    Ok(content) => match apply_search_replace(&content, body) {
+                        Ok(updated) => match fs_write(eff_root.clone(), path_arg.clone(), updated) {
+                            Ok(_) => (true, format!("Edited {}", path_arg)),
+                            Err(e) => (false, e),
+                        },
+                        Err(e) => {
+                            let preview: String = content.chars().take(6000).collect();
+                            (
+                                false,
+                                format!(
+                                    "{}\n\nCurrent content of {}:\n{}\nRetry edit_file with exact lines from above or use write_file.",
+                                    e, path_arg, preview
+                                ),
+                            )
+                        }
+                    },
                     Err(e) => (false, e),
                 }
             }

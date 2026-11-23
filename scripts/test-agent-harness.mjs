@@ -134,11 +134,15 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
   return calls;
 }
 
-function parseToolCalls(rawText) {
-  const outside = parseToolCallsFromSegment(stripThinking(rawText), false);
+function parseToolCalls(rawText, seenKeys = new Set()) {
+  const clean = stripThinking(rawText);
+  const outside = parseToolCallsFromSegment(clean, false);
   if (outside.length > 0) return outside;
-  // Fallback: if upstream gateway placed valid <zeus_tool> blocks inside <think>/reasoning_content
-  return parseToolCallsFromSegment(rawText, true);
+  // Fallback only when visible text after </think> is empty/minimal (< 80 chars) and tool wasn't already executed
+  if (clean.trim().length < 80) {
+    return parseToolCallsFromSegment(rawText, true).filter((c) => !seenKeys.has(`${c.name}|${c.path}|${c.body}`));
+  }
+  return [];
 }
 
 function replaceHunkFuzzy(content, searchRaw, replaceRaw) {
@@ -181,16 +185,23 @@ function executeToolInWorkspace(wsRoot, call) {
       let content = fs.readFileSync(fullPath, "utf8");
       let rest = body;
       let count = 0;
-      while (rest.includes("<<<<<<< SEARCH")) {
-        const si = rest.indexOf("<<<<<<< SEARCH") + "<<<<<<< SEARCH".length;
-        const mi = rest.indexOf("=======", si);
-        const ri = rest.indexOf(">>>>>>> REPLACE", mi);
-        if (mi < 0 || ri < 0) return { ok: false, output: "Malformed SEARCH/REPLACE block" };
-        const sBlock = rest.slice(si, mi).replace(/^\r?\n|\r?\n$/g, "");
-        const rBlock = rest.slice(mi + 7, ri).replace(/^\r?\n|\r?\n$/g, "");
-        rest = rest.slice(ri + ">>>>>>> REPLACE".length);
-        content = replaceHunkFuzzy(content, sBlock, rBlock);
-        count++;
+      try {
+        while (rest.includes("<<<<<<< SEARCH")) {
+          const si = rest.indexOf("<<<<<<< SEARCH") + "<<<<<<< SEARCH".length;
+          const mi = rest.indexOf("=======", si);
+          const ri = rest.indexOf(">>>>>>> REPLACE", mi);
+          if (mi < 0 || ri < 0) return { ok: false, output: "Malformed SEARCH/REPLACE block" };
+          const sBlock = rest.slice(si, mi).replace(/^\r?\n|\r?\n$/g, "");
+          const rBlock = rest.slice(mi + 7, ri).replace(/^\r?\n|\r?\n$/g, "");
+          rest = rest.slice(ri + ">>>>>>> REPLACE".length);
+          content = replaceHunkFuzzy(content, sBlock, rBlock);
+          count++;
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          output: `edit_file: ${err.message} in ${relPath}.\n\nCurrent content of ${relPath}:\n${content.slice(0, 6000)}\nRetry edit_file with exact lines from above or use write_file.`,
+        };
       }
       if (!count) return { ok: false, output: "Missing SEARCH/REPLACE block" };
       fs.writeFileSync(fullPath, content, "utf8");
@@ -322,9 +333,9 @@ function buildHarnessSystemPrompt(target, wsRoot, topEntries, mode = "code") {
   return [
     `You are Zeus, a free general-purpose AI coding & design agent running inside the ZeusDesigns desktop app. You talk, reason, write and edit code, execute bash and python scripts, research, and—only when asked—design interfaces. You work like a principal software engineer pairing with the user.`,
     `## How to respond
-- Answer what was asked, at the size it was asked. A greeting or a simple question gets one or two plain sentences. No tools, no files, no screens, no artifacts, no plan.
+- Answer what was asked, at the size it was asked. If the user sends a greeting ("Hi", "Hello", "Hey"), reply with one normal, direct sentence (e.g. "Hello! What would you like to build or work on?"). No tools, no files, no screens, no artifacts, no roleplay.
 - Never produce a design, template, landing page or mockup unless the user asks for a visual deliverable.
-- Be direct. No filler openers, no recaps of what you just did, no emojis, no taglines, no pep.`,
+- Be direct. No recaps of what you just did, no emojis, no taglines, no pep.`,
     mode === "code" ? `## Model Harness: ${target.label}
 - Never emit \`<zeus_tool>\` or \`<tool_call>\` tags inside \`<think>...</think>\`. Keep \`<think>\` pure plain-text reasoning.
 - Top-level files are already shown in \`## Project\`. Never call \`list_dir\` on \`.\` unless \`## Project\` is missing. When asked to create a new file (such as \`AGENTS.md\`), emit \`<zeus_tool name="write_file" path="AGENTS.md">...</zeus_tool>\` immediately in Turn 1 without calling \`list_dir\` first.
@@ -358,11 +369,13 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
       ]
     : [{ role: "user", content: userPrompt }];
   const trace = [];
+  const seenKeys = new Set();
   let nudged = false;
 
   for (let round = 0; round < maxRounds; round++) {
     const raw = await callModel(target, system, messages);
-    const calls = parseToolCalls(raw);
+    const calls = parseToolCalls(raw, seenKeys);
+    for (const c of calls) seenKeys.add(`${c.name}|${c.path}|${c.body}`);
     if (!calls.length) {
       if (mode === "code" && !nudged && trace.every((t) => t.tools.length === 0)) {
         nudged = true;
