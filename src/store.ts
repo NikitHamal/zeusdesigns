@@ -111,7 +111,7 @@ interface State {
   setBusy: (b: boolean) => void;
 }
 
-const firstConv = (): Conversation => ({ id: uid(), title: "New design chat", messages: [], at: Date.now() });
+const firstConv = (): Conversation => ({ id: uid(), title: "New chat", messages: [], at: Date.now() });
 const conv0 = firstConv();
 const firstPage: Page = { id: "p1", name: "Page 1", convId: conv0.id };
 conv0.activePageId = firstPage.id;
@@ -232,7 +232,7 @@ export const useStore = create<State>()(
           id, pageId: a.pageId ?? s.activePageId, name: a.name ?? `Screen ${s.artboards.length + 1}`, device, w, h, ...pos,
           html: a.html, version: 1, history: [], groupId: a.groupId ?? id, loading: a.loading, source: a.source,
         };
-        set((st) => ({ artboards: [...st.artboards, ab] }));
+        set((st) => ({ artboards: [...st.artboards, ab], ui: st.ui.showCanvas ? st.ui : { ...st.ui, showCanvas: true } }));
         return ab;
       },
       addBlankFrame: (x, y, w, h) => {
@@ -415,3 +415,12 @@ export const useStore = create<State>()(
 
 export const activeConv = (s: State) => s.conversations.find((c) => c.id === s.activeConvId) ?? s.conversations[0];
 export { DESIGN_SYSTEMS };
+
+/** Artifacts (canvas screens) that belong to a conversation. */
+export function convArtifactCount(s: { pages: Page[]; artboards: Artboard[]; conversations: Conversation[] }, convId: string): number {
+  const pIds = new Set(s.pages.filter((p) => p.convId === convId).map((p) => p.id));
+  const direct = s.artboards.filter((a) => pIds.has(a.pageId)).length;
+  const conv = s.conversations.find((c) => c.id === convId);
+  const viaMsg = new Set((conv?.messages ?? []).flatMap((m) => m.artboardIds ?? [])).size;
+  return Math.max(direct, viaMsg);
+}

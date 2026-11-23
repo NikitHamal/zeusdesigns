@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { activeConv, useStore } from "../store";
+import { activeConv, convArtifactCount, useStore } from "../store";
 import { nativePerf, openWorkspace } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dialog, Dropdown, IconBtn, MenuItem } from "./ui";
@@ -28,7 +28,7 @@ function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void })
       .filter((r) => r.c.messages.length > 0 && (!k || r.title || r.hit))
       .slice(0, 30);
   }, [convs, q]);
-  const go = (id: string) => { useStore.getState().setActiveConv(id); useStore.getState().patchUI({ showCanvas: false }); setQ(""); onClose(); };
+  const go = (id: string) => { const st = useStore.getState(); st.setActiveConv(id); st.patchUI({ showCanvas: convArtifactCount(st, id) > 0 }); setQ(""); onClose(); };
   return (
     <Dialog open={open} onClose={onClose} className="w-[min(620px,92vw)] max-h-[70vh]">
       <div className="flex items-center gap-3 border-b border-outline-variant px-5 py-3">
@@ -74,7 +74,7 @@ function ChatRow({ id, title, active, screenCount }: { id: string; title: string
   }
   return (
     <div className={cn("group relative rounded-lg", active && "bg-surface-high")}>
-      <button onClick={() => { setActiveConv(id); patchUI({ showCanvas: false }); }} onDoubleClick={() => setRename(true)} className="state flex h-9 w-full items-center gap-2 rounded-lg px-3 pr-9 text-left text-[14px] text-on-surface">
+      <button onClick={() => { const st = useStore.getState(); setActiveConv(id); patchUI({ showCanvas: convArtifactCount(st, id) > 0 }); }} onDoubleClick={() => setRename(true)} className="state flex h-9 w-full items-center gap-2 rounded-lg px-3 pr-9 text-left text-[14px] text-on-surface">
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {screenCount > 0 && <span className="shrink-0 rounded-full bg-surface-container px-1.5 py-0.5 text-[11px] font-medium text-on-surface-variant group-hover:opacity-0">{screenCount}</span>}
       </button>
@@ -146,7 +146,7 @@ export function Sidebar() {
   const [search, setSearch] = useState(false);
   const [open, setOpen] = useState(true);
   const list = convs.filter((c) => c.messages.length > 0);
-  const split = current.messages.length > 0 || ui.showCanvas;
+  const split = current.messages.length > 0;
   const countByConv = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of convs) {
@@ -169,7 +169,7 @@ export function Sidebar() {
     patchUI({ showCanvas: false, leftTab: "chat" });
   };
   const project = () => {
-    const show = () => patchUI({ leftTab: "files", chatCollapsed: false, showCanvas: true });
+    const show = () => patchUI({ leftTab: "files", chatCollapsed: false });
     if (ui.workspace) show();
     else openWorkspace().then((w) => { if (w) { patchUI({ workspace: w }); show(); } }).catch((e) => notify(e.message));
   };
@@ -181,7 +181,7 @@ export function Sidebar() {
         <span className="px-1 font-display text-[20px] font-semibold tracking-tight text-on-surface">Zeus</span>
       </div>
       <nav className="flex flex-col gap-0.5 px-2">
-        <NavItem icon="add" label="New design" onClick={startNew} active={!split} />
+        <NavItem icon="add" label="New chat" onClick={startNew} active={!split} />
         <NavItem icon="search" label="Search" onClick={() => setSearch(true)} />
         <NavItem icon="folder_open" label={ui.workspace ? ui.workspace.name : "Project folder"} onClick={project} />
         <NavItem icon="local_library" label="Library" onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })} />

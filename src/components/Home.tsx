@@ -5,11 +5,11 @@ import { Thumb } from "./ui";
 import { focusArtboard } from "../lib/actions";
 
 const STARTERS = [
-  { i: "phone_iphone", t: "Mobile app", p: "Design a mobile app home screen for " },
+  { i: "terminal", t: "Build a feature", p: "Build a feature in this project: " },
+  { i: "bug_report", t: "Fix a bug", p: "Find and fix this bug: " },
+  { i: "manage_search", t: "Explain code", p: "Explain how this works: " },
+  { i: "phone_iphone", t: "Design a screen", p: "Design a mobile app home screen for " },
   { i: "web", t: "Landing page", p: "Design a landing page for " },
-  { i: "dashboard", t: "Dashboard", p: "Design an analytics dashboard for " },
-  { i: "swipe", t: "Onboarding", p: "Design a three-step onboarding flow for " },
-  { i: "palette", t: "Design system", p: "Create a design system sheet with color, type and components for " },
 ];
 
 function greeting() {

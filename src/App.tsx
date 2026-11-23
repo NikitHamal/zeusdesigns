@@ -22,7 +22,7 @@ export default function App() {
   const patchUI = useStore((s) => s.patchUI);
   const [w, setW] = useState(() => Number(localStorage.getItem("zeus-chat-w")) || 440);
   const dragging = useRef(false);
-  const split = hasMessages || showCanvas;
+  const split = showCanvas;
 
   useLayoutEffect(() => {
     applyTheme(theme, hue);
@@ -86,6 +86,8 @@ export default function App() {
             )}
             <div className="min-w-0 flex-1 p-2 pl-0"><CanvasPane /></div>
           </>
+        ) : hasMessages ? (
+          <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full max-w-[860px]"><ChatPane /></div></div>
         ) : (
           <Home />
         )}

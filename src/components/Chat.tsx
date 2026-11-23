@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { activeConv, useStore } from "../store";
+import { activeConv, convArtifactCount, useStore } from "../store";
 import type { Attachment, FileNode, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
-import { EFFORTS, findProvider, PROVIDERS, supportsAttachments } from "../lib/providers";
+import { supportsAttachments } from "../lib/providers";
+import { ModelPicker } from "./ModelPicker";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
 import { nativeMemory, openWorkspace, readWorkspaceFile } from "../lib/bridge";
@@ -242,152 +243,6 @@ function ContextWindowPill() {
         </div>
       )}
     </Dropdown>
-  );
-}
-
-const EFFORT_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3, max: 4 };
-const EFFORT_SHORT: Record<string, string> = { low: "Low", medium: "Med", high: "High", max: "Max" };
-
-function EffortBars({ level }: { level: number }) {
-  return (
-    <span className="inline-flex items-end gap-[2px] h-3" aria-hidden>
-      {[1, 2, 3, 4].map((b) => (
-        <i
-          key={b}
-          style={{ height: `${3 + b * 2.2}px` }}
-          className={cn(
-            "w-[2.5px] rounded-full transition-all duration-200",
-            b <= level ? "bg-primary" : "bg-on-surface-variant/30"
-          )}
-        />
-      ))}
-    </span>
-  );
-}
-
-function ModelPicker() {
-  const settings = useStore((s) => s.settings);
-  const patch = useStore((s) => s.patchSettings);
-  const patchUI = useStore((s) => s.patchUI);
-  const custom = settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId);
-  const prov = findProvider(settings.providerId);
-  const label = custom ? custom.model : prov.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
-  const effort = EFFORTS.find((e) => e.id === settings.effort) ?? EFFORTS[1];
-  const level = EFFORT_LEVEL[effort.id] ?? 2;
-
-  const cycleEffort = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const idx = EFFORTS.findIndex((x) => x.id === settings.effort);
-    const next = EFFORTS[(idx + 1) % EFFORTS.length];
-    patch({ effort: next.id });
-  };
-
-  return (
-    <div className="flex min-w-0 items-center gap-[2px] rounded-full bg-surface-high/65 p-0.5">
-      {/* Left segment: Model selector */}
-      <Dropdown up align="right" width={330} className="min-w-0" trigger={({ toggle, open }) => (
-        <button
-          onClick={toggle}
-          title="Select AI model"
-          className={cn(
-            "state morph flex h-8 max-w-full min-w-0 items-center gap-1 rounded-l-full rounded-r-[8px] bg-surface-container/80 pl-3 pr-2 text-[12.5px] font-medium text-on-surface",
-            open && "bg-surface-highest"
-          )}
-        >
-          <span className="truncate">{label}</span>
-          <Icon name="expand_more" size={14} className="shrink-0 text-on-surface-variant" />
-        </button>
-      )}>
-        {(close) => (
-          <>
-            <div className="px-2.5 pt-2 pb-1.5">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                <span>Reasoning effort</span>
-                <span className="normal-case tracking-normal text-primary">{effort.desc}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1 rounded-2xl bg-surface-low p-1">
-                {EFFORTS.map((e) => {
-                  const active = settings.effort === e.id;
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => patch({ effort: e.id })}
-                      className={cn(
-                        "state morph flex h-7 items-center justify-center gap-1 rounded-xl text-xs font-semibold transition-all",
-                        active ? "bg-primary-container text-on-primary-container" : "text-on-surface-variant hover:text-on-surface"
-                      )}
-                    >
-                      {e.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="my-1 border-t border-outline-variant/60" />
-            <MenuLabel>Model</MenuLabel>
-            {PROVIDERS.map((p) => p.models.map((m) => (
-              <MenuItem
-                key={p.id + m.id} active={settings.providerId === p.id && settings.modelId === m.id}
-                icon={m.vision ? <Icon name="image" size={15} className="text-primary" /> : <Icon name="chat_bubble" size={14} className="text-on-surface-variant/60" />}
-                label={m.label} desc={`${p.name} · ${p.speed}${m.vision ? " · Vision" : ""}`}
-                onClick={() => { patch({ providerId: p.id, modelId: m.id }); close(); }}
-              />
-            )))}
-            {settings.customProviders.length > 0 && <MenuLabel>Your API keys</MenuLabel>}
-            {settings.customProviders.map((c) => (
-              <MenuItem key={c.id} label={c.model} desc={`${c.name} · ${c.format}`} active={settings.providerId === `custom:${c.id}`} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} />
-            ))}
-            <MenuItem icon={<Icon name="add" size={16} />} label="Add your own endpoint" onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} />
-          </>
-        )}
-      </Dropdown>
-
-      {/* Right segment: Instant M3 Expressive Effort selector (Popover + Shift-click cycle) */}
-      <Dropdown up align="right" width={264} trigger={({ toggle, open }) => (
-        <button
-          onClick={(e) => (e.shiftKey ? cycleEffort(e) : toggle())}
-          onContextMenu={(e) => { e.preventDefault(); cycleEffort(e); }}
-          title={`Reasoning effort: ${effort.label} (${effort.desc}) — click to pick, right-click to cycle`}
-          className={cn(
-            "state morph flex h-8 shrink-0 items-center gap-1.5 rounded-l-[8px] rounded-r-full bg-surface-container/80 pl-2 pr-2.5 text-[12px] font-semibold text-on-surface",
-            open && "bg-surface-highest"
-          )}
-        >
-          <EffortBars level={level} />
-          <span className="hidden @[360px]:inline">{EFFORT_SHORT[effort.id] ?? effort.label}</span>
-        </button>
-      )}>
-        {(close) => (
-          <div className="p-2">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Reasoning effort</span>
-              <span className="text-[11px] font-medium text-primary">{effort.label}</span>
-            </div>
-            <div className="grid grid-cols-4 gap-1 rounded-2xl bg-surface-low p-1">
-              {EFFORTS.map((e) => {
-                const active = settings.effort === e.id;
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => { patch({ effort: e.id }); close(); }}
-                    className={cn(
-                      "state morph flex h-8 flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all",
-                      active ? "bg-primary text-on-primary" : "text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
-                    )}
-                  >
-                    {EFFORT_SHORT[e.id] ?? e.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-2 flex items-center justify-between px-1 text-[11.5px] text-on-surface-variant">
-              <span>{effort.desc}</span>
-              <button onClick={(e) => { cycleEffort(e); }} className="font-medium text-primary hover:underline">Cycle</button>
-            </div>
-          </div>
-        )}
-      </Dropdown>
-    </div>
   );
 }
 
@@ -658,6 +513,8 @@ export function ChatPane() {
   const leftTab = useStore((s) => s.ui.leftTab);
   const patchUI = useStore((s) => s.patchUI);
   const setTitle = useStore((s) => s.setTitle);
+  const showCanvas = useStore((s) => s.ui.showCanvas);
+  const artifacts = useStore((s) => convArtifactCount(s, s.activeConvId));
   const [editing, setEditing] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -686,8 +543,11 @@ export function ChatPane() {
         )}
         <span className="flex-1" />
         <ContextWindowPill />
+        {(artifacts > 0 || showCanvas) && (
+          <IconBtn label={showCanvas ? "Close canvas" : "Open canvas"} size={36} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="dashboard" size={20} /></IconBtn>
+        )}
         <IconBtn label={leftTab === "files" ? "Back to chat" : "Project files"} size={36} active={leftTab === "files"} onClick={() => patchUI({ leftTab: leftTab === "files" ? "chat" : "files" })}><Icon name="account_tree" size={20} /></IconBtn>
-        <IconBtn label="Hide chat" size={36} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={20} /></IconBtn>
+        {showCanvas && <IconBtn label="Hide chat" size={36} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={20} /></IconBtn>}
       </div>
       {leftTab === "files" ? <FilesPanel /> : (
         <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-3">

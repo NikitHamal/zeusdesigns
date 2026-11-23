@@ -1,3 +1,4 @@
+import { CTX_VERIFIED } from "./ctxVerified";
 // Catalog of bundled keyless providers (implemented natively in the engine — see docs/BACKEND_CONTRACT.md).
 export interface ModelInfo {
   id: string;
@@ -7,6 +8,8 @@ export interface ModelInfo {
   vision?: boolean;
   contextWindow?: number;
   maxOutput?: number;
+  /** true when the window comes from the gateway's own /models response (scripts/verify-context.mjs) */
+  verified?: boolean;
 }
 export interface ProviderMeta {
   id: string; name: string; tagline: string; speed: string; color: string; icon: string;
@@ -450,6 +453,29 @@ export const PROVIDERS: ProviderMeta[] = [
     models: [{ id: "llama3.1-8b", label: "Llama 3.1 8B", note: "32k ctx · 20,000+ tok/s micro-task engine", vision: false, contextWindow: 32000, maxOutput: 4096 }],
   },
 ];
+
+/** OpenCode Zen free tier: official keyless gateway used by OpenCode itself (`Authorization: Bearer public`). Models and limits come from the live /zen/v1/models response. */
+PROVIDERS.splice(1, 0, {
+  id: "opencodezen", name: "OpenCode Zen", tagline: "", speed: "~90 tok/s", color: "#1f8a70", icon: "terminal",
+  contextWindow: 200000,
+  models: Object.entries(CTX_VERIFIED.opencodezen ?? {}).map(([id, v]) => ({
+    id, label: (v.name ?? id).replace(/\s+Free$/i, ""), reasoning: !!v.reasoning, vision: !!v.vision, contextWindow: v.ctx, maxOutput: Math.min(v.out ?? 16384, 32768),
+  })),
+});
+
+/* Overlay real limits from live /models responses; strip hand-typed "NNk ctx" claims from notes (the picker shows the real number). */
+for (const p of PROVIDERS) {
+  for (const m of p.models) {
+    const v = CTX_VERIFIED[p.id]?.[m.id];
+    if (v) {
+      m.contextWindow = v.ctx; m.verified = true;
+      if (v.out) m.maxOutput = Math.min(v.out, 32768);
+      if (v.vision !== undefined) m.vision = v.vision;
+    }
+    if (m.note) m.note = m.note.replace(/^[\d.,]+\s?[kKM]?\s*ctx\s*·\s*/, "");
+    if (m.contextWindow && m.maxOutput && m.maxOutput > m.contextWindow / 2) m.maxOutput = Math.floor(m.contextWindow / 2);
+  }
+}
 
 export const DEMO_PROVIDER: ProviderMeta = {
   id: "demo", name: "Zeus Demo Engine", tagline: "Offline template designer", speed: "instant", color: "#868e96", icon: "draw",

@@ -57,7 +57,7 @@ export async function generateTitle(text: string): Promise<string> {
   }
   const words = text.replace(/[^\p{L}\p{N}\s'-]/gu, " ").split(/\s+/).filter(Boolean).slice(0, 5);
   const t = words.join(" ");
-  return t ? t[0].toUpperCase() + t.slice(1) : "New design chat";
+  return t ? t[0].toUpperCase() + t.slice(1) : "New chat";
 }
 
 /* ---------------- workspace (local project folder) ---------------- */
