@@ -114,13 +114,13 @@ fn resolve_workspace_root(workspace_root: &str) -> String {
 }
 
 #[derive(Debug, Clone)]
-struct InlineToolInvocation {
-    name: String,
-    path: String,
-    start_line: Option<usize>,
-    end_line: Option<usize>,
-    body: String,
-    offset: usize,
+pub struct InlineToolInvocation {
+    pub name: String,
+    pub path: String,
+    pub start_line: Option<usize>,
+    pub end_line: Option<usize>,
+    pub body: String,
+    pub offset: usize,
 }
 
 fn format_tree_compact(nodes: &[FileNode], indent: usize, out: &mut String) {
@@ -251,7 +251,7 @@ fn is_template_placeholder(path: &str, body: &str) -> bool {
     )
 }
 
-fn parse_inline_invocations_segment(
+pub fn parse_inline_invocations_segment(
     clean_text: &str,
     allow_unclosed_tail: bool,
     strict_placeholder_filter: bool,
@@ -539,253 +539,7 @@ fn execute_inline_workspace_tools(
             continue;
         }
 
-        let (ok, output) = match name.as_str() {
-            "read_file" | "read" | "cat" | "view_file" | "open_file" => {
-                match fs_read(eff_root.clone(), path_arg.clone()) {
-                    Ok(content) => {
-                        let total = content.lines().count();
-                        let start = inv.start_line.unwrap_or(1).max(1);
-                        let end = inv.end_line.unwrap_or(usize::MAX);
-                        let mut out = String::new();
-                        let mut last = start;
-                        for (i, line) in content.lines().enumerate() {
-                            let n = i + 1;
-                            if n < start {
-                                continue;
-                            }
-                            if n > end {
-                                break;
-                            }
-                            if out.len() > 40000 {
-                                out.push_str("\n[truncated: call read_file again with start/end]");
-                                break;
-                            }
-                            out.push_str(line);
-                            out.push('\n');
-                            last = n;
-                        }
-                        (
-                            true,
-                            format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out),
-                        )
-                    }
-                    Err(e) => (false, e),
-                }
-            }
-            "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" => {
-                match fs_read(eff_root.clone(), path_arg.clone()) {
-                    Ok(content) => match apply_search_replace(&content, body) {
-                        Ok(updated) => match fs_write(eff_root.clone(), path_arg.clone(), updated) {
-                            Ok(_) => (true, format!("Edited {}", path_arg)),
-                            Err(e) => (false, e),
-                        },
-                        Err(e) => {
-                            let preview: String = content.chars().take(6000).collect();
-                            (
-                                false,
-                                format!(
-                                    "{}\n\nCurrent content of {}:\n{}\nRetry edit_file with exact lines from above or use write_file.",
-                                    e, path_arg, preview
-                                ),
-                            )
-                        }
-                    },
-                    Err(e) => (false, e),
-                }
-            }
-            "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "sync_artboard" => {
-                match fs_write(eff_root.clone(), path_arg.clone(), body.to_string()) {
-                    Ok(_) => (
-                        true,
-                        format!("Synchronized {} ({} bytes)", path_arg, body.len()),
-                    ),
-                    Err(e) => (false, e),
-                }
-            }
-            "search_code" | "grep" | "rg" | "search" | "ripgrep" | "find_in_files" => {
-                let query = if !body.is_empty() { body } else { path_arg.as_str() };
-                let results = search_workspace_code(&eff_root, query, 25);
-                if results.is_empty() {
-                    (true, format!("No matches found for '{}'", query))
-                } else {
-                    let formatted = results
-                        .iter()
-                        .filter_map(|r| {
-                            Some(format!(
-                                "{}:{}: {}",
-                                r.get("path")?.as_str()?,
-                                r.get("line")?.as_u64()?,
-                                r.get("snippet")?.as_str()?
-                            ))
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    (true, formatted)
-                }
-            }
-            "list_dir" | "ls" | "dir" | "list_files" | "glob" | "find_files" => {
-                let p = Path::new(&eff_root);
-                if path_arg.contains("..") {
-                    (false, "list_dir: path must stay inside the project".to_string())
-                } else {
-                    let clean_rel = path_arg
-                        .trim()
-                        .trim_matches(|c| c == '.' || c == '/' || c == '\\');
-                    let target = if clean_rel.is_empty() {
-                        p.to_path_buf()
-                    } else {
-                        p.join(clean_rel)
-                    };
-                    let tree = walk_workspace(p, &target, 2);
-                    if tree.is_empty() {
-                        (
-                            true,
-                            "Directory is empty (0 files). Proceed directly without re-listing."
-                                .to_string(),
-                        )
-                    } else {
-                        let mut out = String::new();
-                        format_tree_compact(&tree, 0, &mut out);
-                        (true, out.trim_end().to_string())
-                    }
-                }
-            }
-            "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" => {
-                let cmd_str = if !body.is_empty() {
-                    body.to_string()
-                } else {
-                    path_arg.clone()
-                };
-                match shell_run(eff_root.clone(), cmd_str) {
-                    Ok(v) => format_exec_result(&v),
-                    Err(e) => (false, e),
-                }
-            }
-            "python" | "python3" | "py" | "python_exec" | "run_python" => {
-                let script = if !body.is_empty() {
-                    body.to_string()
-                } else {
-                    path_arg.clone()
-                };
-                match python_run(eff_root.clone(), script) {
-                    Ok(v) => format_exec_result(&v),
-                    Err(e) => (false, e),
-                }
-            }
-            "web_fetch" | "fetch" | "curl" | "webfetch" => {
-                let target_url = if !path_arg.is_empty() {
-                    path_arg.as_str()
-                } else {
-                    body
-                };
-                match reqwest::blocking::Client::builder()
-                    .timeout(std::time::Duration::from_secs(15))
-                    .build()
-                    .and_then(|c| c.get(target_url).send())
-                    .and_then(|r| r.text())
-                {
-                    Ok(txt) => {
-                        let readable = if txt.contains('<') {
-                            html_to_text(&txt)
-                        } else {
-                            txt
-                        };
-                        (true, readable.chars().take(8000).collect::<String>())
-                    }
-                    Err(e) => (false, format!("web_fetch failed: {}", e)),
-                }
-            }
-            "memory_search" | "memory_list" | "memory_get" | "memory_read" => {
-                let store = crate::memory::MemoryStore::default();
-                let cat = if matches!(
-                    path_arg.as_str(),
-                    "preferences" | "profile" | "topics" | "areas" | "all"
-                ) {
-                    Some(path_arg.as_str())
-                } else {
-                    None
-                };
-                let query = if !body.is_empty() {
-                    body
-                } else if cat.is_none() {
-                    path_arg.as_str()
-                } else {
-                    ""
-                };
-                let hits = store.search(query, cat, None);
-                if hits.is_empty() {
-                    (true, "No matching memory entries found.".to_string())
-                } else {
-                    let formatted = hits
-                        .iter()
-                        .take(30)
-                        .map(|m| format!("{} | [{}] {}", m.id, m.category, m.text))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    (true, formatted)
-                }
-            }
-            "memory" | "memory_save" | "memory_add" | "memory_set" => {
-                let store = crate::memory::MemoryStore::default();
-                let cat = if !path_arg.is_empty() {
-                    Some(path_arg.clone())
-                } else {
-                    Some("preferences".to_string())
-                };
-                let items = store.add(body.to_string(), cat, None);
-                let latest_id = items.last().map(|m| m.id.as_str()).unwrap_or("mem");
-                (
-                    true,
-                    format!(
-                        "Saved memory {} ({} total items)",
-                        latest_id,
-                        items.len()
-                    ),
-                )
-            }
-            "memory_edit" | "memory_update" => {
-                let store = crate::memory::MemoryStore::default();
-                match store.update(&path_arg, body.to_string(), None) {
-                    Ok(items) => (
-                        true,
-                        format!(
-                            "Updated memory '{}' ({} total items)",
-                            path_arg,
-                            items.len()
-                        ),
-                    ),
-                    Err(e) => (false, e),
-                }
-            }
-            "memory_delete" | "memory_remove" | "memory_forget" => {
-                let store = crate::memory::MemoryStore::default();
-                let target = if !path_arg.is_empty() {
-                    path_arg.as_str()
-                } else {
-                    body
-                };
-                let items = store.remove(target);
-                (
-                    true,
-                    format!(
-                        "Removed memory '{}' ({} total items remaining)",
-                        target,
-                        items.len()
-                    ),
-                )
-            }
-            other if other.starts_with("mcp:") => {
-                let reg = crate::mcp::McpRegistry::default();
-                reg.invoke_tool(other, body)
-            }
-            _ => (
-                false,
-                format!(
-                    "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete.",
-                    name
-                ),
-            ),
-        };
+        let (ok, output) = execute_single_workspace_tool(&eff_root, &inv);
 
         let _ = app.emit(
             event_topic,
@@ -796,6 +550,261 @@ fn execute_inline_workspace_tools(
                 "output": output
             }),
         );
+    }
+}
+
+pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation) -> (bool, String) {
+    let name = inv.name.trim();
+    let path_arg = &inv.path;
+    let body = inv.body.trim();
+    let eff_root = resolve_workspace_root(eff_root);
+
+    match name {
+        "read_file" | "read" | "cat" | "view_file" | "open_file" => {
+            match fs_read(eff_root.clone(), path_arg.clone()) {
+                Ok(content) => {
+                    let total = content.lines().count();
+                    let start = inv.start_line.unwrap_or(1).max(1);
+                    let end = inv.end_line.unwrap_or(usize::MAX);
+                    let mut out = String::new();
+                    let mut last = start;
+                    for (i, line) in content.lines().enumerate() {
+                        let n = i + 1;
+                        if n < start {
+                            continue;
+                        }
+                        if n > end {
+                            break;
+                        }
+                        if out.len() > 40000 {
+                            out.push_str("\n[truncated: call read_file again with start/end]");
+                            break;
+                        }
+                        out.push_str(line);
+                        out.push('\n');
+                        last = n;
+                    }
+                    (
+                        true,
+                        format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out),
+                    )
+                }
+                Err(e) => (false, e),
+            }
+        }
+        "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" => {
+            match fs_read(eff_root.clone(), path_arg.clone()) {
+                Ok(content) => match apply_search_replace(&content, body) {
+                    Ok(updated) => match fs_write(eff_root.clone(), path_arg.clone(), updated) {
+                        Ok(_) => (true, format!("Edited {}", path_arg)),
+                        Err(e) => (false, e),
+                    },
+                    Err(e) => {
+                        let preview: String = content.chars().take(6000).collect();
+                        (
+                            false,
+                            format!(
+                                "{}\n\nCurrent content of {}:\n{}\nRetry edit_file with exact lines from above or use write_file.",
+                                e, path_arg, preview
+                            ),
+                        )
+                    }
+                },
+                Err(e) => (false, e),
+            }
+        }
+        "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "sync_artboard" => {
+            match fs_write(eff_root.clone(), path_arg.clone(), body.to_string()) {
+                Ok(_) => (
+                    true,
+                    format!("Synchronized {} ({} bytes)", path_arg, body.len()),
+                ),
+                Err(e) => (false, e),
+            }
+        }
+        "search_code" | "grep" | "rg" | "search" | "ripgrep" | "find_in_files" => {
+            let query = if !body.is_empty() { body } else { path_arg.as_str() };
+            let results = search_workspace_code(&eff_root, query, 25);
+            if results.is_empty() {
+                (true, format!("No matches found for '{}'", query))
+            } else {
+                let formatted = results
+                    .iter()
+                    .filter_map(|r| {
+                        Some(format!(
+                            "{}:{}: {}",
+                            r.get("path")?.as_str()?,
+                            r.get("line")?.as_u64()?,
+                            r.get("snippet")?.as_str()?
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                (true, formatted)
+            }
+        }
+        "list_dir" | "ls" | "dir" | "list_files" | "glob" | "find_files" => {
+            let p = Path::new(&eff_root);
+            if path_arg.contains("..") {
+                (false, "list_dir: path must stay inside the project".to_string())
+            } else {
+                let clean_rel = path_arg
+                    .trim()
+                    .trim_matches(|c| c == '.' || c == '/' || c == '\\');
+                let target = if clean_rel.is_empty() {
+                    p.to_path_buf()
+                } else {
+                    p.join(clean_rel)
+                };
+                let tree = walk_workspace(p, &target, 2);
+                if tree.is_empty() {
+                    (
+                        true,
+                        "Directory is empty (0 files). Proceed directly without re-listing."
+                            .to_string(),
+                    )
+                } else {
+                    let mut out = String::new();
+                    format_tree_compact(&tree, 0, &mut out);
+                    (true, out.trim_end().to_string())
+                }
+            }
+        }
+        "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" => {
+            let cmd_str = if !body.is_empty() {
+                body.to_string()
+            } else {
+                path_arg.clone()
+            };
+            match shell_run(eff_root.clone(), cmd_str) {
+                Ok(v) => format_exec_result(&v),
+                Err(e) => (false, e),
+            }
+        }
+        "python" | "python3" | "py" | "python_exec" | "run_python" => {
+            let script = if !body.is_empty() {
+                body.to_string()
+            } else {
+                path_arg.clone()
+            };
+            match python_run(eff_root.clone(), script) {
+                Ok(v) => format_exec_result(&v),
+                Err(e) => (false, e),
+            }
+        }
+        "web_fetch" | "fetch" | "curl" | "webfetch" => {
+            let target_url = if !path_arg.is_empty() {
+                path_arg.as_str()
+            } else {
+                body
+            };
+            match reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(15))
+                .build()
+                .and_then(|c| c.get(target_url).send())
+                .and_then(|r| r.text())
+            {
+                Ok(txt) => {
+                    let readable = if txt.contains('<') {
+                        html_to_text(&txt)
+                    } else {
+                        txt
+                    };
+                    (true, readable.chars().take(8000).collect::<String>())
+                }
+                Err(e) => (false, format!("web_fetch failed: {}", e)),
+            }
+        }
+        "memory_search" | "memory_list" | "memory_get" | "memory_read" => {
+            let store = crate::memory::MemoryStore::default();
+            let cat = if matches!(
+                path_arg.as_str(),
+                "preferences" | "profile" | "topics" | "areas" | "all"
+            ) {
+                Some(path_arg.as_str())
+            } else {
+                None
+            };
+            let query = if !body.is_empty() {
+                body
+            } else if cat.is_none() {
+                path_arg.as_str()
+            } else {
+                ""
+            };
+            let hits = store.search(query, cat, None);
+            if hits.is_empty() {
+                (true, "No matching memory entries found.".to_string())
+            } else {
+                let formatted = hits
+                    .iter()
+                    .take(30)
+                    .map(|m| format!("{} | [{}] {}", m.id, m.category, m.text))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                (true, formatted)
+            }
+        }
+        "memory" | "memory_save" | "memory_add" | "memory_set" => {
+            let store = crate::memory::MemoryStore::default();
+            let cat = if !path_arg.is_empty() {
+                Some(path_arg.clone())
+            } else {
+                Some("preferences".to_string())
+            };
+            let items = store.add(body.to_string(), cat, None);
+            let latest_id = items.last().map(|m| m.id.as_str()).unwrap_or("mem");
+            (
+                true,
+                format!(
+                    "Saved memory {} ({} total items)",
+                    latest_id,
+                    items.len()
+                ),
+            )
+        }
+        "memory_edit" | "memory_update" => {
+            let store = crate::memory::MemoryStore::default();
+            match store.update(path_arg, body.to_string(), None) {
+                Ok(items) => (
+                    true,
+                    format!(
+                        "Updated memory '{}' ({} total items)",
+                        path_arg,
+                        items.len()
+                    ),
+                ),
+                Err(e) => (false, e),
+            }
+        }
+        "memory_delete" | "memory_remove" | "memory_forget" => {
+            let store = crate::memory::MemoryStore::default();
+            let target = if !path_arg.is_empty() {
+                path_arg.as_str()
+            } else {
+                body
+            };
+            let items = store.remove(target);
+            (
+                true,
+                format!(
+                    "Removed memory '{}' ({} total items remaining)",
+                    target,
+                    items.len()
+                ),
+            )
+        }
+        other if other.starts_with("mcp:") => {
+            let reg = crate::mcp::McpRegistry::default();
+            reg.invoke_tool(other, body)
+        }
+        _ => (
+            false,
+            format!(
+                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete.",
+                name
+            ),
+        ),
     }
 }
 

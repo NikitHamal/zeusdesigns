@@ -10,13 +10,13 @@ const GATEWAY = "http://127.0.0.1:11435";
 const sessions = new Map<string, string>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function sdk(directory?: string) {
+async function sdk(directory?: string, baseUrl = activeOcBase) {
   const { createOpencodeClient } = await import("@opencode-ai/sdk/client");
-  return createOpencodeClient({ baseUrl: BASE, directory });
+  return createOpencodeClient({ baseUrl, directory });
 }
 
 export async function ocHealthy(): Promise<boolean> {
-  try { return (await fetch(`${BASE}/global/health`, { signal: AbortSignal.timeout(1500) })).ok; } catch { return false; }
+  return (await checkHealthAt(BASE)) || (await checkHealthAt(GATEWAY));
 }
 
 /** Provider/model pair OpenCode should use for the model picked in Zeus. Zen is OpenCode's own provider; everything else goes through the Zeus gateway. */
@@ -47,13 +47,38 @@ async function buildConfig(providerId: string, modelId: string): Promise<Record<
   return cfg;
 }
 
-export async function ensureOpenCode(root: string | undefined, providerId: string, modelId: string) {
-  if (await ocHealthy()) return;
+let activeOcBase = BASE;
+
+async function checkHealthAt(url: string): Promise<boolean> {
+  try { return (await fetch(`${url}/global/health`, { signal: AbortSignal.timeout(1200) })).ok; } catch { return false; }
+}
+
+export async function ensureOpenCode(root: string | undefined, providerId: string, modelId: string): Promise<string> {
+  if (await checkHealthAt(BASE)) {
+    activeOcBase = BASE;
+    return BASE;
+  }
   const cfg = await buildConfig(providerId, modelId);
-  const r = await nativeOpenCode.start(root ?? "", OC_PORT, JSON.stringify(cfg));
-  if (r === null) throw new Error("The OpenCode runtime needs the desktop app.");
-  for (let i = 0; i < 50; i++) { await sleep(400); if (await ocHealthy()) return; }
-  throw new Error("OpenCode did not start. Install it with: npm i -g opencode-ai");
+  const r = await nativeOpenCode.start(root ?? "", OC_PORT, JSON.stringify(cfg)).catch(() => null);
+  if (r !== null) {
+    for (let i = 0; i < 4; i++) {
+      await sleep(300);
+      if (await checkHealthAt(BASE)) {
+        activeOcBase = BASE;
+        return BASE;
+      }
+    }
+  }
+  // Built-in Native Rust OpenCode Server fallback on `GATEWAY` (`127.0.0.1:11435`) — works with 0 external CLI installs!
+  if (await checkHealthAt(GATEWAY)) {
+    activeOcBase = GATEWAY;
+    return GATEWAY;
+  }
+  const { nativeServer } = await import("./bridge");
+  const st = await nativeServer.start();
+  const gw = st?.baseUrl || GATEWAY;
+  activeOcBase = gw;
+  return gw;
 }
 
 interface Hooks {
@@ -68,8 +93,8 @@ export async function runOpenCode(opts: { convId: string; title: string; prompt:
   const st = useStore.getState();
   const { providerId, modelId } = st.settings;
   const root = st.ui.workspace?.root;
-  await ensureOpenCode(root, providerId, modelId);
-  const c = await sdk(root);
+  const baseUrl = await ensureOpenCode(root, providerId, modelId);
+  const c = await sdk(root, baseUrl);
   let sid = sessions.get(opts.convId);
   if (!sid) {
     const created = await c.session.create({ body: { title: opts.title } });

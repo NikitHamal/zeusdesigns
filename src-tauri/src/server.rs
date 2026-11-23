@@ -50,12 +50,24 @@ pub struct ServerStatus {
     pub last_model: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcSession {
+    pub id: String,
+    pub title: String,
+    pub directory: String,
+    pub messages: Vec<ChatMessage>,
+    pub created: u64,
+}
+
 pub struct LocalServerState {
     pub running: AtomicBool,
     pub stop_signal: Mutex<Option<Arc<AtomicBool>>>,
     pub port: AtomicU16,
     pub request_count: AtomicU64,
     pub last_model: Mutex<String>,
+    pub oc_sessions: Mutex<std::collections::HashMap<String, OcSession>>,
+    pub oc_cancels: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    pub oc_subscribers: Mutex<Vec<std::sync::mpsc::Sender<Value>>>,
 }
 
 impl Default for LocalServerState {
@@ -66,8 +78,43 @@ impl Default for LocalServerState {
             port: AtomicU16::new(DEFAULT_SERVER_PORT),
             request_count: AtomicU64::new(0),
             last_model: Mutex::new("gemini-4-hydrogen".to_string()),
+            oc_sessions: Mutex::new(std::collections::HashMap::new()),
+            oc_cancels: Mutex::new(std::collections::HashMap::new()),
+            oc_subscribers: Mutex::new(Vec::new()),
         }
     }
+}
+
+impl LocalServerState {
+    pub fn broadcast_oc_event(&self, ev: Value) {
+        if let Ok(mut subs) = self.oc_subscribers.lock() {
+            subs.retain(|tx| tx.send(ev.clone()).is_ok());
+        }
+    }
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let h1 = (bytes[i + 1] as char).to_digit(16);
+            let h2 = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(d1), Some(d2)) = (h1, h2) {
+                out.push(((d1 << 4) | d2) as u8);
+                i += 3;
+                continue;
+            }
+        } else if bytes[i] == b'+' {
+            out.push(b' ');
+            i += 1;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
 }
 
 fn now_secs() -> u64 {
@@ -1026,6 +1073,366 @@ fn write_sse_event(stream: &mut TcpStream, event: &str, data: &Value) -> std::io
     stream.flush()
 }
 
+fn strip_tool_xml_for_oc(raw: &str) -> String {
+    let mut out = crate::agent::strip_thinking_blocks(raw);
+    for (open_tag, close_tag) in [
+        ("<zeus_tool", "</zeus_tool>"),
+        ("<tool_call>", "</tool_call>"),
+        ("<function_call>", "</function_call>"),
+        ("<bash>", "</bash>"),
+        ("<shell>", "</shell>"),
+        ("<python>", "</python>"),
+        ("<memory_search>", "</memory_search>"),
+        ("<memory_save", "</memory_save>"),
+        ("<memory_edit", "</memory_edit>"),
+        ("<memory_delete", "</memory_delete>"),
+    ] {
+        loop {
+            let Some(start) = out.find(open_tag) else { break };
+            let rest = &out[start..];
+            if open_tag == "<zeus_tool" {
+                if let Some(gt) = rest.find('>') {
+                    if rest[..gt].trim_end().ends_with('/') {
+                        out.replace_range(start..start + gt + 1, "");
+                        continue;
+                    }
+                }
+            }
+            if let Some(rel_end) = rest.find(close_tag) {
+                out.replace_range(start..start + rel_end + close_tag.len(), "");
+            } else {
+                out.truncate(start);
+                break;
+            }
+        }
+    }
+    out.trim().to_string()
+}
+
+fn handle_opencode_session_message(
+    stream: &mut TcpStream,
+    raw_path: &str,
+    session_id: &str,
+    body_bytes: &[u8],
+    engine: Arc<ProviderEngine>,
+    server_state: Arc<LocalServerState>,
+) {
+    let req_json: Value = serde_json::from_slice(body_bytes).unwrap_or_else(|_| json!({}));
+    let dir_q = raw_path
+        .split('?')
+        .nth(1)
+        .and_then(|q| {
+            q.split('&').find_map(|kv| {
+                let (k, v) = kv.split_once('=')?;
+                if k == "directory" {
+                    Some(percent_decode(v))
+                } else {
+                    None
+                }
+            })
+        })
+        .unwrap_or_default();
+
+    let model_str = req_json
+        .get("model")
+        .and_then(|m| {
+            if let Some(s) = m.as_str() {
+                Some(s.to_string())
+            } else {
+                let pid = m.get("providerID").and_then(|x| x.as_str()).unwrap_or("zeusdesigns");
+                let mid = m.get("modelID").and_then(|x| x.as_str()).unwrap_or("mercury-3");
+                if pid == "opencode" {
+                    Some(format!("opencodezen/{}", mid))
+                } else if mid.contains('/') {
+                    Some(mid.to_string())
+                } else {
+                    Some(format!("{}/{}", pid, mid))
+                }
+            }
+        })
+        .unwrap_or_else(|| "mercury3/mercury-3".to_string());
+    let (provider_id, upstream_model) = resolve_provider_and_model(&model_str);
+
+    let user_text = req_json
+        .get("parts")
+        .and_then(|p| p.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|x| x.get("text").and_then(|t| t.as_str()))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .or_else(|| req_json.get("text").and_then(|t| t.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default();
+
+    let custom_sys = req_json
+        .get("system")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let mut workdir = dir_q;
+    let mut history: Vec<ChatMessage> = Vec::new();
+    if let Ok(mut guard) = server_state.oc_sessions.lock() {
+        let entry = guard.entry(session_id.to_string()).or_insert_with(|| OcSession {
+            id: session_id.to_string(),
+            title: "OpenCode Session".to_string(),
+            directory: workdir.clone(),
+            messages: Vec::new(),
+            created: now_secs(),
+        });
+        if workdir.is_empty() && !entry.directory.is_empty() {
+            workdir = entry.directory.clone();
+        } else if !workdir.is_empty() {
+            entry.directory = workdir.clone();
+        }
+        entry.messages.push(ChatMessage {
+            role: "user".to_string(),
+            content: user_text.clone(),
+            attachments: Vec::new(),
+        });
+        history = entry.messages.clone();
+    }
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    if let Ok(mut cguard) = server_state.oc_cancels.lock() {
+        cguard.insert(session_id.to_string(), cancel_flag.clone());
+    }
+
+    let asst_msg_id = format!("msg_{}", random_hex(10));
+    server_state.broadcast_oc_event(json!({
+        "type": "message.updated",
+        "properties": {
+            "info": {
+                "id": asst_msg_id,
+                "sessionID": session_id,
+                "role": "assistant"
+            }
+        }
+    }));
+
+    let tool_sys = "You are running inside the Zeus Native OpenCode SDK Agent Runtime. You have direct access to workspace tools via <zeus_tool>: `shell` (bash), `python`, `read_file`, `write_file`, `edit_file` (with <<<<<<< SEARCH / ======= / >>>>>>> REPLACE), `search_code`, `list_dir`, `memory_search`, `memory_save`, `memory_edit`, `memory_delete`. Execute tools directly to inspect, edit, test, and verify code.";
+    let system_prompt = if custom_sys.trim().is_empty() {
+        tool_sys.to_string()
+    } else {
+        format!("{}\n\n{}", custom_sys, tool_sys)
+    };
+
+    let mut final_clean_answer = String::new();
+    for round in 0..12usize {
+        if cancel_flag.load(Ordering::Relaxed) {
+            break;
+        }
+        let chat_req = ChatRequest {
+            request_id: format!("oc-{}-{}", session_id, round),
+            provider: provider_id.clone(),
+            model: upstream_model.clone(),
+            effort: "medium".to_string(),
+            system: system_prompt.clone(),
+            messages: history.clone(),
+            workspace_root: if workdir.is_empty() { None } else { Some(workdir.clone()) },
+            custom: None,
+        };
+
+        let mut round_raw = String::new();
+        let text_part_id = format!("prt_txt_{}_{}", round, random_hex(6));
+        let reason_part_id = format!("prt_rsn_{}_{}", round, random_hex(6));
+        let mut prev_vis = String::new();
+        let mut prev_rsn = String::new();
+
+        let res = dispatch_stream(&engine, &chat_req, &cancel_flag, |delta| {
+            round_raw.push_str(delta);
+            let (rsn, vis_raw) = split_thinking_and_content(&round_raw);
+            if rsn.len() > prev_rsn.len() {
+                let d = rsn[prev_rsn.len()..].to_string();
+                prev_rsn = rsn.clone();
+                server_state.broadcast_oc_event(json!({
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": reason_part_id,
+                            "sessionID": session_id,
+                            "messageID": asst_msg_id,
+                            "type": "reasoning",
+                            "text": rsn
+                        },
+                        "delta": d
+                    }
+                }));
+            }
+            let vis_clean = strip_tool_xml_for_oc(&vis_raw);
+            if vis_clean.len() > prev_vis.len() && !vis_raw.contains("<zeus_tool") && !vis_raw.contains("<tool_call>") {
+                let d = vis_clean[prev_vis.len()..].to_string();
+                prev_vis = vis_clean.clone();
+                server_state.broadcast_oc_event(json!({
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": text_part_id,
+                            "sessionID": session_id,
+                            "messageID": asst_msg_id,
+                            "type": "text",
+                            "text": vis_clean
+                        },
+                        "delta": d
+                    }
+                }));
+            }
+        });
+
+        if let Err(err) = res {
+            server_state.broadcast_oc_event(json!({
+                "type": "session.error",
+                "properties": {
+                    "sessionID": session_id,
+                    "error": { "name": "ProviderError", "data": { "message": err } }
+                }
+            }));
+            break;
+        }
+
+        let clean_no_think = crate::agent::strip_thinking_blocks(&round_raw);
+        let mut invocations = crate::agent::parse_inline_invocations_segment(&clean_no_think, true, true);
+        if invocations.is_empty() && clean_no_think.trim().len() < 80 {
+            invocations = crate::agent::parse_inline_invocations_segment(&round_raw, false, true);
+        }
+
+        let vis_final = strip_tool_xml_for_oc(&clean_no_think);
+        if !vis_final.is_empty() {
+            if vis_final != prev_vis {
+                let delta = if vis_final.starts_with(&prev_vis) {
+                    vis_final[prev_vis.len()..].to_string()
+                } else {
+                    vis_final.clone()
+                };
+                server_state.broadcast_oc_event(json!({
+                    "type": "message.part.updated",
+                    "properties": {
+                        "part": {
+                            "id": text_part_id,
+                            "sessionID": session_id,
+                            "messageID": asst_msg_id,
+                            "type": "text",
+                            "text": vis_final
+                        },
+                        "delta": delta
+                    }
+                }));
+            }
+            final_clean_answer = vis_final.clone();
+        }
+
+        if invocations.is_empty() {
+            history.push(ChatMessage {
+                role: "assistant".to_string(),
+                content: final_clean_answer.clone(),
+                attachments: Vec::new(),
+            });
+            break;
+        }
+
+        let mut canonical_calls = Vec::new();
+        let mut tool_results_block = String::from("Tool results:\n");
+        for (t_idx, inv) in invocations.iter().enumerate() {
+            let call_id = format!("call_{}_{}_{}", round, t_idx, random_hex(4));
+            let input_obj = json!({
+                "path": inv.path,
+                "body": inv.body
+            });
+            server_state.broadcast_oc_event(json!({
+                "type": "message.part.updated",
+                "properties": {
+                    "part": {
+                        "id": call_id,
+                        "callID": call_id,
+                        "sessionID": session_id,
+                        "messageID": asst_msg_id,
+                        "type": "tool",
+                        "tool": inv.name,
+                        "state": {
+                            "status": "running",
+                            "input": input_obj
+                        }
+                    }
+                }
+            }));
+
+            let (ok, output) = crate::agent::execute_single_workspace_tool(&workdir, inv);
+            server_state.broadcast_oc_event(json!({
+                "type": "message.part.updated",
+                "properties": {
+                    "part": {
+                        "id": call_id,
+                        "callID": call_id,
+                        "sessionID": session_id,
+                        "messageID": asst_msg_id,
+                        "type": "tool",
+                        "tool": inv.name,
+                        "state": {
+                            "status": if ok { "completed" } else { "error" },
+                            "input": input_obj,
+                            "output": output,
+                            "error": if ok { Value::Null } else { Value::String(output.clone()) }
+                        }
+                    }
+                }
+            }));
+
+            canonical_calls.push(format!(
+                "<zeus_tool name=\"{}\" path=\"{}\">{}</zeus_tool>",
+                inv.name, inv.path, inv.body
+            ));
+            tool_results_block.push_str(&format!(
+                "<tool_result name=\"{}\" ok=\"{}\">\n{}\n</tool_result>\n",
+                inv.name, ok, output
+            ));
+        }
+        tool_results_block.push_str("Continue from these tool results. Emit another <zeus_tool> if more steps are needed, or provide the final response.");
+        history.push(ChatMessage {
+            role: "assistant".to_string(),
+            content: canonical_calls.join("\n"),
+            attachments: Vec::new(),
+        });
+        history.push(ChatMessage {
+            role: "user".to_string(),
+            content: tool_results_block,
+            attachments: Vec::new(),
+        });
+    }
+
+    if let Ok(mut guard) = server_state.oc_sessions.lock() {
+        if let Some(sess) = guard.get_mut(session_id) {
+            sess.messages = history;
+        }
+    }
+
+    server_state.broadcast_oc_event(json!({
+        "type": "session.idle",
+        "properties": { "sessionID": session_id }
+    }));
+
+    write_json_response(
+        stream,
+        "200 OK",
+        &json!({
+            "info": {
+                "id": asst_msg_id,
+                "sessionID": session_id,
+                "role": "assistant"
+            },
+            "parts": [
+                {
+                    "id": format!("prt_final_{}", random_hex(6)),
+                    "sessionID": session_id,
+                    "messageID": asst_msg_id,
+                    "type": "text",
+                    "text": final_clean_answer
+                }
+            ]
+        }),
+    );
+}
+
 fn handle_http_connection(
     mut stream: TcpStream,
     engine: Arc<ProviderEngine>,
@@ -1082,14 +1489,16 @@ fn handle_http_connection(
 
     let port = server_state.port.load(Ordering::Relaxed);
 
-    if method == "GET" && (path == "/" || path == "/health" || path == "/v1/health") {
+    if method == "GET" && (path == "/" || path == "/health" || path == "/v1/health" || path == "/global/health") {
         let models = build_openai_models_list();
         write_json_response(
             &mut stream,
             "200 OK",
             &json!({
+                "healthy": true,
+                "version": "1.0.0",
                 "status": "ok",
-                "server": "ZeusDesigns Local OpenAI & OpenCode Gateway",
+                "server": "ZeusDesigns Local OpenAI & Native OpenCode Server",
                 "port": port,
                 "base_url": format!("http://127.0.0.1:{}/v1", port),
                 "models_count": models.len(),
@@ -1098,6 +1507,136 @@ fn handle_http_connection(
             }),
         );
         return;
+    }
+
+    // Native OpenCode SDK Server Protocol (`/event`, `/session`, `/session/{id}/message`, `/session/{id}/abort`)
+    if method == "GET" && (path == "/event" || path == "/global/event" || path == "/api/event") {
+        if write_sse_headers(&mut stream).is_err() {
+            return;
+        }
+        let _ = write_sse_data(&mut stream, &json!({ "type": "server.connected", "properties": {} }));
+        let (tx, rx) = std::sync::mpsc::channel::<Value>();
+        if let Ok(mut subs) = server_state.oc_subscribers.lock() {
+            subs.push(tx);
+        }
+        loop {
+            match rx.recv_timeout(Duration::from_secs(15)) {
+                Ok(ev) => {
+                    if write_sse_data(&mut stream, &ev).is_err() {
+                        break;
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if stream.write_all(b": keepalive\n\n").is_err() || stream.flush().is_err() {
+                        break;
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        return;
+    }
+
+    if (path == "/session" || path == "/api/session") && method == "GET" {
+        let list: Vec<Value> = server_state
+            .oc_sessions
+            .lock()
+            .map(|m| {
+                m.values()
+                    .map(|s| {
+                        json!({
+                            "id": s.id,
+                            "title": s.title,
+                            "directory": s.directory,
+                            "version": "1.0.0",
+                            "time": { "created": s.created, "updated": now_secs() }
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        write_json_response(&mut stream, "200 OK", &json!(list));
+        return;
+    }
+
+    if (path == "/session" || path == "/api/session") && method == "POST" {
+        let req_json: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| json!({}));
+        let sid = format!("ses_{}", random_hex(12));
+        let title = req_json
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("New Session")
+            .to_string();
+        let dir_q = raw_path
+            .split('?')
+            .nth(1)
+            .and_then(|q| {
+                q.split('&').find_map(|kv| {
+                    let (k, v) = kv.split_once('=')?;
+                    if k == "directory" {
+                        Some(percent_decode(v))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .unwrap_or_default();
+        let created = now_secs();
+        let sess = OcSession {
+            id: sid.clone(),
+            title: title.clone(),
+            directory: dir_q.clone(),
+            messages: Vec::new(),
+            created,
+        };
+        if let Ok(mut guard) = server_state.oc_sessions.lock() {
+            guard.insert(sid.clone(), sess);
+        }
+        write_json_response(
+            &mut stream,
+            "200 OK",
+            &json!({
+                "id": sid,
+                "title": title,
+                "directory": dir_q,
+                "version": "1.0.0",
+                "time": { "created": created, "updated": created }
+            }),
+        );
+        return;
+    }
+
+    if path.starts_with("/session/") || path.starts_with("/api/session/") {
+        let clean_p = path.trim_start_matches("/api");
+        let segs: Vec<&str> = clean_p.split('/').filter(|s| !s.is_empty()).collect();
+        if segs.len() >= 2 && segs[0] == "session" {
+            let sid = segs[1].to_string();
+            let action = segs.get(2).copied().unwrap_or("");
+            if method == "POST" && (action == "abort" || action == "interrupt") {
+                if let Ok(guard) = server_state.oc_cancels.lock() {
+                    if let Some(flag) = guard.get(&sid) {
+                        flag.store(true, Ordering::Relaxed);
+                    }
+                }
+                server_state.broadcast_oc_event(json!({
+                    "type": "session.idle",
+                    "properties": { "sessionID": sid }
+                }));
+                write_json_response(&mut stream, "200 OK", &json!(true));
+                return;
+            }
+            if method == "POST" && (action == "message" || action == "prompt" || action == "prompt_async") {
+                handle_opencode_session_message(
+                    &mut stream,
+                    raw_path,
+                    &sid,
+                    &body_bytes,
+                    engine,
+                    server_state,
+                );
+                return;
+            }
+        }
     }
 
     if method == "GET" && (path == "/v1/models" || path == "/models") {
