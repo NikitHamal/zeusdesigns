@@ -626,11 +626,13 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "blockrun", "ovhcloud", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+    } else if (["kilo", "blockrun", "ovhcloud", "together2api", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
         blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "" },
         ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "" },
+        together2api: { baseUrl: "https://lolmaobruhhh-test.hf.space/v1", apiKey: "" },
+        aihorde: { baseUrl: "https://oai.aihorde.net/v1", apiKey: "0000000000" },
         apisfreellm: { baseUrl: "https://api.apisfreellm.com/v1", apiKey: "free" },
         llm7: { baseUrl: "https://api.llm7.io/v1", apiKey: "unused" },
         pollinations: { baseUrl: "https://text.pollinations.ai/openai", apiKey: "" },
