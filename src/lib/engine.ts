@@ -100,11 +100,16 @@ export function parseStream(full: string): { text: string; blocks: Block[]; leak
   );
   // Strip fenced or raw tool call blocks so agent tool calls render as chips, not raw XML/JSON text
   full = full
-    .replace(/```(?:xml|json|tool_call)?\s*<(?:zeus_tool|tool_call|function_call)[\s\S]*?<\/(?:zeus_tool|tool_call|function_call)>\s*```/gi, "")
+    .replace(/```(?:xml|json|tool_call)?\s*<(?:zeus_tool|tool_call|function_call|function|invoke|ifm\|tool_calls)[\s\S]*?<\/(?:zeus_tool|tool_call|function_call|function|invoke|ifm\|tool_calls)>\s*```/gi, "")
+    .replace(/<\|start\|>assistant<\|channel\|>commentary[\s\S]*?(?:<\|end\|>|<\|return\|>|<\|call\|>|$)/gi, "")
     .replace(/<zeus_tool[^>]*\/>/g, "")
     .replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/g, "")
     .replace(/<tool_call[\s\S]*?(<\/tool_call>|$)/g, "")
-    .replace(/<function_call[\s\S]*?(<\/function_call>|$)/g, "");
+    .replace(/<function_call[\s\S]*?(<\/function_call>|$)/g, "")
+    .replace(/<function(?:=|\s+name=)[\s\S]*?(<\/function>|$)/gi, "")
+    .replace(/<invoke\s+name=[\s\S]*?(<\/invoke>|$)/gi, "")
+    .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, "")
+    .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, "");
   let text = "";
   const blocks: Block[] = [];
   let i = 0;
@@ -674,18 +679,25 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
           }
-          // 3. Round-0 Code Action Nudge when a workspace is open and the model only described its plan without calling a tool
+          // 3. Code Action & Reasoning-Cutoff Nudge when the model only described its plan (e.g., "Let's list directory" / "We need to pull...") without calling a tool
+          const statedPlanOnly =
+            /\b(let'?s\s+(list|check|run|read|inspect|pull|fetch|search|look|verify|see|test|create|write|edit)|we\s+need\s+to\s+(pull|list|check|run|read|inspect|update|fix)|i\s+(will|need\s+to|should)\s+(list|check|run|read|inspect|pull|fetch|search|verify|test))\b/i.test(
+              `${roundText} ${extraThink}`
+            ) || (!roundText.trim() && extraThink.trim().length > 0);
           if (
-            mode === "code" &&
+            (mode === "code" || Boolean(st.ui.workspace)) &&
             !produced &&
             !nudged &&
-            round === 0 &&
-            tools.every((t) => t.name === "context_compact") &&
-            Boolean(st.ui.workspace) &&
-            /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md)\b/i.test(opts.text)
+            (round === 0 || statedPlanOnly) &&
+            (statedPlanOnly ||
+              /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md|pull|push|fetch|clone|git|github|status|diff|check|inspect|list|read|search|find|grep)\b/i.test(
+                opts.text
+              ))
           ) {
             nudged = true;
-            if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
+            if (roundText && full.endsWith(roundText)) {
+              full = full.slice(0, full.length - roundText.length);
+            }
             msgs = [
               ...msgs,
               {
@@ -694,7 +706,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               },
               {
                 role: "user",
-                content: `Your reply did not contain a \`<zeus_tool>\` block, so no file or command ran in the workspace. Emit \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="read_file" path="..."></zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, or \`<zeus_tool name="python">...</zeus_tool>\` now.`,
+                content: `Your reply stopped after planning without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, \`<zeus_tool name="read_file" path="..."></zeus_tool>\`, \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, or \`<zeus_tool name="write_file" path="...">...</zeus_tool>\` now.`,
               },
             ];
             current = { ...req, requestId: uid(), messages: msgs };

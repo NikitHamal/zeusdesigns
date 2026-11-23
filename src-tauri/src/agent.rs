@@ -820,11 +820,29 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
             }
         }
         "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" => {
-            let cmd_str = if !body.is_empty() {
+            let mut cmd_str = if !body.is_empty() {
                 body.to_string()
             } else {
                 path_arg.clone()
             };
+            // Strip upstream proxy container paths (`cd /app && ...`, `cd /home/app && ...`, `cd /workspace && ...`)
+            // when those container directories do not exist locally, since `shell_run` already executes in `eff_root`.
+            for prefix in [
+                "cd /workspace 2>/dev/null || cd /app && ",
+                "cd /app && ",
+                "cd /home/app && ",
+                "cd /workspace && ",
+                "cd /app; ",
+                "cd /home/app; ",
+                "cd /workspace; ",
+            ] {
+                if let Some(rest) = cmd_str.trim_start().strip_prefix(prefix) {
+                    if !Path::new("/app").exists() {
+                        cmd_str = rest.to_string();
+                        break;
+                    }
+                }
+            }
             match shell_run(eff_root.clone(), cmd_str) {
                 Ok(v) => format_exec_result(&v),
                 Err(e) => (false, e),
