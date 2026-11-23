@@ -626,13 +626,17 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "llm7", "pollinations"].includes(settings.providerId)) {
-      const browserCustom =
-        settings.providerId === "kilo"
-          ? { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "", format: "openai" as const }
-          : settings.providerId === "llm7"
-            ? { baseUrl: "https://api.llm7.io/v1", apiKey: "unused", format: "openai" as const }
-            : { baseUrl: "https://text.pollinations.ai/openai", apiKey: "", format: "openai" as const };
+    } else if (["kilo", "blockrun", "ovhcloud", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+      const browserBase: Record<string, { baseUrl: string; apiKey: string }> = {
+        kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
+        blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "" },
+        ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "" },
+        apisfreellm: { baseUrl: "https://api.apisfreellm.com/v1", apiKey: "free" },
+        llm7: { baseUrl: "https://api.llm7.io/v1", apiKey: "unused" },
+        pollinations: { baseUrl: "https://text.pollinations.ai/openai", apiKey: "" },
+      };
+      const cfg = browserBase[settings.providerId] ?? browserBase.kilo;
+      const browserCustom = { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, format: "openai" as const };
       try {
         await streamCustom({ ...req, custom: browserCustom }, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
       } catch {
