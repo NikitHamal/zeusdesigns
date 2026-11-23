@@ -7,6 +7,7 @@ import { MATERIAL_ICONS } from "./materialIcons";
 import { DesignSystem, tokensCss } from "./designSystems";
 import type { Device } from "../types";
 import { blueprintFor } from "./blueprints";
+import { directionPrompt } from "./direction";
 import { DESIGN_FONTS, fontFaceCss, fontsUsedIn } from "./fonts";
 
 /* icons: home, search, settings, person, notifications, favorite, star, bookmark, share, mail, chat, call, calendar_today, schedule,
@@ -684,6 +685,8 @@ Rules: Display numerals (.z-display) and screen titles (.z-h1) use var(--heading
 13. Every row has the same height, every card in a row has the same height, every icon button is 40px or 44px. Check alignment before you finish.
 14. Long text wraps or truncates with z-truncate. Horizontal scrollers (z-chips) are for chips only and never show a scroll bar.
 15. If the user states a durable fact about themselves, their brand or how they like to work, append <remember category="preferences|profile|topics|areas">one short sentence</remember> after your reply text. Never for ordinary design requests.
+
+${directionPrompt(intent)}
 
 ## Concept first (this is what separates a design from a template)
 Before any HTML, decide inside <think>: (a) the one-sentence concept that only fits THIS subject, (b) the signature layout move that is not the default (asymmetric split, oversized numerals, editorial timeline, dense table with inline sparklines, split-pane workspace, a single full-bleed object), (c) the real content you will use: names, numbers, places, units taken from or implied by the brief.
