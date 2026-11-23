@@ -17,6 +17,7 @@ const BROWSER_KEYLESS: Record<string, { baseUrl: string; apiKey: string; format:
   opencodezen: { baseUrl: "https://opencode.ai/zen/v1", apiKey: "public", format: "openai" },
   hfrouter: { baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", apiKey: "", format: "openai" },
   litellmhub: { baseUrl: "https://alchoholpad-litellm.hf.space/v1", apiKey: "", format: "openai" },
+  vireonix: { baseUrl: "https://vireonix.ai/v1", apiKey: "", format: "openai" },
   gemweb2api: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "", format: "openai" },
   gemma4vl: { baseUrl: "https://will-resolute-gemma4-vision-ui.hf.space/v1", apiKey: "free", format: "openai" },
   phi4cloud: { baseUrl: "https://deleriousson-llama-cpp.hf.space/v1", apiKey: "free", format: "openai" },

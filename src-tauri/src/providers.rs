@@ -869,6 +869,20 @@ pub fn catalog() -> Vec<ProviderInfo> {
             ],
         },
         ProviderInfo {
+            id: "vireonix".to_string(),
+            name: "Vireonix Auto".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~120 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![ModelSpec {
+                id: "auto".to_string(),
+                label: "Vireonix Auto".to_string(),
+                note: None,
+                reasoning: false,
+                vision: false,
+            }],
+        },
+        ProviderInfo {
             id: "gemweb2api".to_string(),
             name: "Gemini Web Gateway".to_string(),
             kind: "keyless".to_string(),
@@ -6841,6 +6855,25 @@ where
     stream_oai_targets_auth("LiteLLM Frontier Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
 }
 
+/// Stream from Vireonix (`vireonix.ai/v1`, anonymous request-aware router, 1M context).
+/// The gateway interleaves non-standard `{"vireonix": ...}` metadata frames, which the shared streamer skips.
+pub fn stream_vireonix<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 2] = [
+        ("https://vireonix.ai/v1/chat/completions", "auto"),
+        ("https://vireonix.ai/v1/chat/completions", "auto"),
+    ];
+    stream_oai_targets_bearer("Vireonix", &targets, system, messages, false, 60, None, cancel, on_delta)
+}
+
 /// Stream from Gemini Web Gateway (`chenian233-gemini-web2api.hf.space`) with in-provider model failover.
 pub fn stream_gemweb2api<F>(
     model: &str,
@@ -7404,6 +7437,7 @@ where
         "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta)),
         "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -7510,7 +7544,7 @@ where
     let fallbacks: &[&str] = if has_attachments {
         &["freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "chatjimmy"]
+        &["mercury3", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -7527,6 +7561,7 @@ where
             "freellmhub" => stream_freellmhub("glm-5.3", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "hfrouter" => stream_hfrouter("deepseek-v4-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemweb2api" => stream_gemweb2api("gemini-3.5-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "vireonix" => stream_vireonix("auto", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemma4vl" => stream_gemma4vl("gemma-4-e4b-vision-q4", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "phi4cloud" => stream_phi4cloud("phi-4-14b-gguf", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "llamacppcloud" => stream_llamacppcloud(
@@ -7650,6 +7685,7 @@ mod tests {
         assert!(ids.contains(&"hfrouter"));
         assert!(ids.contains(&"litellmhub"));
         assert!(ids.contains(&"gemweb2api"));
+        assert!(ids.contains(&"vireonix"));
         assert!(ids.contains(&"gemma4vl"));
         assert!(ids.contains(&"phi4cloud"));
         assert!(ids.contains(&"llamacppcloud"));

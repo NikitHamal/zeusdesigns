@@ -383,6 +383,38 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~60 tok/s"
         },
         {
+            "vireonix",
+            "Vireonix",
+            ProviderFormat::SCRAPER_VIREONIX,
+            "https://vireonix.ai/v1",
+            "auto",
+            {
+                {"auto", "Vireonix Auto", "Request-aware router, no key", false, false, false, 120}
+            },
+            1000000,
+            16384,
+            false,
+            "~120 tok/s"
+        },
+        {
+            "opencodezen",
+            "OpenCode Zen",
+            ProviderFormat::SCRAPER_OPENCODEZEN,
+            "https://opencode.ai/zen/v1",
+            "big-pickle",
+            {
+                {"big-pickle", "Big Pickle", "Reasoning and tool use", true, false, false, 200},
+                {"deepseek-v4.1-flash-free", "DeepSeek V4.1 Flash", "Fast long-context reasoning", true, false, true, 200},
+                {"mimo-v2.6-flash-free", "MiMo V2.6 Flash", "Fast multimodal reasoning", true, false, true, 200},
+                {"iceman-free", "Iceman", "Reasoning", true, false, false, 200},
+                {"beam-free", "Beam", "Software engineering", true, false, false, 200}
+            },
+            200000,
+            16384,
+            false,
+            "~90 tok/s"
+        },
+        {
             "gemma4vl",
             "Gemma 4 Vision & QAT Studio",
             ProviderFormat::SCRAPER_GEMMA4VL,

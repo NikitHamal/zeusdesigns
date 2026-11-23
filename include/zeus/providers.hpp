@@ -25,6 +25,8 @@ enum class ProviderFormat {
     SCRAPER_HFROUTER, // HF Router Hub (cgjgj-ollamahftraemonitor.hf.space)
     SCRAPER_LITELLMHUB, // LiteLLM Frontier Hub (alchoholpad-litellm.hf.space)
     SCRAPER_GEMWEB2API, // Gemini Web Gateway (chenian233-gemini-web2api.hf.space)
+    SCRAPER_VIREONIX,   // Vireonix (vireonix.ai/v1) anonymous request-aware router, 1M context
+    SCRAPER_OPENCODEZEN,// OpenCode Zen (opencode.ai/zen/v1) free tier, Bearer public
     SCRAPER_GEMMA4VL,    // Gemma 4 Vision & QAT Studio (will-resolute / titoo3 / hispa-nico / elseodelasgalletas / gefdsv)
     SCRAPER_PHI4CLOUD,   // Phi-4 & Llama 3.1 Abliterated Cloud (5fp-phi-4-gguf / fggaerg / deleriousson)
     SCRAPER_LLAMACPPCLOUD,// Llama.cpp LFM & SmolVLM Cloud (r1000th / ramedde / aliroohan179 / apathy-exe)

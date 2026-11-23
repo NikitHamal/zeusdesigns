@@ -34,6 +34,7 @@ const SCRAPER_PROVIDERS = new Set([
   "hfrouter",
   "litellmhub",
   "gemweb2api",
+  "vireonix",
   "gemma4vl",
   "phi4cloud",
   "llamacppcloud",

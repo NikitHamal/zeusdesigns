@@ -127,6 +127,13 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
+    id: "vireonix", name: "Vireonix", tagline: "", speed: "~120 tok/s", color: "#2b8a3e", icon: "route",
+    contextWindow: 1000000,
+    models: [
+      { id: "auto", label: "Vireonix Auto", note: "Request-aware router, no key", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+    ],
+  },
+  {
     id: "gemweb2api", name: "Gemini Web Gateway", tagline: "", speed: "~60 tok/s", color: "#1c7ed6", icon: "language",
     contextWindow: 262144,
     models: [
