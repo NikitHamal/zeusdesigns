@@ -309,6 +309,7 @@ const OPENCODE_FEATURED_MODELS = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5", provider: "Unikey Anonymous" },
   { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", provider: "Unikey Anonymous" },
   { id: "gpt-6-astra", label: "GPT-6 Astra", provider: "Unikey Anonymous" },
+  { id: "mistral-large-4-1t", label: "Mistral Large 4 1T", provider: "NVIDIA NIM Cloud" },
   { id: "qwen4-max", label: "Qwen 4 Max", provider: "Qwen" },
   { id: "Qwen3.6-35B-A3B", label: "Qwen 3.6 35B A3B MoE", provider: "Colibri Qwen" },
   { id: "DeepSeek-V4.1-Flash-1017", label: "DeepSeek V4.1 Flash", provider: "OVHcloud AI" },
@@ -518,6 +519,41 @@ function ServerTab() {
               </button>
             );
           })}
+        </div>
+
+        <div className="flex items-center gap-2 pt-1">
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-high px-3 text-xs font-medium text-on-surface outline-none focus:border-primary"
+          >
+            <optgroup label="Featured OpenCode Aliases">
+              {OPENCODE_FEATURED_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label} · {m.provider} (zeusdesigns/{m.id})
+                </option>
+              ))}
+            </optgroup>
+            {PROVIDERS.map((p) => (
+              <optgroup key={p.id} label={`${p.name} (${p.speed})`}>
+                {p.models.map((m) => {
+                  const scoped = `${p.id}/${m.id}`;
+                  return (
+                    <option key={scoped} value={scoped}>
+                      {m.label} (zeusdesigns/{scoped})
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+          <button
+            onClick={() => copy(`zeusdesigns/${selectedModel}`, "OpenCode model ID")}
+            className="state flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-high px-3 font-mono text-xs font-medium text-on-surface"
+          >
+            <Icon name="content_copy" size={13} />
+            zeusdesigns/{selectedModel}
+          </button>
         </div>
 
         <div className="grid gap-2 pt-1 sm:grid-cols-2">
