@@ -168,7 +168,82 @@ fn format_exec_result(v: &Value) -> (bool, String) {
     (code == 0, text)
 }
 
-fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
+fn is_known_valid_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "read_file"
+            | "read"
+            | "cat"
+            | "view_file"
+            | "open_file"
+            | "write_file"
+            | "write"
+            | "create_file"
+            | "save_file"
+            | "overwrite_file"
+            | "sync_artboard"
+            | "edit_file"
+            | "edit"
+            | "patch_file"
+            | "replace_in_file"
+            | "str_replace"
+            | "search_code"
+            | "grep"
+            | "rg"
+            | "search"
+            | "ripgrep"
+            | "find_in_files"
+            | "list_dir"
+            | "ls"
+            | "dir"
+            | "list_files"
+            | "glob"
+            | "find_files"
+            | "shell"
+            | "bash"
+            | "sh"
+            | "cmd"
+            | "terminal"
+            | "exec"
+            | "run_command"
+            | "run"
+            | "python"
+            | "python3"
+            | "py"
+            | "python_exec"
+            | "run_python"
+            | "web_fetch"
+            | "fetch"
+            | "curl"
+            | "webfetch"
+            | "memory"
+    ) || name.starts_with("studio_")
+        || name.starts_with("mcp:")
+}
+
+fn is_template_placeholder(path: &str, body: &str) -> bool {
+    matches!(
+        path,
+        "ARG" | "relative/file" | "relative/path" | "subdir" | "sub/dir" | "filename" | "https://..."
+    ) || matches!(
+        body,
+        "BODY"
+            | "command"
+            | "python3_code"
+            | "python_script_code"
+            | "complete file content"
+            | "full_file_content"
+            | "substring_or_symbol"
+            | "pattern"
+            | "one durable fact worth keeping"
+    )
+}
+
+fn parse_inline_invocations_segment(
+    clean_text: &str,
+    allow_unclosed_tail: bool,
+    strict_placeholder_filter: bool,
+) -> Vec<InlineToolInvocation> {
     let mut list = Vec::new();
 
     // 1. Parse `<zeus_tool ...>...</zeus_tool>` and self-closing `<zeus_tool ... />`
@@ -181,9 +256,12 @@ fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
         let self_closing = header.trim_end().ends_with('/');
         let (body, next_pos) = if self_closing {
             ("", start + gt + 1)
-        } else {
-            let Some(end_rel) = rest.find("</zeus_tool>") else { break };
+        } else if let Some(end_rel) = rest.find("</zeus_tool>") {
             (rest[gt + 1..end_rel].trim(), start + end_rel + 12)
+        } else if allow_unclosed_tail && rest.len() > gt + 2 {
+            (rest[gt + 1..].trim(), clean_text.len())
+        } else {
+            break;
         };
         search_from = next_pos;
 
@@ -233,6 +311,11 @@ fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
             path_arg = eff_body.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
         }
 
+        if strict_placeholder_filter
+            && (!is_known_valid_tool(&name) || is_template_placeholder(&path_arg, &eff_body))
+        {
+            continue;
+        }
         list.push(InlineToolInvocation {
             name,
             path: path_arg,
@@ -306,6 +389,11 @@ fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
                     serde_json::to_string(&args_obj).unwrap_or_default()
                 };
                 if !name.is_empty() {
+                    if strict_placeholder_filter
+                        && (!is_known_valid_tool(&name) || is_template_placeholder(&path, &body))
+                    {
+                        continue;
+                    }
                     list.push(InlineToolInvocation {
                         name,
                         path,
@@ -324,28 +412,30 @@ fn parse_inline_invocations(clean_text: &str) -> Vec<InlineToolInvocation> {
 }
 
 /// Parse inline `<zeus_tool>` or `<tool_call>` blocks emitted by the agent
-/// outside `<think>` blocks, executing local file/search/shell/python actions and emitting
-/// `tool_call` + `tool_result` events back to the UI.
+/// outside `<think>` blocks (with end-of-stream fallback if an upstream gateway routed valid
+/// tool calls into `<think>`), executing local file/search/shell/python actions.
 fn execute_inline_workspace_tools(
     app: &AppHandle,
     event_topic: &str,
     workspace_root: &str,
     full_text: &str,
     executed_ids: &mut std::collections::HashSet<String>,
+    stream_ended: bool,
 ) {
     let clean_text = strip_thinking_blocks(full_text);
+    let mut invocations = parse_inline_invocations_segment(&clean_text, stream_ended, true);
+    if invocations.is_empty() && stream_ended {
+        // Fallback when an upstream gateway routes the model's <zeus_tool> call into reasoning_content (<think>)
+        invocations = parse_inline_invocations_segment(full_text, false, true);
+    }
     let eff_root = resolve_workspace_root(workspace_root);
-    for inv in parse_inline_invocations(&clean_text) {
+    for inv in invocations {
         let name = inv.name.trim().to_string();
         let path_arg = inv.path;
         let body = inv.body.trim();
 
         // Ignore literal syntax examples if a model ever echoes a template placeholder
         if matches!(name.as_str(), "TOOL" | "tool_name" | "NAME" | "") {
-            continue;
-        }
-        if name.starts_with("studio_") || name.contains("studio_") {
-            // Built-in Zeus Studio tools execute directly in the frontend webview runtime.
             continue;
         }
 
@@ -365,6 +455,11 @@ fn execute_inline_workspace_tools(
                 "args": { "path": path_arg, "body": body }
             }),
         );
+
+        if name.starts_with("studio_") || name.contains("studio_") {
+            // Built-in Zeus Studio tools execute directly in the frontend webview runtime after receiving tool_call.
+            continue;
+        }
 
         let (ok, output) = match name.as_str() {
             "read_file" | "read" | "cat" | "view_file" | "open_file" => {
@@ -780,9 +875,26 @@ pub fn chat_stream(
                     root,
                     &accumulated,
                     &mut executed_tools,
+                    false,
                 );
             }
         });
+
+        if res.is_ok()
+            && (accumulated.contains("<zeus_tool")
+                || accumulated.contains("<tool_call>")
+                || accumulated.contains("<function_call>"))
+        {
+            let root = enriched_req.workspace_root.as_deref().unwrap_or("");
+            execute_inline_workspace_tools(
+                &app,
+                &topic,
+                root,
+                &accumulated,
+                &mut executed_tools,
+                true,
+            );
+        }
 
         let elapsed_secs = started.elapsed().as_secs_f64().max(0.05);
         let out_tokens = (accumulated.len() / 4).max(1);

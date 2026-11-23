@@ -66,14 +66,52 @@ When the user asks for a standalone visual deliverable (a page, a small game, a 
 type Mapped = { role: "user" | "assistant"; content: string; attachments: { name: string; mime: string; dataUrl: string }[] };
 
 /** History without any canvas state, so non-design turns never see artboards. */
-export function buildPlainContext(opts: { convMessages: Message[]; userMsg: Message; quoteToText: (q: Quote, boards: Artboard[]) => string }) {
+export function buildPlainContext(opts: {
+  convMessages: Message[];
+  userMsg: Message;
+  quoteToText: (q: Quote, boards: Artboard[]) => string;
+  mode?: Intent;
+}) {
+  const s = useStore.getState();
+  const ws = s.ui.workspace;
   const all = [...opts.convMessages, opts.userMsg].filter((m) => !m.error && (m.text.trim() || m.attachments?.length));
   const messages: Mapped[] = all.map((m) => {
     let content = m.text;
     if (m.quote) content = opts.quoteToText(m.quote, []) + "\n" + content;
     for (const a of m.attachments ?? []) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 20000)}`;
     if (m.role === "assistant" && m.artboardIds?.length) content += `\n[Opened ${m.artboardIds.length} artifact${m.artboardIds.length > 1 ? "s" : ""} in the preview]`;
-    return { role: m.role, content, attachments: (m.attachments ?? []).filter((a) => a.dataUrl && a.mime.startsWith("image/")).map((a) => ({ name: a.name, mime: a.mime, dataUrl: a.dataUrl! })) };
+    return {
+      role: m.role,
+      content,
+      attachments: (m.attachments ?? [])
+        .filter((a) => a.dataUrl && a.mime.startsWith("image/"))
+        .map((a) => ({ name: a.name, mime: a.mime, dataUrl: a.dataUrl! })),
+    };
   });
+
+  // In `code` mode when a workspace is open, prefill the final user turn with a completed `list_dir`
+  // tool round so models immediately see `<zeus_tool>` working in their own voice and never waste
+  // Turn 1 calling `list_dir` on `.` again.
+  if (opts.mode === "code" && ws && messages.length > 0) {
+    const lastIdx = messages.length - 1;
+    const last = messages[lastIdx];
+    if (last.role === "user") {
+      const dirListing = ws.tree.length
+        ? ws.tree.slice(0, 60).map((n) => (n.dir ? `${n.name}/` : n.name)).join("\n")
+        : "Directory is empty (0 files). Proceed directly without re-listing.";
+      messages.splice(
+        lastIdx,
+        1,
+        last,
+        { role: "assistant", content: `<zeus_tool name="list_dir" path=""></zeus_tool>`, attachments: [] },
+        {
+          role: "user",
+          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\nContinue the task from these results. Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, or <zeus_tool name="write_file" path="...">...</zeus_tool> to complete the request.`,
+          attachments: [],
+        }
+      );
+    }
+  }
+
   return { messages, themeOverride: null, isCanvasFollowUp: false };
 }

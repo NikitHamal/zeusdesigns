@@ -338,7 +338,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const mode = classifyIntent(opts.text, { boards: boards.length, quote: Boolean(opts.quote), asVariant: opts.asVariant, workspace: Boolean(freshSt.ui.workspace) });
   const { messages: history, themeOverride, isCanvasFollowUp } = mode === "design"
     ? buildMultiTurnContext({ convMessages: conv.messages, userMsg, boards, target, asVariant: opts.asVariant, quoteToText, spec })
-    : buildPlainContext({ convMessages: conv.messages, userMsg, quoteToText });
+    : buildPlainContext({ convMessages: conv.messages, userMsg, quoteToText, mode });
 
   controller = new AbortController();
   const signal = controller.signal;
@@ -557,20 +557,21 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
                 s
                   .replace(/<think>[\s\S]*?(<\/think>|$)/gi, (m) => " ".repeat(m.length))
                   .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, (m) => " ".repeat(m.length));
-              const findCloseTag = (s: string): { idx: number; len: number } | null => {
+              // Block only hallucinated <tool_result> / <tool_response> tags so multi-tool turns can stream completely
+              const findFakeResult = (s: string): number => {
                 const clean = outsideThink(s);
-                for (const tag of ["</zeus_tool>", "</tool_call>", "</function_call>"]) {
+                for (const tag of ["<tool_result", "<tool_response"]) {
                   const i = clean.indexOf(tag);
-                  if (i >= 0) return { idx: i, len: tag.length };
+                  if (i >= 0) return i;
                 }
-                return null;
+                return -1;
               };
-              if (findCloseTag(roundText)) return; // a real tool call outside <think> ends the turn
+              if (findFakeResult(roundText) >= 0) return;
               const before = roundText.length;
               roundText += e.text;
-              const closed = findCloseTag(roundText);
-              const piece = closed ? roundText.slice(before, closed.idx + closed.len) : e.text;
-              if (closed) roundText = roundText.slice(0, closed.idx + closed.len);
+              const fakeAt = findFakeResult(roundText);
+              const piece = fakeAt >= 0 ? roundText.slice(before, fakeAt) : e.text;
+              if (fakeAt >= 0) roundText = roundText.slice(0, fakeAt);
               if (!piece) return;
               // Gate potential web-scraper refusal prefixes so they never flash in the chat UI
               if (isCanvasFollowUp && !roundText.includes("<artboard") && roundText.length < 320 && (looksLikeRefusalStart(roundText) || isCanvasRefusal(roundText))) {
@@ -651,12 +652,56 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
           }
+          // 3. Round-0 Code Action Nudge when a workspace is open and the model only described its plan without calling a tool
+          if (
+            mode === "code" &&
+            !produced &&
+            !nudged &&
+            round === 0 &&
+            tools.every((t) => t.name === "context_compact") &&
+            Boolean(st.ui.workspace) &&
+            /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md)\b/i.test(opts.text)
+          ) {
+            nudged = true;
+            if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
+            msgs = [
+              ...msgs,
+              {
+                role: "assistant",
+                content: "Understood. I will emit the `<zeus_tool>` XML block now to execute the workspace action directly.",
+              },
+              {
+                role: "user",
+                content: `Your reply did not contain a \`<zeus_tool>\` block, so no file or command ran in the workspace. Emit \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="read_file" path="..."></zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, or \`<zeus_tool name="python">...</zeus_tool>\` now.`,
+              },
+            ];
+            current = { ...req, requestId: uid(), messages: msgs };
+            continue;
+          }
           break;
         }
-        const closeZeus = roundText.lastIndexOf("</zeus_tool>");
-        const closeToolCall = roundText.lastIndexOf("</tool_call>");
-        const closeAt = Math.max(closeZeus >= 0 ? closeZeus + 12 : -1, closeToolCall >= 0 ? closeToolCall + 12 : -1);
-        const said = closeAt >= 0 ? roundText.slice(0, closeAt) : roundText;
+        const strippedRound = roundText
+          .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
+          .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
+          .trim();
+        const canonicalTools = roundTools
+          .map((t) => {
+            let p = "";
+            let b = "";
+            try {
+              const parsed = JSON.parse(t.args ?? "{}");
+              p = parsed.path ?? "";
+              b = parsed.body ?? "";
+            } catch {
+              b = t.args ?? "";
+            }
+            return `<zeus_tool name="${t.name}"${p ? ` path="${p}"` : ""}>${b}</zeus_tool>`;
+          })
+          .join("\n");
+        const said =
+          strippedRound.includes("</zeus_tool>") || strippedRound.includes("</tool_call>")
+            ? strippedRound
+            : [strippedRound, canonicalTools].filter(Boolean).join("\n");
         msgs = [
           ...msgs,
           { role: "assistant", content: said },
