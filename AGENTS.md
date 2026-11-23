@@ -32,6 +32,9 @@ All working states (`LiveStatus`, `WorkLog`, `ThinkingBlock`, `ToolRow`, `Bottom
 ## Agent routing (`src/lib/agent.ts`, `src/lib/opencode.ts`)
 `sendMessage` classifies every turn (`classifyIntent`): `chat`, `code` or `design`. Only `design` uses the canvas harness. A new feature that needs canvas state must not leak into `chat`/`code` prompts. Never make a greeting produce an artifact. The model picker lists providers on the left and models on the right; reasoning tiers come from `reasoningTiers` and context windows from `ctxVerified.ts` (re-run `node scripts/verify-context.mjs`). The `OpenCode` runtime drives `opencode serve` through `@opencode-ai/sdk`.
 
+## Art direction and M3E Canvas artifacts (`src/lib/direction.ts`, `src/lib/m3e.ts`)
+`directionPrompt(brief)` gives every design brief one of six concrete directions plus a signature layout move; add a direction by appending to `DIRECTIONS` (keep them visually distinct, bundled fonts only, no shadows or gradients). `<m3e title="...">{json}</m3e>` is a second artifact type: the document follows lnkiai/m3e-canvas `public/agent.md`, `M3ePane` hosts the real editor through a `#docz=` share link. `M3E_TRIGGER` routes such requests to chat mode and adds `M3E_GUIDE` to the prompt. Before changing any provider catalog run `node scripts/probe-models.mjs <gateway>`.
+
 ## Zeus Studio (built-in MCP)
 `src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.
 
