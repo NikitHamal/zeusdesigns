@@ -2859,9 +2859,15 @@ where
         let sys_safe: String = system.chars().take(24000).collect();
         let is_opencode = sys_safe.contains("OpenCode / OpenAI Tool-Calling Protocol");
         let is_design = sys_safe.contains("## Current canvas page");
+        let is_tools = is_agent_tool_request(&sys_safe);
+        let spec_text = if is_tools {
+            format!("{}\n\n[System Specification]\n{}", scraper_xml_dsl_banner(), sys_safe)
+        } else {
+            format!("[System Specification]\n{}", sys_safe)
+        };
         history.push(json!({
             "role": "user",
-            "content": format!("[System Specification]\n{}", sys_safe)
+            "content": spec_text
         }));
         history.push(json!({
             "role": "assistant",
@@ -2869,6 +2875,8 @@ where
                 "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
             } else if is_design {
                 "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
+            } else if is_tools {
+                "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
             } else {
                 "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
             }
@@ -4580,8 +4588,13 @@ where
                                     in_think = false;
                                     on_delta("</think>");
                                 }
+                                let cleaned_harmony = text
+                                    .replace("<|start|>assistant<|channel|>commentary to=zeus_tool", "<zeus_tool")
+                                    .replace("to=zeus_tool", "<zeus_tool")
+                                    .replace("<|end|>", "")
+                                    .replace("<|return|>", "");
                                 saw_text = true;
-                                on_delta(text);
+                                on_delta(&cleaned_harmony);
                             }
                         }
                     }
@@ -4604,8 +4617,13 @@ where
                     on_delta("</think>");
                 }
                 if let Some(text) = msg.get("content").and_then(|t| t.as_str()).filter(|s| !s.is_empty()) {
+                    let cleaned_harmony = text
+                        .replace("<|start|>assistant<|channel|>commentary to=zeus_tool", "<zeus_tool")
+                        .replace("to=zeus_tool", "<zeus_tool")
+                        .replace("<|end|>", "")
+                        .replace("<|return|>", "");
                     saw_text = true;
-                    on_delta(text);
+                    on_delta(&cleaned_harmony);
                 }
             }
         }
