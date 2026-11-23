@@ -297,6 +297,14 @@ export function buildFallbackOpencodeConfig(port = fallbackServerPort): Record<s
           apiKey: "zeus-local",
         },
         models: {
+          "mercury-3": {
+            name: "Mercury 3 Diffusion 2,000+ tok/s (Zeus Inception)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 128000, output: 16384 },
+          },
           "gemini-4-hydrogen": {
             name: "Gemini 4 Hydrogen (Zeus FreeCC)",
             tool_call: true,

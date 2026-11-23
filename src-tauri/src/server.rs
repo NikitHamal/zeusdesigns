@@ -1,6 +1,6 @@
 // ZeusDesigns Local OpenAI & Anthropic Compatible Server (`127.0.0.1:11435`).
 //
-// Exposes all 31 verified keyless providers (including web scrapers like DeepAI, Qwen, Ptero,
+// Exposes all 34 verified keyless providers (including Mercury 3, Gemini Web, LongCat, DeepAI, Qwen, Ptero,
 // Unikey, K2Horizon, Motif, YQCloud, ChatJimmy, and Anthropic proxies like FreeCC Gemini 4 Hydrogen)
 // as a standard OpenAI `/v1/chat/completions`, `/v1/models`, `/v1/responses` and Anthropic `/v1/messages`
 // local HTTP server with a Universal OpenCode Tool-Calling Bridge (`tools` -> `<tool_call>` -> `delta.tool_calls`).
