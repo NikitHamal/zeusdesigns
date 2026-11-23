@@ -398,16 +398,17 @@ const normalizeImageDataUrl = (rawUrl: string, mime: string): Promise<string> =>
     const img = new Image();
     img.onload = () => {
       try {
+        const minDim = 64;
         const maxDim = 1280;
         const w0 = img.naturalWidth || img.width || 512;
         const h0 = img.naturalHeight || img.height || 512;
-        if (w0 <= maxDim && h0 <= maxDim && rawUrl.length < 350000 && (mime === "image/png" || mime === "image/jpeg")) {
+        if (w0 >= minDim && h0 >= minDim && w0 <= maxDim && h0 <= maxDim && rawUrl.length < 350000 && (mime === "image/png" || mime === "image/jpeg")) {
           resolve(rawUrl);
           return;
         }
         const scale = Math.min(1, maxDim / Math.max(w0, h0));
-        const w = Math.max(16, Math.round(w0 * scale));
-        const h = Math.max(16, Math.round(h0 * scale));
+        const w = Math.max(minDim, Math.round(w0 * scale));
+        const h = Math.max(minDim, Math.round(h0 * scale));
         const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
@@ -486,7 +487,7 @@ export function Composer({ hero }: { hero?: boolean }) {
     const h = (e: Event) => {
       const st = useStore.getState();
       if (!supportsAttachments(st.settings.providerId, st.settings.modelId)) {
-        st.notify("Select a vision-capable model (Kilo, Qwen, Ptero, DeepAI) to attach files");
+        st.notify("Select a vision-capable model (Kilo, Qwen, or Ptero) to attach images or files");
         return;
       }
       setAtts((a) => [...a, (e as CustomEvent<Attachment>).detail]);
@@ -500,7 +501,7 @@ export function Composer({ hero }: { hero?: boolean }) {
 
   const addFiles = async (files: FileList | File[]) => {
     if (!canAttach) {
-      useStore.getState().notify("Select a vision-capable model (Kilo, Qwen, Ptero, DeepAI) to attach images or files");
+      useStore.getState().notify("Select a vision-capable model (Kilo, Qwen, or Ptero) to attach images or files");
       return;
     }
     const list = await Promise.all(Array.from(files).slice(0, 8).map(readFile));

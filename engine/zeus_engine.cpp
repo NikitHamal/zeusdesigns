@@ -131,7 +131,7 @@ KeylessProviderEngine::KeylessProviderEngine() {
             ProviderFormat::SCRAPER_GEMINIWEB,
             "https://gemini.google.com",
             "gemini-flash-lite",
-            {{"gemini-flash-lite", "Gemini Flash-Lite", "Anonymous StreamGenerate", false, true, true, 150}},
+            {{"gemini-flash-lite", "Gemini Flash-Lite", "Anonymous StreamGenerate", false, true, false, 150}},
             128000,
             8192,
             false,
@@ -148,6 +148,7 @@ KeylessProviderEngine::KeylessProviderEngine() {
                 {"qwen3.8-max", "Qwen 3.8 Max", "Multimodal reasoning & frontend specialist", true, true, true, 90},
                 {"qwen3.8-omni-flash", "Qwen 3.8 Omni Flash", "Fast native multimodal vision & UI", true, false, true, 120},
                 {"qwen3.5-omni-plus", "Qwen 3.5 Omni Plus", "Multimodal vision specialist", true, false, true, 105},
+                {"qwen3.7-max", "Qwen 3.7 Max", "1M ctx flagship multimodal & thinking", true, true, true, 95},
                 {"qwen3.7-plus", "Qwen 3.7 Plus", "1M ctx multimodal & thinking", true, true, true, 95}
             },
             256000,
@@ -230,6 +231,7 @@ KeylessProviderEngine::KeylessProviderEngine() {
                 {"baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash", "1M ctx Baidu flagship reasoning", true, false, false, 150},
                 {"reflection/beam-free", "Reflection Beam 1.0", "1M ctx 501B MoE software engineering", true, false, false, 120},
                 {"particle-ai/particle-1:free", "Particle-1 VL", "1M ctx Multimodal design & reasoning", true, false, true, 135},
+                {"dots-studio/dots-3-note-preview:free", "Dots 3 Note VL", "262k ctx Multimodal vision & UI notes", true, false, true, 140},
                 {"recursive/flint-v1.0:free", "Recursive Flint 1.0", "262k ctx Fast code & UI synthesis", true, false, false, 150},
                 {"kilo-auto/free", "Kilo Auto Free", "256k ctx Fastest available free model", true, false, false, 150}
             },
@@ -245,7 +247,9 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "https://ptero.pro/wp-json/mlp/v1",
             "gpt-6.1-terra:voyage",
             {
-                {"gpt-6.1-terra:voyage", "GPT-6.1 Terra", "Frontier multimodal vision & UI architect", false, false, true, 110},
+                {"gpt-6.1-terra:voyage", "GPT-6.1 Terra", "Frontier multimodal vision & UI architect", true, false, true, 110},
+                {"agnes-2.5-flash:agnes", "Agnes 2.5 Flash VL", "Multimodal vision, reasoning & UI synthesis", true, false, true, 125},
+                {"agnes-3.0-flash:agnes", "Agnes 3.0 Flash", "Fast frontend architecture & reasoning", true, false, false, 135},
                 {"glm-5.3-flash", "GLM 5.3 Flash", "Z.ai 320B MoE fast UI coder", false, false, false, 130},
                 {"mimo-v2.6-flash:tokenharbor", "MiMo V2.6 Flash", "Xiaomi fast reasoning & frontend coder", true, false, false, 145},
                 {"kimi-k3:apinex", "Kimi K3", "Moonshot 2.8T MoE", false, false, false, 105}

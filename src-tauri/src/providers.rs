@@ -278,6 +278,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: true,
                 },
                 ModelSpec {
+                    id: "qwen3.7-max".to_string(),
+                    label: "Qwen 3.7 Max".to_string(),
+                    note: Some("1M ctx · Flagship multimodal & thinking".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "qwen3.7-plus".to_string(),
                     label: "Qwen 3.7 Plus".to_string(),
                     note: Some("1M ctx · Multimodal & thinking".to_string()),
@@ -297,8 +304,22 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     id: "gpt-6.1-terra:voyage".to_string(),
                     label: "GPT-6.1 Terra".to_string(),
                     note: Some("Frontier multimodal vision & UI architect".to_string()),
-                    reasoning: false,
+                    reasoning: true,
                     vision: true,
+                },
+                ModelSpec {
+                    id: "agnes-2.5-flash:agnes".to_string(),
+                    label: "Agnes 2.5 Flash VL".to_string(),
+                    note: Some("Multimodal vision, reasoning & UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "agnes-3.0-flash:agnes".to_string(),
+                    label: "Agnes 3.0 Flash".to_string(),
+                    note: Some("Fast frontend architecture & reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
                 },
                 ModelSpec {
                     id: "glm-5.3-flash".to_string(),
@@ -1643,7 +1664,7 @@ where
 {
     let acct = acquire_qwen_account(engine)?;
     let qwen_model = match model {
-        "qwen4-max" | "qwen3.8-max" | "qwen3.8-omni-flash" | "qwen3.5-omni-plus" | "qwen3.7-plus" => model,
+        "qwen4-max" | "qwen3.8-max" | "qwen3.7-max" | "qwen3.8-omni-flash" | "qwen3.5-omni-plus" | "qwen3.7-plus" => model,
         _ => "qwen4-max",
     };
     let thinking = (effort == "high" || effort == "max")
@@ -2328,12 +2349,17 @@ where
         }
     }
 
-    // On Ptero, gpt-6.1-terra:voyage is the free model with supports_images: true
+    // On Ptero, gpt-6.1-terra:voyage and agnes-2.5-flash:agnes are the free models in freeVisionModelIds
     let eff_model = if !attachments.is_empty() {
-        "gpt-6.1-terra:voyage"
+        match model {
+            "gpt-6.1-terra:voyage" | "agnes-2.5-flash:agnes" => model,
+            _ => "gpt-6.1-terra:voyage",
+        }
     } else {
         match model {
             "gpt-6.1-terra:voyage"
+            | "agnes-2.5-flash:agnes"
+            | "agnes-3.0-flash:agnes"
             | "glm-5.3-flash"
             | "mimo-v2.6-flash:tokenharbor"
             | "qwen3.7-flash:minirouter"
@@ -2379,10 +2405,12 @@ where
     let payload = json!({
         "message": message_text,
         "model": eff_model,
+        "conversation_id": uuid_v4(),
         "history": history,
         "attachments": attachments,
+        "github_repo": "",
         "lang": "en",
-        "mode": "full"
+        "mode": "smart"
     });
 
     let guest_token = random_hex(32);
@@ -2412,6 +2440,20 @@ where
                 if let Some(raw) = trimmed.strip_prefix("data:") {
                     let raw = raw.trim();
                     if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                        if let Some(act) = ev.get("activity") {
+                            if act.get("type").and_then(|t| t.as_str()) == Some("thinking") {
+                                if let Some(lbl) = act.get("label").and_then(|l| l.as_str()) {
+                                    if !lbl.is_empty() {
+                                        if !in_think {
+                                            in_think = true;
+                                            on_delta("<think>");
+                                        }
+                                        on_delta(lbl);
+                                        on_delta("\n");
+                                    }
+                                }
+                            }
+                        }
                         if let Some(th) = ev.get("thinking_token").and_then(|t| t.as_str()) {
                             if !th.is_empty() {
                                 if !in_think {
@@ -2681,8 +2723,8 @@ where
     F: FnMut(&str),
 {
     let eff_model = match model {
-        "openai" | "openai-fast" => model,
-        _ => "openai",
+        "openai-fast" => "openai-fast",
+        _ => "openai-fast",
     };
 
     let mut oai_msgs = Vec::new();
