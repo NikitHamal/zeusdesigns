@@ -10,7 +10,7 @@ import { DEVICE_SIZE } from "../types";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
-import { nativePerf, type PerfStats } from "../lib/bridge";
+import { download, nativePerf, nativeServer, type PerfStats, type ServerStatus } from "../lib/bridge";
 import { Icon } from "./Icon";
 import { MemoryTab } from "./MemoryPanel";
 import { ConnectorsTab } from "./Connectors";
@@ -18,6 +18,7 @@ import { ConnectorsTab } from "./Connectors";
 const TABS = [
   { id: "appearance", label: "Appearance", icon: "palette", group: "General" },
   { id: "providers", label: "Models", icon: "memory", group: "General" },
+  { id: "server", label: "Local server", icon: "dns", group: "Capabilities" },
   { id: "memory", label: "Memory", icon: "psychology", group: "Your Zeus" },
   { id: "library", label: "Design library", icon: "local_library", group: "Capabilities" },
   { id: "mcp", label: "Connectors", icon: "extension", group: "Capabilities" },
@@ -302,6 +303,242 @@ function UpdatesTab() {
   );
 }
 
+const OPENCODE_FEATURED_MODELS = [
+  { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen", provider: "FreeClaude & Gemini 4" },
+  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash VL", provider: "FreeClaude & Gemini 4" },
+  { id: "claude-opus-5-5", label: "Claude Opus 5.5", provider: "Unikey Anonymous" },
+  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", provider: "Unikey Anonymous" },
+  { id: "gpt-6-astra", label: "GPT-6 Astra", provider: "Unikey Anonymous" },
+  { id: "qwen4-max", label: "Qwen 4 Max", provider: "Qwen" },
+  { id: "Qwen3.6-35B-A3B", label: "Qwen 3.6 35B A3B MoE", provider: "Colibri Qwen" },
+  { id: "DeepSeek-V4.1-Flash-1017", label: "DeepSeek V4.1 Flash", provider: "OVHcloud AI" },
+  { id: "glm-5.3", label: "GLM 5.3", provider: "Together Frontier" },
+  { id: "nemotron-3.5-super-vl", label: "Nemotron 3.5 Super VL 120B", provider: "Kilo / NIM" },
+  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", provider: "DeepAI" },
+  { id: "k2-horizon", label: "K2-Horizon 375B", provider: "K2Horizon" },
+];
+
+function ServerTab() {
+  const notify = useStore((s) => s.notify);
+  const workspace = useStore((s) => s.ui.workspace);
+  const [status, setStatus] = useState<ServerStatus | null>(null);
+  const [portInput, setPortInput] = useState("11435");
+  const [selectedModel, setSelectedModel] = useState("gemini-4-hydrogen");
+  const [busy, setBusy] = useState(false);
+  const [installedPaths, setInstalledPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      nativeServer.status().then((st) => {
+        if (!alive) return;
+        setStatus(st);
+        setPortInput(String(st.port));
+      });
+    load();
+    const id = setInterval(load, 3500);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    notify(`Copied ${label}`);
+  };
+
+  const toggleServer = async (on: boolean) => {
+    setBusy(true);
+    try {
+      const p = Number(portInput) || 11435;
+      const st = on ? await nativeServer.start(p) : await nativeServer.stop();
+      setStatus(st);
+      notify(st.running ? `Server active on ${st.openaiBaseUrl}` : "Local server stopped");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyPort = async () => {
+    const p = Number(portInput);
+    if (!p || p < 1024 || p > 65535) {
+      notify("Enter a valid port (1024–65535)");
+      return;
+    }
+    setBusy(true);
+    try {
+      const st = await nativeServer.start(p);
+      setStatus(st);
+      notify(`Bound to ${st.openaiBaseUrl}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const installOpencode = async () => {
+    setBusy(true);
+    try {
+      const res = await nativeServer.installOpencode(workspace?.root);
+      setInstalledPaths(res.paths);
+      notify(`Configured OpenCode (${res.defaultModel})`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to write opencode.json");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyOpencodeJson = async () => {
+    const cfg = await nativeServer.opencodeConfig();
+    copy(JSON.stringify(cfg, null, 2), "opencode.json");
+  };
+
+  const downloadOpencodeJson = async () => {
+    const cfg = await nativeServer.opencodeConfig();
+    download("opencode.json", JSON.stringify(cfg, null, 2), "application/json");
+    notify("Downloaded opencode.json");
+  };
+
+  const baseUrl = status?.openaiBaseUrl ?? "http://127.0.0.1:11435/v1";
+  const chatUrl = status?.chatCompletionsUrl ?? "http://127.0.0.1:11435/v1/chat/completions";
+  const messagesUrl = status?.messagesUrl ?? "http://127.0.0.1:11435/v1/messages";
+  const modelsUrl = status?.modelsUrl ?? "http://127.0.0.1:11435/v1/models";
+  const apiKey = status?.apiKey ?? "zeus-local";
+  const cliCmd = `opencode -m zeusdesigns/${selectedModel}`;
+  const curlCmd = `curl ${chatUrl} -H "Content-Type: application/json" -H "Authorization: Bearer ${apiKey}" -d '{"model":"${selectedModel}","messages":[{"role":"user","content":"Hello"}]}'`;
+
+  const endpoints = [
+    { label: "OpenAI Base URL", value: baseUrl },
+    { label: "Chat Completions", value: chatUrl },
+    { label: "Anthropic Messages", value: messagesUrl },
+    { label: "Models Catalog", value: modelsUrl },
+    { label: "API Key", value: apiKey },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-outline-variant bg-surface-container p-4">
+        <div className="flex items-center gap-3">
+          <span className={cn("grid size-10 shrink-0 place-items-center rounded-[14px]", status?.running !== false ? "bg-primary text-on-primary" : "bg-surface-high text-on-surface-variant")}>
+            <Icon name="dns" size={20} />
+          </span>
+          <div>
+            <div className="flex items-center gap-2 font-semibold text-on-surface">
+              <span>OpenAI &amp; OpenCode Local Gateway</span>
+              <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-xs text-on-surface-variant">
+                {status?.running !== false ? `127.0.0.1:${status?.port ?? 11435}` : "Stopped"}
+              </span>
+            </div>
+            <div className="text-xs text-on-surface-variant">
+              {status?.modelCount ?? 148} models · {PROVIDERS.length} keyless providers · {status?.requestCount ?? 0} requests · last {status?.lastModel ?? "gemini-4-hydrogen"}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={portInput}
+            onChange={(e) => setPortInput(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            className="h-9 w-24 rounded-xl border border-outline-variant bg-surface-high px-3 font-mono text-xs text-on-surface outline-none focus:border-primary"
+            placeholder="11435"
+          />
+          <button
+            onClick={applyPort}
+            disabled={busy}
+            className="state h-9 rounded-xl border border-outline-variant px-3 text-xs font-semibold text-on-surface"
+          >
+            Bind port
+          </button>
+          <Toggle on={status?.running !== false} onChange={toggleServer} />
+        </div>
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {endpoints.map((ep) => (
+          <div key={ep.label} className="flex items-center justify-between gap-2 rounded-[20px] border border-outline-variant/60 bg-surface-container px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-on-surface-variant">{ep.label}</div>
+              <div className="truncate font-mono text-xs text-on-surface">{ep.value}</div>
+            </div>
+            <IconBtn label={`Copy ${ep.label}`} size={32} onClick={() => copy(ep.value, ep.label)}>
+              <Icon name="content_copy" size={15} />
+            </IconBtn>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 rounded-[24px] border border-outline-variant bg-surface-container p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-display text-base font-semibold text-on-surface">OpenCode Integration</div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={installOpencode}
+              disabled={busy}
+              className="state morph flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
+            >
+              <Icon name="download" size={15} />
+              Install to OpenCode
+            </button>
+            <button
+              onClick={copyOpencodeJson}
+              className="state flex h-9 items-center gap-1.5 rounded-full bg-secondary-container px-3.5 text-xs font-semibold text-on-secondary-container"
+            >
+              <Icon name="content_copy" size={14} />
+              Copy opencode.json
+            </button>
+            <button
+              onClick={downloadOpencodeJson}
+              className="state flex h-9 items-center gap-1.5 rounded-full bg-surface-high px-3.5 text-xs font-semibold text-on-surface"
+            >
+              <Icon name="description" size={14} />
+              Save file
+            </button>
+          </div>
+        </div>
+
+        {installedPaths.length > 0 && (
+          <div className="rounded-xl bg-surface-high px-3 py-2 font-mono text-xs text-on-surface">
+            Written: {installedPaths.join(" · ")}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {OPENCODE_FEATURED_MODELS.map((m) => {
+            const on = selectedModel === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setSelectedModel(m.id)}
+                className={cn(
+                  "state rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  on ? "bg-primary text-on-primary font-semibold" : "bg-surface-high text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-2 pt-1 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-high px-3 py-2">
+            <code className="truncate font-mono text-xs text-on-surface">{cliCmd}</code>
+            <IconBtn label="Copy OpenCode CLI command" size={28} onClick={() => copy(cliCmd, "OpenCode command")}>
+              <Icon name="content_copy" size={14} />
+            </IconBtn>
+          </div>
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-high px-3 py-2">
+            <code className="truncate font-mono text-xs text-on-surface">{curlCmd}</code>
+            <IconBtn label="Copy curl command" size={28} onClick={() => copy(curlCmd, "curl command")}>
+              <Icon name="content_copy" size={14} />
+            </IconBtn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AboutTab() {
   const ready = useStore((s) => s.ui.nativeReady);
   const version = useStore((s) => s.ui.version);
@@ -351,6 +588,7 @@ export function SettingsDialog() {
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
           {cur.id !== "memory" && <h3 className="mb-5 text-xl font-semibold">{cur.label}</h3>}
           {cur.id === "providers" && <ProvidersTab />}
+          {cur.id === "server" && <ServerTab />}
           {cur.id === "library" && <LibraryTab />}
           {cur.id === "memory" && <MemoryTab />}
           {cur.id === "mcp" && <ConnectorsTab />}

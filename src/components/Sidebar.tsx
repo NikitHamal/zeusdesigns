@@ -186,6 +186,12 @@ export function Sidebar() {
         <NavItem icon="folder_open" label={ui.workspace ? ui.workspace.name : "Project folder"} onClick={project} />
         <NavItem icon="local_library" label="Library" onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })} />
         <NavItem icon="extension" label="Connectors" onClick={() => patchUI({ settingsOpen: true, settingsTab: "mcp" })} />
+        <NavItem
+          icon="dns"
+          label="Local server"
+          onClick={() => patchUI({ settingsOpen: true, settingsTab: "server" })}
+          right={<span className="rounded-full bg-surface-high px-1.5 py-0.5 font-mono text-[10.5px] text-on-surface-variant">:11435</span>}
+        />
       </nav>
       <button onClick={() => setOpen(!open)} className="state mx-2 mt-5 flex h-8 items-center gap-1 rounded-lg px-3 text-[13px] font-medium text-on-surface-variant">
         Chats<Icon name={open ? "expand_more" : "chevron_right"} size={16} />

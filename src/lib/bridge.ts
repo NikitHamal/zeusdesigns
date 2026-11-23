@@ -245,3 +245,181 @@ export const nativePerf = {
   setAuto: async (enabled: boolean): Promise<PerfStats> =>
     (await tryInvoke<PerfStats>("perf_set_auto", { enabled })) ?? fallbackPerfStats(enabled),
 };
+
+/* ---------------- Local OpenAI / Anthropic / OpenCode Server ---------------- */
+export interface ServerStatus {
+  running: boolean;
+  port: number;
+  baseUrl: string;
+  openaiBaseUrl: string;
+  chatCompletionsUrl: string;
+  modelsUrl: string;
+  messagesUrl: string;
+  opencodeConfigUrl: string;
+  apiKey: string;
+  requestCount: number;
+  modelCount: number;
+  lastModel: string;
+}
+
+let fallbackServerRunning = true;
+let fallbackServerPort = 11435;
+
+function buildFallbackServerStatus(): ServerStatus {
+  const base = `http://127.0.0.1:${fallbackServerPort}`;
+  return {
+    running: fallbackServerRunning,
+    port: fallbackServerPort,
+    baseUrl: base,
+    openaiBaseUrl: `${base}/v1`,
+    chatCompletionsUrl: `${base}/v1/chat/completions`,
+    modelsUrl: `${base}/v1/models`,
+    messagesUrl: `${base}/v1/messages`,
+    opencodeConfigUrl: `${base}/v1/opencode.json`,
+    apiKey: "zeus-local",
+    requestCount: 0,
+    modelCount: 148,
+    lastModel: "gemini-4-hydrogen",
+  };
+}
+
+export function buildFallbackOpencodeConfig(port = fallbackServerPort): Record<string, unknown> {
+  return {
+    $schema: "https://opencode.ai/config.json",
+    model: "zeusdesigns/gemini-4-hydrogen",
+    small_model: "zeusdesigns/claude-haiku-5-5",
+    provider: {
+      zeusdesigns: {
+        npm: "@ai-sdk/openai-compatible",
+        name: "ZeusDesigns Local Gateway (Free Keyless)",
+        options: {
+          baseURL: `http://127.0.0.1:${port}/v1`,
+          apiKey: "zeus-local",
+        },
+        models: {
+          "gemini-4-hydrogen": {
+            name: "Gemini 4 Hydrogen (Zeus FreeCC)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 262144, output: 16384 },
+          },
+          "gemini-3-flash-preview": {
+            name: "Gemini 3 Flash VL (Zeus FreeCC)",
+            tool_call: true,
+            reasoning: true,
+            attachment: true,
+            temperature: true,
+            limit: { context: 262144, output: 16384 },
+          },
+          "claude-opus-5-5": {
+            name: "Claude Opus 5.5 (Zeus Unikey)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 200000, output: 16384 },
+          },
+          "gpt-6.1-sol": {
+            name: "GPT-6.1 Sol (Zeus Unikey)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 200000, output: 16384 },
+          },
+          "gpt-6-astra": {
+            name: "GPT-6 Astra (Zeus Unikey)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 200000, output: 16384 },
+          },
+          "claude-haiku-5-5": {
+            name: "Claude Haiku 5.5 (Zeus DeepAI)",
+            tool_call: true,
+            reasoning: false,
+            attachment: false,
+            temperature: true,
+            limit: { context: 64000, output: 8192 },
+          },
+          "qwen4-max": {
+            name: "Qwen 4 Max (Zeus Qwen App)",
+            tool_call: true,
+            reasoning: true,
+            attachment: true,
+            temperature: true,
+            limit: { context: 256000, output: 16384 },
+          },
+          "Qwen3.6-35B-A3B": {
+            name: "Qwen 3.6 35B A3B MoE (Zeus Colibri)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 131072, output: 16384 },
+          },
+          "DeepSeek-V4.1-Flash-1017": {
+            name: "DeepSeek V4.1 Flash (Zeus OVHcloud)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 262144, output: 16384 },
+          },
+          "glm-5.3": {
+            name: "GLM 5.3 Flagship (Zeus Together)",
+            tool_call: true,
+            reasoning: true,
+            attachment: false,
+            temperature: true,
+            limit: { context: 131072, output: 16384 },
+          },
+          "nemotron-3.5-super-vl": {
+            name: "Nemotron 3.5 Super VL 120B (Zeus Kilo)",
+            tool_call: true,
+            reasoning: true,
+            attachment: true,
+            temperature: true,
+            limit: { context: 262144, output: 16384 },
+          },
+        },
+      },
+    },
+  };
+}
+
+export const nativeServer = {
+  status: async (): Promise<ServerStatus> =>
+    (await tryInvoke<ServerStatus>("server_status")) ?? buildFallbackServerStatus(),
+  start: async (port?: number): Promise<ServerStatus> => {
+    if (port && port > 1024 && port < 65535) fallbackServerPort = port;
+    fallbackServerRunning = true;
+    return (await tryInvoke<ServerStatus>("server_start", port ? { port } : {})) ?? buildFallbackServerStatus();
+  },
+  stop: async (): Promise<ServerStatus> => {
+    fallbackServerRunning = false;
+    return (await tryInvoke<ServerStatus>("server_stop")) ?? buildFallbackServerStatus();
+  },
+  opencodeConfig: async (): Promise<Record<string, unknown>> =>
+    (await tryInvoke<Record<string, unknown>>("server_opencode_config")) ?? buildFallbackOpencodeConfig(),
+  installOpencode: async (
+    workspaceRoot?: string
+  ): Promise<{ ok: boolean; paths: string[]; baseUrl: string; defaultModel: string }> => {
+    const r = await tryInvoke<{ ok: boolean; paths: string[]; baseUrl: string; defaultModel: string }>(
+      "server_install_opencode",
+      workspaceRoot ? { workspaceRoot } : {}
+    );
+    if (r) return r;
+    const cfg = buildFallbackOpencodeConfig();
+    download("opencode.json", JSON.stringify(cfg, null, 2), "application/json");
+    return {
+      ok: true,
+      paths: ["opencode.json (downloaded)"],
+      baseUrl: `http://127.0.0.1:${fallbackServerPort}/v1`,
+      defaultModel: "zeusdesigns/gemini-4-hydrogen",
+    };
+  },
+};
