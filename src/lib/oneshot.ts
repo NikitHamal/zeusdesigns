@@ -10,7 +10,7 @@ export function activeCustom() {
 
 const BROWSER_KEYLESS: Record<string, { baseUrl: string; apiKey: string; format: "openai" | "anthropic" }> = {
   kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "", format: "openai" },
-  nimcloud: { baseUrl: "https://mmoranguito-openai-nim-proxy.hf.space/v1", apiKey: "free", format: "openai" },
+  nimcloud: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free", format: "openai" },
   colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free", format: "openai" },
   gemma4vl: { baseUrl: "https://will-resolute-gemma4-vision-ui.hf.space/v1", apiKey: "free", format: "openai" },
   phi4cloud: { baseUrl: "https://deleriousson-llama-cpp.hf.space/v1", apiKey: "free", format: "openai" },

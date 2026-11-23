@@ -637,7 +637,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     } else if (["kilo", "nimcloud", "colibriqwen", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
-        nimcloud: { baseUrl: "https://mmoranguito-openai-nim-proxy.hf.space/v1", apiKey: "free" },
+        nimcloud: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
         colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free" },
         gemma4vl: {
           baseUrl: settings.modelId === "gemma-4-e2b-q6k-aggressive"

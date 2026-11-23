@@ -4523,32 +4523,46 @@ where
 
     let sys_safe: String = system.chars().take(26000).collect();
     let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
+    if eff_model.contains("/gemini/") {
+        candidate_routes.push((
+            "https://calkotter-free-claude-code.hf.space",
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
+            14,
+        ));
+    }
     for &h in hosts {
         let t_secs = if eff_model.contains("/gemini/") || eff_model.contains("kimi-k3.1-pro") || eff_model.contains("step-5") {
-            8
+            6
         } else {
-            22
+            16
         };
-        candidate_routes.push((h, eff_model, t_secs));
+        if eff_model != "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash" {
+            candidate_routes.push((h, eff_model, t_secs));
+        }
     }
     candidate_routes.push((
         "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-        20,
+        "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
+        14,
     ));
     candidate_routes.push((
         "https://calkotter-free-claude-code.hf.space",
         "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
-        18,
+        14,
+    ));
+    candidate_routes.push((
+        "https://calkotter-free-claude-code.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/ising-calibration-1.5-31b",
+        14,
+    ));
+    candidate_routes.push((
+        "https://calkotter-free-claude-code.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+        16,
     ));
     candidate_routes.push((
         "https://calkotter-free-claude-code.hf.space",
         "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
-        22,
-    ));
-    candidate_routes.push((
-        "https://dherain24-claude-proxy.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
         18,
     ));
 
