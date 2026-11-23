@@ -245,14 +245,15 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "nimcloud",
             "NVIDIA NIM OpenAI Cloud",
             ProviderFormat::SCRAPER_NIMCLOUD,
-            "https://mmoranguito-openai-nim-proxy.hf.space/v1",
-            "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "https://garystu-openai-nim-proxy.hf.space/v1",
+            "nvidia/nemotron-3-ultra-550b-a55b",
             {
                 {"nvidia/nemotron-3.5-super-vl-120b-a12b", "Nemotron 3.5 Super VL 120B", "262k ctx NVIDIA 120B MoE vision & UI architect", true, false, true, 185},
                 {"nvidia/nemotron-3-ultra-550b-a55b", "Nemotron 3 Ultra 550B", "262k ctx 550B MoE frontier reasoning", true, false, false, 165},
                 {"nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni 30B VL", "256k ctx 30B Omni vision & reasoning", true, false, true, 180},
                 {"nvidia/nemotron-3.5-lightning-30b-a3b", "Nemotron 3.5 Lightning 30B", "262k ctx High-speed MoE UI coder", true, false, false, 195},
                 {"nvidia/nemotron-3.5-bolt-e4b", "Nemotron 3.5 Bolt E4B", "262k ctx Low-latency UI synthesis", false, false, false, 210},
+                {"mistralai/mistral-large-4-1t-a52b", "Mistral Large 4 1T A52B", "262k ctx Mistral 1T MoE frontier reasoning & UI architect", true, false, false, 180},
                 {"stepfun-ai/step-5-preview", "StepFun Step 5 Preview", "256k ctx StepFun Step 5 frontier reasoning & code", true, false, false, 175}
             },
             262144,

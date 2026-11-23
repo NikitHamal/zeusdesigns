@@ -5085,7 +5085,7 @@ where
                         }
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if text.contains("[proxy error:") {
-                                return Err("Together Frontier upstream model unavailable".to_string());
+                                return fallback(eff_model, system, messages, cancel, on_delta);
                             }
                             if !text.is_empty() {
                                 if in_think {
@@ -5112,7 +5112,7 @@ where
     if saw_text {
         Ok(())
     } else {
-        Err("Together Frontier stream ended without output".to_string())
+        fallback(eff_model, system, messages, cancel, on_delta)
     }
 }
 
@@ -5379,12 +5379,12 @@ where
         ],
         "nanbeige4.3-33b" => &[
             (
-                "https://apathy-exe-nanbeige4-3-33b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--bartowski--Nanbeige_Nanbeige4.3-33B-GGUF/snapshots/9beb68421fdf7be095093a6888325fa2c83ddd38/Nanbeige_Nanbeige4.3-33B-Q4_K_M.gguf",
-            ),
-            (
                 "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
+            ),
+            (
+                "https://apathy-exe-nanbeige4-3-33b.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--bartowski--Nanbeige_Nanbeige4.3-33B-GGUF/snapshots/9beb68421fdf7be095093a6888325fa2c83ddd38/Nanbeige_Nanbeige4.3-33B-Q4_K_M.gguf",
             ),
         ],
         "muse-glimmer-30b" => &[
