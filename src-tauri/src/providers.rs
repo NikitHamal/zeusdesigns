@@ -4056,13 +4056,6 @@ where
         }
     }
 
-    let payload = json!({
-        "model": eff_model,
-        "stream": true,
-        "max_tokens": 16384,
-        "messages": oai_msgs
-    });
-
     let client = build_client(90)?;
     let candidates = if has_images {
         vec![eff_model, "Qwen2.5-VL-72B-Instruct", "Qwen3.8-27B", "qwen3-vl-30b-a3b"]
