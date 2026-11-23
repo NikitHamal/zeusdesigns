@@ -626,22 +626,45 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
-      const browserBase: Record<string, { baseUrl: string; apiKey: string }> = {
+    } else if (["kilo", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+      const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
         blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "" },
         ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "" },
+        freecc: {
+          baseUrl: settings.modelId.includes("kimi-k3.1-pro")
+            ? "https://dherain24-claude-proxy.hf.space"
+            : "https://calkotter-free-claude-code.hf.space",
+          apiKey: "free",
+          format: "anthropic",
+        },
         vlmrun: { baseUrl: "https://gateway.vlm.run/v1/openai", apiKey: "" },
         together2api: { baseUrl: "https://lolmaobruhhh-test.hf.space/v1", apiKey: "" },
+        hfcluster: {
+          baseUrl: settings.modelId === "gemma-4-e2b-q8"
+            ? "https://rabu1234-gemma-4-e2b-it-gguf.hf.space/v1"
+            : settings.modelId === "gemma-4-e4b-q5"
+            ? "https://amirkazim-qwen-7b-chat.hf.space/v1"
+            : "https://apathy-exe-qwen3-8-27b.hf.space/v1",
+          apiKey: "",
+        },
         aihorde: { baseUrl: "https://oai.aihorde.net/v1", apiKey: "0000000000" },
         apisfreellm: { baseUrl: "https://api.apisfreellm.com/v1", apiKey: "free" },
         llm7: { baseUrl: "https://api.llm7.io/v1", apiKey: "unused" },
         pollinations: { baseUrl: "https://text.pollinations.ai/openai", apiKey: "" },
       };
       const cfg = browserBase[settings.providerId] ?? browserBase.kilo;
-      const browserCustom = { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, format: "openai" as const };
+      const browserModel =
+        settings.providerId === "hfcluster"
+          ? settings.modelId === "gemma-4-e2b-q8"
+            ? "gemma-4-e2b-it-Q8_0.gguf"
+            : settings.modelId === "gemma-4-e4b-q5"
+            ? "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf"
+            : "/root/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf"
+          : req.model;
+      const browserCustom = { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, format: cfg.format ?? ("openai" as const) };
       try {
-        await streamCustom({ ...req, custom: browserCustom }, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
+        await streamCustom({ ...req, model: browserModel, custom: browserCustom }, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
       } catch {
         await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
       }

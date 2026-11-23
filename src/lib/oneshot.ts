@@ -8,14 +8,28 @@ export function activeCustom() {
   return settings.providerId.startsWith("custom:") ? settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId) : undefined;
 }
 
+const BROWSER_KEYLESS: Record<string, { baseUrl: string; apiKey: string; format: "openai" | "anthropic" }> = {
+  kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "", format: "openai" },
+  blockrun: { baseUrl: "https://blockrun.ai/api/v1", apiKey: "", format: "openai" },
+  ovhcloud: { baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", apiKey: "", format: "openai" },
+  freecc: { baseUrl: "https://calkotter-free-claude-code.hf.space", apiKey: "free", format: "anthropic" },
+  vlmrun: { baseUrl: "https://gateway.vlm.run/v1/openai", apiKey: "", format: "openai" },
+  together2api: { baseUrl: "https://lolmaobruhhh-test.hf.space/v1", apiKey: "", format: "openai" },
+  aihorde: { baseUrl: "https://oai.aihorde.net/v1", apiKey: "0000000000", format: "openai" },
+  apisfreellm: { baseUrl: "https://api.apisfreellm.com/v1", apiKey: "free", format: "openai" },
+  llm7: { baseUrl: "https://api.llm7.io/v1", apiKey: "unused", format: "openai" },
+  pollinations: { baseUrl: "https://text.pollinations.ai/openai", apiKey: "", format: "openai" },
+};
+
 export function canCallModel(): boolean {
   const s = useStore.getState();
-  return !!activeCustom() || (isNative && s.ui.nativeReady);
+  return !!activeCustom() || (isNative && s.ui.nativeReady) || Boolean(BROWSER_KEYLESS[s.settings.providerId]);
 }
 
 export async function oneShot(system: string, user: string, opts: { effort?: Effort; timeoutMs?: number } = {}): Promise<string> {
   const { settings, ui } = useStore.getState();
-  const custom = activeCustom();
+  const browserFallback = BROWSER_KEYLESS[settings.providerId];
+  const custom = activeCustom() ?? (browserFallback ? { id: settings.providerId, name: settings.providerId, model: settings.modelId, ...browserFallback } : undefined);
   const req: ChatRequest = {
     requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId,
     effort: opts.effort ?? "low", system, messages: [{ role: "user", content: user }],

@@ -22,8 +22,10 @@ enum class ProviderFormat {
     SCRAPER_UNIKEY,      // Unikey (getunikey.ai/api/anonymous/chat/completions) Kimi K3, K2.7 Code, Grok 4.3
     SCRAPER_BLOCKRUN,    // BlockRun (blockrun.ai/api/v1) zero-key NVIDIA, MiniMax M3.1, Poolside, Cohere
     SCRAPER_OVHCLOUD,    // OVHcloud AI (oai.endpoints.kepler.ai.cloud.ovh.net/v1) DeepSeek V4.1, Qwen 3.8 VL, Gemma 4
+    SCRAPER_FREECC,      // FreeClaude & Gemini 4 (calkotter-free-claude-code.hf.space / dherain24-claude-proxy.hf.space)
     SCRAPER_VLMRUN,      // VLM Run Gateway (gateway.vlm.run/v1/openai) DiffusionGemma 26B A4B VL, Qwen 3.5 VL, GLM-OCR
     SCRAPER_TOGETHER2API,// Together Frontier (lolmaobruhhh-test.hf.space/v1) GLM 5.3, Kimi K3, Muse Glimmer 30B
+    SCRAPER_HFCLUSTER,   // HF Frontier Cluster (apathy-exe-qwen3-8-27b / wanyamaelis-qwen3-8-27b / gemma4 spaces)
     SCRAPER_AIHORDE,     // AI Horde (oai.aihorde.net/v1) Qwen 3.8 Flash Next, Qwen 3.8 27B, Gemma 4
     SCRAPER_APISFREELLM, // APIsFreeLLM (api.apisfreellm.com/v1) 10,000 req/day zero-key stream
     SCRAPER_LLM7,        // LLM7 (api.llm7.io/v1) Codestral Latest, Gemma 3 27B, GPT-OSS 20B

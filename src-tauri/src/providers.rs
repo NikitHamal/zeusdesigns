@@ -437,6 +437,85 @@ pub fn catalog() -> Vec<ProviderInfo> {
             ],
         },
         ProviderInfo {
+            id: "freecc".to_string(),
+            name: "FreeClaude & Gemini 4".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~170 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview".to_string(),
+                    label: "Gemini 3 Flash VL".to_string(),
+                    note: Some("1M ctx · Google multimodal vision & UI architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen".to_string(),
+                    label: "Gemini 4 Hydrogen".to_string(),
+                    note: Some("1M ctx · Google Gemini 4 frontier reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite".to_string(),
+                    label: "Gemini 3.1 Flash Lite VL".to_string(),
+                    note: Some("1M ctx · Low-latency multimodal vision & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro".to_string(),
+                    label: "Kimi K3.1 Pro".to_string(),
+                    note: Some("256k ctx · Moonshot K3.1 Pro flagship software engineer".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview".to_string(),
+                    label: "StepFun Step 5 Preview".to_string(),
+                    note: Some("256k ctx · StepFun Step 5 frontier reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b".to_string(),
+                    label: "Nemotron 3.5 Super VL 120B".to_string(),
+                    note: Some("262k ctx · NVIDIA 120B MoE vision & UI architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b".to_string(),
+                    label: "Nemotron 3 Ultra 550B".to_string(),
+                    note: Some("262k ctx · 550B MoE frontier reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b".to_string(),
+                    label: "Nemotron 3.5 Lightning 30B".to_string(),
+                    note: Some("262k ctx · High-speed MoE UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b".to_string(),
+                    label: "Nemotron 3.5 Bolt E4B".to_string(),
+                    note: Some("262k ctx · Ultra-fast UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "claude-3-freecc-no-thinking/nvidia_nim/poolside/laguna-xs-2.1".to_string(),
+                    label: "Poolside Laguna XS 2.1".to_string(),
+                    note: Some("128k ctx · Poolside agentic frontend coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
             id: "vlmrun".to_string(),
             name: "VLM Run Gateway".to_string(),
             kind: "keyless".to_string(),
@@ -520,6 +599,36 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     label: "Qwen 3.5 9B".to_string(),
                     note: Some("128k ctx · Alibaba compact fast UI coder".to_string()),
                     reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "hfcluster".to_string(),
+            name: "HF Frontier Cluster".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~135 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "qwen3.8-27b-q8".to_string(),
+                    label: "Qwen 3.8 27B (UD-Q8_K_XL)".to_string(),
+                    note: Some("64k ctx · High-precision Q8_K_XL reasoning & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-e4b-q5".to_string(),
+                    label: "Gemma 4 E4B IT (Q5_K_P)".to_string(),
+                    note: Some("64k ctx · Google Gemma 4 E4B fast UI & code generator".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-e2b-q8".to_string(),
+                    label: "Gemma 4 E2B IT (Q8_0)".to_string(),
+                    note: Some("64k ctx · Google Gemma 4 E2B low-latency coder".to_string()),
+                    reasoning: false,
                     vision: false,
                 },
             ],
@@ -3554,6 +3663,309 @@ where
     }
 }
 
+/// Stream from FreeClaude & Gemini 4 Gateway (`calkotter-free-claude-code.hf.space` & `dherain24-claude-proxy.hf.space`, zero-key Anthropic Messages SSE with multimodal vision).
+pub fn stream_freecc<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+
+    let eff_model = if has_images {
+        match model {
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
+            | "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b" => model,
+            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+        }
+    } else {
+        match model {
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview"
+            | "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen"
+            | "claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite"
+            | "claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro"
+            | "claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+            | "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b"
+            | "claude-3-freecc-no-thinking/nvidia_nim/poolside/laguna-xs-2.1" => model,
+            _ => "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+        }
+    };
+
+    let hosts: &[&str] = if eff_model.contains("kimi-k3.1-pro") {
+        &[
+            "https://dherain24-claude-proxy.hf.space",
+            "https://calkotter-free-claude-code.hf.space",
+        ]
+    } else if eff_model.contains("/gemini/") {
+        &["https://calkotter-free-claude-code.hf.space"]
+    } else {
+        &[
+            "https://calkotter-free-claude-code.hf.space",
+            "https://dherain24-claude-proxy.hf.space",
+        ]
+    };
+
+    let mut anth_msgs = Vec::new();
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            anth_msgs.push(json!({
+                "role": m.role,
+                "content": m.content
+            }));
+        } else {
+            let mut content_blocks = Vec::new();
+            for img in imgs {
+                let b64_data = img
+                    .data_url
+                    .split_once(',')
+                    .map(|(_, b)| b)
+                    .unwrap_or(img.data_url.as_str());
+                content_blocks.push(json!({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img.mime,
+                        "data": b64_data
+                    }
+                }));
+            }
+            content_blocks.push(json!({ "type": "text", "text": m.content }));
+            anth_msgs.push(json!({
+                "role": m.role,
+                "content": content_blocks
+            }));
+        }
+    }
+
+    let sys_safe: String = system.chars().take(24000).collect();
+    let payload = json!({
+        "model": eff_model,
+        "max_tokens": 16384,
+        "stream": true,
+        "system": sys_safe,
+        "messages": anth_msgs
+    });
+
+    let client = build_client(180)?;
+    for &host in hosts {
+        let resp = match client
+            .post(format!("{}/v1/messages", host))
+            .header("Content-Type", "application/json")
+            .header("x-api-key", "free")
+            .header("anthropic-version", "2023-06-01")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if ev.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
+                        if let Some(delta) = ev.get("delta") {
+                            if let Some(th) = delta.get("thinking").and_then(|t| t.as_str()) {
+                                if !th.is_empty() {
+                                    if !in_think {
+                                        in_think = true;
+                                        on_delta("<think>");
+                                    }
+                                    on_delta(th);
+                                }
+                            } else if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+    Err("FreeClaude & Gemini 4 stream ended without output".to_string())
+}
+
+/// Stream from HF Frontier Cluster (`apathy-exe-qwen3-8-27b`, `wanyamaelis-qwen3-8-27b`, `agrawal-prateek-gemma4-e4b`, `amirkazim-qwen-7b-chat`, `rabu1234-gemma-4-e2b`).
+pub fn stream_hfcluster<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: &[(&str, &str)] = match model {
+        "gemma-4-e4b-q5" => &[
+            (
+                "https://amirkazim-qwen-7b-chat.hf.space/v1/chat/completions",
+                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
+            ),
+            (
+                "https://agrawal-prateek-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
+                "gemma4-e4b",
+            ),
+        ],
+        "gemma-4-e2b-q8" => &[
+            (
+                "https://rabu1234-gemma-4-e2b-it-gguf.hf.space/v1/chat/completions",
+                "gemma-4-e2b-it-Q8_0.gguf",
+            ),
+            (
+                "https://agrawal-prateek-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
+                "gemma4-e4b",
+            ),
+        ],
+        _ => &[
+            (
+                "https://apathy-exe-qwen3-8-27b.hf.space/v1/chat/completions",
+                "/root/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf",
+            ),
+            (
+                "https://wanyamaelis-qwen3-8-27b.hf.space/v1/chat/completions",
+                "/home/user/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf",
+            ),
+            (
+                "https://amirkazim-qwen-7b-chat.hf.space/v1/chat/completions",
+                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
+            ),
+        ],
+    };
+
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        let sys_safe: String = system.chars().take(20000).collect();
+        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
+    }
+    for m in messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+
+    let client = build_client(180)?;
+    for &(endpoint, upstream_model) in targets {
+        let payload = json!({
+            "model": upstream_model,
+            "stream": true,
+            "max_tokens": 8192,
+            "messages": oai_msgs
+        });
+
+        let resp = match client
+            .post(endpoint)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut fallback_reason = String::new();
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(d) = delta {
+                            let r_text = d
+                                .get("reasoning_content")
+                                .or_else(|| d.get("reasoning"))
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("");
+                            if !r_text.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(r_text);
+                                fallback_reason.push_str(r_text);
+                            }
+                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if !saw_text && !fallback_reason.trim().is_empty() {
+            on_delta(fallback_reason.trim());
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+    Err("HF Frontier Cluster stream ended without output".to_string())
+}
+
 /// Stream from VLM Run Gateway (`https://gateway.vlm.run/v1/openai/chat/completions`, zero-key DiffusionGemma 26B A4B VL / Qwen 3.5 VL / GLM-OCR).
 pub fn stream_vlmrun<F>(
     model: &str,
@@ -4207,10 +4619,15 @@ where
                         .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", &req.system, &req.messages, cancel, &mut on_delta))
                 }
             }),
+        "freecc" => stream_freecc(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_freecc("claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview", &req.system, &req.messages, cancel, &mut on_delta))
+            .or_else(|_| stream_freecc("claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b", &req.system, &req.messages, cancel, &mut on_delta)),
         "vlmrun" => stream_vlmrun(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_vlmrun("qwen/qwen3.5-0.8b", &req.system, &req.messages, cancel, &mut on_delta)),
         "together2api" => stream_together2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta)),
+        "hfcluster" => stream_hfcluster(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
+            .or_else(|_| stream_hfcluster("gemma-4-e4b-q5", &req.system, &req.messages, cancel, &mut on_delta)),
         "aihorde" => stream_aihorde(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
             .or_else(|_| stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta)),
         "apisfreellm" => stream_apisfreellm(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -4270,9 +4687,9 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["ptero", "kilo", "ovhcloud", "vlmrun", "blockrun", "qwen"]
+        &["freecc", "ptero", "kilo", "ovhcloud", "vlmrun", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
+        &["mercury3", "freecc", "kilo", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "unikey", "llm7", "pollinations", "apisfreellm", "aihorde", "ptero", "k2horizon", "motif", "deepai", "yqcloud", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -4280,6 +4697,13 @@ where
         }
         let ok = match fb {
             "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
+            "freecc" => stream_freecc(
+                "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+                &req.system,
+                &req.messages,
+                cancel,
+                &mut on_delta,
+            ).is_ok(),
             "kilo" => stream_kilo(
                 if has_attachments { "nvidia/nemotron-3.5-super-vl:free" } else { "kilo-auto/free" },
                 &req.system,
@@ -4303,6 +4727,7 @@ where
             ).is_ok(),
             "vlmrun" => stream_vlmrun("google/diffusiongemma-26b-a4b-it", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "together2api" => stream_together2api("glm-5.3-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "hfcluster" => stream_hfcluster("qwen3.8-27b-q8", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "aihorde" => stream_aihorde("Qwen/Qwen3.8-Flash-Next", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "apisfreellm" => stream_apisfreellm("free-ai", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "ptero" => stream_ptero("gpt-6.1-terra:voyage", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -4357,13 +4782,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_catalog_contains_all_fourteen_keyless_providers() {
+    fn test_catalog_contains_all_twenty_two_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(cat.len(), 22);
         assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"blockrun"));
         assert!(ids.contains(&"ovhcloud"));
+        assert!(ids.contains(&"freecc"));
+        assert!(ids.contains(&"vlmrun"));
+        assert!(ids.contains(&"together2api"));
+        assert!(ids.contains(&"hfcluster"));
+        assert!(ids.contains(&"aihorde"));
         assert!(ids.contains(&"apisfreellm"));
         assert!(ids.contains(&"qwen"));
         assert!(ids.contains(&"ptero"));

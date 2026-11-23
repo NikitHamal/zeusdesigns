@@ -292,6 +292,29 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~150 tok/s"
         },
         {
+            "freecc",
+            "FreeClaude & Gemini 4",
+            ProviderFormat::SCRAPER_FREECC,
+            "https://calkotter-free-claude-code.hf.space",
+            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
+            {
+                {"claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview", "Gemini 3 Flash VL", "1M ctx Google multimodal vision & UI architect", true, false, true, 175},
+                {"claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen", "Gemini 4 Hydrogen", "1M ctx Google Gemini 4 frontier reasoning & code", true, false, false, 165},
+                {"claude-3-freecc-no-thinking/gemini/models/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite VL", "1M ctx Low-latency multimodal vision & layout", false, false, true, 190},
+                {"claude-3-freecc-no-thinking/nvidia_nim/moonshotai/kimi-k3.1-pro", "Kimi K3.1 Pro", "256k ctx Moonshot K3.1 Pro flagship software engineer", true, false, false, 150},
+                {"claude-3-freecc-no-thinking/nvidia_nim/stepfun-ai/step-5-preview", "StepFun Step 5 Preview", "256k ctx StepFun Step 5 frontier reasoning & code", true, false, false, 160},
+                {"claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b", "Nemotron 3.5 Super VL 120B", "262k ctx NVIDIA 120B MoE vision & UI architect", true, false, true, 155},
+                {"claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b", "Nemotron 3 Ultra 550B", "262k ctx 550B MoE frontier reasoning", true, false, false, 135},
+                {"claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b", "Nemotron 3.5 Lightning 30B", "262k ctx High-speed MoE UI coder", true, false, false, 185},
+                {"claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b", "Nemotron 3.5 Bolt E4B", "262k ctx Ultra-fast UI synthesis", true, false, false, 195},
+                {"claude-3-freecc-no-thinking/nvidia_nim/poolside/laguna-xs-2.1", "Poolside Laguna XS 2.1", "128k ctx Poolside agentic frontend coder", false, false, false, 160}
+            },
+            262144,
+            16384,
+            false,
+            "~170 tok/s"
+        },
+        {
             "vlmrun",
             "VLM Run Gateway",
             ProviderFormat::SCRAPER_VLMRUN,
@@ -326,6 +349,22 @@ KeylessProviderEngine::KeylessProviderEngine() {
             16384,
             false,
             "~145 tok/s"
+        },
+        {
+            "hfcluster",
+            "HF Frontier Cluster",
+            ProviderFormat::SCRAPER_HFCLUSTER,
+            "https://apathy-exe-qwen3-8-27b.hf.space/v1",
+            "qwen3.8-27b-q8",
+            {
+                {"qwen3.8-27b-q8", "Qwen 3.8 27B (UD-Q8_K_XL)", "64k ctx High-precision Q8_K_XL reasoning & UI architect", true, false, false, 130},
+                {"gemma-4-e4b-q5", "Gemma 4 E4B IT (Q5_K_P)", "64k ctx Google Gemma 4 E4B fast UI & code generator", false, false, false, 145},
+                {"gemma-4-e2b-q8", "Gemma 4 E2B IT (Q8_0)", "64k ctx Google Gemma 4 E2B low-latency coder", false, false, false, 165}
+            },
+            65536,
+            8192,
+            false,
+            "~135 tok/s"
         },
         {
             "aihorde",
