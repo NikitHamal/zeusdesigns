@@ -42,6 +42,7 @@ export const PROVIDERS: ProviderMeta[] = [
       { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", label: "Nemotron 3 Nano Omni 30B VL", note: "256k ctx · 30B Omni vision & reasoning", reasoning: true, vision: true, contextWindow: 256000, maxOutput: 16384 },
       { id: "nvidia/nemotron-3.5-lightning-30b-a3b", label: "Nemotron 3.5 Lightning 30B", note: "262k ctx · High-speed MoE UI coder", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "nvidia/nemotron-3.5-bolt-e4b", label: "Nemotron 3.5 Bolt E4B", note: "262k ctx · Low-latency UI synthesis", reasoning: false, vision: false, contextWindow: 262144, maxOutput: 16384 },
+      { id: "mistralai/mistral-large-4-1t-a52b", label: "Mistral Large 4 1T A52B", note: "262k ctx · Mistral 1T MoE frontier reasoning & UI architect", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
       { id: "stepfun-ai/step-5-preview", label: "StepFun Step 5 Preview", note: "256k ctx · StepFun Step 5 frontier reasoning & code", reasoning: true, vision: false, contextWindow: 256000, maxOutput: 16384 },
     ],
   },

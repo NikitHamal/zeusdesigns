@@ -129,6 +129,7 @@ fn build_client(timeout_secs: u64) -> Result<Client, String> {
     Client::builder()
         .user_agent(CHROME_UA)
         .cookie_store(true)
+        .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| format!("HTTP client init failed: {}", e))
@@ -269,6 +270,13 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     label: "Nemotron 3.5 Bolt E4B".to_string(),
                     note: Some("262k ctx · Low-latency UI synthesis".to_string()),
                     reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "mistralai/mistral-large-4-1t-a52b".to_string(),
+                    label: "Mistral Large 4 1T A52B".to_string(),
+                    note: Some("262k ctx · Mistral 1T MoE frontier reasoning & UI architect".to_string()),
+                    reasoning: true,
                     vision: false,
                 },
                 ModelSpec {
@@ -3912,18 +3920,39 @@ where
         "messages": oai_msgs
     });
 
-    let client = build_client(180)?;
-    let resp = client
-        .post("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream, application/json")
-        .json(&payload)
-        .send()
-        .map_err(|e| format!("OVHcloud request failed: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("OVHcloud HTTP {}", resp.status()));
+    let client = build_client(90)?;
+    let candidates = if has_images {
+        vec![eff_model, "Qwen2.5-VL-72B-Instruct", "Qwen3.8-27B", "qwen3-vl-30b-a3b"]
+    } else {
+        vec![eff_model, "Qwen3.8-27B", "Qwen3.5-397B-A17B", "qwen3.6-35b-a3b", "gpt-oss-120b"]
+    };
+    let mut active_resp = None;
+    for cand in candidates {
+        let cand_payload = json!({
+            "model": cand,
+            "stream": true,
+            "max_tokens": 16384,
+            "messages": oai_msgs
+        });
+        let ip = fake_ipv4();
+        if let Ok(r) = client
+            .post("https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream, application/json")
+            .header("X-Forwarded-For", &ip)
+            .header("X-Real-IP", &ip)
+            .json(&cand_payload)
+            .send()
+        {
+            if r.status().is_success() {
+                active_resp = Some(r);
+                break;
+            }
+        }
     }
+    let Some(resp) = active_resp else {
+        return Err("OVHcloud all candidate models rate-limited or unavailable".to_string());
+    };
 
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -4838,72 +4867,52 @@ where
     let targets: &[(&str, &str)] = if has_images || model == "gemma-4-e4b-ud-q5" {
         &[
             (
+                "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
+                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
+            ),
+            (
+                "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                "/models/gemma-4-E4B-it-Q4_K_M.gguf",
+            ),
+            (
                 "https://rikunarita-gemma-4-e4b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions",
                 "/app/gemma-4-E4B-it-UD-Q5_K_XL.gguf",
-            ),
-            (
-                "https://agrawal-prateek-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
-                "gemma4-e4b",
-            ),
-            (
-                "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
             ),
         ]
     } else {
         match model {
-            "gemma-4-12b-it" => &[
-                (
-                    "https://markpaulm-gemma-4-12b-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-12B-it-abliterated",
-                ),
-                (
-                    "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
-                ),
-            ],
-            "gemma-4-12b-coding" => &[
-                (
-                    "https://shanghsin-gemma-4-12b.hf.space/v1/chat/completions",
-                    "gemma4-coding-Q2_K.gguf",
-                ),
-                (
-                    "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
-                ),
-            ],
             "gemma-4-e4b-qat" => &[
                 (
                     "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
                     "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
                 ),
                 (
-                    "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
+                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
+                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
                 ),
             ],
             "gemma-4-ollama" => &[
                 (
-                    "https://ismizo-gemma4.hf.space/v1/chat/completions",
-                    "gemma4:latest",
+                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
+                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
                 ),
                 (
-                    "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
+                    "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
+                    "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
                 ),
             ],
             _ => &[
                 (
-                    "https://markpaulm-gemma-4-31b-it-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-31B-it-abliterated",
+                    "https://mikeee-gemma-4-e4b-uncensored-hauhaucs-aggressive-q5-k-p.hf.space/v1/chat/completions",
+                    "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
                 ),
                 (
-                    "https://markpaulm-gemma-4-12b-abliterated.hf.space/v1/chat/completions",
-                    "huihui-ai/Huihui-gemma-4-12B-it-abliterated",
+                    "https://hispa-nico-gemma4-e2b.hf.space/v1/chat/completions",
+                    "huihui-ai/Huihui-gemma-4-E4B-it-qat-q4_0-unquantized-abliterated-GGUF:Q4_0",
                 ),
                 (
-                    "https://shanghsin-gemma-4-12b.hf.space/v1/chat/completions",
-                    "gemma4-coding-Q2_K.gguf",
+                    "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
+                    "/models/gemma-4-E4B-it-Q4_K_M.gguf",
                 ),
             ],
         }
@@ -6145,6 +6154,7 @@ where
         | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
         | "nvidia/nemotron-3.5-lightning-30b-a3b"
         | "nvidia/nemotron-3.5-bolt-e4b"
+        | "mistralai/mistral-large-4-1t-a52b"
         | "stepfun-ai/step-5-preview" => model,
         _ => "nvidia/nemotron-3.5-super-vl-120b-a12b",
     };
@@ -6154,7 +6164,7 @@ where
         ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
         ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
     ];
-    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 120, cancel, on_delta)
+    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 90, cancel, on_delta)
 }
 
 /// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space`).
@@ -6225,23 +6235,24 @@ where
 {
     let targets: &[(&str, &str)] = match model {
         "llama-3.1-8b-abliterated" => &[
-            ("https://fggaerg-llama-abliterated-api.hf.space/v1/chat/completions", "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"),
             ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
+            ("https://hircoir-llamacpp.hf.space/v1/chat/completions", "/home/app/llama-model.gguf"),
+            ("https://fggaerg-llama-abliterated-api.hf.space/v1/chat/completions", "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"),
         ],
         "llama-cpp-fast" => &[
             ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
-            ("https://5fp-phi-4-gguf.hf.space/v1/chat/completions", "/data/model.gguf"),
+            ("https://hircoir-llamacpp.hf.space/v1/chat/completions", "/home/app/llama-model.gguf"),
         ],
         _ => &[
-            ("https://5fp-phi-4-gguf.hf.space/v1/chat/completions", "/data/model.gguf"),
-            ("https://fggaerg-llama-abliterated-api.hf.space/v1/chat/completions", "hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-abliterated-GGUF:Q4_K_M"),
             ("https://deleriousson-llama-cpp.hf.space/v1/chat/completions", "model.gguf"),
+            ("https://hircoir-llamacpp.hf.space/v1/chat/completions", "/home/app/llama-model.gguf"),
+            ("https://5fp-phi-4-gguf.hf.space/v1/chat/completions", "/data/model.gguf"),
         ],
     };
-    stream_oai_targets("Phi-4 & Llama 3.1 Abliterated Cloud", targets, system, messages, false, 120, cancel, on_delta)
+    stream_oai_targets("Phi-4 & Llama 3.1 Abliterated Cloud", targets, system, messages, false, 60, cancel, on_delta)
 }
 
-/// Stream from Llama.cpp LFM & SmolVLM Cloud (`r1000th-llama-cpp`, `ramedde-gemma4cpu`, `aliroohan179-llama-server`, `apathy-exe-lfm2-5-230m`).
+/// Stream from Llama.cpp LFM & SmolVLM Cloud (`ramedde-gemma4cpu`, `apathy-exe-lfm2-5-230m`, `hircoir-llamacpp`, `r1000th-llama-cpp`).
 pub fn stream_llamacppcloud<F>(
     model: &str,
     system: &str,
@@ -6255,26 +6266,26 @@ where
     let targets: &[(&str, &str)] = match model {
         "lfm3-1.7b-gguf" => &[
             ("https://ramedde-gemma4cpu.hf.space/v1/chat/completions", "ngquocvinh/LFM3-1.7B-GGUF"),
-            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
+            ("https://apathy-exe-lfm2-5-230m.hf.space/v1/chat/completions", "/model.gguf"),
         ],
         "smolvlm-500m-instruct" => &[
-            ("https://aliroohan179-llama-server.hf.space/v1/chat/completions", "/home/brewuser/.cache/llama.cpp/ggml-org_SmolVLM-500M-Instruct-GGUF_SmolVLM-500M-Instruct-Q8_0.gguf"),
             ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+            ("https://aliroohan179-llama-server.hf.space/v1/chat/completions", "/home/brewuser/.cache/llama.cpp/ggml-org_SmolVLM-500M-Instruct-GGUF_SmolVLM-500M-Instruct-Q8_0.gguf"),
         ],
         "lfm2.5-230m-instant" => &[
             ("https://apathy-exe-lfm2-5-230m.hf.space/v1/chat/completions", "/model.gguf"),
-            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
+            ("https://ramedde-gemma4cpu.hf.space/v1/chat/completions", "ngquocvinh/LFM3-1.7B-GGUF"),
         ],
         _ => &[
-            ("https://r1000th-llama-cpp.hf.space/v1/chat/completions", "LFM2.5-2.6B-Uncensored-Q4_K_M.gguf"),
             ("https://ramedde-gemma4cpu.hf.space/v1/chat/completions", "ngquocvinh/LFM3-1.7B-GGUF"),
             ("https://apathy-exe-lfm2-5-230m.hf.space/v1/chat/completions", "/model.gguf"),
+            ("https://hircoir-llamacpp.hf.space/v1/chat/completions", "/home/app/llama-model.gguf"),
         ],
     };
-    stream_oai_targets("Llama.cpp LFM & SmolVLM Cloud", targets, system, messages, true, 120, cancel, on_delta)
+    stream_oai_targets("Llama.cpp LFM & SmolVLM Cloud", targets, system, messages, true, 60, cancel, on_delta)
 }
 
-/// Stream from Ollama Multi-Model Cloud (`deepak7376`, `qweret6565`, `gentle-tech`, `amarbruhman`, `zurikoff`, `clarasu`).
+/// Stream from Ollama Multi-Model Cloud (`amarbruhman`, `qweret6565`, `deepak7376`, `gentle-tech`, `zurikoff`, `clarasu`).
 pub fn stream_ollamacloud<F>(
     model: &str,
     system: &str,
@@ -6288,27 +6299,27 @@ where
     let targets: &[(&str, &str)] = match model {
         "gemma:7b-instruct" => &[
             ("https://qweret6565-ollama-server.hf.space/v1/chat/completions", "gemma:7b-instruct"),
-            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
+            ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
         ],
         "qwen2.5:1.5b" => &[
-            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
-            ("https://clarasu-ollama-server.hf.space/v1/chat/completions", "qwen2.5:0.5b"),
+            ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
+            ("https://qweret6565-ollama-server.hf.space/v1/chat/completions", "gemma:7b-instruct"),
         ],
         "qwen-coder-0.5b" => &[
             ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
-            ("https://zurikoff-ollama-server.hf.space/v1/chat/completions", "qwen2.5-coder:0.5b"),
+            ("https://qweret6565-ollama-server.hf.space/v1/chat/completions", "gemma:7b-instruct"),
         ],
         "moondream:latest" => &[
-            ("https://clarasu-ollama-server.hf.space/v1/chat/completions", "moondream:latest"),
             ("https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions", "/models/gemma-4-E4B-it-Q4_K_M.gguf"),
+            ("https://clarasu-ollama-server.hf.space/v1/chat/completions", "moondream:latest"),
         ],
         _ => &[
-            ("https://deepak7376-ollama-server.hf.space/v1/chat/completions", "deepseek-r1:1.5b"),
-            ("https://gentle-tech-ollama-server.hf.space/v1/chat/completions", "qwen2.5:1.5b"),
             ("https://amarbruhman-ollama-server.hf.space/v1/chat/completions", "qwen-coder-0.5b"),
+            ("https://qweret6565-ollama-server.hf.space/v1/chat/completions", "gemma:7b-instruct"),
+            ("https://deepak7376-ollama-server.hf.space/v1/chat/completions", "deepseek-r1:1.5b"),
         ],
     };
-    stream_oai_targets("Ollama Multi-Model Cloud", targets, system, messages, true, 120, cancel, on_delta)
+    stream_oai_targets("Ollama Multi-Model Cloud", targets, system, messages, true, 60, cancel, on_delta)
 }
 
 /// Stream from YQCloud (`https://api.binjie.fun/api/generateStream`, zero-auth streaming chat).

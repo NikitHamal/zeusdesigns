@@ -234,6 +234,15 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
             16384,
         ),
         (
+            "mistral-large-4-1t",
+            "nimcloud",
+            "Mistral Large 4 1T A52B (Zeus NIM Cloud)",
+            true,
+            false,
+            262144,
+            16384,
+        ),
+        (
             "k2-horizon",
             "k2horizon",
             "K2-Horizon 375B Reasoning (Zeus IFM)",
@@ -354,6 +363,10 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
         "nemotron-3-ultra-550b" => (
             "nimcloud".to_string(),
             "nvidia/nemotron-3-ultra-550b-a55b".to_string(),
+        ),
+        "mistral-large-4-1t" | "mistralai/mistral-large-4-1t-a52b" => (
+            "nimcloud".to_string(),
+            "mistralai/mistral-large-4-1t-a52b".to_string(),
         ),
         "k2-horizon" | "IFM/K2-Horizon-375B-A23B" => {
             ("k2horizon".to_string(), "k2-horizon".to_string())

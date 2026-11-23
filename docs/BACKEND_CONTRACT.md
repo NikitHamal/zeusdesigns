@@ -21,6 +21,8 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `memory_list` / `memory_add` / `memory_delete` | `{text}` / `{id}` | `MemoryItem[]` |
 | `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
 | `perf_stats` / `perf_trim` / `perf_set_auto` | – / – / `{enabled}` | `PerfStats` / `TrimReport` / `PerfStats` |
+| `server_status` / `server_start` / `server_stop` | – / `{port?}` / – | `ServerStatus` (`running`, `port`, `baseUrl`, `openaiBaseUrl`, `chatCompletionsUrl`, `modelsUrl`, `messagesUrl`, `opencodeConfigUrl`, `apiKey`, `requestCount`, `modelCount`, `lastModel`) |
+| `server_opencode_config` / `server_install_opencode` | – / `{workspaceRoot?}` | `opencode.json` object / `{ok, paths, baseUrl, defaultModel}` |
 
 ### `ChatRequest`
 ```ts
@@ -69,7 +71,7 @@ The shell is Rust (Tauri 2 / WebView2). The native C++ engine plugs in through a
 4. Register the commands in `lib.rs` (`invoke_handler`). The UI flips to the native path automatically as soon as
    `providers_list` resolves (`ui.nativeReady`), no UI change needed.
 
-Provider slugs sent by the UI: `mercury3`, `kilo`, `zencloud`, `gemma4pro`, `frontierlab`, `liquidai`, `claudebridge`, `groqlpu`, `bonsaicloud`, `unslothcloud`, `koboldcloud`, `blockrun`, `ovhcloud`, `freecc`, `vlmrun`, `together2api`, `hfcluster`, `aihorde`, `apisfreellm`, `qwen`, `ptero`, `unikey`, `llm7`, `pollinations`, `yqcloud`, `deepai`, `k2horizon`, `motif`, `longcat`, `geminiweb`, `chatjimmy`, `custom`.
+Provider slugs sent by the UI: `kilo`, `nimcloud`, `colibriqwen`, `gemma4vl`, `phi4cloud`, `llamacppcloud`, `ollamacloud`, `gemma4pro`, `frontierlab`, `liquidai`, `bonsaicloud`, `unslothcloud`, `koboldcloud`, `blockrun`, `ovhcloud`, `freecc`, `vlmrun`, `together2api`, `hfcluster`, `aihorde`, `apisfreellm`, `qwen`, `ptero`, `unikey`, `llm7`, `pollinations`, `yqcloud`, `deepai`, `k2horizon`, `motif`, `chatjimmy`, `custom`.
 Unknown model ids must fall back to the provider's default model.
 Multimodal image/file attachments (`messages[*].attachments`) are supported natively across `kilo` (`image_url`), `gemma4pro` (`image_url`), `claudebridge` (Anthropic `/v1/messages` `image` base64), `blockrun` (`image_url`), `ovhcloud` (`image_url`), `freecc` (Anthropic `/v1/messages` `image` base64), `vlmrun` (`image_url`), `qwen` (`/api/v2/files/getstsToken` + `OSS4-HMAC-SHA256` OSS PUT + `files`), `deepai` (`generateIslandKey` + `/chat_attachments/upload` + `attachment_uuids`), `ptero` (`attachments`), and `custom` (OpenAI `image_url` / Anthropic `image` base64).
 
