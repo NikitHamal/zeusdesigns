@@ -29,6 +29,9 @@ Every artboard goes through `harden()` before it reaches the canvas: structure r
 ## Chat activity UI (`src/components/Activity.tsx`)
 All working states (`LiveStatus`, `WorkLog`, `ThinkingBlock`, `ToolRow`, `BottomToolbar`) use clean `.zshine` shimmer text with no orb or `auto_awesome` sparkle logo. `WorkLog` groups reasoning and tool steps in one collapsible card: open while streaming, collapsed to "Worked for Ns" after, with `ThinkingBlock` and each `ToolRow` independently collapsible. Reasoning comes from `<think>` blocks, provider-side reasoning deltas (`mercury3`, `k2horizon`), or extracted plan lines (`extractLeakedPlan`). On the canvas, `DesigningFx` (`Canvas.tsx`) renders a design-system-aware `BlueprintWireframe` with a diagonal `.zc-sheen` shimmer while an artboard streams.
 
+## Agent routing (`src/lib/agent.ts`, `src/lib/opencode.ts`)
+`sendMessage` classifies every turn (`classifyIntent`): `chat`, `code` or `design`. Only `design` uses the canvas harness. A new feature that needs canvas state must not leak into `chat`/`code` prompts. Never make a greeting produce an artifact. The model picker lists providers on the left and models on the right; reasoning tiers come from `reasoningTiers` and context windows from `ctxVerified.ts` (re-run `node scripts/verify-context.mjs`). The `OpenCode` runtime drives `opencode serve` through `@opencode-ai/sdk`.
+
 ## Zeus Studio (built-in MCP)
 `src/lib/studio.ts` holds the `studio_*` tools and `studioBrief()`. Tools run in the webview and need no install; `engine.ts` answers them locally. To add a tool, append to `STUDIO_TOOLS` with a real implementation; the prompt, Connectors list and chat chip label (`TOOL_LABEL` in `Chat.tsx`) follow. Never add a tool that returns canned or fake data.
 

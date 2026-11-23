@@ -17,6 +17,7 @@ export interface CatalogEntry {
 }
 
 export const CATALOG: CatalogEntry[] = [
+  { id: "m3e-canvas", name: "M3E Canvas", publisher: "lnkiai", desc: "Design Material 3 Expressive app screens, open them in M3E Canvas, then build the app from the finished screens.", category: "Design", icon: "dashboard", command: "npx", args: ["-y", "m3e-canvas"], runtime: "node", link: "https://github.com/lnkiai/m3e-canvas" },
   { id: "shadcn", name: "shadcn/ui", publisher: "shadcn", desc: "Browse, search and install shadcn components and blocks.", category: "Design", icon: "dashboard", command: "npx", args: ["-y", "shadcn@latest", "mcp"], runtime: "node", link: "https://ui.shadcn.com/docs/mcp" },
   { id: "magicui", name: "Magic UI", publisher: "Magic UI", desc: "Animated React components and effects for landing pages.", category: "Design", icon: "auto_awesome", command: "npx", args: ["-y", "@magicuidesign/mcp@latest"], runtime: "node", link: "https://magicui.design/docs/mcp" },
   { id: "playwright", name: "Playwright", publisher: "Microsoft", desc: "Drive a real browser: open pages, click, read the page, take screenshots.", category: "Browser", icon: "language", command: "npx", args: ["-y", "@playwright/mcp@latest"], runtime: "node", link: "https://github.com/microsoft/playwright-mcp" },

@@ -10,6 +10,8 @@ import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
+import { runOpenCode } from "./opencode";
+import { agentPrompt, buildPlainContext, classifyIntent } from "./agent";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { tokensCss } from "./designSystems";
@@ -326,15 +328,10 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
 
   const boards = getConversationBoards(freshSt);
   const spec = getProviderSpecialization(settings.providerId, settings.modelId);
-  const { messages: history, themeOverride, isCanvasFollowUp } = buildMultiTurnContext({
-    convMessages: conv.messages,
-    userMsg,
-    boards,
-    target,
-    asVariant: opts.asVariant,
-    quoteToText,
-    spec,
-  });
+  const mode = classifyIntent(opts.text, { boards: boards.length, quote: Boolean(opts.quote), asVariant: opts.asVariant, workspace: Boolean(freshSt.ui.workspace) });
+  const { messages: history, themeOverride, isCanvasFollowUp } = mode === "design"
+    ? buildMultiTurnContext({ convMessages: conv.messages, userMsg, boards, target, asVariant: opts.asVariant, quoteToText, spec })
+    : buildPlainContext({ convMessages: conv.messages, userMsg, quoteToText });
 
   controller = new AbortController();
   const signal = controller.signal;
@@ -508,8 +505,10 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const nativeOn = isNative && useStore.getState().ui.nativeReady;
-  const toolsText = nativeOn ? await toolsPrompt().catch(() => "") : "";
-  const system = buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText });
+  const toolsText = nativeOn ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
+  const system = mode === "design"
+    ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
+    : [agentPrompt(mode), toolsText].filter(Boolean).join("\n\n");
   const req: ChatRequest = {
     requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId, effort: settings.effort,
     system, messages: history, workspaceRoot: st.ui.workspace?.root,
@@ -522,8 +521,20 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
   };
 
+  const useOC = settings.agentRuntime === "opencode" && nativeOn && mode !== "design" && !custom;
   try {
-    if (nativeOn) {
+    if (useOC) {
+      await runOpenCode({
+        convId, title: conv.title, prompt: opts.text, signal,
+        onText: (t) => { full += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
+        onReasoning: (t) => { extraThink += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
+        onTool: (t) => {
+          const cur = tools.find((x) => x.id === t.id);
+          if (cur) Object.assign(cur, t); else tools.push(t);
+          if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
+        },
+      });
+    } else if (nativeOn) {
       let current = req;
       let msgs: ChatRequest["messages"] = history;
       let nudged = false;
@@ -573,14 +584,14 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         });
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (signal.aborted || round >= 4) break;
+        if (signal.aborted || round >= (mode === "code" ? 30 : mode === "chat" ? 6 : 4)) break;
         if (!roundTools.length) {
           const parsedNow = parseStream(extractRemember(full).clean);
           const produced = parsedNow.blocks.length > 0;
           const unclosedBlock = parsedNow.blocks.find((b) => !b.closed && b.html.length > 100);
 
           // 1. Auto-continuation if an <artboard> truncated mid-stream before </artboard>
-          if (unclosedBlock && round < 3) {
+          if (unclosedBlock && round < 3 && (mode === "design" || unclosedBlock.html.length > 100)) {
             tools.push({
               id: uid(),
               name: "auto_continue",
@@ -606,7 +617,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           if (refused && preSyncedIds.size > 0) {
             break;
           }
-          if ((!produced || refused) && !nudged && (DESIGN_INTENT.test(opts.text) || isCanvasFollowUp || refused)) {
+          if (mode === "design" && (!produced || refused) && !nudged && (DESIGN_INTENT.test(opts.text) || isCanvasFollowUp || refused)) {
             nudged = true;
             if (full.endsWith(roundText)) full = full.slice(0, full.length - roundText.length);
             const targetHint = boards.length > 0 && isCanvasFollowUp
@@ -627,20 +638,21 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         msgs = [
           ...msgs,
           { role: "assistant", content: said },
-          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
+          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, mode === "code" ? 16000 : 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
         ];
         current = { ...req, requestId: uid(), messages: msgs };
         full += "\n\n";
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);
-    } else if (["kilo", "nimcloud", "colibriqwen", "freellmhub", "aibridge", "hfrouter", "litellmhub", "gemweb2api", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
+    } else if (["kilo", "opencodezen", "nimcloud", "colibriqwen", "freellmhub", "aibridge", "hfrouter", "litellmhub", "gemweb2api", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "koboldcloud", "blockrun", "ovhcloud", "freecc", "vlmrun", "together2api", "hfcluster", "aihorde", "apisfreellm", "llm7", "pollinations"].includes(settings.providerId)) {
       const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
         kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
         nimcloud: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
         colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free" },
         freellmhub: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "" },
         aibridge: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
+        opencodezen: { baseUrl: "https://opencode.ai/zen/v1", apiKey: "public" },
         hfrouter: { baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", apiKey: "" },
         litellmhub: { baseUrl: "https://alchoholpad-litellm.hf.space/v1", apiKey: "" },
         gemweb2api: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },

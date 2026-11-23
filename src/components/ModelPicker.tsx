@@ -34,6 +34,7 @@ export function ModelPicker() {
   const settings = useStore((s) => s.settings);
   const patch = useStore((s) => s.patchSettings);
   const patchUI = useStore((s) => s.patchUI);
+  const nativeReady = useStore((s) => s.ui.nativeReady);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const custom = settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId);
@@ -113,9 +114,21 @@ export function ModelPicker() {
                 </div>
               </div>
             )}
-            <button onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} className="state flex h-10 shrink-0 items-center gap-2 border-t border-outline-variant/60 px-3 text-[13px] font-medium text-on-surface">
-              <Icon name="add" size={16} />Add your own endpoint
-            </button>
+            <div className="flex h-11 shrink-0 items-center gap-2 border-t border-outline-variant/60 px-2">
+              <button onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} className="state flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-on-surface">
+                <Icon name="add" size={16} />Endpoint
+              </button>
+              <span className="flex-1" />
+              {nativeReady && (
+                <div className="flex gap-0.5 rounded-full bg-surface-low p-0.5" title="Agent runtime">
+                  {(["zeus", "opencode"] as const).map((r) => (
+                    <button key={r} onClick={() => patch({ agentRuntime: r })} className={cn("h-7 rounded-full px-3 text-[12px] font-semibold", (settings.agentRuntime ?? "zeus") === r ? "bg-primary text-on-primary" : "text-on-surface-variant")}>
+                      {r === "zeus" ? "Zeus" : "OpenCode"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Dropdown>

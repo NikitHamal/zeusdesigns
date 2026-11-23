@@ -32,6 +32,7 @@ export interface Settings {
   selfCheck: boolean;
   studioOn: boolean;
   learnOn: boolean;
+  agentRuntime?: "zeus" | "opencode";
 }
 export interface Viewport { x: number; y: number; z: number }
 

@@ -14,6 +14,7 @@ const BROWSER_KEYLESS: Record<string, { baseUrl: string; apiKey: string; format:
   colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free", format: "openai" },
   freellmhub: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "", format: "openai" },
   aibridge: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "", format: "openai" },
+  opencodezen: { baseUrl: "https://opencode.ai/zen/v1", apiKey: "public", format: "openai" },
   hfrouter: { baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", apiKey: "", format: "openai" },
   litellmhub: { baseUrl: "https://alchoholpad-litellm.hf.space/v1", apiKey: "", format: "openai" },
   gemweb2api: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "", format: "openai" },

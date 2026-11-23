@@ -81,3 +81,9 @@ Multimodal image/file attachments (`messages[*].attachments`) are supported nati
 
 ## Anonymous OpenAI-compatible gateways (session 18)
 `freellmhub`, `aibridge`, `hfrouter`, `litellmhub` and `gemweb2api` stream `POST /v1/chat/completions` on public hf.space gateways with no `Authorization` header (`freellmhub` rejects any bearer token). Each provider walks its own model chain before the global failover list, and reasoning deltas are wrapped in `<think>`.
+
+
+## Session 19 additions
+- `opencode_start(root, port, config)` / `opencode_stop()` (`workspace.rs`): spawn or kill `opencode serve` (config JSON goes in `OPENCODE_CONFIG_CONTENT`). The UI talks to it over HTTP with `@opencode-ai/sdk` on `127.0.0.1:4096`.
+- Inline tool `edit_file`: `<zeus_tool name="edit_file" path="f">` with `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE` blocks. `read_file` accepts `start` and `end`; `list_dir` accepts `path`.
+- Provider `opencodezen`: OpenAI-compatible `https://opencode.ai/zen/v1/chat/completions`, `Authorization: Bearer public`, free models only.

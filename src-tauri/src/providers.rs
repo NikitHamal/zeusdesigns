@@ -481,6 +481,92 @@ pub fn catalog() -> Vec<ProviderInfo> {
             }],
         },
         ProviderInfo {
+            id: "opencodezen".to_string(),
+            name: "OpenCode Zen".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~90 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "big-pickle".to_string(),
+                    label: "Big Pickle".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "mimo-v2.6-flash-free".to_string(),
+                    label: "MiMo-V2.6-Flash".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "deepseek-v4.1-flash-free".to_string(),
+                    label: "DeepSeek V4.1 Flash".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "iceman-free".to_string(),
+                    label: "Iceman".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "beam-free".to_string(),
+                    label: "Beam".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "flint-40b-free".to_string(),
+                    label: "Flint 40B".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "nemotron-3.5-super-vl-free".to_string(),
+                    label: "Nemotron 3.5 Super VL".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "jev-1.13-free".to_string(),
+                    label: "Jev 1.13".to_string(),
+                    note: None,
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "nemotron-3.5-lightning-free".to_string(),
+                    label: "Nemotron 3.5 Lightning".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "hy4-flash-free".to_string(),
+                    label: "Hy4 flash".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "tidepool-alpha-free".to_string(),
+                    label: "Tidepool Alpha".to_string(),
+                    note: None,
+                    reasoning: true,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
             id: "freellmhub".to_string(),
             name: "FreeLLM Hub".to_string(),
             kind: "keyless".to_string(),
@@ -6481,10 +6567,44 @@ fn stream_oai_targets_auth<F>(
 where
     F: FnMut(&str),
 {
-    let norm_messages = normalize_multi_turn_messages(messages, 10, 3200, 22000);
+    stream_oai_targets_bearer(
+        provider_label,
+        targets,
+        system,
+        messages,
+        allow_vision,
+        timeout_secs,
+        if send_auth { Some("free") } else { None },
+        cancel,
+        on_delta,
+    )
+}
+
+/// Core OpenAI-compatible streamer. `bearer` is the Authorization token to send (None = anonymous).
+/// Agent-grade gateways (large context windows) get a deeper history budget so tool results survive.
+fn stream_oai_targets_bearer<F>(
+    provider_label: &str,
+    targets: &[(&str, &str)],
+    system: &str,
+    messages: &[ChatMessage],
+    allow_vision: bool,
+    timeout_secs: u64,
+    bearer: Option<&str>,
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let deep = provider_label == "OpenCode Zen";
+    let norm_messages = if deep {
+        normalize_multi_turn_messages(messages, 60, 24000, 160000)
+    } else {
+        normalize_multi_turn_messages(messages, 10, 3200, 22000)
+    };
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe = smart_cap_system(system, 16000);
+        let sys_safe = smart_cap_system(system, if deep { 40000 } else { 16000 });
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in &norm_messages {
@@ -6517,7 +6637,7 @@ where
         let payload = json!({
             "model": upstream_model,
             "stream": true,
-            "max_tokens": 8192,
+            "max_tokens": if deep { 16384 } else { 8192 },
             "messages": oai_msgs
         });
 
@@ -6525,8 +6645,8 @@ where
             .post(endpoint)
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream, application/json");
-        if send_auth {
-            rb = rb.header("Authorization", "Bearer free");
+        if let Some(token) = bearer {
+            rb = rb.header("Authorization", format!("Bearer {}", token));
         }
         let resp = match rb.json(&payload).send()
         {
@@ -6632,6 +6752,29 @@ where
         ("https://bun008-freellmapi.hf.space/v1/chat/completions", "DeepSeek-V4-Flash"),
     ];
     stream_oai_targets_auth("FreeLLM Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
+}
+
+/// Stream from OpenCode Zen (`opencode.ai/zen/v1`), the official keyless free tier OpenCode itself uses
+/// (`Authorization: Bearer public`). Free models only; an unknown id falls back through the chain.
+pub fn stream_opencodezen<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    const EP: &str = "https://opencode.ai/zen/v1/chat/completions";
+    let requested = if model.trim().is_empty() { "big-pickle" } else { model };
+    let targets: [(&str, &str); 4] = [
+        (EP, requested),
+        (EP, "big-pickle"),
+        (EP, "deepseek-v4.1-flash-free"),
+        (EP, "mimo-v2.6-flash-free"),
+    ];
+    stream_oai_targets_bearer("OpenCode Zen", &targets, system, messages, true, 120, Some("public"), cancel, on_delta)
 }
 
 /// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) with in-provider model failover.
@@ -7257,6 +7400,7 @@ where
         "colibriqwen" => stream_colibriqwen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "freellmhub" => stream_freellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "aibridge" => stream_aibridge(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "opencodezen" => stream_opencodezen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -7493,7 +7637,8 @@ mod tests {
     fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 34);
+        assert_eq!(cat.len(), 40);
+        assert!(ids.contains(&"opencodezen"));
         assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"longcat"));
         assert!(ids.contains(&"geminiweb"));

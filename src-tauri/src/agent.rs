@@ -97,9 +97,41 @@ fn execute_inline_workspace_tools(
 
         let (ok, output) = match name.as_str() {
             "read_file" => match fs_read(workspace_root.to_string(), path_arg.clone()) {
-                Ok(content) => (true, content.chars().take(4000).collect::<String>()),
+                Ok(content) => {
+                    let total = content.lines().count();
+                    let start = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok()).unwrap_or(1).max(1);
+                    let end = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok()).unwrap_or(usize::MAX);
+                    let mut out = String::new();
+                    let mut last = start;
+                    for (i, line) in content.lines().enumerate() {
+                        let n = i + 1;
+                        if n < start {
+                            continue;
+                        }
+                        if n > end {
+                            break;
+                        }
+                        if out.len() > 40000 {
+                            out.push_str("\n[truncated: call read_file again with start/end]");
+                            break;
+                        }
+                        out.push_str(line);
+                        out.push('\n');
+                        last = n;
+                    }
+                    (true, format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out))
+                }
                 Err(e) => (false, e),
             },
+            "edit_file" => {
+                let res = fs_read(workspace_root.to_string(), path_arg.clone())
+                    .and_then(|content| apply_search_replace(&content, body))
+                    .and_then(|updated| fs_write(workspace_root.to_string(), path_arg.clone(), updated));
+                match res {
+                    Ok(_) => (true, format!("Edited {}", path_arg)),
+                    Err(e) => (false, e),
+                }
+            }
             "write_file" | "sync_artboard" => {
                 match fs_write(workspace_root.to_string(), path_arg.clone(), body.to_string()) {
                     Ok(_) => (true, format!("Synchronized {} ({} bytes)", path_arg, body.len())),
@@ -112,8 +144,13 @@ fn execute_inline_workspace_tools(
             }
             "list_dir" => {
                 let p = Path::new(workspace_root);
-                let tree = walk_workspace(p, p, 2);
-                (true, serde_json::to_string(&tree).unwrap_or_default())
+                if path_arg.contains("..") {
+                    (false, "list_dir: path must stay inside the project".to_string())
+                } else {
+                    let target = if path_arg.is_empty() { p.to_path_buf() } else { p.join(&path_arg) };
+                    let tree = walk_workspace(p, &target, 2);
+                    (true, serde_json::to_string(&tree).unwrap_or_default())
+                }
             }
             "shell" => match shell_run(workspace_root.to_string(), body.to_string()) {
                 Ok(v) => (true, v.to_string()),
@@ -203,6 +240,54 @@ fn html_to_text(html: &str) -> String {
         }
     }
     res
+}
+
+/// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks. Each SEARCH must match exactly once.
+fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
+    let s_tag = "<<<<<<< SEARCH";
+    let m_tag = "=======";
+    let r_tag = ">>>>>>> REPLACE";
+    let crlf = content.contains("\r\n");
+    let mut out = content.to_string();
+    let mut rest = body;
+    let mut n = 0usize;
+    while let Some(si) = rest.find(s_tag) {
+        let after_s = &rest[si + s_tag.len()..];
+        let Some(mi) = after_s.find(m_tag) else {
+            return Err("edit_file: missing ======= divider".to_string());
+        };
+        let search_raw = after_s[..mi].trim_matches(|c| c == '\n' || c == '\r');
+        let after_m = &after_s[mi + m_tag.len()..];
+        let Some(ri) = after_m.find(r_tag) else {
+            return Err("edit_file: missing >>>>>>> REPLACE".to_string());
+        };
+        let replace_raw = after_m[..ri].trim_matches(|c| c == '\n' || c == '\r');
+        rest = &after_m[ri + r_tag.len()..];
+        if search_raw.is_empty() {
+            return Err("edit_file: SEARCH block is empty".to_string());
+        }
+        let (search, replace) = if crlf {
+            (
+                search_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
+                replace_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
+            )
+        } else {
+            (search_raw.to_string(), replace_raw.to_string())
+        };
+        let count = out.matches(search.as_str()).count();
+        if count == 0 {
+            return Err(format!("edit_file: SEARCH block {} not found. Read the file again and copy the lines exactly.", n + 1));
+        }
+        if count > 1 {
+            return Err(format!("edit_file: SEARCH block {} matches {} places. Add surrounding lines so it is unique.", n + 1, count));
+        }
+        out = out.replacen(search.as_str(), replace.as_str(), 1);
+        n += 1;
+    }
+    if n == 0 {
+        return Err("edit_file: BODY needs a <<<<<<< SEARCH / ======= / >>>>>>> REPLACE block".to_string());
+    }
+    Ok(out)
 }
 
 fn extract_attr(header: &str, key: &str) -> Option<String> {

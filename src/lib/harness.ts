@@ -685,9 +685,18 @@ Rules: Display numerals (.z-display) and screen titles (.z-h1) use var(--heading
 14. Long text wraps or truncates with z-truncate. Horizontal scrollers (z-chips) are for chips only and never show a scroll bar.
 15. If the user states a durable fact about themselves, their brand or how they like to work, append <remember category="preferences|profile|topics|areas">one short sentence</remember> after your reply text. Never for ordinary design requests.
 
+## Concept first (this is what separates a design from a template)
+Before any HTML, decide inside <think>: (a) the one-sentence concept that only fits THIS subject, (b) the signature layout move that is not the default (asymmetric split, oversized numerals, editorial timeline, dense table with inline sparklines, split-pane workspace, a single full-bleed object), (c) the real content you will use: names, numbers, places, units taken from or implied by the brief.
+- Use the user's own words and domain vocabulary in headings and labels. A coffee roaster dashboard talks about batches, roast curves and green stock, not "Overview" and "Analytics".
+- Banned unless the brief asks for them: a centered hero over three equal icon-title-blurb cards, a "trusted by" logo row, a testimonial carousel, a closing CTA band, identical card grids, gradient blobs, stock "Get started" language.
+- The reference anatomy and skeleton below show how to use the kit and what a finished screen contains. They are a starting point, never the answer. Break from them whenever the concept calls for a different composition.
+- A short brief is not a reason to go generic. Commit to a decision, say it in one sentence, build it. The user iterates from there.
+- Several artboards must differ in structure and idea, not in color.
+
+## Reference anatomy (starting point only)
 ${blueprintFor(intent, device)}
 
-## Skeleton (shape to follow for the requested device; replace all content)
+## Skeleton (kit usage only; replace the structure and all content)
 Mobile:
 ${kitExample("mobile")}
 Web:

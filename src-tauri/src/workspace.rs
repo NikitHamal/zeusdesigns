@@ -304,3 +304,70 @@ mod tests {
         assert!(safe_join("/tmp", "src/App.tsx").is_ok());
     }
 }
+
+static OPENCODE_CHILD: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
+
+/// Starts `opencode serve` for the project folder (OpenCode SDK runtime). `config` is the inline
+/// OpenCode config JSON (Zeus local gateway provider + permissions) passed via OPENCODE_CONFIG_CONTENT.
+#[tauri::command]
+pub fn opencode_start(root: String, port: u16, config: String) -> Result<String, String> {
+    use std::process::{Command, Stdio};
+    let mut guard = OPENCODE_CHILD.lock().map_err(|_| "opencode state is locked".to_string())?;
+    if let Some(child) = guard.as_mut() {
+        if matches!(child.try_wait(), Ok(None)) {
+            return Ok("running".to_string());
+        }
+    }
+    let port_s = port.to_string();
+    let serve: Vec<&str> = vec![
+        "serve", "--port", port_s.as_str(),
+        "--cors", "http://tauri.localhost",
+        "--cors", "tauri://localhost",
+        "--cors", "http://localhost:1420",
+    ];
+    let mut cmd = if cfg!(windows) {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg("opencode");
+        c
+    } else {
+        Command::new("opencode")
+    };
+    cmd.args(serve)
+        .env("OPENCODE_CONFIG_CONTENT", config)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    if !root.trim().is_empty() {
+        cmd.current_dir(&root);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    match cmd.spawn() {
+        Ok(child) => {
+            *guard = Some(child);
+            Ok("started".to_string())
+        }
+        Err(e) => Err(format!("Could not start OpenCode ({}). Install it with: npm i -g opencode-ai", e)),
+    }
+}
+
+#[tauri::command]
+pub fn opencode_stop() -> Result<(), String> {
+    if let Ok(mut guard) = OPENCODE_CHILD.lock() {
+        if let Some(mut child) = guard.take() {
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/PID", child.id().to_string().as_str(), "/T", "/F"])
+                    .creation_flags(0x08000000)
+                    .output();
+            }
+            let _ = child.kill();
+        }
+    }
+    Ok(())
+}
