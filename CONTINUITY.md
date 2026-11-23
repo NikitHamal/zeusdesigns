@@ -5,6 +5,16 @@ Running log across agent sessions. Newest session first. Rules live in `AGENTS.m
 ## Current state
 - Engine & Local OpenAI/OpenCode Server: 40 free keyless providers (`freellmhub`, `aibridge`, `hfrouter`, `litellmhub`, `gemweb2api`, `mercury3`, `kilo`, `nimcloud`, `colibriqwen`, `gemma4vl`, `phi4cloud`, `llamacppcloud`, `ollamacloud`, `gemma4pro`, `frontierlab`, `liquidai`, `bonsaicloud`, `unslothcloud`, `koboldcloud`, `blockrun`, `ovhcloud`, `freecc`, `vlmrun`, `together2api`, `hfcluster`, `aihorde`, `apisfreellm`, `qwen`, `ptero`, `unikey`, `llm7`, `pollinations`, `yqcloud`, `deepai`, `k2horizon`, `motif`, `longcat`, `geminiweb`, `chatjimmy`) — with `mercury3` (Mercury 3), `geminiweb` (Gemini Web), `longcat` (LongCat 2.5), and all live sub-models restored and hardened with multi-node failover, while removing only the 3 genuinely dead proxy endpoints (`zencloud`, `claudebridge`, `groqlpu`) and adding 6 brand-new keyless providers (`nimcloud`, `colibriqwen`, `gemma4vl`, `phi4cloud`, `llamacppcloud`, `ollamacloud`). Exposes a built-in Local OpenAI, Anthropic, and OpenCode HTTP Gateway (`127.0.0.1:11435` — `/v1/chat/completions`, `/v1/models`, `/v1/responses`, `/v1/messages`, `/v1/opencode.json`) with a Universal OpenCode Tool-Calling Bridge (`tools` -> `<tool_call>` -> `delta.tool_calls` + multi-turn `<tool_response>` role alternation & recency reinforcement) and 1-click `~/.config/opencode/opencode.json` installer. Sub-17MB Win32 working-set governance. Stable.
 
+## Session 23
+Goal: fix WebView2 "Out of Memory" crash and the folder never opening when a local project folder is picked.
+
+Root cause: `workspace_tree` walked depth 3 with no node cap (home folders, AppData, huge monorepos), the full tree crossed IPC, was stored on every project and re-serialized into localStorage on each store write; a failed call then fell through to a second browser folder picker.
+
+Shipped:
+- `src-tauri/src/workspace.rs`: budgeted walker (700 nodes, 250 per dir, 6000 for code search), skips symlinks/junctions/system entries/dot-dirs and heavy caches, `check_project_root` rejects drive roots, home and system folders with a clear message, default depth 2, new lazy `workspace_list` command.
+- `src/lib/bridge.ts`, `src/components/Chat.tsx`: native errors now surface as toasts (no fallback picker), folders expand lazily.
+- `src/store.ts`, `src/App.tsx`: trees are never persisted; the active project's tree is rebuilt on launch and on project change.
+
 ## Session 22
 Goal: structure conversations inside local Project folders (like Claude Code and OpenCode), upgrade workspace UI/UX with an inline File Viewer/Editor and interactive Project Terminal, turn off the Local OpenAI Server by default, replace full-memory prompt preloading with on-demand agent memory tools (`memory_search`, `memory_save`, `memory_edit`, `memory_delete`), and verify 6/6 benchmark pass rates across model families.
 
