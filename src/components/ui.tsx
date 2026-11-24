@@ -171,61 +171,7 @@ export const Thumb = memo(function Thumb({ html, w, h, width, className }: { htm
   return <ShadowFrame html={html} w={w} h={h} scale={sc} interactive={false} className={className} />;
 });
 
-/* ---------- Markdown (small, dependency-free) ---------- */
-function inline(s: string, key: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_|\[[^\]]+\]\([^)]+\))/g;
-  let last = 0, m: RegExpExecArray | null, i = 0;
-  while ((m = re.exec(s))) {
-    if (m.index > last) out.push(s.slice(last, m.index));
-    const t = m[0];
-    const k = `${key}-${i++}`;
-    if (t.startsWith("**")) out.push(<strong key={k}>{t.slice(2, -2)}</strong>);
-    else if (t.startsWith("`")) out.push(<code key={k}>{t.slice(1, -1)}</code>);
-    else if (t.startsWith("[")) { const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(t)!; out.push(<a key={k} href={mm[2]} target="_blank" rel="noreferrer">{mm[1]}</a>); }
-    else out.push(<em key={k}>{t.slice(1, -1)}</em>);
-    last = m.index + t.length;
-  }
-  if (last < s.length) out.push(s.slice(last));
-  return out;
-}
-
-export function Markdown({ text }: { text: string }) {
-  const lines = text.split("\n");
-  const nodes: ReactNode[] = [];
-  let i = 0, k = 0;
-  while (i < lines.length) {
-    const l = lines[i];
-    if (l.startsWith("```")) {
-      const buf: string[] = []; i++;
-      while (i < lines.length && !lines[i].startsWith("```")) buf.push(lines[i++]);
-      i++;
-      nodes.push(<pre key={k++}><code>{buf.join("\n")}</code></pre>);
-    } else if (/^#{1,3}\s/.test(l)) {
-      const lvl = l.match(/^#+/)![0].length;
-      const C = (["h1", "h2", "h3"] as const)[lvl - 1];
-      nodes.push(<C key={k++}>{inline(l.replace(/^#+\s/, ""), `h${k}`)}</C>); i++;
-    } else if (/^\s*[-*]\s/.test(l)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*[-*]\s/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*]\s/, ""));
-      nodes.push(<ul key={k++}>{items.map((it, j) => <li key={j}>{inline(it, `u${k}${j}`)}</li>)}</ul>);
-    } else if (/^\s*\d+\.\s/.test(l)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*\d+\.\s/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+\.\s/, ""));
-      nodes.push(<ol key={k++}>{items.map((it, j) => <li key={j}>{inline(it, `o${k}${j}`)}</li>)}</ol>);
-    } else if (l.startsWith(">")) {
-      const buf: string[] = [];
-      while (i < lines.length && lines[i].startsWith(">")) buf.push(lines[i++].replace(/^>\s?/, ""));
-      nodes.push(<blockquote key={k++}>{inline(buf.join(" "), `q${k}`)}</blockquote>);
-    } else if (!l.trim()) i++;
-    else {
-      const buf: string[] = [];
-      while (i < lines.length && lines[i].trim() && !/^(```|#{1,3}\s|\s*[-*]\s|\s*\d+\.\s|>)/.test(lines[i])) buf.push(lines[i++]);
-      nodes.push(<p key={k++}>{inline(buf.join(" "), `p${k}`)}</p>);
-    }
-  }
-  return <div className="md text-[14.5px] text-on-surface select-text">{nodes}</div>;
-}
+export { Markdown } from "./MarkdownView";
 
 /* ---------- Toggle ---------- */
 export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
