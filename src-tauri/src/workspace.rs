@@ -387,6 +387,125 @@ pub fn fs_write(root: String, path: String, content: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to write '{}': {}", target.display(), e))
 }
 
+#[tauri::command(async)]
+pub fn fs_delete(root: String, path: String) -> Result<String, String> {
+    let target = safe_join(&root, &path)?;
+    if !target.exists() {
+        // Case-insensitive lookup inside parent directory (e.g. `agents.md` vs `AGENTS.md`)
+        if let (Some(parent), Some(fname)) = (target.parent(), target.file_name()) {
+            let want = fname.to_string_lossy().to_lowercase();
+            if let Ok(entries) = fs::read_dir(parent) {
+                for entry in entries.flatten() {
+                    if entry.file_name().to_string_lossy().to_lowercase() == want {
+                        let actual = entry.path();
+                        if actual.is_dir() {
+                            fs::remove_dir_all(&actual)
+                                .map_err(|e| format!("Failed to delete directory '{}': {}", actual.display(), e))?;
+                        } else {
+                            fs::remove_file(&actual)
+                                .map_err(|e| format!("Failed to delete file '{}': {}", actual.display(), e))?;
+                        }
+                        return Ok(format!("Deleted {}", entry.file_name().to_string_lossy()));
+                    }
+                }
+            }
+        }
+        return Err(format!("File not found: {}", path));
+    }
+    if target.is_dir() {
+        fs::remove_dir_all(&target)
+            .map_err(|e| format!("Failed to delete directory '{}': {}", target.display(), e))?;
+    } else {
+        fs::remove_file(&target)
+            .map_err(|e| format!("Failed to delete file '{}': {}", target.display(), e))?;
+    }
+    Ok(format!("Deleted {}", path))
+}
+
+/// Handle common single-command POSIX file operations (`rm`, `del`, `pwd`, `touch`, `mkdir -p`) natively
+/// in Rust so Windows `cmd.exe` never fails with `'rm' is not recognized as an internal or external command`.
+fn try_builtin_posix_shell(workdir: &Path, clean_cmd: &str) -> Option<Value> {
+    let trimmed = clean_cmd.trim();
+    if trimmed.contains("&&") || trimmed.contains("||") || trimmed.contains('|') || trimmed.contains(';') || trimmed.contains('>') || trimmed.contains('<') {
+        return None;
+    }
+    let tokens: Vec<String> = {
+        let mut out = Vec::new();
+        let mut cur = String::new();
+        let mut quote: Option<char> = None;
+        for ch in trimmed.chars() {
+            match quote {
+                Some(q) if ch == q => quote = None,
+                Some(_) => cur.push(ch),
+                None if ch == '"' || ch == '\'' => quote = Some(ch),
+                None if ch.is_whitespace() => {
+                    if !cur.is_empty() {
+                        out.push(std::mem::take(&mut cur));
+                    }
+                }
+                None => cur.push(ch),
+            }
+        }
+        if !cur.is_empty() {
+            out.push(cur);
+        }
+        out
+    };
+    if tokens.is_empty() {
+        return None;
+    }
+    let prog = tokens[0].to_ascii_lowercase();
+    let root_str = workdir.to_string_lossy().to_string();
+    match prog.as_str() {
+        "rm" | "del" | "erase" | "unlink" | "remove-item" => {
+            let mut targets = Vec::new();
+            for t in &tokens[1..] {
+                if t.starts_with('-') || (prog == "del" && t.starts_with('/')) {
+                    continue;
+                }
+                targets.push(t.clone());
+            }
+            if targets.is_empty() {
+                return None;
+            }
+            let mut deleted = Vec::new();
+            let mut errors = Vec::new();
+            let force = tokens[1..].iter().any(|t| t == "-f" || t == "-rf" || t == "-fr" || t.eq_ignore_ascii_case("-force"));
+            for t in targets {
+                match fs_delete(root_str.clone(), t.clone()) {
+                    Ok(msg) => deleted.push(msg),
+                    Err(e) => {
+                        if !force {
+                            errors.push(e);
+                        } else {
+                            deleted.push(format!("Removed {} (if present)", t));
+                        }
+                    }
+                }
+            }
+            if errors.is_empty() {
+                Some(json!({
+                    "code": 0,
+                    "stdout": deleted.join("\n"),
+                    "stderr": ""
+                }))
+            } else {
+                Some(json!({
+                    "code": 1,
+                    "stdout": deleted.join("\n"),
+                    "stderr": errors.join("\n")
+                }))
+            }
+        }
+        "pwd" => Some(json!({
+            "code": 0,
+            "stdout": format!("{}\n", workdir.display()),
+            "stderr": ""
+        })),
+        _ => None,
+    }
+}
+
 /// Sanitize AI-emitted shell commands so they never spawn an external Windows console/GUI window
 /// (`start`, `cmd /k`, `powershell -NoExit`, `pause`) or block on interactive prompts.
 pub fn sanitize_shell_command(raw: &str) -> String {
@@ -434,6 +553,10 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
             "stdout": "(non-interactive shell ready — pass a specific command to run)",
             "stderr": ""
         }));
+    }
+
+    if let Some(builtin_res) = try_builtin_posix_shell(&workdir, &clean_cmd) {
+        return Ok(builtin_res);
     }
 
     #[cfg(target_os = "windows")]

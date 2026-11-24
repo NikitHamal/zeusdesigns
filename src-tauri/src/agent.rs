@@ -2,7 +2,8 @@ use crate::providers::{
     catalog, chatjimmy_complete, dispatch_stream, ChatRequest, ProviderEngine, ProviderInfo,
 };
 use crate::workspace::{
-    fs_read, fs_write, python_run, search_workspace_code, shell_run, walk_workspace, FileNode,
+    fs_delete, fs_read, fs_write, python_run, search_workspace_code, shell_run, walk_workspace,
+    FileNode,
 };
 use serde_json::{json, Value};
 use std::path::Path;
@@ -183,6 +184,11 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "save_file"
             | "overwrite_file"
             | "sync_artboard"
+            | "delete_file"
+            | "remove_file"
+            | "rm"
+            | "del"
+            | "unlink"
             | "edit_file"
             | "edit"
             | "patch_file"
@@ -998,6 +1004,17 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     true,
                     format!("Synchronized {} ({} bytes)", path_arg, body.len()),
                 ),
+                Err(e) => (false, e),
+            }
+        }
+        "delete_file" | "remove_file" | "rm" | "del" | "unlink" => {
+            let target_path = if !path_arg.is_empty() {
+                path_arg.clone()
+            } else {
+                body.trim().to_string()
+            };
+            match fs_delete(eff_root.clone(), target_path) {
+                Ok(msg) => (true, msg),
                 Err(e) => (false, e),
             }
         }
