@@ -2365,6 +2365,7 @@ where
             let is_opencode = sys_full.contains("OpenCode / OpenAI Tool-Calling Protocol");
             let is_design = sys_full.contains("## Current canvas page");
             let is_tools = is_agent_tool_request(&sys_full);
+            let already_has_tool_turn = messages.iter().any(|m| m.content.contains("<zeus_tool"));
             let spec_text = if is_tools {
                 format!("{}\n\n[System Specification]\n{}", scraper_xml_dsl_banner(), sys_full)
             } else {
@@ -2382,10 +2383,10 @@ where
                     "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
                 } else if is_design {
                     "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place without ever asking the user to paste HTML."
-                } else if is_tools {
+                } else if is_tools && !already_has_tool_turn {
                     "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
                 } else {
-                    "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
+                    "Understood. I am Zeus connected to the local workspace runtime. I will answer greetings concisely and for coding or workspace tasks I will emit <zeus_tool> blocks with full content outside <think> to execute shell, python, or file operations."
                 } }]
             }));
         }
@@ -2872,6 +2873,7 @@ where
         let is_opencode = sys_safe.contains("OpenCode / OpenAI Tool-Calling Protocol");
         let is_design = sys_safe.contains("## Current canvas page");
         let is_tools = is_agent_tool_request(&sys_safe);
+        let already_has_tool_turn = messages.iter().any(|m| m.content.contains("<zeus_tool"));
         let spec_text = if is_tools {
             format!("{}\n\n[System Specification]\n{}", scraper_xml_dsl_banner(), sys_safe)
         } else {
@@ -2887,10 +2889,10 @@ where
                 "Understood. I will follow the OpenCode / OpenAI Tool-Calling Protocol strictly. When a tool action is needed, I will emit <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call> outside <think> and wait for <tool_response>."
             } else if is_design {
                 "Understood. I am Zeus running inside the ZeusDesigns desktop harness with direct read/write access to the user's multi-artboard canvas. I will inspect <canvas_state> and <current_artboard> directly and emit complete <artboard> or <zeus_tool> blocks to create or revise screens in place."
-            } else if is_tools {
+            } else if is_tools && !already_has_tool_turn {
                 "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
             } else {
-                "Understood. I am Zeus. I will answer greetings and questions concisely without generating unsolicited designs, and for coding or workspace tasks I will emit <zeus_tool> blocks outside <think> to execute shell, python, or file operations."
+                "Understood. I am Zeus connected to the local workspace runtime. I will answer greetings concisely and for coding or workspace tasks I will emit <zeus_tool> blocks with full content outside <think> to execute shell, python, or file operations."
             }
         }));
     }

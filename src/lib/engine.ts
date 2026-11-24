@@ -696,8 +696,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
           }
-          // 3. Code Action & Reasoning-Cutoff Nudge when the model only described its plan (e.g., "Let's list directory" / "We need to pull...") without calling a tool
+          // 3. Code Action & Reasoning-Cutoff Nudge when the model only described its plan or dumped a code block without calling a write/edit tool
+          const hasMutatingTool = tools.some((t) => /^(write_file|write|create_file|edit_file|edit|patch_file|python|python3|memory_save|memory_edit|memory_delete)$/.test(t.name));
+          const dumpedCodeWithoutWrite = !hasMutatingTool && /```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText);
           const statedPlanOnly =
+            dumpedCodeWithoutWrite ||
             /\b(let'?s\s+(list|check|run|read|inspect|pull|fetch|search|look|verify|see|test|create|write|edit)|we\s+need\s+to\s+(pull|list|check|run|read|inspect|update|fix)|i\s+(will|need\s+to|should)\s+(list|check|run|read|inspect|pull|fetch|search|verify|test))\b/i.test(
               `${roundText} ${extraThink}`
             ) || (!roundText.trim() && extraThink.trim().length > 0);

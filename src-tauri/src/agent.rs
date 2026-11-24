@@ -386,6 +386,7 @@ pub fn parse_inline_invocations_segment(
     }
 
     // 2. Also parse `<tool_call>{...}</tool_call>` and `<function_call>{...}</function_call>`
+    // (including unclosed tail when vLLM strips `</tool_call>` as a stop token at end of stream)
     for (open_tag, close_tag) in [
         ("<tool_call>", "</tool_call>"),
         ("<function_call>", "</function_call>"),
@@ -394,14 +395,20 @@ pub fn parse_inline_invocations_segment(
         while let Some(rel_start) = clean_text[from..].find(open_tag) {
             let start = from + rel_start;
             let after_open = start + open_tag.len();
-            let Some(rel_end) = clean_text[after_open..].find(close_tag) else { break };
-            let raw = clean_text[after_open..after_open + rel_end]
+            let (raw_slice, next_from) = if let Some(rel_end) = clean_text[after_open..].find(close_tag) {
+                (&clean_text[after_open..after_open + rel_end], after_open + rel_end + close_tag.len())
+            } else if allow_unclosed_tail && clean_text.len() > after_open + 2 {
+                (&clean_text[after_open..], clean_text.len())
+            } else {
+                break;
+            };
+            let raw = raw_slice
                 .trim()
                 .trim_start_matches("```json")
                 .trim_start_matches("```")
                 .trim_end_matches("```")
                 .trim();
-            from = after_open + rel_end + close_tag.len();
+            from = next_from;
 
             let parsed_val = serde_json::from_str::<Value>(raw).ok().or_else(|| {
                 // Support GLM-4/5 native `<tool_call>tool_name\n{"arg": "val"}</tool_call>` format
@@ -1241,8 +1248,8 @@ fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
         return Ok(out);
     }
 
-    // Fallback: JSON {"oldString" / "old_str" / "search": "...", "newString" / "new_str" / "replace": "..."}
-    let trimmed = body.trim();
+    // Fallback 1: JSON {"oldString" / "old_str" / "search": "...", "newString" / "new_str" / "replace": "..."}
+    let trimmed = unescaped_body.trim();
     if trimmed.starts_with('{') && trimmed.ends_with('}') {
         if let Ok(j) = serde_json::from_str::<Value>(trimmed) {
             let old_s = j
@@ -1261,6 +1268,24 @@ fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
                 return replace_hunk_fuzzy(&out, o, r, 1);
             }
         }
+    }
+
+    // Fallback 2: When a model passes the complete replacement file content to `edit_file` without `<<<<<<<` markers
+    if !trimmed.is_empty() && !trimmed.contains("<<<<") && !trimmed.contains(">>>>") && (trimmed.lines().count() >= 2 || content.lines().count() <= 3) {
+        let mut full_new = trimmed
+            .trim_start_matches("```javascript")
+            .trim_start_matches("```typescript")
+            .trim_start_matches("```python")
+            .trim_start_matches("```rust")
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim()
+            .to_string();
+        if content.ends_with('\n') && !full_new.ends_with('\n') {
+            full_new.push('\n');
+        }
+        return Ok(full_new);
     }
 
     Err("edit_file: BODY needs a <<<<<<< SEARCH / ======= / >>>>>>> REPLACE block".to_string())

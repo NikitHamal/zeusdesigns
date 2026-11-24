@@ -147,9 +147,8 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
       const s = clean.indexOf(open, f);
       if (s < 0) break;
       const e = clean.indexOf(close, s + open.length);
-      if (e < 0) break;
-      const raw = clean.slice(s + open.length, e).trim().replace(/^```(?:json)?|```$/g, "").trim();
-      f = e + close.length;
+      const raw = (e >= 0 ? clean.slice(s + open.length, e) : clean.slice(s + open.length)).trim().replace(/^```(?:json)?|```$/g, "").trim();
+      f = e >= 0 ? e + close.length : clean.length;
       let j = null;
       try {
         j = JSON.parse(raw);
@@ -318,13 +317,17 @@ function executeToolInWorkspace(wsRoot, call) {
             count++;
           }
         }
+        if (!count && rest.trim() && !rest.includes("<<<<") && !rest.includes(">>>>") && rest.trim().split("\n").length >= 2) {
+          content = rest.trim().replace(/^```[a-z]*\n|\n```$/gi, "") + "\n";
+          count++;
+        }
       } catch (err) {
         return {
           ok: false,
           output: `edit_file: ${err.message} in ${relPath}.\n\nCurrent content of ${relPath}:\n${content.slice(0, 6000)}\nRetry edit_file with exact lines from above or use write_file.`,
         };
       }
-      if (!count) return { ok: false, output: "Missing SEARCH/REPLACE block" };
+      if (!count) return { ok: false, output: `Missing SEARCH/REPLACE block in ${relPath}.\n\nCurrent content of ${relPath}:\n${content.slice(0, 6000)}\nRetry edit_file with <<<<<<< SEARCH / ======= / >>>>>>> REPLACE or use write_file.` };
       fs.writeFileSync(fullPath, content, "utf8");
       return { ok: true, output: `Edited ${relPath}` };
     }
@@ -448,10 +451,11 @@ async function callMercury3(system, messages, wantsTools = true) {
     headers: { "User-Agent": CHROME_UA, Accept: "*/*", Origin: "https://chat.inceptionlabs.ai", Referer: "https://chat.inceptionlabs.ai/" },
   }, 8000);
   const { token } = JSON.parse(sessRaw);
+  const hasToolTurn = messages.some((m) => m.content.includes("<zeus_tool"));
   const specText = wantsTools ? `${SCRAPER_XML_DSL_BANNER}\n\n[System Specification]\n${system}` : `[System Specification]\n${system}`;
   const incMsgs = [
     { id: "sys1", role: "user", parts: [{ type: "text", text: specText }] },
-    { id: "sys2", role: "assistant", parts: [{ type: "text", text: wantsTools ? `<zeus_tool name="list_dir" path=""></zeus_tool>` : "Understood." }] },
+    { id: "sys2", role: "assistant", parts: [{ type: "text", text: wantsTools && !hasToolTurn ? `<zeus_tool name="list_dir" path=""></zeus_tool>` : "Understood. I am Zeus connected to the local workspace runtime. I will emit <zeus_tool> blocks with full content outside <think>." }] },
     ...messages.map((m, i) => ({ id: `m${i}`, role: m.role, parts: [{ type: "text", text: m.content }] })),
   ];
   const raw = await fetchTextWithTimeout("https://chat.inceptionlabs.ai/api/chat", {
@@ -533,9 +537,10 @@ function generateDeepAIIslandKey(ua) {
 
 async function callDeepAI(model, system, messages, wantsTools = true) {
   const specText = wantsTools ? `${SCRAPER_XML_DSL_BANNER}\n\n[System Specification]\n${system}` : `[System Specification]\n${system}`;
+  const hasToolTurn = messages.some((m) => m.content.includes("<zeus_tool"));
   const history = [
     { role: "user", content: specText },
-    { role: "assistant", content: wantsTools ? `<zeus_tool name="list_dir" path=""></zeus_tool>` : "Understood." },
+    { role: "assistant", content: wantsTools && !hasToolTurn ? `<zeus_tool name="list_dir" path=""></zeus_tool>` : "Understood. I am Zeus connected to the local workspace runtime. I will emit <zeus_tool> blocks with full content outside <think>." },
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
   const form = new FormData();
@@ -755,7 +760,9 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
     const calls = parseToolCalls(raw, seenKeys);
     for (const c of calls) seenKeys.add(`${c.name}|${c.path}|${c.body}`);
     if (!calls.length) {
-      if (mode === "code" && !nudged && trace.every((t) => t.tools.length === 0)) {
+      const hasMutating = trace.some((t) => t.tools.some((x) => ["write_file", "edit_file", "python", "memory_save", "memory_edit", "memory_delete"].includes(x.name)));
+      const dumpedCode = !hasMutating && /```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(raw);
+      if (mode === "code" && !nudged && (trace.every((t) => t.tools.length === 0) || dumpedCode)) {
         nudged = true;
         messages.push({
           role: "assistant",
@@ -763,7 +770,7 @@ async function runAgentTask(target, wsRoot, userPrompt, maxRounds = 6, mode = "c
         });
         messages.push({
           role: "user",
-          content: "Your previous reply did not contain a `<zeus_tool>` block, so no file or command ran in the workspace. Emit the `<zeus_tool name=\"...\">...</zeus_tool>` block now (`shell`, `python`, `read_file`, `edit_file`, or `write_file`).",
+          content: "Your previous reply did not contain a `<zeus_tool>` block to apply the change on disk. Emit the `<zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>`, `<zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>`, `<zeus_tool name=\"python\">...</zeus_tool>`, or `<zeus_tool name=\"shell\">...</zeus_tool>` block now.",
         });
         continue;
       }
