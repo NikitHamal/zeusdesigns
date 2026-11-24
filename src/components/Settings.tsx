@@ -5,6 +5,7 @@ import { PROVIDERS } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { SKILLS } from "../lib/skills";
 import {
+  buildHarnessNamespace,
   BUILTIN_HARNESS_SKILLS,
   BUILTIN_SUBAGENTS,
   getActiveHarnessSummary,
@@ -12,6 +13,13 @@ import {
   materializeHarnessTree,
   ZEUS_SURFACE,
 } from "../lib/harness2";
+import {
+  HYPERFRAMES_VISUAL_STYLES,
+  OPEN_DESIGN_BRANDS,
+  OPEN_DESIGN_SKILLS_CATALOG,
+  STARTER_HYPERFRAMES_VIDEO_HTML,
+  STARTER_OPEN_SLIDE_DECK_HTML,
+} from "../lib/openDesign";
 import { ACCENTS } from "../lib/theme";
 import { renderScreen } from "../lib/templates";
 import { DEVICE_SIZE } from "../types";
@@ -146,12 +154,18 @@ function LibraryTab() {
   const { settings, ui } = useStore();
   const patch = useStore((s) => s.patchSettings);
   const notify = useStore((s) => s.notify);
-  const [sub, setSub] = useState<"harness" | "skills">("harness");
+  const [sub, setSub] = useState<"harness" | "skills" | "opendesign">("harness");
   const [q, setQ] = useState("");
   const [writingTree, setWritingTree] = useState(false);
   const skills = useMemo(() => SKILLS.filter((s) => (s.name + s.desc + s.category).toLowerCase().includes(q.toLowerCase())), [q]);
   const summary = getActiveHarnessSummary(settings.providerId, settings.modelId);
   const lessons = getProjectHarnessLessons(ui.workspace?.root);
+  const nsLabel = buildHarnessNamespace({
+    benchmark: "zeus",
+    substrate: summary.family,
+    mode: "sequential",
+    k: 1,
+  });
   void DESIGN_SYSTEMS; void getDS; void renderScreen; void DEVICE_SIZE; void canvasApi; void Thumb;
 
   const handleMaterialize = async () => {
@@ -181,6 +195,7 @@ function LibraryTab() {
           options={[
             { id: "harness", label: "Harness² Surface (c1..c8)", icon: <Icon name="bolt" size={14} /> },
             { id: "skills", label: `Skills · ${BUILTIN_HARNESS_SKILLS.length + SKILLS.length}`, icon: <Icon name="menu_book" size={14} /> },
+            { id: "opendesign", label: `OpenDesign & HyperFrames · ${OPEN_DESIGN_BRANDS.length}`, icon: <Icon name="movie" size={14} /> },
           ]}
         />
         {sub === "skills" && (
@@ -202,7 +217,7 @@ function LibraryTab() {
                 </span>
               </div>
               <div className="text-xs text-on-surface-variant">
-                Protocol: <span className="font-mono text-on-surface">{summary.protocol}</span> · Max rounds: <span className="font-mono text-on-surface">{summary.maxToolRounds}</span> · Always-on cap: <span className="font-mono text-on-surface">{summary.alwaysOnMax.toLocaleString()} chars</span>
+                Namespace: <span className="font-mono text-on-surface">{nsLabel}</span> · Protocol: <span className="font-mono text-on-surface">{summary.protocol}</span> · Max rounds: <span className="font-mono text-on-surface">{summary.maxToolRounds}</span> · Budget: <span className="font-mono text-on-surface">R=4k / P=3k ({summary.alwaysOnMax.toLocaleString()} chars)</span>
               </div>
             </div>
             <button
@@ -252,6 +267,67 @@ function LibraryTab() {
               </ul>
             </div>
           )}
+        </div>
+      ) : sub === "opendesign" ? (
+        <div className="space-y-4">
+          <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                HyperFrames Visual Style Presets ({HYPERFRAMES_VISUAL_STYLES.length})
+              </span>
+              <span className="font-mono text-[11px] text-on-surface-variant">visual-styles.md</span>
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {HYPERFRAMES_VISUAL_STYLES.map((vs) => (
+                <div key={vs.id} className="flex flex-col justify-between rounded-xl border border-outline-variant/50 bg-surface-high p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display text-xs font-bold text-on-surface">{vs.name}</span>
+                    <span className="font-mono text-[10px] text-primary">{vs.gsapEase}</span>
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10.5px] text-on-surface-variant">
+                    {vs.tradition} · {vs.mood}
+                  </div>
+                  <p className="mt-1.5 text-[11.5px] text-on-surface-variant">{vs.promptRule}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                OpenDesign HyperFrames &amp; Slide Templates ({OPEN_DESIGN_SKILLS_CATALOG.length})
+              </span>
+              <span className="font-mono text-[11px] text-on-surface-variant">Click to open in Workbench</span>
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {OPEN_DESIGN_SKILLS_CATALOG.map((sk) => (
+                <button
+                  key={sk.id}
+                  onClick={() => {
+                    const st = useStore.getState();
+                    const created = st.addArtboard({
+                      name: sk.name,
+                      device: "web",
+                      html:
+                        sk.starterHtml ??
+                        (sk.mode === "deck" ? STARTER_OPEN_SLIDE_DECK_HTML : STARTER_HYPERFRAMES_VIDEO_HTML),
+                    });
+                    st.setSel([created.id]);
+                    st.patchUI({ settingsOpen: false, showCanvas: true });
+                    notify(`Opened ${sk.name} in Artifact Workbench`);
+                  }}
+                  className="state flex flex-col justify-between rounded-xl border border-outline-variant/50 bg-surface-high p-3 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display text-xs font-bold text-on-surface">{sk.name}</span>
+                    <span className="font-mono text-[10px] uppercase text-primary">{sk.category} · {sk.aspect}</span>
+                  </div>
+                  <p className="mt-1 text-[11.5px] text-on-surface-variant">{sk.summary}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
