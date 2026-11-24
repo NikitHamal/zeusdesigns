@@ -10,7 +10,8 @@ Open-source, ultra-light **native Windows** AI coding & software engineering wor
 | **Tools** | 8 Quick Primitives + 38+ draggable UI blocks + 6 Full Layouts, on-canvas element toolbar (`↑`, `↓`, `⧉`, `⊞`, `✕`) + 8-point resize handles, select, pan, text, frame, sticky notes, pen, shapes, pin-comments, **Ask Zeus** (`Ctrl+K`) |
 | **AI** | 40 free keyless providers: OpenCode Zen, Mercury 3, FreeLLM Hub, AI Bridge Gateway, HF Router Hub, LiteLLM Frontier Hub, Gemini Web Gateway, Kilo Gateway, NVIDIA NIM Cloud, Colibri Qwen 3.6, Gemma 4 Vision Studio, Phi-4 Cloud, Llama.cpp LFM Cloud, Ollama Cloud, Gemma 4 Flagship Cluster, Frontier Lab, Liquid AI LFM, Bonsai Ternary, Unsloth Cloud, KoboldAI Cloud, BlockRun, OVHcloud AI, FreeClaude & Gemini 4, VLM Run, Together Frontier, HF Cluster, AI Horde, APIsFreeLLM, Qwen, Ptero Frontier, Unikey, LLM7, Pollinations, YQCloud, DeepAI, K2Horizon, Motif, LongCat, Gemini Web, ChatJimmy + Local OpenAI/OpenCode Server (`127.0.0.1:11435`) |
 | **Workspace** | Open any local folder; the agent reads, designs, edits and syncs live screens into real files. Persistent Memory, shell tool, MCP client |
-| **Library** | Design systems: Material 3 Expressive, Material 3, Apple HIG, Fluent 2, shadcn/ui, IBM Carbon, Ant Design, Polaris, Atlassian, Neo-brutalism, Glassmorphism, Editorial, Claude Warm · 17 frontend skills |
+| **Library** | 16 `DESIGN.md` Brand Systems, 8 HyperFrames Visual Styles (`visual-styles.md`), 15 OpenDesign Video/Slide/Motion Skills, and Zeus Harness² (`c1..c8`) |
+| **Branches** | `main`: **Zeus Codes** (`v0.1.<run>`) · `open-design`: **Zeus OpenDesign Experimental Studio & HyperFrames Video** (`v0.2.<run>-opendesign`) |
 
 ## What is inside
 
