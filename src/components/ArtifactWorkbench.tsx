@@ -26,14 +26,14 @@ const VIEWPORT_WIDTHS: Record<ViewportSize, string> = {
 
 export function ArtifactWorkbench() {
   const boards = useStore((s) => s.artboards);
-  const selectedIds = useStore((s) => s.selectedIds);
+  const selectedIds = useStore((s) => s.sel);
   const conv = useStore(activeConv);
   const workspace = useStore((s) => s.ui.workspace);
   const patchUI = useStore((s) => s.patchUI);
   const addArtboard = useStore((s) => s.addArtboard);
   const updateArtboard = useStore((s) => s.updateArtboard);
-  const deleteArtboard = useStore((s) => s.deleteArtboard);
-  const select = useStore((s) => s.select);
+  const removeArtboards = useStore((s) => s.removeArtboards);
+  const select = useStore((s) => s.setSel);
   const notify = useStore((s) => s.notify);
 
   const [mode, setMode] = useState<ViewMode>("preview");
@@ -140,12 +140,14 @@ export function ArtifactWorkbench() {
         .replace(/^-|-$/g, "") || "artifact";
     const fileName = `${slug}.html`;
     if (workspace) {
-      const ok = await writeWorkspaceFile(workspace, fileName, html);
-      if (ok) {
-        const tree = await refreshTree();
-        if (tree) patchUI({ workspace: { ...workspace, tree } });
+      try {
+        await writeWorkspaceFile(workspace, fileName, html);
+        const refreshed = await refreshTree(workspace);
+        if (refreshed) patchUI({ workspace: { ...workspace, tree: refreshed } });
         notify(`Saved ${fileName} to ${workspace.name}`);
         return;
+      } catch {
+        /* fallback to browser download */
       }
     }
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -174,12 +176,12 @@ export function ArtifactWorkbench() {
   };
 
   const loadStarter = (kind: "hyperframes" | "deck") => {
-    const id = addArtboard({
+    const created = addArtboard({
       name: kind === "hyperframes" ? "HyperFrames Launch Video" : "Open-Slide 1920 Deck",
       device: "web",
       html: kind === "hyperframes" ? STARTER_HYPERFRAMES_VIDEO_HTML : STARTER_OPEN_SLIDE_DECK_HTML,
     });
-    select([id]);
+    select([created.id]);
     patchUI({ showCanvas: true });
   };
 
@@ -347,7 +349,7 @@ export function ArtifactWorkbench() {
             {workspace ? "Save HTML" : "Export HTML"}
           </button>
 
-          <IconBtn label="Delete artifact" size={28} onClick={() => deleteArtboard(active.id)}>
+          <IconBtn label="Delete artifact" size={28} onClick={() => removeArtboards([active.id])}>
             <Icon name="delete" size={15} />
           </IconBtn>
 
