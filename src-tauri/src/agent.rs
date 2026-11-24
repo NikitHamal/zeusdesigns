@@ -87,7 +87,13 @@ pub fn chat_cancel(
 /// so tool tags mentioned inside a model's internal reasoning trace are never executed as real tools.
 pub fn strip_thinking_blocks(raw: &str) -> String {
     let mut out = raw.to_string();
-    for (open_tag, close_tag) in [("<think>", "</think>"), ("<thinking>", "</thinking>")] {
+    for (open_tag, close_tag) in [
+        ("<think>", "</think>"),
+        ("<thinking>", "</thinking>"),
+        ("<thought>", "</thought>"),
+        ("<reasoning>", "</reasoning>"),
+        ("<|begin_of_thought|>", "<|end_of_thought|>"),
+    ] {
         loop {
             let lower = out.to_ascii_lowercase();
             let Some(start) = lower.find(open_tag) else { break };
@@ -99,6 +105,14 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
                 out.truncate(start);
                 break;
             }
+        }
+    }
+    // Also strip orphan prefix reasoning when an upstream template pre-opened <think> on the server
+    for close_tag in ["</think>", "</thinking>", "</thought>", "</reasoning>", "<|end_of_thought|>"] {
+        let lower = out.to_ascii_lowercase();
+        if let Some(end_idx) = lower.find(close_tag) {
+            let drain_to = end_idx + close_tag.len();
+            out.replace_range(0..drain_to, "");
         }
     }
     out
@@ -611,13 +625,20 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
-    // 4. Also support direct shorthand XML tags (`<bash>...</bash>`, `<python>...</python>`, `<memory_search>...</memory_search>`, etc.)
-    // when a model emits `<bash>` instead of `<zeus_tool name="bash">`
+    // 4. Also support direct shorthand XML tags (`<bash>...</bash>`, `<python>...</python>`, `<edit_file path="...">...</edit_file>`, etc.)
+    // when a model emits `<edit_file>` or `<bash>` instead of `<zeus_tool name="...">`
     if list.is_empty() {
         for tag_name in [
             "bash",
             "shell",
             "python",
+            "read_file",
+            "write_file",
+            "edit_file",
+            "delete_file",
+            "search_code",
+            "list_dir",
+            "web_fetch",
             "memory_search",
             "memory_save",
             "memory_edit",
@@ -643,22 +664,34 @@ pub fn parse_inline_invocations_segment(
                     ("", start + gt + 1)
                 } else if let Some(end_rel) = rest.find(&close_pat) {
                     (rest[gt + 1..end_rel].trim(), start + end_rel + close_pat.len())
+                } else if allow_unclosed_tail && rest.len() > gt + 2 {
+                    (rest[gt + 1..].trim(), clean_text.len())
                 } else {
                     break;
                 };
                 from = next_pos;
-                let path_arg = extract_attr(header, "path")
+                let mut path_arg = extract_attr(header, "path")
+                    .or_else(|| extract_attr(header, "file"))
                     .or_else(|| extract_attr(header, "id"))
                     .or_else(|| extract_attr(header, "category"))
+                    .or_else(|| extract_attr(header, "url"))
                     .unwrap_or_default();
+                if path_arg.is_empty()
+                    && matches!(tag_name, "read_file" | "list_dir" | "delete_file")
+                    && !body.contains('\n')
+                {
+                    path_arg = body.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
+                }
+                let start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
+                let end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
                 if is_template_placeholder(tag_name, &path_arg, body) {
                     continue;
                 }
                 list.push(InlineToolInvocation {
                     name: tag_name.to_string(),
                     path: path_arg,
-                    start_line: None,
-                    end_line: None,
+                    start_line,
+                    end_line,
                     body: body.to_string(),
                     offset: start,
                 });
@@ -1562,12 +1595,22 @@ pub fn chat_stream(
                 || stripped.contains("</bash>")
                 || stripped.contains("</shell>")
                 || stripped.contains("</python>")
+                || stripped.contains("</read_file>")
+                || stripped.contains("</write_file>")
+                || stripped.contains("</edit_file>")
+                || stripped.contains("</delete_file>")
+                || stripped.contains("</search_code>")
+                || stripped.contains("</list_dir>")
+                || stripped.contains("</web_fetch>")
                 || stripped.contains("</memory_search>")
                 || stripped.contains("</memory_save>")
                 || stripped.contains("</memory_edit>")
                 || stripped.contains("</memory_delete>")
                 || stripped.contains("</ifm|tool_call>")
                 || (stripped.contains("<zeus_tool") && stripped.contains("/>"))
+                || (stripped.contains("<read_file") && stripped.contains("/>"))
+                || (stripped.contains("<list_dir") && stripped.contains("/>"))
+                || (stripped.contains("<delete_file") && stripped.contains("/>"))
             {
                 let root = enriched_req.workspace_root.as_deref().unwrap_or("");
                 execute_inline_workspace_tools(
@@ -1594,6 +1637,13 @@ pub fn chat_stream(
                 || accumulated.contains("<bash")
                 || accumulated.contains("<shell")
                 || accumulated.contains("<python")
+                || accumulated.contains("<read_file")
+                || accumulated.contains("<write_file")
+                || accumulated.contains("<edit_file")
+                || accumulated.contains("<delete_file")
+                || accumulated.contains("<search_code")
+                || accumulated.contains("<list_dir")
+                || accumulated.contains("<web_fetch")
                 || accumulated.contains("<memory_"))
         {
             let root = enriched_req.workspace_root.as_deref().unwrap_or("");

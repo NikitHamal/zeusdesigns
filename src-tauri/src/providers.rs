@@ -6826,14 +6826,9 @@ where
             continue;
         }
         if !saw_text && !fallback_reason.trim().is_empty() && !is_upstream_error_text(&fallback_reason) {
-            let reason_has_tool = fallback_reason.contains("<zeus_tool")
-                || fallback_reason.contains("<tool_call>")
-                || fallback_reason.contains("<function")
-                || fallback_reason.contains("<artboard");
-            if reason_has_tool || !wants_agent_tools {
-                on_delta(fallback_reason.trim());
-                saw_text = true;
-            }
+            // Never re-emit `fallback_reason` outside `<think>` because it was already streamed inside `<think>...</think>`.
+            // Only mark `saw_text = true` so `agent.rs` can inspect `<think>` via end-of-stream tool fallback if a tool call was placed inside reasoning.
+            saw_text = true;
         }
         if saw_text {
             return Ok(());
