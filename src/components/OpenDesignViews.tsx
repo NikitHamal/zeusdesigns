@@ -3,6 +3,8 @@ import { useStore } from "../store";
 import {
   detectDeliverableKind,
   getOpenDesignBrand,
+  HYPERFRAMES_PALETTES,
+  HYPERFRAMES_PROMPT_TEMPLATES,
   OPEN_DESIGN_BRANDS,
   OPEN_DESIGN_MODES,
   OPEN_DESIGN_SKILLS_CATALOG,
@@ -413,7 +415,52 @@ export function OpenDesignSkillsView() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-4 overflow-y-auto p-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="rounded-2xl border border-outline-variant/60 bg-surface-low p-4">
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="font-display text-xs font-bold uppercase tracking-wider text-primary">
+              HyperFrames Official Palettes ({HYPERFRAMES_PALETTES.length}) &amp; Video Prompt Templates ({HYPERFRAMES_PROMPT_TEMPLATES.length})
+            </span>
+            <span className="font-mono text-[11px] text-on-surface-variant">design-templates/hyperframes &amp; prompt-templates/video</span>
+          </div>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {HYPERFRAMES_PALETTES.map((pal) => (
+              <span key={pal.id} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/50 bg-surface px-2.5 py-1 font-mono text-[11px] text-on-surface">
+                <span style={{ background: pal.bg, borderColor: pal.ink }} className="size-3 rounded-sm border" />
+                <span style={{ background: pal.accent }} className="size-3 rounded-sm" />
+                <span>{pal.name}</span>
+              </span>
+            ))}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {HYPERFRAMES_PROMPT_TEMPLATES.map((pt) => (
+              <button
+                key={pt.id}
+                onClick={() => {
+                  patchSettings({ openDesignMode: "hyperframes", openDesignAspect: pt.aspect });
+                  patchUI({ odTab: "studio", leftTab: "chat" });
+                  sendMessage({ text: pt.prompt });
+                }}
+                className="state flex flex-col justify-between rounded-xl border border-outline-variant/60 bg-surface p-3.5 text-left"
+              >
+                <div>
+                  <div className="flex items-center justify-between font-mono text-[10px] text-primary">
+                    <span>{pt.category.toUpperCase()}</span>
+                    <span>{pt.aspect} · {pt.durationSec}s</span>
+                  </div>
+                  <div className="mt-1.5 font-display text-xs font-bold text-on-surface">{pt.title}</div>
+                  <p className="mt-1 text-[11.5px] text-on-surface-variant">{pt.summary}</p>
+                </div>
+                <div className="mt-3 inline-flex items-center gap-1 font-mono text-[10.5px] font-semibold text-primary">
+                  <Icon name="movie" size={13} />
+                  <span>Generate HyperFrames Video</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid auto-rows-max grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {list.map((sk) => {
           const brand = getOpenDesignBrand(sk.brandId);
           return (
@@ -457,6 +504,7 @@ export function OpenDesignSkillsView() {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

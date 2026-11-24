@@ -379,7 +379,7 @@ export function Sidebar() {
           label="Brand & DESIGN.md"
           active={ui.odTab === "design-systems"}
           onClick={() => patchUI({ odTab: "design-systems" })}
-          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant">12</span>}
+          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant">16</span>}
         />
         <NavItem
           icon="movie"
