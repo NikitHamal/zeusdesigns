@@ -20,6 +20,7 @@ import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
 import { Collapse, LiveStatus, WorkLog } from "./Activity";
+import { OpenDesignCreationBar } from "./OpenDesignViews";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
 /* ------------------------------------------------------------------ */
@@ -1280,6 +1281,9 @@ export function ChatPane() {
               </div>
             )}
             <div className="mx-auto w-full max-w-[840px]">
+              <div className="px-4 pb-1.5">
+                <OpenDesignCreationBar compact />
+              </div>
               <Composer />
             </div>
           </div>

@@ -4,13 +4,15 @@ import { Icon } from "./Icon";
 import { Dropdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { focusArtboard } from "../lib/actions";
 import { openWorkspace, openWorkspaceByPath } from "../lib/bridge";
+import { OpenDesignCreationBar } from "./OpenDesignViews";
+import { STARTER_HYPERFRAMES_VIDEO_HTML, STARTER_OPEN_SLIDE_DECK_HTML } from "../lib/openDesign";
 
 const STARTERS = [
-  { i: "terminal", t: "Build a feature", p: "Build a feature in this project: " },
-  { i: "bug_report", t: "Fix a bug & test", p: "Find and fix this bug, then run tests to verify: " },
-  { i: "manage_search", t: "Map codebase", p: "Map the architecture of this project and explain how it works." },
-  { i: "code", t: "Refactor module", p: "Refactor and optimize this module while keeping all tests passing: " },
-  { i: "description", t: "Generate AGENTS.md", p: "Inspect this project and write a comprehensive AGENTS.md file." },
+  { i: "movie", t: "HyperFrames Video (Code-to-Video)", p: "Create a 5-scene HyperFrames 16:9 product launch video with <section class=\"frame\" data-duration=\"3000\" data-scene=\"...\"> scenes, telemetry metrics, and <!-- HYPERFRAMES_META: ... --> metadata for: " },
+  { i: "slideshow", t: "Open-Slide 1920×1080 Deck", p: "Create a 6-slide Open-Slide 1920x1080 presentation deck (<section class=\"slide\" data-slide-id=\"1\" data-title=\"...\" data-notes=\"...\">) with a single focal point per slide for: " },
+  { i: "web", t: "Interactive Prototype", p: "Build an interactive product prototype with working navigation, data views, and zero box-shadows for: " },
+  { i: "palette", t: "Brand & DESIGN.md Specimen", p: "Create an interactive Brand Identity & DESIGN.md Specimen sheet with color swatches, typography scale, and UI components for: " },
+  { i: "terminal", t: "Code & Fix Bug", p: "Find and fix this bug in the project workspace, then run tests to verify: " },
 ];
 
 function greeting() {
@@ -120,8 +122,46 @@ export function Home() {
           </button>
         </div>
 
+        <div className="mb-3 flex justify-center">
+          <OpenDesignCreationBar />
+        </div>
+
         <div className="-mx-3"><Composer hero /></div>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              const st = useStore.getState();
+              const created = st.addArtboard({
+                name: "HyperFrames Launch Video",
+                device: "web",
+                html: STARTER_HYPERFRAMES_VIDEO_HTML,
+              });
+              st.setSel([created.id]);
+              st.patchUI({ showCanvas: true, odTab: "studio" });
+            }}
+            className="state flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-semibold text-on-primary"
+          >
+            <Icon name="movie" size={17} />
+            Try HyperFrames Code-to-Video Studio
+          </button>
+          <button
+            onClick={() => {
+              const st = useStore.getState();
+              const created = st.addArtboard({
+                name: "Open-Slide 1920 Architecture Deck",
+                device: "web",
+                html: STARTER_OPEN_SLIDE_DECK_HTML,
+              });
+              st.setSel([created.id]);
+              st.patchUI({ showCanvas: true, odTab: "studio" });
+            }}
+            className="state flex h-9 items-center gap-2 rounded-lg border border-outline-variant/70 bg-surface-container px-3.5 text-xs font-semibold text-on-surface"
+          >
+            <Icon name="slideshow" size={17} />
+            Try Open-Slide 1920×1080 Deck Studio
+          </button>
+        </div>
+        <div className="mt-2.5 flex flex-wrap justify-center gap-2">
           {STARTERS.map((s) => (
             <button key={s.t} onClick={() => window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: s.p }))} className="state flex h-9 items-center gap-2 rounded-lg bg-surface-container px-3 text-sm font-medium text-on-surface">
               <Icon name={s.i} size={18} />{s.t}

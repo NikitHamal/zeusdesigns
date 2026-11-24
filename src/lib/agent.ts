@@ -5,6 +5,7 @@ import { memoryBlock } from "./memory";
 import { getProviderSpecialization } from "./context";
 import { getCodingHarnessProfile } from "./codingHarness";
 import { composeHarness2Surface } from "./harness2";
+import { buildOpenDesignDeliverablePrompt, type OpenDesignCreationMode } from "./openDesign";
 import { M3E_GUIDE, M3E_TRIGGER } from "./m3e";
 
 export type Intent = "chat" | "code" | "design";
@@ -57,8 +58,27 @@ export function agentPrompt(mode: Intent, userText = ""): string {
       ? composeHarness2Surface({ profile, workspace: ws, userPrompt: userText })
       : `## Tools
 Use tools when the task needs workspace files, shell/python execution, web pages, or user memory (\`memory_search\`, \`memory_save\`, \`memory_edit\`, \`memory_delete\`). User memory is never preloaded into the prompt—always emit \`<zeus_tool name="memory_search">...</zeus_tool>\` when asked what you remember or know about the user's preferences/projects, and emit \`memory_save\`, \`memory_edit\`, or \`memory_delete\` when asked to record, update, or forget durable facts.`,
-    `## Artifacts
-When the user asks for a standalone visual deliverable (a page, a small game, a widget, a diagram, a prototype), emit it as one complete self-contained HTML document in <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard>. It opens next to the chat as a live preview. Inline CSS and JS only, no CDNs. Everything else (code, explanations, answers) stays in the chat or on disk in the user's project.`,
+    `## Artifacts & OpenDesign Deliverables
+When the user asks for a visual deliverable (an interactive prototype, a HyperFrames code-to-video composition, an Open-Slide 1920x1080 deck, a kinetic motion poster, or a Brand/DESIGN.md specimen), emit it as one complete self-contained HTML document inside <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard>. It opens next to the chat in the Zeus OpenDesign Studio with live preview, HyperFrames timeline scrubber, WebM/MP4 video export, and slide deck presenter.`,
+    (() => {
+      const low = userText.toLowerCase();
+      let odMode: OpenDesignCreationMode | null = null;
+      if (/\b(hyperframes?|video|reel|sizzle|mp4|webm|scene|scenes|frame animation|code[- ]to[- ]video)\b/.test(low)) {
+        odMode = "hyperframes";
+      } else if (/\b(slide|slides|deck|presentation|pitch deck|open-slide|1920)\b/.test(low)) {
+        odMode = "deck";
+      } else if (/\b(design\.md|brand kit|brand specimen|style guide|design system)\b/.test(low)) {
+        odMode = "brand-kit";
+      } else if (DESIGN_ASK.test(userText)) {
+        odMode = s.settings.openDesignMode && s.settings.openDesignMode !== "code" ? s.settings.openDesignMode : "prototype";
+      }
+      if (!odMode) return "";
+      return buildOpenDesignDeliverablePrompt({
+        mode: odMode,
+        brandId: s.settings.openDesignBrandId ?? "m3-expressive",
+        aspect: s.settings.openDesignAspect ?? "16:9",
+      });
+    })(),
     spec.isKeylessScraper
       ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. Never claim you lack file, terminal, or python access.`
       : "",

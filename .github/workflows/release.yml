@@ -2,7 +2,7 @@ name: Windows Build & Release
 
 on:
   push:
-    branches: [main]
+    branches: [open-design]
     paths-ignore:
       - "**/*.md"
   workflow_dispatch:
@@ -17,10 +17,10 @@ concurrency:
 
 jobs:
   windows:
-    name: Build Windows exe + installer
+    name: Build Windows exe + installer (Zeus OpenDesign Experiment)
     runs-on: windows-latest
     env:
-      TAG: v0.1.${{ github.run_number }}
+      TAG: v0.2.${{ github.run_number }}-opendesign
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +37,7 @@ jobs:
           key: icon-${{ hashFiles('public/app-icon.png') }}
 
       - name: Stamp release version
-        run: node scripts/stamp-version.mjs 0.1.${{ github.run_number }}
+        run: node scripts/stamp-version.mjs 0.2.${{ github.run_number }}
 
       - name: Install JS dependencies
         run: npm ci
@@ -55,14 +55,14 @@ jobs:
         with:
           tauriScript: npx tauri
           tagName: ${{ env.TAG }}
-          releaseName: "Zeus Codes ${{ env.TAG }}"
+          releaseName: "Zeus OpenDesign (Experiment) ${{ env.TAG }}"
           releaseBody: |
-            Automated Windows build of **Zeus Codes** (native Rust + C++20 + WebView2, Zeus Harness² & OpenCode runtime).
+            Experimental Windows build of **Zeus OpenDesign** (`open-design` branch — Collaborative AI Design + HyperFrames Code-to-Video + Open-Slide 1920×1080 Deck + DESIGN.md Studio powered by 40 Free Keyless AI Providers & Zeus Harness²).
 
             - `ZeusDesigns_*_x64-setup.exe` — installer
             - `ZeusDesigns-portable.exe` — standalone executable (needs WebView2, preinstalled on Windows 10/11)
           releaseDraft: false
-          prerelease: false
+          prerelease: true
 
       - name: Attach portable standalone exe
         shell: pwsh

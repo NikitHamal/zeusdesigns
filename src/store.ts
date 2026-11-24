@@ -17,6 +17,8 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 
 export const DEFAULT_PROJECT_ID = "proj-default";
 
+import type { OpenDesignCreationMode, VideoAspectRatio } from "./lib/openDesign";
+
 export interface Settings {
   theme: "light" | "dark" | "system";
   hue: number;
@@ -24,6 +26,9 @@ export interface Settings {
   modelId: string;
   effort: Effort;
   designSystemId: string;
+  openDesignMode?: OpenDesignCreationMode;
+  openDesignBrandId?: string;
+  openDesignAspect?: VideoAspectRatio;
   skills: string[];
   customProviders: CustomProvider[];
   mcp: McpServer[];
@@ -42,6 +47,7 @@ interface UI {
   settingsOpen: boolean;
   settingsTab: string;
   leftTab: "chat" | "files" | "terminal";
+  odTab?: "studio" | "design-systems" | "skills" | "deliverables";
   compare: string[] | null;
   interactId: string | null;
   editId: string | null;

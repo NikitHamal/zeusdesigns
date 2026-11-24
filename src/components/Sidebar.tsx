@@ -359,7 +359,7 @@ export function Sidebar() {
       <div className="flex h-14 shrink-0 items-center justify-between gap-1 px-3">
         <div className="flex items-center gap-1">
           <IconBtn label="Hide sidebar" size={34} onClick={() => patchUI({ sidebarOpen: false })}><Icon name="left_panel_close" size={20} /></IconBtn>
-          <span className="px-1 font-display text-[19px] font-semibold tracking-tight text-on-surface">Zeus Codes</span>
+          <span className="px-1 font-display text-[18px] font-semibold tracking-tight text-on-surface">Zeus OpenDesign</span>
         </div>
         <div className="flex items-center gap-0.5">
           <IconBtn label="Search chats" size={32} onClick={() => setSearch(true)}><Icon name="search" size={18} /></IconBtn>
@@ -367,7 +367,36 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-3.5 pb-1.5 pt-1">
+      <div className="flex flex-col gap-0.5 border-b border-outline-variant/60 px-2 pb-2">
+        <NavItem
+          icon="auto_awesome"
+          label="Studio & Agent"
+          active={(ui.odTab ?? "studio") === "studio"}
+          onClick={() => patchUI({ odTab: "studio" })}
+        />
+        <NavItem
+          icon="palette"
+          label="Brand & DESIGN.md"
+          active={ui.odTab === "design-systems"}
+          onClick={() => patchUI({ odTab: "design-systems" })}
+          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant">12</span>}
+        />
+        <NavItem
+          icon="movie"
+          label="HyperFrames & Skills"
+          active={ui.odTab === "skills"}
+          onClick={() => patchUI({ odTab: "skills" })}
+          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-primary">VIDEO</span>}
+        />
+        <NavItem
+          icon="grid_view"
+          label="All Deliverables"
+          active={ui.odTab === "deliverables"}
+          onClick={() => patchUI({ odTab: "deliverables" })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between px-3.5 pb-1.5 pt-2">
         <span className="text-[11.5px] font-semibold uppercase tracking-wider text-on-surface-variant">Projects</span>
         <button
           onClick={() => pickProjectFolder()}
