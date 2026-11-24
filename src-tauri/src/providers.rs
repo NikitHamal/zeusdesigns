@@ -5103,14 +5103,26 @@ where
     F: FnMut(&str),
 {
     let eff_model = if model.is_empty() { "free-ai" } else { model };
+    let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(18000).collect();
+        let sys_raw: String = system.chars().take(18000).collect();
+        let sys_safe = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+        } else {
+            sys_raw
+        };
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
-    for m in messages {
+    let last_idx = messages.len().saturating_sub(1);
+    for (idx, m) in messages.iter().enumerate() {
         if !m.content.trim().is_empty() {
-            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
+                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
+            } else {
+                m.content.clone()
+            };
+            oai_msgs.push(json!({ "role": m.role, "content": content }));
         }
     }
 
@@ -5136,6 +5148,7 @@ where
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
     let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -5148,16 +5161,22 @@ where
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
-                    if let Some(text) = delta.and_then(|d| d.get("content")).and_then(|t| t.as_str()) {
-                        if !text.is_empty() {
-                            saw_text = true;
-                            on_delta(text);
+                    if let Some(d) = delta {
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                saw_text = true;
+                                on_delta(text);
+                            }
                         }
                     }
                 }
             }
         }
         line.clear();
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
     }
     if saw_text {
         Ok(())
@@ -5513,6 +5532,7 @@ where
     let mut line = String::new();
     let mut in_think = false;
     let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -5539,6 +5559,7 @@ where
                             }
                             on_delta(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -5557,6 +5578,9 @@ where
     }
     if in_think {
         on_delta("</think>");
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
     }
     if saw_text {
         Ok(())
@@ -5581,9 +5605,15 @@ where
         _ => "glm-5.3",
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(24000).collect();
+        let sys_raw: String = system.chars().take(24000).collect();
+        let sys_safe = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+        } else {
+            sys_raw
+        };
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in messages {
@@ -5592,12 +5622,15 @@ where
         }
     }
 
-    let payload = json!({
+    let mut payload = json!({
         "model": eff_model,
         "stream": true,
         "max_tokens": 16384,
         "messages": oai_msgs
     });
+    if wants_tools {
+        payload["tools"] = build_native_oai_agent_tools();
+    }
 
     let fallback = |em: &str, sys: &str, msgs: &[ChatMessage], c: &AtomicBool, od: &mut F| -> Result<(), String> {
         match em {
@@ -5629,6 +5662,7 @@ where
     let mut in_think = false;
     let mut saw_text = false;
     let mut fallback_reason = String::new();
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -5656,6 +5690,7 @@ where
                             on_delta(r_text);
                             fallback_reason.push_str(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if text.contains("[proxy error:") {
                                 return fallback(eff_model, system, messages, cancel, on_delta);
@@ -5677,6 +5712,9 @@ where
     }
     if in_think {
         on_delta("</think>");
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
     }
     if !saw_text && !fallback_reason.trim().is_empty() {
         on_delta(fallback_reason.trim());
@@ -7130,8 +7168,17 @@ where
             lines.push(format!("{}: {}", lbl, m.content));
         }
     }
-    let prompt = lines.join("\n\n");
-    let sys_safe: String = system.chars().take(18000).collect();
+    let wants_tools = is_agent_tool_request(system);
+    let mut prompt = lines.join("\n\n");
+    if wants_tools && !prompt.contains("<tool_result") && !prompt.contains("[XML DSL") {
+        prompt.push_str("\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)");
+    }
+    let sys_raw: String = system.chars().take(18000).collect();
+    let sys_safe = if wants_tools {
+        format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+    } else {
+        sys_raw
+    };
 
     let payload = json!({
         "prompt": prompt,
