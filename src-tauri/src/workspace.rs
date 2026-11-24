@@ -636,6 +636,45 @@ pub fn sanitize_shell_command(raw: &str) -> String {
         s.truncate(new_len);
         s = s.trim().to_string();
     }
+    for open_tag in ["```bash", "```sh", "```shell", "```cmd", "```", "<command>", "<code>", "<bash>", "<shell>"] {
+        if let Some(rest) = s.strip_prefix(open_tag) {
+            s = rest.trim().to_string();
+        }
+    }
+    loop {
+        let mut changed = false;
+        for close_tag in ["```", "</command>", "</code>", "</bash>", "</shell>", "</zeus_tool>", "</tool_call>", "</command", "</code", "</bash", "</shell", "</zeus_tool", "<|close|>argument", "<|close|>call"] {
+            if let Some(rest) = s.strip_suffix(close_tag) {
+                s = rest.trim().to_string();
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    s
+}
+
+pub fn clean_python_script(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    for open_tag in ["```python3", "```python", "```py", "```", "<command>", "<code>", "<script>", "<python>", "<py>"] {
+        if let Some(rest) = s.strip_prefix(open_tag) {
+            s = rest.trim().to_string();
+        }
+    }
+    loop {
+        let mut changed = false;
+        for close_tag in ["```", "</command>", "</code>", "</script>", "</python>", "</py>", "</bash>", "</shell>", "</zeus_tool>", "</tool_call>", "<|close|>argument", "<|close|>call"] {
+            if let Some(rest) = s.strip_suffix(close_tag) {
+                s = rest.trim().to_string();
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
     s
 }
 
@@ -725,6 +764,7 @@ pub fn python_run(root: String, script: String) -> Result<Value, String> {
     use std::io::Write;
     use std::process::Stdio;
 
+    let script = clean_python_script(&script);
     let workdir = if root.trim().is_empty() {
         std::env::current_dir().map_err(|e| e.to_string())?
     } else {

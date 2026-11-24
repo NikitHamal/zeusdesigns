@@ -256,6 +256,7 @@ function buildToolExamples(style: ToolExecutionStyle): string {
     `- \`<zeus_tool name="shell">rg -n "handleSubmit" src/ && git status -sb</zeus_tool>\` (alias: \`name="bash"\`) — run any bash/sh/cmd pipeline, git, ripgrep, test, or build command in the project root`,
     `- \`<zeus_tool name="python">import pathlib, json\nprint(len(list(pathlib.Path(".").rglob("*.ts"))))</zeus_tool>\` — run a multi-line Python 3 script directly in the project root via stdin`,
     `- \`<zeus_tool name="write_file" path="AGENTS.md"># Project Guidelines\n\nBuild and test instructions...</zeus_tool>\` — create or overwrite a file in one step`,
+    `- \`<zeus_tool name="delete_file" path="AGENTS.md"></zeus_tool>\` — delete a file or directory from the project workspace`,
     `- \`<zeus_tool name="edit_file" path="src/app.ts"><<<<<<< SEARCH\nconst port = 3000;\n=======\nconst port = Number(process.env.PORT) || 3000;\n>>>>>>> REPLACE</zeus_tool>\` — surgical search/replace edit (or JSON \`{"oldString":"...","newString":"..."}\`)`,
     `- \`<zeus_tool name="read_file" path="src/app.ts" start="1" end="200"></zeus_tool>\` — read a file (optional 1-indexed line range)`,
     `- \`<zeus_tool name="search_code">functionName</zeus_tool>\` — fast substring/symbol search across workspace files`,

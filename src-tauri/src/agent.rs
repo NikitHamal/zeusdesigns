@@ -667,8 +667,8 @@ pub fn parse_inline_invocations_segment(
     }
 
     // 5. Support K2-Horizon `<ifm|tool_call>NAME\n<ifm|arg_key>...</ifm|arg_key>\n<ifm|arg_value>...</ifm|arg_value>\n</ifm|tool_call>`
-    // and hybrid `<ifm|tool_call>edit_file path="src/router.js">...</zeus_tool>`
-    if list.is_empty() {
+    // and hybrid `<ifm|tool_call>edit_file path="src/router.js">...</zeus_tool>` (even when mixed with `<zeus_tool>` in the same turn)
+    {
         let open_pat = "<ifm|tool_call>";
         let mut from = 0;
         while let Some(rel_s) = clean_text[from..].find(open_pat) {
@@ -789,7 +789,7 @@ pub fn parse_inline_invocations_segment(
     }
 
     // 7. Support K2-Horizon `<|open|>call name="..."><|sep|><|open|>argument key="..."><|sep|>...<|close|>argument...<|close|>call`
-    if list.is_empty() && clean_text.contains("<|open|>call") {
+    if clean_text.contains("<|open|>call") {
         let mut from = 0;
         while let Some(rel_s) = clean_text[from..].find("<|open|>call") {
             let start = from + rel_s;

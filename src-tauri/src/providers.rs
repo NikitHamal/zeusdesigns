@@ -6383,6 +6383,20 @@ fn build_native_oai_agent_tools() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "delete_file",
+                "description": "Delete a file or directory in the project workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Relative file path to delete" }
+                    },
+                    "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "edit_file",
                 "description": "Edit an existing file using <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks or oldString/newString.",
                 "parameters": {

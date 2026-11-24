@@ -70,6 +70,7 @@ function extractAttr(header, key) {
 const VALID_TOOLS = new Set([
   "read_file", "read", "cat", "cat_file", "view_file",
   "write_file", "write", "create_file", "save_file",
+  "delete_file", "remove_file", "rm", "del", "unlink",
   "edit_file", "edit", "patch_file", "str_replace",
   "list_dir", "ls", "dir", "list_files",
   "search_code", "grep", "rg", "search",
@@ -238,7 +239,7 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
       }
     }
   }
-  if (!calls.length) {
+  {
     const ifmRe = /<ifm\|tool_call>\s*([^\s<>]+)([\s\S]*?)(?:<\/(?:ifm\|tool_call|zeus_tool)>|$)/g;
     let im;
     while ((im = ifmRe.exec(clean)) !== null) {
@@ -262,10 +263,10 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
           else if (!b) b = v;
         }
       }
-      if (!isInvalidToolArgs(name, p, b)) calls.push({ name, path: p, body: b });
+      if (!isInvalidToolArgs(name, p, b)) calls.push({ name, path: p, body: b, offset: im.index });
     }
   }
-  if (!calls.length && clean.includes("<|open|>call")) {
+  if (clean.includes("<|open|>call")) {
     const callRe = /<\|open\|>call([^<]*)<\|sep\|>([\s\S]*?)(?:<\|close\|>call|$)/g;
     let cm;
     while ((cm = callRe.exec(clean)) !== null) {
@@ -287,7 +288,7 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
         else if (!b) b = v;
       }
       if (sPart) b = `<<<<<<< SEARCH\n${sPart}\n=======\n${rPart}\n>>>>>>> REPLACE`;
-      if (!isInvalidToolArgs(name, p, b)) calls.push({ name, path: p, body: b });
+      if (!isInvalidToolArgs(name, p, b)) calls.push({ name, path: p, body: b, offset: cm.index });
     }
   }
   if (!calls.length && clean.includes("to=zeus_tool")) {
@@ -358,6 +359,24 @@ function executeToolInWorkspace(wsRoot, call) {
       fs.writeFileSync(fullPath, body, "utf8");
       return { ok: true, output: `Synchronized ${relPath} (${Buffer.byteLength(body)} bytes)` };
     }
+    case "delete_file":
+    case "remove_file":
+    case "rm":
+    case "del":
+    case "unlink": {
+      let target = fullPath;
+      if (!fs.existsSync(target) && relPath) {
+        const dir = path.dirname(target);
+        const want = path.basename(target).toLowerCase();
+        if (fs.existsSync(dir)) {
+          const match = fs.readdirSync(dir).find((f) => f.toLowerCase() === want);
+          if (match) target = path.join(dir, match);
+        }
+      }
+      if (!fs.existsSync(target)) return { ok: false, output: `File not found: ${relPath}` };
+      fs.rmSync(target, { recursive: true, force: true });
+      return { ok: true, output: `Deleted ${relPath}` };
+    }
     case "edit_file":
     case "edit":
     case "patch_file": {
@@ -425,14 +444,20 @@ function executeToolInWorkspace(wsRoot, call) {
     case "bash":
     case "cmd":
     case "exec": {
-      const cmd = body || relPath;
+      const cmd = (body || relPath || "")
+        .replace(/^(?:```(?:bash|sh|shell)?|<command>|<code>|<bash>|<shell>)\s*/gi, "")
+        .replace(/(?:\s*(?:```|<\/command>|<\/code>|<\/bash>|<\/shell>|<\/zeus_tool>|<\/tool_call>|<\|close\|>argument|<\|close\|>call))+$/gi, "")
+        .trim();
       const r = spawnSync("bash", ["-lc", cmd], { cwd: wsRoot, encoding: "utf8", timeout: 15000 });
       const out = [r.stdout?.trimEnd(), r.stderr?.trimEnd() ? `[stderr]\n${r.stderr.trimEnd()}` : "", r.status !== 0 ? `[exit code: ${r.status}]` : ""].filter(Boolean).join("\n");
       return { ok: r.status === 0, output: out || `[exit ${r.status ?? 0}] (no output)` };
     }
     case "python":
     case "python3": {
-      const script = body || relPath;
+      const script = (body || relPath || "")
+        .replace(/^(?:```(?:python3?|py)?|<command>|<code>|<script>|<python>|<py>)\s*/gi, "")
+        .replace(/(?:\s*(?:```|<\/command>|<\/code>|<\/script>|<\/python>|<\/py>|<\/bash>|<\/shell>|<\/zeus_tool>|<\/tool_call>|<\|close\|>argument|<\|close\|>call))+$/gi, "")
+        .trim();
       const r = spawnSync("python3", ["-u", "-"], { cwd: wsRoot, input: script, encoding: "utf8", timeout: 15000 });
       const out = [r.stdout?.trimEnd(), r.stderr?.trimEnd() ? `[stderr]\n${r.stderr.trimEnd()}` : "", r.status !== 0 ? `[exit code: ${r.status}]` : ""].filter(Boolean).join("\n");
       return { ok: r.status === 0, output: out || `[exit ${r.status ?? 0}] (no output)` };
@@ -502,6 +527,7 @@ const NATIVE_OAI_TOOLS = [
   { type: "function", function: { name: "python", description: "Execute a multi-line Python 3 script in the project workspace directory.", parameters: { type: "object", properties: { code: { type: "string" } }, required: ["code"] } } },
   { type: "function", function: { name: "read_file", description: "Read a file in the project workspace.", parameters: { type: "object", properties: { path: { type: "string" }, start: { type: "integer" }, end: { type: "integer" } }, required: ["path"] } } },
   { type: "function", function: { name: "write_file", description: "Create or overwrite a file in the project workspace.", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
+  { type: "function", function: { name: "delete_file", description: "Delete a file or directory in the project workspace.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
   { type: "function", function: { name: "edit_file", description: "Edit an existing file using <<<<<<< SEARCH / ======= / >>>>>>> REPLACE blocks.", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
   { type: "function", function: { name: "search_code", description: "Search code across all files in the workspace.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } } },
   { type: "function", function: { name: "list_dir", description: "List files and subdirectories in a workspace path.", parameters: { type: "object", properties: { path: { type: "string" } } } } },
@@ -517,7 +543,7 @@ const NATIVE_ANTHROPIC_TOOLS = NATIVE_OAI_TOOLS.map((t) => ({
   input_schema: t.function.parameters,
 }));
 
-const SCRAPER_XML_DSL_BANNER = `[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local ZeusDesigns C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown \`\`\`bash code blocks.\nWhenever an action is needed, translate the request into a raw XML tag outside <think>:\n- <zeus_tool name="shell">command</zeus_tool>\n- <zeus_tool name="python">python3_code</zeus_tool>\n- <zeus_tool name="read_file" path="relative/file" start="1" end="250"></zeus_tool>\n- <zeus_tool name="write_file" path="relative/file">complete content</zeus_tool>\n- <zeus_tool name="edit_file" path="relative/file">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name="list_dir" path="subdir"></zeus_tool>\n- <zeus_tool name="search_code">query</zeus_tool>\n- <zeus_tool name="memory_search">query</zeus_tool> | <zeus_tool name="memory_save" path="preferences">fact</zeus_tool> | <zeus_tool name="memory_edit" path="id">fact</zeus_tool> | <zeus_tool name="memory_delete" path="id"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>.`;
+const SCRAPER_XML_DSL_BANNER = `[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local Zeus Codes C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown \`\`\`bash code blocks.\nWhenever an action is needed, translate the request into a raw XML tag outside <think>:\n- <zeus_tool name="shell">command</zeus_tool>\n- <zeus_tool name="python">python3_code</zeus_tool>\n- <zeus_tool name="read_file" path="relative/file" start="1" end="250"></zeus_tool>\n- <zeus_tool name="write_file" path="relative/file">complete content</zeus_tool>\n- <zeus_tool name="delete_file" path="relative/file"></zeus_tool>\n- <zeus_tool name="edit_file" path="relative/file">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name="list_dir" path="subdir"></zeus_tool>\n- <zeus_tool name="search_code">query</zeus_tool>\n- <zeus_tool name="memory_search">query</zeus_tool> | <zeus_tool name="memory_save" path="preferences">fact</zeus_tool> | <zeus_tool name="memory_edit" path="id">fact</zeus_tool> | <zeus_tool name="memory_delete" path="id"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>.`;
 
 async function fetchTextWithTimeout(url, init = {}, timeoutMs = 9000) {
   const ac = new AbortController();
@@ -1118,6 +1144,21 @@ console.log("ALL_AUTH_ROUTER_TESTS_PASSED");\n`);
     fs.rmSync(memFile6, { force: true });
   } catch (e) {
     console.log(`[Task 6: On-Demand Memory] ERROR: ${e.message}`);
+  }
+
+  // Task 7: Screenshot Reproduction ("delete agents md file")
+  try {
+    const ws7 = fs.mkdtempSync(path.join(os.tmpdir(), "zeus-t7-"));
+    fs.writeFileSync(path.join(ws7, "AGENTS.md"), "# Old Agents File\nDelete me.\n", "utf8");
+    const t0 = Date.now();
+    const trace7 = await runAgentTask(target, ws7, "delete agents md file", 4, "code");
+    const toolsUsed = trace7.flatMap((r) => r.tools.map((t) => `${t.name}(${t.path || t.body?.slice(0, 24) || ""})[${t.ok ? "ok" : "ERR"}]`));
+    const deleted = !fs.existsSync(path.join(ws7, "AGENTS.md")) && !fs.existsSync(path.join(ws7, "agents.md"));
+    console.log(`[Task 7: Delete AGENTS.md] ${deleted ? "PASS" : "FAIL"} (${Date.now() - t0}ms) | steps: ${toolsUsed.length} [${toolsUsed.join(" -> ")}]`);
+    if (!deleted) console.log(`   Task 7 Last RAW: ${JSON.stringify(trace7[trace7.length - 1]?.raw?.slice(-500))}`);
+    fs.rmSync(ws7, { recursive: true, force: true });
+  } catch (e) {
+    console.log(`[Task 7: Delete AGENTS.md] ERROR: ${e.message}`);
   }
 }
 process.exit(0);
