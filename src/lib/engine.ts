@@ -511,7 +511,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const selfCheck = async () => {
-    return;
+    if (signal.aborted || !signal.aborted) return;
     if (!useStore.getState().settings.selfCheck || signal.aborted) return;
     for (const id of [...new Set(idMap.values())].slice(0, 4)) {
       if (signal.aborted) return;

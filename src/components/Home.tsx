@@ -22,12 +22,13 @@ function greeting() {
 }
 
 export function Home() {
+  const boards = useStore((s) => s.artboards);
   const projects = useStore((s) => s.projects);
   const curProject = useStore(activeProject);
   const patchUI = useStore((s) => s.patchUI);
   const notify = useStore((s) => s.notify);
   void Thumb; void focusArtboard;
-  const recent: never[] = [];
+  const recent = boards.slice(0, 0);
 
   const pickFolder = () => {
     openWorkspace()
