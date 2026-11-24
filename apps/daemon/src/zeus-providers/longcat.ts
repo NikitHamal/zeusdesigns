@@ -106,6 +106,7 @@ export const longcat: ZeusProvider = {
         const cookie = await warmCookies(req.signal);
         if (cookie) headers.cookie = cookie;
         const res = await fetch(url, { method: 'POST', headers, body, signal: timeoutSignal(300_000, req.signal) });
+        let upstreamError = '';
         if (!res.ok) {
           lastError = `HTTP ${res.status}`;
           if (res.status === 429) { await sleep(2 ** attempt * 1000 + Math.random() * 1000); continue; }
@@ -132,12 +133,13 @@ export const longcat: ZeusProvider = {
           } else if (type === 'reason' || type === 'think') {
             if (event.content) { sawAny = true; yield { type: 'thought', content: String(event.content) }; }
           } else if (type === 'eventError') {
-            yield { type: 'error', error: `LongCat: ${event.message || 'upstream error'}` };
-            return;
+            upstreamError = String(event.message || 'upstream error');
+            break;
           }
         }
         if (sawAny) { yield { type: 'done' }; return; }
-        lastError = 'stream ended without content';
+        lastError = upstreamError || 'stream ended without content';
+        if (upstreamError) await sleep(1000 + Math.random() * 1000);
       } catch (err) {
         if (sawAny) { yield { type: 'done' }; return; }
         lastError = `request failed: ${(err as Error).message}`;

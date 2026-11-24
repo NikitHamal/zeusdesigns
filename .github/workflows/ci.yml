@@ -1,0 +1,20 @@
+name: ci
+on:
+  push:
+    branches: [zeus-codes]
+  pull_request:
+jobs:
+  daemon:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --ignore-scripts --filter "@open-design/daemon..." --filter "@open-design/web..."
+      - run: pnpm --filter @open-design/daemon build
+      - run: pnpm --filter @open-design/web build
