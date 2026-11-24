@@ -62,8 +62,18 @@ function parseAttrs(s: string) {
   return out;
 }
 
-/** Weak models often skip the <artboard> wrapper. Recover a bare HTML document (raw or fenced) as one artboard. */
+/** Normalize <artifact ...>...</artifact> (OpenDesign/Claude format) or bare HTML documents into <artboard> blocks. */
 export function normalizeStream(full: string): string {
+  if (full.includes("<artifact ") || full.includes("<artifact>")) {
+    full = full
+      .replace(/<artifact\b([^>]*)>/gi, (_m, rawAttrs: string) => {
+        const attrs = parseAttrs(rawAttrs);
+        const name = (attrs.title || attrs.name || attrs.identifier || "Artifact").replace(/"/g, "'");
+        const mode = attrs.mode || "new";
+        return `<artboard name="${name}" device="web" mode="${mode}">`;
+      })
+      .replace(/<\/artifact>/gi, "</artboard>");
+  }
   if (full.includes("<artboard")) return full;
   const m = /(```(?:html)?[ \t]*\n)?(<!doctype html|<html[\s>])/i.exec(full);
   if (!m) return full;
