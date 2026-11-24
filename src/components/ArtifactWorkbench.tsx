@@ -5,10 +5,12 @@ import {
   buildHyperFramesCompositionBundle,
   computeHyperFramesAnimationMap,
   detectDeliverableKind,
+  HYPERFRAMES_PALETTES,
   parseHyperFramesDocument,
   parseOpenSlideDeck,
   STARTER_HYPERFRAMES_VIDEO_HTML,
   STARTER_OPEN_SLIDE_DECK_HTML,
+  type HyperFramesPaletteSpec,
   type VideoAspectRatio,
 } from "../lib/openDesign";
 import { exportHyperFramesToVideo, type VideoExportProgress } from "../lib/videoExporter";
@@ -217,23 +219,41 @@ export function ArtifactWorkbench() {
     );
   };
 
+  const applyHyperFramesPalette = (pal: HyperFramesPaletteSpec) => {
+    if (!active) return;
+    const overrideTag = `<style id="zeus-hyperframes-palette">:root{--bg:${pal.bg}!important;--surface:${pal.surface}!important;--ink:${pal.ink}!important;--accent:${pal.accent}!important;--secondary:${pal.secondary}!important;}body,.frame{background:${pal.bg}!important;color:${pal.ink}!important;}</style>`;
+    const base = (draftHtml ?? active.html).replace(/<style id="zeus-hyperframes-palette">[\s\S]*?<\/style>/gi, "");
+    const nextHtml = base.includes("</head>")
+      ? base.replace("</head>", `${overrideTag}</head>`)
+      : `${overrideTag}\n${base}`;
+    updateArtboard(active.id, { html: nextHtml, version: active.version + 1 });
+    setDraftHtml(null);
+    notify(`Applied HyperFrames palette: ${pal.name}`);
+  };
+
   const handleExportHyperFramesJson = () => {
     if (!active) return;
+    const slug = (active.name || "artifact").toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const manifest = {
-      schema: "open-design.hyperframes.v1",
+      schema: "open-design.artifact-manifest.v1",
       name: active.name,
+      kind: deliverableKind,
+      renderer: deliverableKind === "hyperframes" ? "hyperframes-html" : deliverableKind === "deck" ? "open-slide-1920" : "html-dom",
+      entryFile: `${slug}.html`,
+      version: active.version,
       aspect: videoAspect,
       totalDurationMs: hyperFrames.totalDurationMs,
+      exports: deliverableKind === "hyperframes" ? ["webm", "mp4", "hyperframes.json", "html"] : ["html"],
       frames: hyperFrames.frames,
     };
     const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(active.name || "hyperframes").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.hyperframes.json`;
+    a.download = `${slug}.artifact.manifest.json`;
     a.click();
     URL.revokeObjectURL(url);
-    notify("Exported Remotion / HyperFrames JSON manifest");
+    notify("Exported OpenDesign Artifact Manifest JSON");
   };
 
   const gotoHyperFrame = (idx: number, keepPlaying = false) => {
@@ -732,7 +752,20 @@ export function ArtifactWorkbench() {
                       · {hyperFrames.frames[activeFrameIdx]?.sceneTitle}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-[11px] text-on-surface-variant">
+                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-on-surface-variant">
+                    <div className="hidden items-center gap-1 sm:flex">
+                      {HYPERFRAMES_PALETTES.slice(0, 6).map((pal) => (
+                        <button
+                          key={pal.id}
+                          onClick={() => applyHyperFramesPalette(pal)}
+                          title={`Apply HyperFrames palette: ${pal.name}`}
+                          className="state flex h-5 items-center gap-1 rounded-md border border-outline-variant/60 bg-surface px-1.5 text-[10px] text-on-surface"
+                        >
+                          <span style={{ background: pal.accent }} className="size-2.5 rounded-sm" />
+                          <span>{pal.name.split(" ")[0]}</span>
+                        </button>
+                      ))}
+                    </div>
                     <span>Total {(hyperFrames.totalDurationMs / 1000).toFixed(1)}s</span>
                     <span>·</span>
                     <span>{videoAspect}</span>
