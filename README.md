@@ -1,6 +1,10 @@
-# Zeus Codes (`ZeusDesigns`)
+# Zeus OpenDesign (`open-design` Experimental Branch)
 
-Open-source, ultra-light **native Windows** AI coding & software engineering workspace — a free, no-limits alternative to Claude Code and OpenCode powered by **Zeus Harness²** (adapted from Google Research `harness2` `c1..c8` recursive harness surface) and 40 free keyless AI providers.
+Open-source, ultra-light **native Windows** Collaborative AI Design, **HyperFrames Code-to-Video**, **Open-Slide 1920×1080 Deck**, and **Zeus Harness²** Coding Workspace — adapted from [`nexu-io/open-design`](https://github.com/nexu-io/open-design) and Google Research [`harness2`](https://github.com/google-research/harness2), powered by 40 free keyless AI providers under 17 MB physical RAM.
+
+- **Deliverable Modes**: Interactive Prototype (`1440×900` / `390×844`), **HyperFrames Video (Code-to-Video)** (`16:9` `1920×1080`, `9:16` `1080×1920`, `1:1` `1080×1080` with multi-scene timeline scrubber & client-side `.mp4`/`.webm` video recorder), **Open-Slide 1920×1080 Deck** (with slide thumbnail rail & speaker notes), **OpenMotion Kinetic Poster**, **Brand & `DESIGN.md` Kit**, and **Zeus Harness² Code Agent**.
+- **Brand & `DESIGN.md` Systems**: 12 curated `DESIGN.md` brand systems (Material 3 Expressive, Claude Warm, Linear Precision, Stripe Financial, Vercel Geist, Supabase Studio, Apple HIG, Teenage Engineering Field, Porsche Weissach, Cash App Kinetic, Open-Slide Ash & Lime, Swiss International Grid) + 13 Zeus Design Systems.
+- **Direct DOM Element Inspector**: Click any element in the live preview to edit text, colors, font size, or padding directly, or queue a targeted element refinement for the AI agent.
 
 | | |
 |---|---|
