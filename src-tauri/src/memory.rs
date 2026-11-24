@@ -77,11 +77,18 @@ impl MemoryStore {
         let cat = category.map(|c| c.trim().to_ascii_lowercase()).unwrap_or_default();
         let proj = project.map(|p| p.trim().to_ascii_lowercase()).unwrap_or_default();
         let terms: Vec<&str> = q
-            .split_whitespace()
-            .filter(|w| !w.is_empty() && !matches!(*w, "*" | ".*" | "all" | "everything"))
+            .split(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | '"' | '\'' | '{' | '}' | ':' | '[' | ']'))
+            .filter(|w| {
+                !w.is_empty()
+                    && !matches!(
+                        *w,
+                        "*" | ".*" | "all" | "everything" | "memory" | "memories" | "saved" | "my" | "user" | "list" | "query"
+                    )
+            })
             .collect();
 
-        all.into_iter()
+        let matched: Vec<MemoryItem> = all
+            .iter()
             .filter(|m| {
                 if !cat.is_empty() && cat != "all" && m.category.to_ascii_lowercase() != cat {
                     return false;
@@ -97,9 +104,16 @@ impl MemoryStore {
                     return true;
                 }
                 let hay = format!("{} {} {}", m.id, m.category, m.text).to_ascii_lowercase();
-                terms.iter().all(|t| hay.contains(t)) || hay.contains(&q)
+                terms.iter().any(|t| hay.contains(t)) || hay.contains(&q)
             })
-            .collect()
+            .cloned()
+            .collect();
+
+        if matched.is_empty() && all.len() <= 30 {
+            all
+        } else {
+            matched
+        }
     }
 
     pub fn add(&self, text: String, category: Option<String>, project: Option<String>) -> Vec<MemoryItem> {

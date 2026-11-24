@@ -2825,7 +2825,8 @@ fn upload_deepai_attachment(client: &Client, att: &AttachmentPayload) -> Option<
     }
 }
 
-/// Stream from DeepAI (`https://api.deepai.org/hacking_is_a_serious_crime`) using IslandKey rotation and `/chat_attachments/upload`.
+/// Stream from DeepAI (`https://api.deepai.org/hacking_is_a_serious_crime`) using IslandKey rotation and `/chat_attachments/upload`,
+/// with automatic coding-agent routing so `claude-haiku-5-5`, `gpt-6-luna`, `deepseek-v4.1-flash`, and `glm-5.3-flash` execute on real frontier weights during workspace tool turns.
 pub fn stream_deepai<F>(
     model: &str,
     system: &str,
@@ -2837,6 +2838,23 @@ where
     F: FnMut(&str),
 {
     let has_attachments = messages.iter().any(|m| !m.attachments.is_empty());
+    if !has_attachments && is_agent_tool_request(system) {
+        let routed = match model {
+            "claude-haiku-5-5" | "gemini-2.5-flash-lite" => {
+                stream_aibridge("claude-haiku-5-5", system, messages, cancel, on_delta)
+            }
+            "deepseek-v4.1-flash" | "deepseek-v3.2" => {
+                stream_aibridge("deepseek-v4-flash", system, messages, cancel, on_delta)
+            }
+            "glm-5.3-flash" => {
+                stream_freellmhub("glm-5.3-flash", system, messages, cancel, on_delta)
+            }
+            _ => stream_aibridge("gpt-6-luna", system, messages, cancel, on_delta),
+        };
+        if routed.is_ok() {
+            return Ok(());
+        }
+    }
     let effective_model = match model {
         "qwen4-max" | "qwen3-30b-a3b" | "qwen3.8-max" | "qwen3.8-flash" => {
             if has_attachments { "gpt-6-luna" } else { "qwen3.8-flash" }

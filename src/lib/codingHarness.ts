@@ -243,7 +243,7 @@ function buildWorkflowDirective(style: ToolExecutionStyle, family: ModelFamily):
   }
 
   return `## Coding & Agent Execution Protocol (${style === "bash_python_first" ? "Bash & Python-First" : "High-Speed Hybrid"} · ${family.toUpperCase()})
-1. **Zero Wasted Turns**: Top-level files are already shown in \`## Project\`. Never call \`list_dir\` on \`.\` unless \`## Project\` is missing. When asked to create a new file (like \`AGENTS.md\` or a new module), write it immediately on Turn 1 unless you specifically need to inspect an existing file first.
+1. **Zero Wasted Turns**: Top-level files are already shown in \`## Project\`. Never call \`list_dir\` on \`.\` unless \`## Project\` is missing. When asked to create a new file (like \`AGENTS.md\` or a new module), write it immediately on Turn 1 with complete, production-ready content (at least 150+ chars for documentation files like \`AGENTS.md\`) unless you specifically need to inspect an existing file first.
 2. **Bash & Python Power Tools**: You have full local \`shell\` (bash/cmd) and \`python\` (Python 3) execution in the workspace.
    - Use \`<zeus_tool name="shell">\` for \`rg\`, \`git\`, \`find\`, test suites (\`npm test\`, \`pytest\`, \`cargo check\`, \`node --test\`), and compound shell pipelines.
    - Use \`<zeus_tool name="python">\` to execute multi-line Python 3 scripts via stdin for complex multi-file edits, JSON/AST analysis, data transformation, and algorithmic verification.

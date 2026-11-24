@@ -109,7 +109,9 @@ export function parseStream(full: string): { text: string; blocks: Block[]; leak
     .replace(/<function(?:=|\s+name=)[\s\S]*?(<\/function>|$)/gi, "")
     .replace(/<(?:antml:)?invoke\s+name=[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, "")
     .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, "")
-    .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, "");
+    .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, "")
+    .replace(/<\|open\|>tools[\s\S]*?(?:<\|close\|>tools(?:<\|sep\|>)?|$)/gi, "")
+    .replace(/<\|open\|>call[\s\S]*?(?:<\|close\|>call(?:<\|sep\|>)?|$)/gi, "");
   let text = "";
   const blocks: Block[] = [];
   let i = 0;
@@ -699,14 +701,24 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
           }
-          // 3. Code Action & Reasoning-Cutoff Nudge when the model only described its plan or dumped a code block without calling a write/edit tool
-          const hasMutatingTool = tools.some((t) => /^(write_file|write|create_file|edit_file|edit|patch_file|python|python3|memory_save|memory_edit|memory_delete)$/.test(t.name));
-          const dumpedCodeWithoutWrite = !hasMutatingTool && /```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText);
+          // 3. Harness² Code Action, Post-Inspection Mutation & Reasoning-Cutoff Nudge
+          // Ensures models never stop mid-task after only reading/listing files or cutting off right after </think>
+          const cleanVisibleRound = roundText
+            .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
+            .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
+            .trim();
+          const hasFileOrMemMutation = tools.some((t) => /^(write_file|write|create_file|edit_file|edit|patch_file|python|python3|memory_save|memory_edit|memory_delete)$/.test(t.name));
+          const asksForMutation = /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter)\b/i.test(opts.text);
+          const stoppedAfterReadOnly = asksForMutation && !hasFileOrMemMutation && tools.length > 0;
+          const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || extraThink.trim().length > 0);
+          const dumpedCodeWithoutWrite = !hasFileOrMemMutation && (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) || /\bwith\s+open\s*\(/.test(cleanVisibleRound));
           const statedPlanOnly =
+            cutOffAfterThink ||
+            stoppedAfterReadOnly ||
             dumpedCodeWithoutWrite ||
-            /\b(let'?s\s+(list|check|run|read|inspect|pull|fetch|search|look|verify|see|test|create|write|edit)|we\s+need\s+to\s+(pull|list|check|run|read|inspect|update|fix)|i\s+(will|need\s+to|should)\s+(list|check|run|read|inspect|pull|fetch|search|verify|test))\b/i.test(
+            /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|see|test|create|write|edit|delete|save|continue)|we\s+need\s+to\s+(continue|call|pull|list|check|run|read|inspect|update|fix|delete|save)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test))\b/i.test(
               `${roundText} ${extraThink}`
-            ) || (!roundText.trim() && extraThink.trim().length > 0);
+            );
           if (
             (mode === "code" || Boolean(st.ui.workspace)) &&
             !produced &&
@@ -762,7 +774,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         msgs = [
           ...msgs,
           { role: "assistant", content: said },
-          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, mode === "code" ? codingProfile.maxToolOutputChars : 6000)}\n</tool_result>`).join("\n")}\nContinue the task from these results. Do not repeat a call you already made.` },
+          { role: "user", content: `Tool results:\n${roundTools.map((t) => `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, mode === "code" ? codingProfile.maxToolOutputChars : 6000)}\n</tool_result>`).join("\n")}\nIf every part of the user's request is now complete and verified, do NOT call any more tools and reply with 1-2 concise sentences. Otherwise, emit the next <zeus_tool> block needed to finish the remaining steps (never repeat a call you already made).` },
         ];
         current = { ...req, requestId: uid(), messages: msgs };
         full += "\n\n";

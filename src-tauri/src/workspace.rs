@@ -115,11 +115,32 @@ fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
     } else {
         norm_rel.as_str()
     };
-    let cleaned = stripped
+    let mut cleaned = stripped
         .trim_start_matches("./")
-        .trim_start_matches(['/', '\\']);
-    let candidate = root_path.join(cleaned);
-    for comp in Path::new(cleaned).components() {
+        .trim_start_matches(['/', '\\'])
+        .to_string();
+    // Strip hallucinated container root prefixes (`/workspace/`, `/app/`, `/project/`, `/home/user/.../`)
+    // when the model invents an absolute Linux path that does not exist as a subdirectory in `root_path`.
+    for container_prefix in ["workspace/", "app/", "project/"] {
+        if let Some(rest) = cleaned.strip_prefix(container_prefix) {
+            if !root_path.join(container_prefix.trim_end_matches('/')).exists() && !rest.is_empty() {
+                cleaned = rest.to_string();
+                break;
+            }
+        }
+    }
+    if (cleaned.starts_with("home/") || cleaned.starts_with("Users/") || cleaned.starts_with("root/") || cleaned.starts_with("tmp/"))
+        && !root_path.join(cleaned.split('/').next().unwrap_or("")).exists()
+    {
+        let parts: Vec<&str> = cleaned.split('/').filter(|s| !s.is_empty()).collect();
+        if let Some(src_idx) = parts.iter().position(|&p| matches!(p, "src" | "test" | "tests" | "lib" | "public" | "scripts" | "docs" | ".zeusdesigns")) {
+            cleaned = parts[src_idx..].join("/");
+        } else if let Some(last) = parts.last() {
+            cleaned = (*last).to_string();
+        }
+    }
+    let candidate = root_path.join(&cleaned);
+    for comp in Path::new(&cleaned).components() {
         if matches!(comp, std::path::Component::ParentDir) {
             return Err("Path traversal outside workspace root is not permitted".to_string());
         }

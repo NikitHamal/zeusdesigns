@@ -238,22 +238,38 @@ fn is_known_valid_tool(name: &str) -> bool {
         || name.starts_with("mcp:")
 }
 
-fn is_template_placeholder(path: &str, body: &str) -> bool {
-    matches!(
-        path,
-        "ARG" | "relative/file" | "relative/path" | "subdir" | "sub/dir" | "filename" | "https://..."
+fn is_template_placeholder(name: &str, path: &str, body: &str) -> bool {
+    let p = path.trim();
+    let b = body.trim();
+    if matches!(
+        p,
+        "ARG" | "relative/file" | "relative/path" | "subdir" | "sub/dir" | "filename" | "https://..." | "..." | "path/to/file"
     ) || matches!(
-        body,
+        b,
         "BODY"
             | "command"
             | "python3_code"
             | "python_script_code"
             | "complete file content"
+            | "complete content"
             | "full_file_content"
             | "substring_or_symbol"
             | "pattern"
             | "one durable fact worth keeping"
-    )
+            | "..."
+    ) {
+        return true;
+    }
+    if matches!(name, "shell" | "bash" | "sh" | "cmd" | "python" | "python3" | "py") && b.is_empty() && p.is_empty() {
+        return true;
+    }
+    if matches!(name, "read_file" | "read" | "cat" | "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && p.is_empty() {
+        return true;
+    }
+    if matches!(name, "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && b.is_empty() {
+        return true;
+    }
+    false
 }
 
 pub fn parse_inline_invocations_segment(
@@ -331,7 +347,17 @@ pub fn parse_inline_invocations_segment(
             .unwrap_or_default();
         let start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
         let end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
-        let mut eff_body = body.to_string();
+        let mut eff_body = if body.is_empty() {
+            extract_attr(header, "content")
+                .or_else(|| extract_attr(header, "text"))
+                .or_else(|| extract_attr(header, "fact"))
+                .or_else(|| extract_attr(header, "value"))
+                .or_else(|| extract_attr(header, "code"))
+                .or_else(|| extract_attr(header, "script"))
+                .unwrap_or_default()
+        } else {
+            body.to_string()
+        };
 
         // If the model placed a JSON object inside `<zeus_tool>`, unpack common fields
         if eff_body.starts_with('{') && eff_body.ends_with('}') {
@@ -374,9 +400,7 @@ pub fn parse_inline_invocations_segment(
             path_arg = eff_body.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
         }
 
-        if strict_placeholder_filter
-            && (!is_known_valid_tool(&name) || is_template_placeholder(&path_arg, &eff_body))
-        {
+        if !is_known_valid_tool(&name) || is_template_placeholder(&name, &path_arg, &eff_body) {
             continue;
         }
         list.push(InlineToolInvocation {
@@ -459,6 +483,9 @@ pub fn parse_inline_invocations_segment(
                     .or_else(|| args_obj.get("script"))
                     .or_else(|| args_obj.get("code"))
                     .or_else(|| args_obj.get("content"))
+                    .or_else(|| args_obj.get("text"))
+                    .or_else(|| args_obj.get("fact"))
+                    .or_else(|| args_obj.get("value"))
                     .or_else(|| args_obj.get("query"))
                     .or_else(|| args_obj.get("pattern"))
                     .or_else(|| args_obj.get("body"))
@@ -469,9 +496,7 @@ pub fn parse_inline_invocations_segment(
                     serde_json::to_string(&args_obj).unwrap_or_default()
                 };
                 if !name.is_empty() {
-                    if strict_placeholder_filter
-                        && (!is_known_valid_tool(&name) || is_template_placeholder(&path, &body))
-                    {
+                    if !is_known_valid_tool(&name) || is_template_placeholder(&name, &path, &body) {
                         continue;
                     }
                     list.push(InlineToolInvocation {
@@ -620,7 +645,7 @@ pub fn parse_inline_invocations_segment(
                     .or_else(|| extract_attr(header, "id"))
                     .or_else(|| extract_attr(header, "category"))
                     .unwrap_or_default();
-                if strict_placeholder_filter && is_template_placeholder(&path_arg, body) {
+                if is_template_placeholder(tag_name, &path_arg, body) {
                     continue;
                 }
                 list.push(InlineToolInvocation {
@@ -636,16 +661,46 @@ pub fn parse_inline_invocations_segment(
     }
 
     // 5. Support K2-Horizon `<ifm|tool_call>NAME\n<ifm|arg_key>...</ifm|arg_key>\n<ifm|arg_value>...</ifm|arg_value>\n</ifm|tool_call>`
+    // and hybrid `<ifm|tool_call>edit_file path="src/router.js">...</zeus_tool>`
     if list.is_empty() {
         let open_pat = "<ifm|tool_call>";
-        let close_pat = "</ifm|tool_call>";
         let mut from = 0;
         while let Some(rel_s) = clean_text[from..].find(open_pat) {
             let start = from + rel_s;
             let after_open = start + open_pat.len();
-            let Some(rel_end) = clean_text[after_open..].find(close_pat) else { break };
-            let inner = &clean_text[after_open..after_open + rel_end];
-            from = after_open + rel_end + close_pat.len();
+            let rest_after = &clean_text[after_open..];
+            let end_ifm = rest_after.find("</ifm|tool_call>");
+            let end_zeus = rest_after.find("</zeus_tool>");
+            let (rel_end, close_len) = match (end_ifm, end_zeus) {
+                (Some(i), Some(z)) if i < z => (i, "</ifm|tool_call>".len()),
+                (_, Some(z)) => (z, "</zeus_tool>".len()),
+                (Some(i), None) => (i, "</ifm|tool_call>".len()),
+                (None, None) if allow_unclosed_tail && rest_after.len() > 4 => (rest_after.len(), 0),
+                (None, None) => break,
+            };
+            let inner = &rest_after[..rel_end];
+            from = after_open + rel_end + close_len;
+            if !inner.contains("<ifm|arg_key>") {
+                if let Some(gt) = inner.find('>') {
+                    let head = inner[..gt].trim();
+                    let body_part = inner[gt + 1..].trim();
+                    let tool_name = head.split_whitespace().next().unwrap_or("").trim().to_string();
+                    let path_attr = extract_attr(head, "path")
+                        .or_else(|| extract_attr(head, "file"))
+                        .unwrap_or_default();
+                    if is_known_valid_tool(&tool_name) && !is_template_placeholder(&tool_name, &path_attr, body_part) {
+                        list.push(InlineToolInvocation {
+                            name: tool_name,
+                            path: path_attr,
+                            start_line: None,
+                            end_line: None,
+                            body: body_part.to_string(),
+                            offset: start,
+                        });
+                        continue;
+                    }
+                }
+            }
             let name_end = inner.find('<').unwrap_or(inner.len());
             let name = inner[..name_end].trim().to_string();
             if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
@@ -663,9 +718,9 @@ pub fn parse_inline_invocations_segment(
                 let after_k = kstart + ke + "</ifm|arg_key>".len();
                 let Some(vs) = inner[after_k..].find("<ifm|arg_value>") else { break };
                 let vstart = after_k + vs + "<ifm|arg_value>".len();
-                let Some(ve) = inner[vstart..].find("</ifm|arg_value>") else { break };
+                let ve = inner[vstart..].find("</ifm|arg_value>").unwrap_or(inner.len() - vstart);
                 let val = inner[vstart..vstart + ve].trim();
-                afrom = vstart + ve + "</ifm|arg_value>".len();
+                afrom = (vstart + ve + "</ifm|arg_value>".len()).min(inner.len());
                 if matches!(key, "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
                     path_arg = val.to_string();
                 } else if key == "start" {
@@ -723,6 +778,69 @@ pub fn parse_inline_invocations_segment(
                     json!({ "name": name, "arguments": serde_json::from_str::<Value>(candidate_json).unwrap_or_else(|_| json!({ "body": candidate_json })) })
                 );
                 list.extend(parse_inline_invocations_segment(&fake_tc, false, strict_placeholder_filter));
+            }
+        }
+    }
+
+    // 7. Support K2-Horizon `<|open|>call name="..."><|sep|><|open|>argument key="..."><|sep|>...<|close|>argument...<|close|>call`
+    if list.is_empty() && clean_text.contains("<|open|>call") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("<|open|>call") {
+            let start = from + rel_s;
+            let after_open = start + "<|open|>call".len();
+            let rest = &clean_text[after_open..];
+            let end_call = rest.find("<|close|>call").unwrap_or(rest.len());
+            let block = &rest[..end_call];
+            from = after_open + (end_call + "<|close|>call".len()).min(rest.len());
+            let Some(sep_idx) = block.find("<|sep|>") else { continue };
+            let head = &block[..sep_idx];
+            let name = extract_attr(head, "name").unwrap_or_else(|| head.trim().to_string());
+            if !is_known_valid_tool(&name) {
+                continue;
+            }
+            let mut path_arg = String::new();
+            let mut body_out = String::new();
+            let mut search_part = String::new();
+            let mut replace_part = String::new();
+            let mut afrom = sep_idx + "<|sep|>".len();
+            while let Some(as_rel) = block[afrom..].find("<|open|>argument") {
+                let astart = afrom + as_rel + "<|open|>argument".len();
+                let arest = &block[astart..];
+                let Some(asep) = arest.find("<|sep|>") else { break };
+                let ahead = &arest[..asep];
+                let key = extract_attr(ahead, "key")
+                    .or_else(|| extract_attr(ahead, "name"))
+                    .unwrap_or_default();
+                let val_start = asep + "<|sep|>".len();
+                let val_end = arest[val_start..]
+                    .find("<|close|>argument")
+                    .unwrap_or(arest.len() - val_start);
+                let val = arest[val_start..val_start + val_end].trim();
+                afrom = astart + (val_start + val_end + "<|close|>argument".len()).min(arest.len());
+                if matches!(key.as_str(), "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
+                    path_arg = val.to_string();
+                } else if matches!(key.as_str(), "search" | "oldString" | "old_str" | "old_string") {
+                    search_part = val.to_string();
+                } else if matches!(key.as_str(), "replace" | "newString" | "new_str" | "new_string") {
+                    replace_part = val.to_string();
+                } else if matches!(key.as_str(), "command" | "cmd" | "code" | "script" | "content" | "body" | "query" | "text" | "fact" | "value") {
+                    body_out = val.to_string();
+                } else if body_out.is_empty() {
+                    body_out = val.to_string();
+                }
+            }
+            if !search_part.is_empty() {
+                body_out = format!("<<<<<<< SEARCH\n{}\n=======\n{}\n>>>>>>> REPLACE", search_part, replace_part);
+            }
+            if !is_template_placeholder(&name, &path_arg, &body_out) {
+                list.push(InlineToolInvocation {
+                    name,
+                    path: path_arg,
+                    start_line: None,
+                    end_line: None,
+                    body: body_out,
+                    offset: start,
+                });
             }
         }
     }
@@ -1025,35 +1143,52 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
             }
         }
         "memory" | "memory_save" | "memory_add" | "memory_set" => {
-            let store = crate::memory::MemoryStore::default();
-            let cat = if !path_arg.is_empty() {
-                Some(path_arg.clone())
+            if body.trim().is_empty() || body.trim() == "{}" {
+                (
+                    false,
+                    "memory_save error: content body is empty. Emit <zeus_tool name=\"memory_save\" path=\"preferences\">exact fact to save</zeus_tool>.".to_string(),
+                )
             } else {
-                Some("preferences".to_string())
-            };
-            let items = store.add(body.to_string(), cat, None);
-            let latest_id = items.last().map(|m| m.id.as_str()).unwrap_or("mem");
-            (
-                true,
-                format!(
-                    "Saved memory {} ({} total items)",
-                    latest_id,
-                    items.len()
-                ),
-            )
-        }
-        "memory_edit" | "memory_update" => {
-            let store = crate::memory::MemoryStore::default();
-            match store.update(path_arg, body.to_string(), None) {
-                Ok(items) => (
+                let store = crate::memory::MemoryStore::default();
+                let cat = if !path_arg.is_empty() {
+                    Some(path_arg.clone())
+                } else {
+                    Some("preferences".to_string())
+                };
+                let items = store.add(body.to_string(), cat, None);
+                let latest_id = items.last().map(|m| m.id.as_str()).unwrap_or("mem");
+                (
                     true,
                     format!(
-                        "Updated memory '{}' ({} total items)",
-                        path_arg,
+                        "Saved memory {} ({} total items)",
+                        latest_id,
                         items.len()
                     ),
-                ),
-                Err(e) => (false, e),
+                )
+            }
+        }
+        "memory_edit" | "memory_update" => {
+            if body.trim().is_empty() || body.trim() == "{}" {
+                (
+                    false,
+                    format!(
+                        "memory_edit error: updated text is empty. Emit <zeus_tool name=\"memory_edit\" path=\"{}\">updated text</zeus_tool>.",
+                        path_arg
+                    ),
+                )
+            } else {
+                let store = crate::memory::MemoryStore::default();
+                match store.update(path_arg, body.to_string(), None) {
+                    Ok(items) => (
+                        true,
+                        format!(
+                            "Updated memory '{}' ({} total items)",
+                            path_arg,
+                            items.len()
+                        ),
+                    ),
+                    Err(e) => (false, e),
+                }
             }
         }
         "memory_delete" | "memory_remove" | "memory_forget" => {
@@ -1262,11 +1397,19 @@ fn find_marker_line(text: &str, ch: char) -> Option<(usize, usize)> {
 /// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or flexible 4..9 marker variants or JSON `oldString`/`newString` edits),
 /// with automatic line-trimmed fuzzy fallback when exact whitespace differs.
 fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
-    let unescaped_body = if find_marker_line(body, '<').is_none() && body.contains("\\n") {
+    let mut unescaped_body = if find_marker_line(body, '<').is_none() && body.contains("\\n") {
         body.replace("\\r\\n", "\n").replace("\\n", "\n")
     } else {
         body.to_string()
     };
+    // Normalize inline `=======` or `>>>>>>> REPLACE` when a model omits the newline before the marker
+    for marker in ["=======\n", "=======\r\n", ">>>>>>> REPLACE", ">>>>>>> UPDATED", ">>>>>>>"] {
+        if let Some(pos) = unescaped_body.find(marker) {
+            if pos > 0 && unescaped_body.as_bytes()[pos - 1] != b'\n' && unescaped_body.as_bytes()[pos - 1] != b'=' && unescaped_body.as_bytes()[pos - 1] != b'>' {
+                unescaped_body.insert(pos, '\n');
+            }
+        }
+    }
     let mut out = content.to_string();
     let mut rest = unescaped_body.as_str();
     let mut n = 0usize;
