@@ -426,8 +426,130 @@ export function buildDefaultHarnessTree(providerId: string, modelId: string): Re
   return tree;
 }
 
+export interface HarnessValidationResult {
+  valid: boolean;
+  alwaysOnChars: number;
+  alwaysOnCap: number;
+  repairedTriggers: string[];
+  errors: string[];
+}
+
+/**
+ * Ported from Google Research `harness2/core/tree.py` (`autotrigger`, `check_hooks`, `_check_skills`):
+ * Ensures every skill in `.zeusdesigns/harness/skills/<name>/SKILL.md` has a matching frontmatter
+ * `name:` + `description:` and an active trigger line in `guardrails.md`, and validates `hooks.json`
+ * and the 24,000-char always-on budget.
+ */
+export function validateAndAutotriggerHarnessTree(tree: Record<string, string>): HarnessValidationResult {
+  const errors: string[] = [];
+  const repairedTriggers: string[] = [];
+
+  const alwaysOnText = () =>
+    ZEUS_SURFACE.alwaysOn.map((rel) => tree[rel] ?? "").join("\n\n");
+
+  const skillPrefix = `${ZEUS_SURFACE.skillDir}/`;
+  const skillNames: string[] = [];
+  for (const rel of Object.keys(tree)) {
+    if (rel.startsWith(skillPrefix) && rel.endsWith("/SKILL.md")) {
+      const name = rel.slice(skillPrefix.length, -"/SKILL.md".length);
+      if (name && !name.includes("/")) skillNames.push(name);
+    }
+  }
+
+  for (const name of skillNames.sort()) {
+    const rel = `${ZEUS_SURFACE.skillDir}/${name}/SKILL.md`;
+    const src = tree[rel] ?? "";
+    const fm = src.slice(0, 600);
+    const descMatch = /^description:\s*(.+)$/m.exec(fm);
+    const nameMatch = /^name:\s*(\S+)\s*$/m.exec(fm);
+    if (!descMatch) {
+      errors.push(`${rel} needs a \`description:\` in its frontmatter.`);
+    }
+    if (!nameMatch || nameMatch[1] !== name) {
+      errors.push(`${rel} needs frontmatter \`name: ${name}\` matching its directory.`);
+    }
+    const body = alwaysOnText();
+    if (!body.includes(name)) {
+      const desc = descMatch ? descMatch[1].trim().replace(/\.$/, "") : `the ${name} workflow applies`;
+      const line = `- When ${desc}, load the \`${name}\` skill.`;
+      const cur = tree[ZEUS_SURFACE.autotriggerFile] ?? "";
+      if (body.length + line.length + 2 <= ZEUS_SURFACE.alwaysOnMax) {
+        tree[ZEUS_SURFACE.autotriggerFile] = cur.trim() ? `${cur.trimEnd()}\n${line}\n` : `${line}\n`;
+        repairedTriggers.push(name);
+      }
+    }
+  }
+
+  const hooksSrc = tree[ZEUS_SURFACE.hooksFile];
+  if (hooksSrc) {
+    try {
+      const parsed = JSON.parse(hooksSrc) as { hooks?: Record<string, unknown> };
+      if (!parsed || typeof parsed.hooks !== "object" || !parsed.hooks) {
+        errors.push(`${ZEUS_SURFACE.hooksFile} needs a top-level {"hooks": {"PreToolUse": [...], "PostToolUse": [...]}} object.`);
+      }
+    } catch (e) {
+      errors.push(`${ZEUS_SURFACE.hooksFile} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const totalChars = alwaysOnText().length;
+  if (totalChars > ZEUS_SURFACE.alwaysOnMax) {
+    errors.push(`Always-on surface is ${totalChars} chars, exceeding cap ${ZEUS_SURFACE.alwaysOnMax}.`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    alwaysOnChars: totalChars,
+    alwaysOnCap: ZEUS_SURFACE.alwaysOnMax,
+    repairedTriggers,
+    errors,
+  };
+}
+
+/**
+ * Ported from Google Research `harness2/core/ledger.py`:
+ * Tracks R = 4k rollouts and P = 3k improvement sessions for recursive harness refinement.
+ */
+export class HarnessBudgetLedger {
+  readonly mode: string;
+  readonly taskId: string;
+  readonly k: number;
+  readonly entries: { kind: "rollout" | "session"; label: string; cached: boolean; attempts: number }[] = [];
+
+  constructor(mode: string, taskId: string, k = 1) {
+    this.mode = mode;
+    this.taskId = taskId;
+    this.k = k;
+  }
+
+  rollout(label: string, cached = false) {
+    this.entries.push({ kind: "rollout", label, cached, attempts: 1 });
+  }
+
+  session(label: string, cached = false, attempts = 1) {
+    this.entries.push({ kind: "session", label, cached, attempts });
+  }
+
+  get R(): number {
+    return this.entries.filter((e) => e.kind === "rollout").length;
+  }
+
+  get P(): number {
+    return this.entries.filter((e) => e.kind === "session").length;
+  }
+
+  get expectedR(): number {
+    return 4 * this.k;
+  }
+
+  get expectedP(): number {
+    return 3 * this.k;
+  }
+}
+
 export async function materializeHarnessTree(ws: Workspace, providerId: string, modelId: string): Promise<string[]> {
   const tree = buildDefaultHarnessTree(providerId, modelId);
+  validateAndAutotriggerHarnessTree(tree);
   const written: string[] = [];
   for (const [rel, content] of Object.entries(tree)) {
     if (rel === "AGENTS.md") {
