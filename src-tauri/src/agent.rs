@@ -366,7 +366,17 @@ pub fn parse_inline_invocations_segment(
                 .trim();
             from = after_open + rel_end + close_tag.len();
 
-            if let Ok(v) = serde_json::from_str::<Value>(raw) {
+            let parsed_val = serde_json::from_str::<Value>(raw).ok().or_else(|| {
+                // Support GLM-4/5 native `<tool_call>tool_name\n{"arg": "val"}</tool_call>` format
+                let (first_line, rest_json) = raw.split_once('\n')?;
+                let fn_name = first_line.trim();
+                if fn_name.is_empty() || fn_name.contains(' ') || fn_name.starts_with('<') {
+                    return None;
+                }
+                let args_v = serde_json::from_str::<Value>(rest_json.trim()).ok()?;
+                Some(json!({ "name": fn_name, "arguments": args_v }))
+            });
+            if let Some(v) = parsed_val {
                 let name = v
                     .get("name")
                     .or_else(|| v.get("tool"))
@@ -429,10 +439,14 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
-    // 3. Support `<function name="...">`, `<function=name>`, and `<invoke name="...">` XML formats
+    // 3. Support `<function name="...">`, `<function=name>`, `<invoke name="...">`, and `<antml:invoke name="...">` XML formats
     // (including Qwen3/GLM/Step `<tool_call><function=shell><parameter=command>...</parameter></function></tool_call>`)
     if list.is_empty() {
-        for (open_tag, close_tag) in [("<function", "</function>"), ("<invoke", "</invoke>")] {
+        for (open_tag, close_tag) in [
+            ("<function", "</function>"),
+            ("<invoke", "</invoke>"),
+            ("<antml:invoke", "</antml:invoke>"),
+        ] {
             let mut from = 0;
             while let Some(rel_s) = clean_text[from..].find(open_tag) {
                 let start = from + rel_s;
@@ -462,7 +476,7 @@ pub fn parse_inline_invocations_segment(
                 let mut end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
                 let mut body_out = String::new();
                 let mut saw_params = false;
-                for ptag in ["parameter", "param"] {
+                for ptag in ["parameter", "param", "antml:parameter"] {
                     let p_open = format!("<{}", ptag);
                     let p_close = format!("</{}>", ptag);
                     let mut pfrom = 0;
@@ -631,6 +645,38 @@ pub fn parse_inline_invocations_segment(
     if list.is_empty() && clean_text.contains("to=zeus_tool") {
         let normalized = clean_text.replace("to=zeus_tool", "<zeus_tool");
         return parse_inline_invocations_segment(&normalized, allow_unclosed_tail, strict_placeholder_filter);
+    }
+    if list.is_empty() && clean_text.contains("to=functions.") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("to=functions.") {
+            let start = from + rel_s;
+            let after_prefix = start + "to=functions.".len();
+            let rest = &clean_text[after_prefix..];
+            let name_len = rest
+                .find(|c: char| c.is_whitespace() || c == '<' || c == '{')
+                .unwrap_or(rest.len());
+            let name = rest[..name_len].trim().to_string();
+            let after_name = &rest[name_len..];
+            let Some(brace_s) = after_name.find('{') else {
+                from = after_prefix + name_len;
+                continue;
+            };
+            let json_slice = &after_name[brace_s..];
+            let end_tok = json_slice
+                .find("<|call|>")
+                .or_else(|| json_slice.find("<|end|>"))
+                .or_else(|| json_slice.find("<|return|>"))
+                .unwrap_or(json_slice.len());
+            let candidate_json = json_slice[..end_tok].trim();
+            from = after_prefix + name_len + brace_s + end_tok;
+            if !name.is_empty() && (!strict_placeholder_filter || is_known_valid_tool(&name)) {
+                let fake_tc = format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({ "name": name, "arguments": serde_json::from_str::<Value>(candidate_json).unwrap_or_else(|_| json!({ "body": candidate_json })) })
+                );
+                list.extend(parse_inline_invocations_segment(&fake_tc, false, strict_placeholder_filter));
+            }
+        }
     }
 
     list.sort_by_key(|x| x.offset);
@@ -1215,6 +1261,7 @@ pub fn chat_stream(
                 || stripped.contains("</function_call>")
                 || stripped.contains("</function>")
                 || stripped.contains("</invoke>")
+                || stripped.contains("</antml:invoke>")
                 || stripped.contains("</bash>")
                 || stripped.contains("</shell>")
                 || stripped.contains("</python>")
@@ -1240,10 +1287,12 @@ pub fn chat_stream(
         if res.is_ok()
             && (accumulated.contains("<zeus_tool")
                 || accumulated.contains("to=zeus_tool")
+                || accumulated.contains("to=functions.")
                 || accumulated.contains("<tool_call>")
                 || accumulated.contains("<function_call>")
                 || accumulated.contains("<function")
                 || accumulated.contains("<invoke")
+                || accumulated.contains("<antml:invoke")
                 || accumulated.contains("<ifm|tool_call>")
                 || accumulated.contains("<bash")
                 || accumulated.contains("<shell")

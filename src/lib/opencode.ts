@@ -150,7 +150,13 @@ export async function runOpenCode(opts: { convId: string; title: string; prompt:
       path: { id: sessionId },
       body: { model: ocModel(providerId, modelId), system: opts.system, parts: [{ type: "text", text: opts.prompt }] },
     });
-    await Promise.race([done, sent.then(() => sleep(400))]);
+    const resp = await Promise.race([done.then(() => null), sent.then(async (r) => { await sleep(350); return r; })]);
+    if (seen.size === 0 && resp && typeof resp === "object" && "data" in resp) {
+      const parts = (resp.data as { parts?: { type?: string; text?: string }[] } | undefined)?.parts ?? [];
+      for (const pt of parts) {
+        if (pt.type === "text" && pt.text) opts.onText(pt.text);
+      }
+    }
     if (failure) throw new Error(failure);
   } finally {
     opts.signal.removeEventListener("abort", stop);

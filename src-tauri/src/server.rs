@@ -1244,14 +1244,71 @@ fn handle_opencode_session_message(
         }
     }));
 
-    let tool_sys = "You are running inside the Zeus Native OpenCode SDK Agent Runtime. You have direct access to workspace tools via <zeus_tool>: `shell` (bash), `python`, `read_file`, `write_file`, `edit_file` (with <<<<<<< SEARCH / ======= / >>>>>>> REPLACE), `search_code`, `list_dir`, `memory_search`, `memory_save`, `memory_edit`, `memory_delete`. Execute tools directly to inspect, edit, test, and verify code.";
+    let eff_dir = if workdir.trim().is_empty() {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    } else {
+        workdir.clone()
+    };
+    let top_nodes = crate::workspace::walk_workspace(
+        std::path::Path::new(&eff_dir),
+        std::path::Path::new(&eff_dir),
+        1,
+    );
+    let top_listing = if top_nodes.is_empty() {
+        "(empty directory — 0 files)".to_string()
+    } else {
+        top_nodes
+            .iter()
+            .take(50)
+            .map(|n| if n.dir { format!("{}/", n.name) } else { n.name.clone() })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let is_greeting = matches!(
+        user_text.trim().to_ascii_lowercase().trim_end_matches(|c: char| matches!(c, '!' | '.' | '?' | ' ')),
+        "hi" | "hello" | "hey" | "yo" | "sup" | "hola" | "howdy" | "greetings" | "good morning" | "good afternoon" | "good evening"
+    );
+    if !is_greeting && history.len() == 1 {
+        let orig_user = history[0].content.clone();
+        history = vec![
+            ChatMessage {
+                role: "user".to_string(),
+                content: format!(
+                    "[XML DSL Output Mode — Required by Client Parser]\nWorkspace ({}) is connected. List top-level entries to verify the <zeus_tool> bridge.",
+                    eff_dir
+                ),
+                attachments: Vec::new(),
+            },
+            ChatMessage {
+                role: "assistant".to_string(),
+                content: "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>".to_string(),
+                attachments: Vec::new(),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: format!(
+                    "Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n{}\n</tool_result>\n\nUser request: {}\n(Emit <zeus_tool name=\"shell\">...</zeus_tool>, <zeus_tool name=\"python\">...</zeus_tool>, <zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>, <zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>, <zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>, or <zeus_tool name=\"memory_search\">...</zeus_tool> outside <think> now to execute this request.)",
+                    top_listing, orig_user
+                ),
+                attachments: Vec::new(),
+            },
+        ];
+    }
+
+    let tool_sys = format!(
+        "You are Zeus running inside the ZeusDesigns Native OpenCode SDK Agent Runtime.\nOpen project folder: {}.\n## Agent tools\nEmit tool blocks outside <think> and stop immediately after </zeus_tool>:\n- <zeus_tool name=\"shell\">command</zeus_tool> (alias: name=\"bash\")\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete file content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nexisting\\n=======\\nreplacement\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>",
+        eff_dir
+    );
     let system_prompt = if custom_sys.trim().is_empty() {
-        tool_sys.to_string()
+        tool_sys
     } else {
         format!("{}\n\n{}", custom_sys, tool_sys)
     };
 
     let mut final_clean_answer = String::new();
+    let mut nudged = false;
     for round in 0..12usize {
         if cancel_flag.load(Ordering::Relaxed) {
             break;
@@ -1356,6 +1413,20 @@ fn handle_opencode_session_message(
         }
 
         if invocations.is_empty() {
+            if !is_greeting && !nudged && round == 0 {
+                nudged = true;
+                history.push(ChatMessage {
+                    role: "assistant".to_string(),
+                    content: "Understood. I will emit the `<zeus_tool>` XML block now to execute the workspace action directly.".to_string(),
+                    attachments: Vec::new(),
+                });
+                history.push(ChatMessage {
+                    role: "user".to_string(),
+                    content: "Your reply stopped after planning without emitting a `<zeus_tool>` block, so no command or file operation ran. Output ONLY `<zeus_tool name=\"shell\">...</zeus_tool>`, `<zeus_tool name=\"python\">...</zeus_tool>`, `<zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>`, `<zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>`, or `<zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>` now.".to_string(),
+                    attachments: Vec::new(),
+                });
+                continue;
+            }
             history.push(ChatMessage {
                 role: "assistant".to_string(),
                 content: final_clean_answer.clone(),

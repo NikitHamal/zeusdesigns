@@ -107,7 +107,7 @@ export function parseStream(full: string): { text: string; blocks: Block[]; leak
     .replace(/<tool_call[\s\S]*?(<\/tool_call>|$)/g, "")
     .replace(/<function_call[\s\S]*?(<\/function_call>|$)/g, "")
     .replace(/<function(?:=|\s+name=)[\s\S]*?(<\/function>|$)/gi, "")
-    .replace(/<invoke\s+name=[\s\S]*?(<\/invoke>|$)/gi, "")
+    .replace(/<(?:antml:)?invoke\s+name=[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, "")
     .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, "")
     .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, "");
   let text = "";
@@ -561,7 +561,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   try {
     if (useOC) {
       await runOpenCode({
-        convId, title: conv.title, prompt: opts.text, signal,
+        convId, title: conv.title, prompt: opts.text, system, signal,
         onText: (t) => { full += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
         onReasoning: (t) => { extraThink += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
         onTool: (t) => {

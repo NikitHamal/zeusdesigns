@@ -9,18 +9,20 @@ import { M3E_GUIDE, M3E_TRIGGER } from "./m3e";
 export type Intent = "chat" | "code" | "design";
 
 const DESIGN_ASK = /\b(design|redesign|mock-?up|wireframe|prototype|landing page|home ?page|screen|screens|artboard|canvas|ui|ux|layout|onboarding flow|dashboard (ui|design|screen)|app (ui|design|screen)|hero section|style guide|design system|variant|moodboard|poster|slides?|deck)\b/i;
-const CODE_ASK = /\b(code|bug|fix|implement|refactor|function|class|component|file|files|repo|repository|test|tests|build|compile|npm|pnpm|yarn|pip|cargo|git|github|gitlab|pull|push|fetch|clone|merge|rebase|status|diff|commit|branch|error|exception|stack ?trace|typescript|javascript|python|rust|golang|java|c\+\+|css|html|sql|api|endpoint|script|cli|terminal|command|run|install|debug|lint|deploy|docker|regex|algorithm|read|search|find|grep|edit|write|create|add|remove|rename|update|check|inspect|list|directory|folder|workspace|execute)\b/i;
+const CODE_ASK = /\b(code|bug|fix|implement|refactor|function|class|component|file|files|repo|repository|test|tests|build|compile|npm|pnpm|yarn|pip|cargo|git|github|gitlab|pull|push|fetch|clone|merge|rebase|status|diff|commit|branch|error|exception|stack ?trace|typescript|javascript|python|rust|golang|java|c\+\+|css|html|sql|api|endpoint|script|cli|terminal|command|run|install|debug|lint|deploy|docker|regex|algorithm|read|search|find|grep|edit|write|create|add|remove|rename|update|check|inspect|list|ls|pwd|cat|head|tail|tree|explain|analyze|summarize|review|audit|optimize|clean|format|start|stop|serve|dev|bench|benchmark|overview|structure|architecture|memory|remember|preference|preferences|directory|folder|workspace|execute)\b/i;
 const EDIT_CANVAS = /\b(change|make|switch|apply|tweak|adjust|bigger|smaller|darker|lighter|theme|colou?r|palette|dark mode|light mode|font|spacing|padding|rounder|compact|move|align|swap|replace|add (a|an|the)|remove (the|a))\b/i;
 const NEW_SUBJECT = /\b(new|another|different|from scratch|start over)\b/i;
+const CASUAL_CHAT = /^(thanks|thank you|thx|ty|ok|okay|cool|nice|great|awesome|got it|bye|goodbye|who are you|what model are you|how are you)[!.?\s]*$/i;
 
 /** Decide what the user is asking for so a greeting never becomes a design and a bug fix never touches the canvas. */
 export function classifyIntent(text: string, ctx: { boards: number; quote?: boolean; asVariant?: boolean; workspace?: boolean }): Intent {
   const t = text.trim();
+  if (GREETING_RE.test(t) || CASUAL_CHAT.test(t)) return "chat";
   if (ctx.asVariant || ctx.quote) return "design";
   if (M3E_TRIGGER.test(t)) return "chat";
   if (DESIGN_ASK.test(t)) return /\b(code|bug|refactor|compile|npm|git|function|repo|typescript|python|rust)\b/i.test(t) && !/\b(design|mock-?up|wireframe|landing page|screen|artboard|canvas)\b/i.test(t) ? "code" : "design";
   if (ctx.boards > 0 && EDIT_CANVAS.test(t) && !CODE_ASK.test(t.replace(EDIT_CANVAS, "")) && !NEW_SUBJECT.test(t)) return "design";
-  if (CODE_ASK.test(t) || (ctx.workspace && t.split(/\s+/).length > 4)) return "code";
+  if (CODE_ASK.test(t) || ctx.workspace) return "code";
   return "chat";
 }
 
