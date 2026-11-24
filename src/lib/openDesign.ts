@@ -529,32 +529,128 @@ export const HYPERFRAMES_VISUAL_STYLES: HyperFramesVisualStyle[] = [
     promptRule: "Literary serif display headlines paired with clean sans data labels and warm terracotta accents.",
   },
   {
-    id: "folk-frequency",
-    name: "Field Instrument",
-    tradition: "Dieter Rams / Braun",
-    mood: "Tactile, functional",
-    bestFor: "Hardware interfaces, audio tools, engineering workflows",
-    primaryTransition: "Mechanical Step",
-    gsapEase: "power4.out",
-    bg: "#E6E4E0",
-    ink: "#141414",
-    accent: "#FF5500",
-    promptRule: "Anodized aluminum surface #E6E4E0, stark #141414 ink, safety orange #FF5500 indicators, 1px instrument rules.",
-  },
-  {
-    id: "shadow-cut",
-    name: "Shadow Cut Monochrome",
-    tradition: "Swiss Brutalism",
-    mood: "Stark, architectural",
-    bestFor: "Infrastructure, compilers, zero-latency systems",
-    primaryTransition: "Instant Cut",
-    gsapEase: "expo.out",
-    bg: "#000000",
-    ink: "#EDEDED",
-    accent: "#3ECF8E",
-    promptRule: "Pure monochrome structural grid with 1px #222222 crosshairs and emerald telemetry readout.",
+    id: "editorial-grid",
+    name: "Editorial Newspaper Grid",
+    tradition: "Swiss International Broadsheet",
+    mood: "Authoritative, structured",
+    bestFor: "Research reports, benchmark announcements, engineering deep-dives",
+    primaryTransition: "Column Wipe",
+    gsapEase: "power3.inOut",
+    bg: "#F4F1EA",
+    ink: "#141413",
+    accent: "#9E2A2B",
+    promptRule: "Exposed 1px rules dividing multi-column cells, serif headlines, monospace index numbers, zero shadows.",
   },
 ];
+
+export interface HyperFramesPaletteSpec {
+  id: string;
+  name: string;
+  bg: string;
+  surface: string;
+  ink: string;
+  accent: string;
+  secondary: string;
+  mood: string;
+}
+
+export const HYPERFRAMES_PALETTES: HyperFramesPaletteSpec[] = [
+  { id: "warm-editorial", name: "Warm Editorial", bg: "#FFF5E8", surface: "#F4E7D5", ink: "#1A1410", accent: "#FF5E3A", secondary: "#2BBAB2", mood: "Warm parchment canvas with vermilion and teal accents." },
+  { id: "dark-premium", name: "Dark Premium", bg: "#0B0C0E", surface: "#15171C", ink: "#F4F5F8", accent: "#E2B93B", secondary: "#10B981", mood: "Obsidian broadcast studio with gold and emerald data accents." },
+  { id: "bold-energetic", name: "Bold Energetic", bg: "#111214", surface: "#1D1F24", ink: "#FFFFFF", accent: "#FF4D2D", secondary: "#FACC15", mood: "High-impact kinetic launch palette with vermilion and signal yellow." },
+  { id: "clean-corporate", name: "Clean Corporate", bg: "#F7F8FA", surface: "#FFFFFF", ink: "#0F172A", accent: "#0F766E", secondary: "#D97706", mood: "Crisp Swiss daylight ledger with deep teal and amber highlights." },
+  { id: "monochrome", name: "Pure Monochrome", bg: "#09090B", surface: "#141417", ink: "#FAFAFA", accent: "#E4E4E7", secondary: "#71717A", mood: "Stark architectural black-and-white grid with exposed hairlines." },
+  { id: "nature-earth", name: "Nature Earth", bg: "#141814", surface: "#1E241E", ink: "#ECEFE9", accent: "#84CC16", secondary: "#D97757", mood: "Deep botanical moss with terracotta and botanical lime." },
+  { id: "jewel-rich", name: "Jewel Rich", bg: "#121016", surface: "#1C1922", ink: "#F5F2EB", accent: "#E11D48", secondary: "#F59E0B", mood: "Editorial crimson and warm gold on deep charcoal." },
+  { id: "pastel-soft", name: "Daylight Soft", bg: "#FAF7F2", surface: "#F0ECE1", ink: "#1F1E1B", accent: "#C85A32", secondary: "#2A7B6F", mood: "Soft daylight paper with warm sienna and muted sage." },
+  { id: "neon-electric", name: "Terminal Signal", bg: "#07090B", surface: "#0E1317", ink: "#E6F4F1", accent: "#10B981", secondary: "#F59E0B", mood: "High-frequency telemetry phosphor green and amber on carbon." },
+];
+
+export interface HyperFramesPromptTemplate {
+  id: string;
+  title: string;
+  category: "Product" | "Data" | "Brand" | "Canvas" | "Social";
+  aspect: VideoAspectRatio;
+  durationSec: number;
+  summary: string;
+  prompt: string;
+}
+
+export const HYPERFRAMES_PROMPT_TEMPLATES: HyperFramesPromptTemplate[] = [
+  {
+    id: "hyperframes-app-showcase-three-phones",
+    title: "12s App Showcase — Three Floating Phones",
+    category: "Product",
+    aspect: "16:9",
+    durationSec: 12,
+    summary: "Three mobile device frames surface workout summary, live timer, and streak grid with beat-synced callouts.",
+    prompt: "Build a 12-second HyperFrames app-showcase composition (1920x1080) with three phone screens highlighting a fitness app: (1) Workout summary rings, (2) Live MM:SS activity timer with tabular-nums, and (3) Weekly 7x4 streak grid, ending with a kinetic brand lockup.",
+  },
+  {
+    id: "hyperframes-data-bar-chart-race",
+    title: "12s Animated Bar-Chart Race (NYT Style)",
+    category: "Data",
+    aspect: "16:9",
+    durationSec: 12,
+    summary: "6-bar animated bar-chart race with editorial serif headline, proportional fill bars, and kinetic value labels.",
+    prompt: "Build a 12-second HyperFrames data composition (1920x1080) showing a 6-bar animated bar-chart race with an editorial serif headline, tabular monospace counters, and source footnote.",
+  },
+  {
+    id: "hyperframes-saas-product-promo-30s",
+    title: "30s SaaS Product Launch Promo",
+    category: "Product",
+    aspect: "16:9",
+    durationSec: 30,
+    summary: "Multi-scene SaaS launch reel: problem statement, command palette reveal, live telemetry bento, and CTA lockup.",
+    prompt: "Build a 6-scene HyperFrames SaaS product launch video (1920x1080): Scene 1 bold typographic hook, Scene 2 command-palette workflow reveal, Scene 3 live throughput metrics, Scene 4 customer proof quote, Scene 5 pricing tier comparison, Scene 6 final CTA lockup.",
+  },
+  {
+    id: "hyperframes-brand-sizzle-reel",
+    title: "15s Brand Identity Sizzle Reel",
+    category: "Brand",
+    aspect: "16:9",
+    durationSec: 15,
+    summary: "Fast-cut kinetic typography, color token swatches, and geometric grid choreography for a brand reveal.",
+    prompt: "Build a 5-scene HyperFrames Brand Sizzle Reel (1920x1080) showcasing kinetic display typography, color token swatch reveals with hex codes, typographic scale specimen, and final brand mark lockup.",
+  },
+  {
+    id: "hyperframes-money-counter-hype",
+    title: "10s Financial Metric Counter & Revenue Velocity",
+    category: "Data",
+    aspect: "16:9",
+    durationSec: 10,
+    summary: "Oversized tabular-nums odometer counter with proportional fill bar and quarterly delta breakdown.",
+    prompt: "Build a 5-scene HyperFrames Financial Metric Counter composition (1920x1080) featuring an oversized tabular-nums revenue counter, Q1-Q4 proportional fill bars, and unit economics breakdown.",
+  },
+  {
+    id: "hyperframes-flight-map-route",
+    title: "12s Global SVG Route & Telemetry Map",
+    category: "Data",
+    aspect: "16:9",
+    durationSec: 12,
+    summary: "Animated SVG geodesic flight/network arc across global regions with latency and throughput callouts.",
+    prompt: "Build a 5-scene HyperFrames Global Route & Telemetry Map composition (1920x1080) with animated SVG path drawing between Tokyo, Frankfurt, and New York nodes, showing real-time p99 latency and throughput.",
+  },
+  {
+    id: "hyperframes-website-to-video-promo",
+    title: "15s Website-to-Video Hero Walkthrough",
+    category: "Product",
+    aspect: "16:9",
+    durationSec: 15,
+    summary: "Transforms a product landing page into a multi-scene browser frame walkthrough with zoomed feature callouts.",
+    prompt: "Build a 5-scene HyperFrames Website-to-Video promo (1920x1080) that frames a crisp browser viewport, pans across the hero, zooms into the interactive code editor and live benchmark table, and closes on the release tag.",
+  },
+  {
+    id: "hyperframes-tiktok-karaoke-talking-head",
+    title: "15s Vertical 9:16 Social Reel & Captions",
+    category: "Social",
+    aspect: "9:16",
+    durationSec: 15,
+    summary: "Vertical 1080x1920 short-form motion composition with word-by-word kinetic captions and metric cards.",
+    prompt: "Build a 5-scene vertical 9:16 HyperFrames composition (1080x1920) with word-highlighted kinetic captions, stacked feature cards, and high-contrast mobile-first typography.",
+  },
+];
+
 
 /* ------------------------------------------------------------------ */
 /* Pre-Built Starter HTML Deliverables (HyperFrames, Deck, Prototype) */

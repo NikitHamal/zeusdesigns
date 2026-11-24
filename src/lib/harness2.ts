@@ -734,6 +734,147 @@ export function buildHarnessNamespace(opts: {
   return base;
 }
 
+/**
+ * Ported from Google Research `harness2/core/runmark.py`:
+ * Computes deterministic trial identity fingerprints (`fingerprint` and `inputs_fingerprint`)
+ * and `.adapt_complete` completion markers so stale rollouts are never reused after harness edits.
+ */
+export const ADAPT_COMPLETE_MARK = ".adapt_complete";
+
+function fnv1a64Hex(chunks: readonly string[]): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x811c9dc5 ^ 0x9e3779b9;
+  for (const chunk of chunks) {
+    for (let i = 0; i < chunk.length; i++) {
+      const c = chunk.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 0x01000193) >>> 0;
+      h2 ^= c ^ (i & 0xff);
+      h2 = Math.imul(h2, 0x01000193) >>> 0;
+    }
+  }
+  return h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0");
+}
+
+export function computeHarnessFingerprint(tree: Record<string, string> | null): string {
+  if (!tree) return "base";
+  const keys = Object.keys(tree)
+    .filter((k) => !k.endsWith(ADAPT_COMPLETE_MARK) && !k.includes("__pycache__") && !k.endsWith(".DS_Store"))
+    .sort();
+  if (keys.length === 0) return "absent";
+  const parts: string[] = [];
+  for (const k of keys) {
+    parts.push(`${k}\0${tree[k] ?? ""}\0`);
+  }
+  return fnv1a64Hex(parts);
+}
+
+export function computeTaskInputsFingerprint(taskPrompt: string, files?: Record<string, string>): string {
+  const parts: string[] = [`prompt\0${taskPrompt}\0`];
+  if (files) {
+    for (const rel of Object.keys(files).sort()) {
+      parts.push(`file\0${rel}\0${files[rel] ?? ""}\0`);
+    }
+  }
+  return fnv1a64Hex(parts);
+}
+
+export interface RunmarkRecord {
+  version: number;
+  harness: string;
+  inputs: string;
+  completedAt: number;
+}
+
+export function buildRunmarkRecord(opts: {
+  tree: Record<string, string> | null;
+  taskPrompt: string;
+  files?: Record<string, string>;
+}): RunmarkRecord {
+  return {
+    version: 1,
+    harness: computeHarnessFingerprint(opts.tree),
+    inputs: computeTaskInputsFingerprint(opts.taskPrompt, opts.files),
+    completedAt: Date.now(),
+  };
+}
+
+/**
+ * Ported from Google Research `harness2/core/report.py`:
+ * Summarizes judged selections into benchmark report figures and pick provenance
+ * (`kept_base`, `chose_final`, `chose_candidate`, `n_ungraded`), excluding ungraded rows from the denominator.
+ */
+export interface HarnessBenchmarkSummary {
+  mode: "agg" | "seq";
+  k: number;
+  n: number;
+  nUngraded: number;
+  score: number | null;
+  allPass: number | null;
+  keptBase: number;
+  choseFinal: number;
+  choseCandidate: number;
+  line: string;
+}
+
+export function classifySelectedRolloutKind(r: ScoredRollout): "base" | "final" | "candidate" {
+  const lbl = (r.label || "").trim();
+  if (lbl.startsWith("base") || r.chosenIsBase) return "base";
+  if (r.mode === "agg" || r.mode === "parallel") {
+    return lbl.startsWith("agg") ? "final" : "candidate";
+  }
+  return /^c\d+$/.test(lbl) ? "final" : "candidate";
+}
+
+export function summariseHarnessRollouts(
+  rows: readonly ScoredRollout[],
+  mode: "agg" | "seq" = "seq",
+  k = 1
+): HarnessBenchmarkSummary {
+  const graded = rows.filter((r) => r.frac !== null);
+  const nUngraded = rows.length - graded.length;
+  const n = graded.length;
+  if (n === 0) {
+    return {
+      mode,
+      k,
+      n: 0,
+      nUngraded,
+      score: null,
+      allPass: null,
+      keptBase: 0,
+      choseFinal: 0,
+      choseCandidate: 0,
+      line: `  ${mode === "agg" ? "parallel" : "sequential"} k=${k}: no graded task`,
+    };
+  }
+  const score = (graded.reduce((acc, r) => acc + (r.frac ?? 0), 0) / n) * 100;
+  const allPass = (graded.filter((r) => r.allPass).length / n) * 100;
+  let keptBase = 0;
+  let choseFinal = 0;
+  let choseCandidate = 0;
+  for (const r of graded) {
+    const kind = classifySelectedRolloutKind(r);
+    if (kind === "base") keptBase++;
+    else if (kind === "final") choseFinal++;
+    else choseCandidate++;
+  }
+  const modeName = mode === "agg" ? "parallel" : "sequential";
+  const line = `  ${modeName} k=${k}: n=${n} | partial ${score.toFixed(2)}% | pass ${allPass.toFixed(1)}% | picked output: final ${choseFinal} / candidate ${choseCandidate} / base ${keptBase}${nUngraded ? ` | ungraded ${nUngraded}` : ""}`;
+  return {
+    mode,
+    k,
+    n,
+    nUngraded,
+    score,
+    allPass,
+    keptBase,
+    choseFinal,
+    choseCandidate,
+    line,
+  };
+}
+
 export async function materializeHarnessTree(ws: Workspace, providerId: string, modelId: string): Promise<string[]> {
   const tree = buildDefaultHarnessTree(providerId, modelId);
   validateAndAutotriggerHarnessTree(tree);
