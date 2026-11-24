@@ -977,7 +977,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                         if n > end {
                             break;
                         }
-                        if out.len() > 40000 {
+                        if out.len() > 48000 {
                             out.push_str("\n[truncated: call read_file again with start/end]");
                             break;
                         }

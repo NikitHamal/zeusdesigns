@@ -846,12 +846,23 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
             } else {
                 let full = base.join(&n.path);
                 if let Ok(text) = fs::read_to_string(&full) {
-                    for (idx, line) in text.lines().enumerate() {
+                    let all_lines: Vec<&str> = text.lines().collect();
+                    for (idx, line) in all_lines.iter().enumerate() {
                         if line.to_lowercase().contains(needle) {
+                            let ctx_start = idx.saturating_sub(2);
+                            let ctx_end = (idx + 3).min(all_lines.len());
+                            let ctx_snippet = (ctx_start..ctx_end)
+                                .map(|i| {
+                                    let marker = if i == idx { ">" } else { " " };
+                                    let trimmed_l: String = all_lines[i].trim().chars().take(160).collect();
+                                    format!("{}{}: {}", marker, i + 1, trimmed_l)
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" | ");
                             out.push(json!({
                                 "path": n.path,
                                 "line": idx + 1,
-                                "snippet": line.trim().chars().take(200).collect::<String>()
+                                "snippet": ctx_snippet
                             }));
                             if out.len() >= limit {
                                 return;

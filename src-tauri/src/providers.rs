@@ -2345,10 +2345,15 @@ pub fn stream_mercury3<F>(
 where
     F: FnMut(&str),
 {
-    let inc_effort = match effort {
-        "low" => "low",
-        "medium" => "medium",
-        _ => "high",
+    let has_tool_results = messages.iter().any(|m| m.content.contains("<tool_result"));
+    let inc_effort = if has_tool_results {
+        "low"
+    } else {
+        match effort {
+            "low" => "low",
+            "medium" => "medium",
+            _ => "high",
+        }
     };
     for attempt in 0..2 {
         let token = match ensure_inception_token(engine, attempt > 0) {
@@ -2433,6 +2438,7 @@ where
         let mut saw_text = false;
         let mut saw_think = false;
         let mut in_think = false;
+        let mut think_buf = String::new();
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -2444,7 +2450,7 @@ where
                 }
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                     let etype = ev.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    if etype == "reasoning-delta" || etype == "reasoning" {
+                    if etype == "reasoning-delta" || etype == "reasoning" || etype == "thinking-delta" || etype == "thought-delta" {
                         if let Some(delta) = ev.get("delta").or_else(|| ev.get("text")).and_then(|d| d.as_str()) {
                             if !delta.is_empty() {
                                 if !in_think {
@@ -2452,6 +2458,7 @@ where
                                     on_delta("<think>");
                                 }
                                 saw_think = true;
+                                think_buf.push_str(delta);
                                 on_delta(delta);
                             }
                         }
@@ -2473,6 +2480,67 @@ where
         }
         if in_think {
             on_delta("</think>");
+        }
+        // If Mercury 3 emitted only <think> and cut off before emitting any text-delta (and didn't put <zeus_tool> inside <think>),
+        // immediately request the visible response with reasoningEffort="low" so the turn never ends blank or stalls mid-task.
+        if !saw_text && saw_think && !think_buf.contains("<zeus_tool") && !cancel.load(Ordering::Relaxed) {
+            let mut followup_msgs = inc_msgs.clone();
+            followup_msgs.push(json!({
+                "id": random_hex(16),
+                "role": "assistant",
+                "parts": [{ "type": "text", "text": format!("Thought summary: {}", think_buf.chars().take(1200).collect::<String>()) }]
+            }));
+            followup_msgs.push(json!({
+                "id": random_hex(16),
+                "role": "user",
+                "parts": [{ "type": "text", "text": "Now output ONLY your visible response or the next <zeus_tool> XML block outside <think> to execute the action." }]
+            }));
+            let followup_payload = json!({
+                "reasoningEffort": "low",
+                "webSearchEnabled": false,
+                "voiceMode": false,
+                "timezone": "UTC",
+                "id": random_hex(16),
+                "messages": followup_msgs,
+                "trigger": "submit-message"
+            });
+            if let Ok(resp2) = client
+                .post("https://chat.inceptionlabs.ai/api/chat")
+                .header("Content-Type", "application/json")
+                .header("Accept", "*/*")
+                .header("Origin", "https://chat.inceptionlabs.ai")
+                .header("Referer", "https://chat.inceptionlabs.ai/")
+                .header("x-session-token", &token)
+                .header("Cookie", format!("session={}", token))
+                .json(&followup_payload)
+                .send()
+            {
+                if resp2.status().is_success() {
+                    let mut r2 = BufReader::new(resp2);
+                    let mut l2 = String::new();
+                    while r2.read_line(&mut l2).unwrap_or(0) > 0 {
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        if let Some(raw2) = l2.trim().strip_prefix("data: ") {
+                            if raw2 == "[DONE]" {
+                                break;
+                            }
+                            if let Ok(ev2) = serde_json::from_str::<Value>(raw2) {
+                                if ev2.get("type").and_then(|t| t.as_str()) == Some("text-delta") {
+                                    if let Some(d2) = ev2.get("delta").and_then(|d| d.as_str()) {
+                                        if !d2.is_empty() {
+                                            saw_text = true;
+                                            on_delta(d2);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        l2.clear();
+                    }
+                }
+            }
         }
         if saw_text || saw_think {
             return Ok(());
