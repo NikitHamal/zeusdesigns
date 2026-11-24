@@ -18,8 +18,8 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `workspace_tree` | `{root, depth?}` | `FileNode[]` (name, path, dir, children?) |
 | `workspace_list` | `{root, rel}` | `FileNode[]` (lazy 1-level directory expansion) |
 | `workspace_search` | `{root, query, limit?}` | `{path, line, snippet}[]` |
-| `fs_read` / `fs_write` | `{root, path, content?}` | `string` / `()` |
-| `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` |
+| `fs_read` / `fs_write` / `fs_delete` | `{root, path, content?}` | `string` / `()` / `string` |
+| `shell_run` | `{root, cmd}` | `{code, stdout, stderr}` (CREATE_NO_WINDOW + built-in POSIX `rm`/`ls`/`cat`/`pwd`/`touch`/`mkdir`) |
 | `memory_list` / `memory_search` / `memory_add` / `memory_update` / `memory_delete` | `{query?, category?, project?}` / `{text, category?, project?}` / `{id, text, category?}` / `{id}` | `MemoryItem[]` |
 | `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
 | `perf_stats` / `perf_trim` / `perf_set_auto` | – / – / `{enabled}` | `PerfStats` / `TrimReport` / `PerfStats` |
