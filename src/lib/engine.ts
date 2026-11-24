@@ -124,11 +124,25 @@ export function parseStream(full: string): { text: string; blocks: Block[]; leak
     const attrs = parseAttrs(full.slice(s + 9, gt));
     const e = full.indexOf("</artboard>", gt + 1);
     const clean = (h: string) => h.replace(/^\s*```(?:html)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-    if (e < 0) { blocks.push({ attrs, html: clean(full.slice(gt + 1)), closed: false }); break; }
-    blocks.push({ attrs, html: clean(full.slice(gt + 1, e)), closed: true });
+    const isRealHtmlBlock = (h: string, a: Record<string, string>) => {
+      if (a.name === "..." || h.startsWith('".') || h.startsWith("'.")) return false;
+      return /<(?:!doctype|html|head|body|style|div|main|section|header|nav|article|canvas|svg|script|h1|h2|table|form)\b/i.test(h);
+    };
+    if (e < 0) {
+      const candidate = clean(full.slice(gt + 1));
+      if (isRealHtmlBlock(candidate, attrs)) {
+        blocks.push({ attrs, html: candidate, closed: false });
+      }
+      break;
+    }
+    const candidate = clean(full.slice(gt + 1, e));
+    if (isRealHtmlBlock(candidate, attrs)) {
+      blocks.push({ attrs, html: candidate, closed: true });
+    }
     i = e + 11;
   }
-  const { cleanText, leakedPlan } = extractLeakedPlan(text);
+  const cleanedStray = text.replace(/^\s*(?:``|''|,,)+\s*$/gm, "").trim();
+  const { cleanText, leakedPlan } = extractLeakedPlan(cleanedStray);
   return { text: cleanText, blocks, leakedPlan: leakedPlan || undefined };
 }
 

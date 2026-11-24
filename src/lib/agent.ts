@@ -21,9 +21,11 @@ export function classifyIntent(text: string, ctx: { boards: number; quote?: bool
   if (GREETING_RE.test(t) || CASUAL_CHAT.test(t)) return "chat";
   if (ctx.asVariant || ctx.quote) return "design";
   if (M3E_TRIGGER.test(t)) return "chat";
-  if (DESIGN_ASK.test(t)) return /\b(code|bug|refactor|compile|npm|git|function|repo|typescript|python|rust)\b/i.test(t) && !/\b(design|mock-?up|wireframe|landing page|screen|artboard|canvas)\b/i.test(t) ? "code" : "design";
-  if (ctx.boards > 0 && EDIT_CANVAS.test(t) && !CODE_ASK.test(t.replace(EDIT_CANVAS, "")) && !NEW_SUBJECT.test(t)) return "design";
-  if (CODE_ASK.test(t) || ctx.workspace) return "code";
+  // If the prompt asks for any file, shell, git, code, or deletion action (even alongside a UI/page request), route to `code`
+  // so Zeus Harness² executes all workspace tools first without forcing a design template.
+  if (CODE_ASK.test(t) || /\b(delete|remove|rm|unlink|erase)\b/i.test(t) || ctx.workspace) return "code";
+  if (DESIGN_ASK.test(t)) return "code";
+  if (ctx.boards > 0 && EDIT_CANVAS.test(t) && !NEW_SUBJECT.test(t)) return "design";
   return "chat";
 }
 
@@ -31,7 +33,7 @@ export const GREETING_RE = /^(hi|hello|hey|yo|sup|hola|howdy|greetings|good\s+(m
 
 export function agentPrompt(mode: Intent, userText = ""): string {
   if (mode === "chat" && GREETING_RE.test(userText.trim())) {
-    return "You are Zeus, a free general-purpose AI coding and design agent running inside the ZeusDesigns desktop app. Reply to the user's greeting in one plain, direct sentence (for example: \"Hello! What would you like to build or work on?\") with no tools, no files, no code blocks, no emojis, and no roleplay.";
+    return "You are Zeus, a free AI coding & software engineering agent running inside the Zeus Codes desktop app. Reply to the user's greeting in one plain, direct sentence (for example: \"Hello! What would you like to build or work on?\") with no tools, no files, no code blocks, no emojis, and no roleplay.";
   }
   const s = useStore.getState();
   const ws = s.ui.workspace;
@@ -44,7 +46,7 @@ export function agentPrompt(mode: Intent, userText = ""): string {
     : "";
 
   return [
-    `You are Zeus, a free general-purpose AI coding & design agent running inside the ZeusDesigns desktop app (powered by Zeus Harness²). You talk, reason, write and edit code, execute bash and python scripts, research, and—only when asked—design interfaces. You work like a principal software engineer pairing with the user.`,
+    `You are Zeus, a world-class AI coding and software engineering agent running inside the Zeus Codes desktop app (powered by Zeus Harness² & OpenCode runtime). You write, debug, refactor, and test code, execute bash and python scripts, manage local project files, and build raw, bespoke web interfaces when asked. You work like a principal software engineer pairing with the user.`,
     `## How to respond
 - Answer what was asked, at the size it was asked. If the user sends a greeting ("Hi", "Hello", "Hey"), reply with one normal, direct sentence (e.g. "Hello! What would you like to build or work on?"). No tools, no files, no screens, no artifacts, no roleplay.
 - Never produce a design, template, landing page or mockup unless the user asks for a visual deliverable.

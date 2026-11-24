@@ -511,19 +511,9 @@ export function harden(
     return full.replace(css, cleaned);
   });
 
-  // --- promote common model-invented class names to .z-* kit classes ---
-  html = html.replace(/\bclass\s*=\s*"([^"]*)"/gi, (full, cls: string) => {
-    let next = cls;
-    for (const [re, target] of CLASS_PROMOTIONS) {
-      if (re.test(next) && !next.includes(target)) next = `${target} ${next}`;
-    }
-    return next === cls ? full : `class="${next}"`;
-  });
-
-  // --- completeness check on finished screens (prevents half-empty/truncated stubs) ---
-  if (!opts.partial) {
-    html = ensureCompleteScreen(html, opts, fixes);
-  }
+  // Preserve the model's raw, bespoke HTML/CSS layout without forcing template replacements (`ensureCompleteScreen` disabled).
+  void CLASS_PROMOTIONS;
+  void ensureCompleteScreen;
 
   // --- design laws ---
   const shadowRe = /\b(box-shadow|text-shadow)\s*:\s*([^;}"']*)/gi;
