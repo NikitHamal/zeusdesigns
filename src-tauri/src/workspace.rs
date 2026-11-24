@@ -100,7 +100,24 @@ fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
     let root_path = Path::new(root)
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(root));
-    let cleaned = rel_path.trim_start_matches(['/', '\\']);
+    let norm_rel = rel_path.trim().replace('\\', "/");
+    let norm_root = root.trim().replace('\\', "/").trim_end_matches('/').to_string();
+    let norm_canon = root_path
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_start_matches("//?/")
+        .trim_end_matches('/')
+        .to_string();
+    let stripped = if !norm_root.is_empty() && norm_rel.starts_with(&norm_root) {
+        &norm_rel[norm_root.len()..]
+    } else if !norm_canon.is_empty() && norm_rel.starts_with(&norm_canon) {
+        &norm_rel[norm_canon.len()..]
+    } else {
+        norm_rel.as_str()
+    };
+    let cleaned = stripped
+        .trim_start_matches("./")
+        .trim_start_matches(['/', '\\']);
     let candidate = root_path.join(cleaned);
     for comp in Path::new(cleaned).components() {
         if matches!(comp, std::path::Component::ParentDir) {

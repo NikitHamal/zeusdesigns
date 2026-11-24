@@ -174,6 +174,7 @@ fn is_known_valid_tool(name: &str) -> bool {
         "read_file"
             | "read"
             | "cat"
+            | "cat_file"
             | "view_file"
             | "open_file"
             | "write_file"
@@ -259,6 +260,8 @@ pub fn parse_inline_invocations_segment(
     let mut list = Vec::new();
 
     // 1. Parse `<zeus_tool ...>...</zeus_tool>` and self-closing `<zeus_tool ... />`
+    // Uses depth-aware matching so `write_file`/`edit_file` bodies that document `<zeus_tool>` syntax
+    // (such as `AGENTS.md`) never truncate at an inner example closing tag.
     let mut search_from = 0;
     while let Some(rel_start) = clean_text[search_from..].find("<zeus_tool") {
         let start = search_from + rel_start;
@@ -266,9 +269,43 @@ pub fn parse_inline_invocations_segment(
         let Some(gt) = rest.find('>') else { break };
         let header = &rest[10..gt];
         let self_closing = header.trim_end().ends_with('/');
+        let matched_end = if self_closing {
+            None
+        } else {
+            let mut depth = 1usize;
+            let mut scan = gt + 1;
+            let mut found_end = None;
+            while scan < rest.len() {
+                let next_open = rest[scan..].find("<zeus_tool").map(|i| scan + i);
+                let next_close = rest[scan..].find("</zeus_tool>").map(|i| scan + i);
+                match (next_open, next_close) {
+                    (Some(o), Some(c)) if o < c => {
+                        if let Some(ogt) = rest[o..].find('>') {
+                            let ohead = &rest[o + 10..o + ogt];
+                            if !ohead.trim_end().ends_with('/') {
+                                depth += 1;
+                            }
+                            scan = o + ogt + 1;
+                        } else {
+                            scan = c;
+                        }
+                    }
+                    (_, Some(c)) => {
+                        depth -= 1;
+                        if depth == 0 {
+                            found_end = Some(c);
+                            break;
+                        }
+                        scan = c + 12;
+                    }
+                    _ => break,
+                }
+            }
+            found_end.or_else(|| rest.find("</zeus_tool>"))
+        };
         let (body, next_pos) = if self_closing {
             ("", start + gt + 1)
-        } else if let Some(end_rel) = rest.find("</zeus_tool>") {
+        } else if let Some(end_rel) = matched_end {
             (rest[gt + 1..end_rel].trim(), start + end_rel + 12)
         } else if allow_unclosed_tail && rest.len() > gt + 2 {
             (rest[gt + 1..].trim(), clean_text.len())
@@ -755,7 +792,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
     let eff_root = resolve_workspace_root(eff_root);
 
     match name {
-        "read_file" | "read" | "cat" | "view_file" | "open_file" => {
+        "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" => {
             match fs_read(eff_root.clone(), path_arg.clone()) {
                 Ok(content) => {
                     let total = content.lines().count();
@@ -805,7 +842,25 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                         )
                     }
                 },
-                Err(e) => (false, e),
+                Err(_) => {
+                    // If the target file does not exist yet and the model called edit_file to create it,
+                    // extract the REPLACE block (or full body if no markers) and write it directly.
+                    let new_body = if let Ok(created) = apply_search_replace("", body) {
+                        created
+                    } else if !body.contains("<<<<<<<") {
+                        body.to_string()
+                    } else {
+                        String::new()
+                    };
+                    if !new_body.trim().is_empty() {
+                        match fs_write(eff_root.clone(), path_arg.clone(), new_body.clone()) {
+                            Ok(_) => (true, format!("Created {} ({} bytes)", path_arg, new_body.len())),
+                            Err(e) => (false, e),
+                        }
+                    } else {
+                        (false, format!("File not found: {}. Use write_file to create a new file.", path_arg))
+                    }
+                }
             }
         }
         "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "sync_artboard" => {
@@ -1153,8 +1208,13 @@ fn find_marker_line(text: &str, ch: char) -> Option<(usize, usize)> {
 /// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or flexible 4..9 marker variants or JSON `oldString`/`newString` edits),
 /// with automatic line-trimmed fuzzy fallback when exact whitespace differs.
 fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
+    let unescaped_body = if find_marker_line(body, '<').is_none() && body.contains("\\n") {
+        body.replace("\\r\\n", "\n").replace("\\n", "\n")
+    } else {
+        body.to_string()
+    };
     let mut out = content.to_string();
-    let mut rest = body;
+    let mut rest = unescaped_body.as_str();
     let mut n = 0usize;
     while let Some((_s_start, s_end)) = find_marker_line(rest, '<') {
         let after_s = &rest[s_end..];
@@ -1167,6 +1227,11 @@ fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
         let replace_raw = after_m[..r_start].trim_matches(|c| c == '\n' || c == '\r');
         rest = &after_m[r_end..];
         if search_raw.is_empty() {
+            if out.trim().is_empty() {
+                out = replace_raw.to_string();
+                n += 1;
+                continue;
+            }
             return Err("edit_file: SEARCH block is empty".to_string());
         }
         out = replace_hunk_fuzzy(&out, search_raw, replace_raw, n + 1)?;
