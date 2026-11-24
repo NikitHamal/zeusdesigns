@@ -346,6 +346,86 @@ export const OPEN_DESIGN_BRANDS: OpenDesignBrandSystem[] = [
 - Surfaces: bg #F6F5F0, surface #FFFFFF, ink #111111, muted #555555, accent #E11D48
 - Structure: Exposed 1px #111111 grid lines, 0px radius, asymmetric typographic hierarchy.`,
   },
+  {
+    id: "clickhouse-telemetry",
+    name: "ClickHouse Analytical Slate",
+    domain: "clickhouse.com",
+    category: "software",
+    posture: "Real-time OLAP database console with carbon-black tables and high-visibility signal yellow.",
+    bg: "#0D0D0D",
+    surface: "#161618",
+    ink: "#F5F5F7",
+    muted: "#8C8C94",
+    accent: "#FAFF69",
+    border: "#28282C",
+    displayFont: "'Space Grotesk', sans-serif",
+    sansFont: "'Inter', sans-serif",
+    monoFont: "'JetBrains Mono', monospace",
+    radius: "6px",
+    designMd: `# DESIGN.md — ClickHouse Analytical Slate
+- Surfaces: bg #0D0D0D, surface #161618, ink #F5F5F7, muted #8C8C94, accent #FAFF69
+- Structure: Sub-millisecond query telemetry tables, tabular-nums, 1px #28282C borders, zero shadows.`,
+  },
+  {
+    id: "cloudflare-kumo",
+    name: "Cloudflare Kumo Infrastructure",
+    domain: "cloudflare.com",
+    category: "software",
+    posture: "Global edge network operations center with warm stone light mode and signal amber-orange.",
+    bg: "#FAF9F6",
+    surface: "#FFFFFF",
+    ink: "#191919",
+    muted: "#636363",
+    accent: "#F6821F",
+    border: "#E0DDD5",
+    displayFont: "'Plus Jakarta Sans', sans-serif",
+    sansFont: "'Inter', sans-serif",
+    monoFont: "'JetBrains Mono', monospace",
+    radius: "8px",
+    designMd: `# DESIGN.md — Cloudflare Kumo Infrastructure
+- Surfaces: bg #FAF9F6, surface #FFFFFF, ink #191919, muted #636363, accent #F6821F
+- Structure: Edge PoP status matrices, throughput sparklines, 1px #E0DDD5 borders, zero shadows.`,
+  },
+  {
+    id: "figma-studio",
+    name: "Figma Multiplayer Studio",
+    domain: "figma.com",
+    category: "design-system",
+    posture: "Precision canvas workbench with dark graphite toolbars, crisp property rows, and coral accent.",
+    bg: "#1E1E1E",
+    surface: "#2C2C2C",
+    ink: "#F5F5F5",
+    muted: "#A3A3A3",
+    accent: "#F24E1E",
+    border: "#383838",
+    displayFont: "'Plus Jakarta Sans', sans-serif",
+    sansFont: "'Inter', sans-serif",
+    monoFont: "'JetBrains Mono', monospace",
+    radius: "8px",
+    designMd: `# DESIGN.md — Figma Multiplayer Studio
+- Surfaces: bg #1E1E1E, surface #2C2C2C, ink #F5F5F5, muted #A3A3A3, accent #F24E1E
+- Structure: 240px inspector rails, 28px compact token inputs, 1px #383838 dividers, zero shadows.`,
+  },
+  {
+    id: "airbnb-editorial",
+    name: "Airbnb Belo Editorial",
+    domain: "airbnb.com",
+    category: "consumer",
+    posture: "Warm architectural hospitality showcase with generous spacing, serif titles, and Rausch coral.",
+    bg: "#FAF8F5",
+    surface: "#FFFFFF",
+    ink: "#222222",
+    muted: "#6A6A6A",
+    accent: "#FF385C",
+    border: "#E4E0D8",
+    displayFont: "'Fraunces', Georgia, serif",
+    sansFont: "'Plus Jakarta Sans', sans-serif",
+    monoFont: "'JetBrains Mono', monospace",
+    radius: "16px",
+    designMd: `# DESIGN.md — Airbnb Belo Editorial
+- Surfaces: bg #FAF8F5, surface #FFFFFF, ink #222222, muted #6A6A6A, accent #FF385C
+- Structure: Architectural photography frames, 1px #E4E0D8 borders, zero box-shadows.`,
+  },
 ];
 
 export function getOpenDesignBrand(id?: string): OpenDesignBrandSystem {
@@ -1131,7 +1211,140 @@ export const OPEN_DESIGN_SKILLS_CATALOG: OpenDesignSkillTemplate[] = [
     summary: "Complete brand system specimen with color swatches, type scale, component matrix, and DESIGN.md.",
     prompt: "Create an interactive Brand Identity & DESIGN.md Specimen page showcasing surface color tokens, typography scale, button/input/table component anatomy, and downloadable DESIGN.md guidelines.",
   },
+  {
+    id: "hyperframes-saas-product-promo-30s",
+    name: "HyperFrames 30s SaaS Product Promo (Linear-Style)",
+    category: "video",
+    mode: "hyperframes",
+    aspect: "16:9",
+    brandId: "linear-precision",
+    summary: "4-scene 30-second product launch film: Hook quote, stacked problem cards, UI showcase, and wordmark outro.",
+    prompt: "Build a 5-scene 30-second HyperFrames SaaS product promo video (1920x1080) modelled on Linear product films: Scene 1 Hook headline, Scene 2 Problem user pull-quotes, Scene 3 Interactive UI workbench reveal, Scene 4 Latency & throughput benchmark bars, Scene 5 Wordmark & CTA outro with <!-- HYPERFRAMES_META: ... -->.",
+  },
+  {
+    id: "hyperframes-app-showcase-three-phones",
+    name: "HyperFrames Three-Device Mobile Showcase",
+    category: "video",
+    mode: "hyperframes",
+    aspect: "16:9",
+    brandId: "apple-hig",
+    summary: "Synchronized 3-phone mobile product choreography with feature callout pills and metric counters.",
+    prompt: "Create a 5-scene HyperFrames mobile product showcase video (1920x1080) featuring three synchronized phone frames, staggered feature pills, and tabular telemetry counters.",
+  },
+  {
+    id: "hyperframes-brand-sizzle-reel",
+    name: "HyperFrames Kinetic Brand Sizzle Reel",
+    category: "motion",
+    mode: "hyperframes",
+    aspect: "16:9",
+    brandId: "cash-app-kinetic",
+    summary: "Paula Scher-inspired maximalist kinetic typography reel with rapid 2.5s scene cuts and high-contrast type.",
+    prompt: "Create a 6-scene HyperFrames kinetic brand sizzle reel with oversized 120px display typography filling 75% of the frame, rapid 2500ms scene cadence, and high-contrast carbon/lime palette.",
+  },
+  {
+    id: "motion-frames-kinetic-globe",
+    name: "Motion-Frames Wireframe Globe & Rotating Type Ring",
+    category: "motion",
+    mode: "motion-design",
+    aspect: "16:9",
+    brandId: "claude-warm",
+    summary: "Full-bleed looping CSS/SVG kinetic poster with concentric rotating rings, wireframe globe, and serif headline.",
+    prompt: "Design a full-bleed 16:9 Motion-Frames kinetic poster with 3 concentric rotating SVG rings, a central wireframe technical globe, multilingual ring tokens, corner telemetry stamps, and an Instrument Serif headline.",
+  },
+  {
+    id: "deck-guizang-editorial",
+    name: "Guizang Literary Magazine 1920×1080 Deck",
+    category: "slides",
+    mode: "deck",
+    aspect: "16:9",
+    brandId: "claude-warm",
+    summary: "Editorial magazine presentation deck with serif chapter openers, pull quotes, and structured essays.",
+    prompt: "Create a 6-slide Guizang Editorial 1920x1080 presentation deck (<section class=\"slide\" data-slide-id=\"1\" data-title=\"...\" data-notes=\"...\">) with warm parchment surfaces, literary serif headlines, and structured comparison columns.",
+  },
 ];
+
+export interface HyperFramesBundle {
+  slug: string;
+  cacheDir: string;
+  files: Record<string, string>;
+}
+
+/**
+ * Ported from `nexu-io/open-design` (`od media scaffold` / `.hyperframes-cache/<slug>/`):
+ * Packages any HyperFrames HTML composition into the canonical 3-file OpenDesign bundle
+ * (`hyperframes.json`, `meta.json`, `index.html` with `window.__timelines.main` bridge).
+ */
+export function buildHyperFramesCompositionBundle(opts: {
+  html: string;
+  title: string;
+  aspect?: VideoAspectRatio;
+}): HyperFramesBundle {
+  const parsed = parseHyperFramesDocument(opts.html);
+  const slug =
+    (opts.title || "hyperframes-video")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "hyperframes-video";
+  const cacheDir = `.hyperframes-cache/${slug}`;
+  const totalSec = Math.max(1, +(parsed.totalDurationMs / 1000).toFixed(2));
+  const timelineBridge = `<script>
+window.__timelines = window.__timelines || {};
+window.__timelines.main = {
+  duration: function() { return ${totalSec}; },
+  seek: function(sec) {
+    var ms = sec * 1000;
+    var acc = 0;
+    var frames = document.querySelectorAll('.frame');
+    for (var i = 0; i < frames.length; i++) {
+      var d = Number(frames[i].getAttribute('data-duration')) || 3000;
+      if (ms <= acc + d || i === frames.length - 1) {
+        window.postMessage({ type: 'zeus:hyperframes-goto', index: i, playing: false }, '*');
+        break;
+      }
+      acc += d;
+    }
+  }
+};
+</script>`;
+  const enrichedHtml = opts.html.includes("window.__timelines")
+    ? opts.html
+    : opts.html.includes("</body>")
+    ? opts.html.replace("</body>", `${timelineBridge}\n</body>`)
+    : `${opts.html}\n${timelineBridge}`;
+
+  return {
+    slug,
+    cacheDir,
+    files: {
+      [`${cacheDir}/hyperframes.json`]: JSON.stringify(
+        {
+          paths: {
+            blocks: "compositions",
+            components: "compositions/components",
+            assets: "assets",
+          },
+          media: { autoProxy: false },
+        },
+        null,
+        2
+      ),
+      [`${cacheDir}/meta.json`]: JSON.stringify(
+        {
+          id: slug,
+          name: opts.title || "HyperFrames Composition",
+          aspect: opts.aspect || parsed.aspect,
+          width: parsed.width,
+          height: parsed.height,
+          durationSec: totalSec,
+          scenes: parsed.frames.length,
+        },
+        null,
+        2
+      ),
+      [`${cacheDir}/index.html`]: enrichedHtml,
+    },
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* Parsers for HyperFrames Video & Open-Slide Decks                   */
