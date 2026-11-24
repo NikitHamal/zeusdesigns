@@ -1251,7 +1251,7 @@ export function ChatPane() {
 
         <ContextWindowPill />
         {(artifacts > 0 || showCanvas) && (
-          <IconBtn label={showCanvas ? "Close canvas" : "Open canvas"} size={34} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="dashboard" size={19} /></IconBtn>
+          <IconBtn label={showCanvas ? "Close workbench" : "Open workbench"} size={34} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="code_blocks" size={19} /></IconBtn>
         )}
         {showCanvas && <IconBtn label="Hide chat" size={34} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={19} /></IconBtn>}
       </div>

@@ -55,9 +55,9 @@ jobs:
         with:
           tauriScript: npx tauri
           tagName: ${{ env.TAG }}
-          releaseName: "ZeusDesigns ${{ env.TAG }}"
+          releaseName: "Zeus Codes ${{ env.TAG }}"
           releaseBody: |
-            Automated Windows build of **ZeusDesigns** (native Rust + WebView2, Material 3 Expressive).
+            Automated Windows build of **Zeus Codes** (native Rust + C++20 + WebView2, Zeus Harness² & OpenCode runtime).
 
             - `ZeusDesigns_*_x64-setup.exe` — installer
             - `ZeusDesigns-portable.exe` — standalone executable (needs WebView2, preinstalled on Windows 10/11)
