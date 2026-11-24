@@ -1160,5 +1160,45 @@ console.log("ALL_AUTH_ROUTER_TESTS_PASSED");\n`);
   } catch (e) {
     console.log(`[Task 7: Delete AGENTS.md] ERROR: ${e.message}`);
   }
+
+  // Task 8: Screenshot Reproduction (In "index.html", update the <div> element ("Your neighborhood coffee spot"): remove that --- part)
+  try {
+    const ws8 = fs.mkdtempSync(path.join(os.tmpdir(), "zeus-t8-"));
+    const cssPad = Array.from({ length: 180 }, (_, i) => `.coffee-token-${i} { color: #354b37; padding: ${i % 12}px; }`).join("\n");
+    const html8 = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>sunday. — Neighborhood Coffee</title>
+<style>
+${cssPad}
+.eyebrow-row { display: flex; align-items: center; gap: 10px; border: 1px solid #d97757; padding: 4px 10px; }
+.eyebrow-dash { width: 24px; height: 1px; background: #354b37; }
+</style>
+</head>
+<body>
+  <header><span>sunday.</span><button>ORDER AHEAD</button></header>
+  <main>
+    <div class="eyebrow-row">
+      <span class="eyebrow-dash">---</span>
+      <div class="eyebrow-text">Your neighborhood coffee spot</div>
+    </div>
+    <h1>Good coffee. <em>No rush.</em></h1>
+  </main>
+</body>
+</html>\n`;
+    fs.writeFileSync(path.join(ws8, "index.html"), html8, "utf8");
+    const t0 = Date.now();
+    const prompt8 = `In "index.html", update the <div.eyebrow-row> element (path-0-1-0, text: "Your neighborhood coffee spot"): remove that --- part\n\nTarget element HTML:\n\`\`\`html\n<div class="eyebrow-row">\n      <span class="eyebrow-dash">---</span>\n      <div class="eyebrow-text">Your neighborhood coffee spot</div>\n    </div>\n\`\`\`\nApply the change directly to "index.html" using edit_file or write_file.`;
+    const trace8 = await runAgentTask(target, ws8, prompt8, 5, "code");
+    const toolsUsed = trace8.flatMap((r) => r.tools.map((t) => `${t.name}(${t.path || ""})[${t.ok ? "ok" : "ERR"}]`));
+    const updatedHtml = fs.readFileSync(path.join(ws8, "index.html"), "utf8");
+    const removedDash = !updatedHtml.includes('<span class="eyebrow-dash">---</span>') && updatedHtml.includes("Your neighborhood coffee spot");
+    console.log(`[Task 8: DOM Inspector Refine index.html] ${removedDash ? "PASS" : "FAIL"} (${Date.now() - t0}ms) | steps: ${toolsUsed.length} [${toolsUsed.join(" -> ")}]`);
+    if (!removedDash) console.log(`   Task 8 Last RAW: ${JSON.stringify(trace8[trace8.length - 1]?.raw?.slice(-500))}`);
+    fs.rmSync(ws8, { recursive: true, force: true });
+  } catch (e) {
+    console.log(`[Task 8: DOM Inspector Refine index.html] ERROR: ${e.message}`);
+  }
 }
 process.exit(0);
