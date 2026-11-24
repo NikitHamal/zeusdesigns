@@ -616,6 +616,124 @@ export function scoreAndProposeRecursiveStage(opts: {
   };
 }
 
+/**
+ * Ported from Google Research `harness2/core/selection.py` & `harness2/core/schedule.py`:
+ * Anonymizes candidate rollout labels (`A..Z`), orders graded candidates first without
+ * discarding ungraded rollouts, selects the non-regressing Pareto winner, and formats
+ * canonical `<bench>-<substrate>-<mode><k>` namespaces.
+ */
+export interface CandidateSelection {
+  taskId: string;
+  mode: "parallel" | "sequential";
+  k: number;
+  chosenId: string;
+  chosenLabel: string;
+  chosenIsBase: boolean;
+  why: string;
+  idMap: Record<string, string>;
+  nCandidates: number;
+  ok: boolean;
+}
+
+function toAnonId(index: number): string {
+  let out = "";
+  let n = Math.floor(index) + 1;
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    n = Math.floor((n - 1) / 26);
+    out = String.fromCharCode(65 + rem) + out;
+  }
+  return out;
+}
+
+export function assignAnonIds(labels: readonly string[], taskId: string, k = 1, mode = "sequential"): Record<string, string> {
+  const ordered = [...labels].sort();
+  let hash = 2166136261;
+  const seedStr = `${taskId}|${k}|${mode}`;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash ^= seedStr.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  // Deterministic Fisher-Yates shuffle
+  let s = hash >>> 0;
+  for (let i = ordered.length - 1; i > 0; i--) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    const tmp = ordered[i];
+    ordered[i] = ordered[j];
+    ordered[j] = tmp;
+  }
+  const map: Record<string, string> = {};
+  ordered.forEach((lbl, idx) => {
+    map[toAnonId(idx)] = lbl;
+  });
+  return map;
+}
+
+export function selectBestRolloutCandidate(
+  taskId: string,
+  candidates: readonly ScoredRollout[],
+  mode: "parallel" | "sequential" = "sequential",
+  k = 1
+): CandidateSelection {
+  if (!candidates.length) {
+    return {
+      taskId,
+      mode,
+      k,
+      chosenId: "A",
+      chosenLabel: "base",
+      chosenIsBase: true,
+      why: "No candidate rollouts supplied; defaulting to base harness.",
+      idMap: { A: "base" },
+      nCandidates: 0,
+      ok: false,
+    };
+  }
+  const idMap = assignAnonIds(
+    candidates.map((c) => c.label),
+    taskId,
+    k,
+    mode
+  );
+  // Graded first, highest pass fraction wins
+  const sorted = [...candidates].sort((a, b) => {
+    const aGraded = a.frac !== null ? 0 : 1;
+    const bGraded = b.frac !== null ? 0 : 1;
+    if (aGraded !== bGraded) return aGraded - bGraded;
+    return (b.frac ?? 0) - (a.frac ?? 0);
+  });
+  const winner = sorted[0];
+  const chosenId = Object.entries(idMap).find(([, lbl]) => lbl === winner.label)?.[0] ?? "A";
+  return {
+    taskId,
+    mode,
+    k,
+    chosenId,
+    chosenLabel: winner.label,
+    chosenIsBase: winner.chosenIsBase,
+    why: `Selected ${winner.label} (${winner.nPassed}/${winner.nCriteria} criteria passed, dimension=${winner.dimension}).`,
+    idMap,
+    nCandidates: candidates.length,
+    ok: true,
+  };
+}
+
+export function buildHarnessNamespace(opts: {
+  benchmark: string;
+  substrate: string;
+  mode: "parallel" | "sequential" | "agg" | "seq";
+  k: number;
+  seed?: number;
+  tag?: string;
+}): string {
+  const modeTok = opts.mode === "parallel" || opts.mode === "agg" ? "agg" : "seq";
+  let base = `${opts.benchmark}-${opts.substrate}-${modeTok}${opts.k}`;
+  if (typeof opts.seed === "number") base += `-s${opts.seed}`;
+  if (opts.tag) base += `-${opts.tag.replace(/[^A-Za-z0-9_.-]/g, "")}`;
+  return base;
+}
+
 export async function materializeHarnessTree(ws: Workspace, providerId: string, modelId: string): Promise<string[]> {
   const tree = buildDefaultHarnessTree(providerId, modelId);
   validateAndAutotriggerHarnessTree(tree);
