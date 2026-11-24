@@ -3,7 +3,7 @@
 Operating manual for every coding agent working in `NikitHamal/zeusdesigns`. Read this and `CONTINUITY.md` before touching code.
 
 ## Product
-ZeusDesigns is a native Windows app (Tauri 2, Rust, C++20 FFI, WebView2) that pairs an agent chat with an infinite multi-artboard canvas. UI is React 19 + Tailwind 4 + Zustand in `src/`. Engine is Rust in `src-tauri/src/` and C++20 in `engine/`.
+Zeus Codes (`ZeusDesigns`) is a native Windows AI coding & software engineering app (Tauri 2, Rust, C++20 FFI, WebView2) powered by **Zeus Harness²** (`src/lib/harness2.ts`, adapted from Google Research `harness2` `c1..c8` surface) and an OpenCode-compatible native execution loop. UI is React 19 + Tailwind 4 + Zustand in `src/`. Engine is Rust in `src-tauri/src/` and C++20 in `engine/`.
 
 ## Non-negotiable laws
 These apply to the app UI and to every design-system prompt, skill, template and generated screen.

@@ -1,7 +1,6 @@
-# ZeusDesigns
+# Zeus Codes (`ZeusDesigns`)
 
-Open-source, ultra-light **native Windows** AI design & coding workspace — a Claude Design–style
-split-screen studio with an infinite multi-artboard canvas, free keyless AI providers and a full agent toolbox.
+Open-source, ultra-light **native Windows** AI coding & software engineering workspace — a free, no-limits alternative to Claude Code and OpenCode powered by **Zeus Harness²** (adapted from Google Research `harness2` `c1..c8` recursive harness surface) and 40 free keyless AI providers.
 
 | | |
 |---|---|
