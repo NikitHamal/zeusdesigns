@@ -5,15 +5,20 @@ import { PROVIDERS } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { SKILLS } from "../lib/skills";
 import {
+  ADAPT_COMPLETE_MARK,
+  buildDefaultHarnessTree,
   buildHarnessNamespace,
   BUILTIN_HARNESS_SKILLS,
   BUILTIN_SUBAGENTS,
+  computeHarnessFingerprint,
   getActiveHarnessSummary,
   getProjectHarnessLessons,
   materializeHarnessTree,
   ZEUS_SURFACE,
 } from "../lib/harness2";
 import {
+  HYPERFRAMES_PALETTES,
+  HYPERFRAMES_PROMPT_TEMPLATES,
   HYPERFRAMES_VISUAL_STYLES,
   OPEN_DESIGN_BRANDS,
   OPEN_DESIGN_SKILLS_CATALOG,
@@ -166,6 +171,10 @@ function LibraryTab() {
     mode: "sequential",
     k: 1,
   });
+  const harnessFp = useMemo(
+    () => computeHarnessFingerprint(buildDefaultHarnessTree(settings.providerId, settings.modelId)),
+    [settings.providerId, settings.modelId]
+  );
   void DESIGN_SYSTEMS; void getDS; void renderScreen; void DEVICE_SIZE; void canvasApi; void Thumb;
 
   const handleMaterialize = async () => {
@@ -217,7 +226,7 @@ function LibraryTab() {
                 </span>
               </div>
               <div className="text-xs text-on-surface-variant">
-                Namespace: <span className="font-mono text-on-surface">{nsLabel}</span> · Protocol: <span className="font-mono text-on-surface">{summary.protocol}</span> · Max rounds: <span className="font-mono text-on-surface">{summary.maxToolRounds}</span> · Budget: <span className="font-mono text-on-surface">R=4k / P=3k ({summary.alwaysOnMax.toLocaleString()} chars)</span>
+                Namespace: <span className="font-mono text-on-surface">{nsLabel}</span> · Runmark FP: <span className="font-mono text-on-surface">{harnessFp.slice(0, 12)} ({ADAPT_COMPLETE_MARK})</span> · Protocol: <span className="font-mono text-on-surface">{summary.protocol}</span> · Max rounds: <span className="font-mono text-on-surface">{summary.maxToolRounds}</span> · Budget: <span className="font-mono text-on-surface">R=4k / P=3k ({summary.alwaysOnMax.toLocaleString()} chars)</span>
               </div>
             </div>
             <button
@@ -289,6 +298,43 @@ function LibraryTab() {
                   </div>
                   <p className="mt-1.5 text-[11.5px] text-on-surface-variant">{vs.promptRule}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                HyperFrames Palettes ({HYPERFRAMES_PALETTES.length}) &amp; Video Prompt Templates ({HYPERFRAMES_PROMPT_TEMPLATES.length})
+              </span>
+              <span className="font-mono text-[11px] text-on-surface-variant">prompt-templates/video/</span>
+            </div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {HYPERFRAMES_PALETTES.map((pal) => (
+                <span key={pal.id} className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/50 bg-surface-high px-2.5 py-1 font-mono text-[11px] text-on-surface">
+                  <span style={{ background: pal.bg, borderColor: pal.ink }} className="size-3 rounded-sm border" />
+                  <span style={{ background: pal.accent }} className="size-3 rounded-sm" />
+                  <span>{pal.name}</span>
+                </span>
+              ))}
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {HYPERFRAMES_PROMPT_TEMPLATES.map((pt) => (
+                <button
+                  key={pt.id}
+                  onClick={() => {
+                    useStore.getState().patchUI({ settingsOpen: false });
+                    window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: pt.prompt }));
+                    notify(`Loaded HyperFrames prompt: ${pt.title}`);
+                  }}
+                  className="state flex flex-col justify-between rounded-xl border border-outline-variant/50 bg-surface-high p-3 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-display text-xs font-bold text-on-surface">{pt.title}</span>
+                    <span className="font-mono text-[10px] text-primary">{pt.category} · {pt.aspect} · {pt.durationSec}s</span>
+                  </div>
+                  <p className="mt-1 text-[11.5px] text-on-surface-variant">{pt.summary}</p>
+                </button>
               ))}
             </div>
           </div>
