@@ -230,6 +230,10 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "memory_delete"
             | "memory_remove"
             | "memory_forget"
+            | "load_skill"
+            | "skill"
+            | "subagent"
+            | "task"
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
@@ -1069,6 +1073,49 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 ),
             )
         }
+        "load_skill" | "skill" => {
+            let skill_name = if !path_arg.is_empty() {
+                path_arg.trim()
+            } else {
+                body.trim()
+            };
+            let rel = format!(".zeusdesigns/harness/skills/{}/SKILL.md", skill_name);
+            if let Ok(custom_skill) = fs_read(eff_root.clone(), rel) {
+                (true, format!("[Harness² Skill '{}']\n{}", skill_name, custom_skill))
+            } else {
+                let builtin = match skill_name {
+                    "bug_hunt_verify" => "1. Read the failing test or target module directly with read_file or search_code.\n2. Identify the exact mathematical/logical mismatch.\n3. Patch in one pass with edit_file or write_file.\n4. Run the verification command via shell or python and confirm exit code 0.",
+                    "python_data_pipeline" => "1. Run a single <zeus_tool name=\"python\"> script that reads the input file, deduplicates/filters/aggregates in memory, writes the output file, and prints a verification summary.",
+                    "multi_file_refactor" => "1. Inspect coupled modules first.\n2. Update each file deterministically and run the test suite before finishing.",
+                    _ => "Proceed directly with shell, python, read_file, edit_file, or write_file to complete the task.",
+                };
+                (true, format!("[Harness² Skill '{}']\n{}", skill_name, builtin))
+            }
+        }
+        "subagent" | "task" => {
+            let target_q = if !body.is_empty() { body } else { path_arg.as_str() };
+            let hits = search_workspace_code(&eff_root, target_q, 15);
+            if hits.is_empty() {
+                let tree = walk_workspace(Path::new(&eff_root), Path::new(&eff_root), 2);
+                let mut out = String::new();
+                format_tree_compact(&tree, 0, &mut out);
+                (true, format!("[Harness² Subagent Summary]\nWorkspace files:\n{}", out.trim_end()))
+            } else {
+                let formatted = hits
+                    .iter()
+                    .filter_map(|r| {
+                        Some(format!(
+                            "{}:{}: {}",
+                            r.get("path")?.as_str()?,
+                            r.get("line")?.as_u64()?,
+                            r.get("snippet")?.as_str()?
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                (true, format!("[Harness² Subagent Summary for '{}']\n{}", target_q, formatted))
+            }
+        }
         other if other.starts_with("mcp:") => {
             let reg = crate::mcp::McpRegistry::default();
             reg.invoke_tool(other, body)
@@ -1076,7 +1123,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         _ => (
             false,
             format!(
-                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete.",
+                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete, load_skill, subagent.",
                 name
             ),
         ),

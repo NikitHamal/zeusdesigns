@@ -88,8 +88,6 @@ pub fn run() {
             workspace::fs_read,
             workspace::fs_write,
             workspace::shell_run,
-            workspace::opencode_start,
-            workspace::opencode_stop,
             memory::memory_list,
             memory::memory_search,
             memory::memory_add,

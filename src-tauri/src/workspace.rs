@@ -366,6 +366,38 @@ pub fn fs_write(root: String, path: String, content: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to write '{}': {}", target.display(), e))
 }
 
+/// Sanitize AI-emitted shell commands so they never spawn an external Windows console/GUI window
+/// (`start`, `cmd /k`, `powershell -NoExit`, `pause`) or block on interactive prompts.
+pub fn sanitize_shell_command(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    let lower = s.to_ascii_lowercase();
+    for prefix in [
+        "start \"\" cmd /c ",
+        "start \"\" cmd /k ",
+        "start cmd /c ",
+        "start cmd /k ",
+        "start powershell ",
+        "start \"\" ",
+        "cmd /k ",
+        "cmd.exe /k ",
+        "cmd /c ",
+        "cmd.exe /c ",
+        "powershell -noexit ",
+        "powershell.exe -noexit ",
+    ] {
+        if lower.starts_with(prefix) {
+            s = s[prefix.len()..].trim().to_string();
+            break;
+        }
+    }
+    if s.to_ascii_lowercase().ends_with("&& pause") {
+        let new_len = s.len().saturating_sub(8);
+        s.truncate(new_len);
+        s = s.trim().to_string();
+    }
+    s
+}
+
 #[tauri::command(async)]
 pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
     use std::process::Stdio;
@@ -374,13 +406,31 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
     } else {
         PathBuf::from(&root)
     };
+    let clean_cmd = sanitize_shell_command(&cmd);
+    if clean_cmd.is_empty() || matches!(clean_cmd.to_ascii_lowercase().as_str(), "pause" | "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "bash") {
+        return Ok(json!({
+            "code": 0,
+            "stdout": "(non-interactive shell ready — pass a specific command to run)",
+            "stderr": ""
+        }));
+    }
 
     #[cfg(target_os = "windows")]
     let output = {
         use std::os::windows::process::CommandExt;
+        // 0x08000000 = CREATE_NO_WINDOW: guarantees zero external terminal/console window popup on the PC
         Command::new("cmd")
-            .args(["/C", &cmd])
+            .args(["/d", "/s", "/c", &clean_cmd])
             .current_dir(&workdir)
+            .env("CI", "true")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GCM_INTERACTIVE", "never")
+            .env("NPM_CONFIG_YES", "true")
+            .env("PIP_NO_INPUT", "1")
+            .env("PYTHONIOENCODING", "utf-8")
+            .env("PYTHONUTF8", "1")
+            .env("NO_COLOR", "1")
+            .env("TERM", "dumb")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -391,14 +441,25 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
 
     #[cfg(not(target_os = "windows"))]
     let output = Command::new("bash")
-        .args(["-lc", &cmd])
+        .args(["-lc", &clean_cmd])
         .current_dir(&workdir)
+        .env("CI", "true")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GCM_INTERACTIVE", "never")
+        .env("NPM_CONFIG_YES", "true")
+        .env("PIP_NO_INPUT", "1")
+        .env("PYTHONIOENCODING", "utf-8")
+        .env("PYTHONUTF8", "1")
+        .env("NO_COLOR", "1")
+        .env("TERM", "dumb")
         .stdin(Stdio::null())
         .output()
         .or_else(|_| {
             Command::new("sh")
-                .args(["-lc", &cmd])
+                .args(["-lc", &clean_cmd])
                 .current_dir(&workdir)
+                .env("CI", "true")
+                .env("GIT_TERMINAL_PROMPT", "0")
                 .stdin(Stdio::null())
                 .output()
         })
@@ -436,6 +497,10 @@ pub fn python_run(root: String, script: String) -> Result<Value, String> {
         let mut cmd = Command::new(bin);
         cmd.args(*args)
             .current_dir(&workdir)
+            .env("CI", "true")
+            .env("PYTHONIOENCODING", "utf-8")
+            .env("PYTHONUTF8", "1")
+            .env("PIP_NO_INPUT", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -538,71 +603,10 @@ mod tests {
         assert!(safe_join("/tmp", "../etc/passwd").is_err());
         assert!(safe_join("/tmp", "src/App.tsx").is_ok());
     }
-}
 
-static OPENCODE_CHILD: std::sync::Mutex<Option<std::process::Child>> = std::sync::Mutex::new(None);
-
-/// Starts `opencode serve` for the project folder (OpenCode SDK runtime). `config` is the inline
-/// OpenCode config JSON (Zeus local gateway provider + permissions) passed via OPENCODE_CONFIG_CONTENT.
-#[tauri::command]
-pub fn opencode_start(root: String, port: u16, config: String) -> Result<String, String> {
-    use std::process::{Command, Stdio};
-    let mut guard = OPENCODE_CHILD.lock().map_err(|_| "opencode state is locked".to_string())?;
-    if let Some(child) = guard.as_mut() {
-        if matches!(child.try_wait(), Ok(None)) {
-            return Ok("running".to_string());
-        }
+    #[test]
+    fn test_sanitize_shell_command_strips_window_spawners() {
+        assert_eq!(sanitize_shell_command("start cmd /c npm test && pause"), "npm test");
+        assert_eq!(sanitize_shell_command("cmd /k git status -sb"), "git status -sb");
     }
-    let port_s = port.to_string();
-    let serve: Vec<&str> = vec![
-        "serve", "--port", port_s.as_str(),
-        "--cors", "http://tauri.localhost",
-        "--cors", "tauri://localhost",
-        "--cors", "http://localhost:1420",
-    ];
-    let mut cmd = if cfg!(windows) {
-        let mut c = Command::new("cmd");
-        c.arg("/C").arg("opencode");
-        c
-    } else {
-        Command::new("opencode")
-    };
-    cmd.args(serve)
-        .env("OPENCODE_CONFIG_CONTENT", config)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    if !root.trim().is_empty() {
-        cmd.current_dir(&root);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    match cmd.spawn() {
-        Ok(child) => {
-            *guard = Some(child);
-            Ok("started".to_string())
-        }
-        Err(e) => Err(format!("Could not start OpenCode ({}). Install it with: npm i -g opencode-ai", e)),
-    }
-}
-
-#[tauri::command]
-pub fn opencode_stop() -> Result<(), String> {
-    if let Ok(mut guard) = OPENCODE_CHILD.lock() {
-        if let Some(mut child) = guard.take() {
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/PID", child.id().to_string().as_str(), "/T", "/F"])
-                    .creation_flags(0x08000000)
-                    .output();
-            }
-            let _ = child.kill();
-        }
-    }
-    Ok(())
 }

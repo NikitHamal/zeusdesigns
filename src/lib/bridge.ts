@@ -507,8 +507,3 @@ export const nativeServer = {
     };
   },
 };
-
-export const nativeOpenCode = {
-  start: (root: string, port: number, config: string) => tryInvoke<string>("opencode_start", { root, port, config }),
-  stop: () => tryInvoke<void>("opencode_stop"),
-};
