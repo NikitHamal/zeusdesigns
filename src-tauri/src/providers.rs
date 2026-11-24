@@ -4410,6 +4410,7 @@ where
     let mut line = String::new();
     let mut in_think = false;
     let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
@@ -4436,6 +4437,7 @@ where
                             }
                             on_delta(r_text);
                         }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -4454,6 +4456,9 @@ where
     }
     if in_think {
         on_delta("</think>");
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
     }
     if saw_text {
         Ok(())
@@ -4478,14 +4483,26 @@ where
         _ => "codestral-latest",
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(24000).collect();
+        let sys_raw: String = system.chars().take(22000).collect();
+        let sys_safe = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+        } else {
+            sys_raw
+        };
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
-    for m in messages {
+    let last_idx = messages.len().saturating_sub(1);
+    for (idx, m) in messages.iter().enumerate() {
         if !m.content.trim().is_empty() {
-            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
+                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
+            } else {
+                m.content.clone()
+            };
+            oai_msgs.push(json!({ "role": m.role, "content": content }));
         }
     }
 
@@ -4493,12 +4510,15 @@ where
     let candidates = vec![eff_model, "codestral-latest", "default"];
     let mut active_resp = None;
     for cand in candidates {
-        let payload = json!({
+        let mut payload = json!({
             "model": cand,
             "stream": true,
             "max_tokens": 8000,
             "messages": oai_msgs
         });
+        if wants_tools {
+            payload["tools"] = build_native_oai_agent_tools();
+        }
         let ip = fake_ipv4();
         if let Ok(r) = client
             .post("https://api.llm7.io/v1/chat/completions")
@@ -4522,6 +4542,7 @@ where
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
     let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -4534,16 +4555,22 @@ where
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
-                    if let Some(text) = delta.and_then(|d| d.get("content")).and_then(|t| t.as_str()) {
-                        if !text.is_empty() {
-                            saw_text = true;
-                            on_delta(text);
+                    if let Some(d) = delta {
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                saw_text = true;
+                                on_delta(text);
+                            }
                         }
                     }
                 }
             }
         }
         line.clear();
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
     }
     if saw_text {
         Ok(())
@@ -5410,97 +5437,7 @@ where
         ],
     };
 
-    let mut oai_msgs = Vec::new();
-    if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(20000).collect();
-        oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
-    }
-    for m in messages {
-        if !m.content.trim().is_empty() {
-            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
-        }
-    }
-
-    let client = build_client(180)?;
-    for &(endpoint, upstream_model) in targets {
-        let payload = json!({
-            "model": upstream_model,
-            "stream": true,
-            "max_tokens": 8192,
-            "messages": oai_msgs
-        });
-
-        let resp = match client
-            .post(endpoint)
-            .header("Content-Type", "application/json")
-            .header("Accept", "text/event-stream, application/json")
-            .json(&payload)
-            .send()
-        {
-            Ok(r) if r.status().is_success() => r,
-            _ => continue,
-        };
-
-        let mut reader = BufReader::new(resp);
-        let mut line = String::new();
-        let mut in_think = false;
-        let mut saw_text = false;
-        let mut fallback_reason = String::new();
-
-        while reader.read_line(&mut line).unwrap_or(0) > 0 {
-            if cancel.load(Ordering::Relaxed) {
-                return Ok(());
-            }
-            if let Some(raw) = line.trim().strip_prefix("data:") {
-                let raw = raw.trim();
-                if raw == "[DONE]" {
-                    break;
-                }
-                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
-                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
-                        let delta = choice.get("delta").or_else(|| choice.get("message"));
-                        if let Some(d) = delta {
-                            let r_text = d
-                                .get("reasoning_content")
-                                .or_else(|| d.get("reasoning"))
-                                .and_then(|t| t.as_str())
-                                .unwrap_or("");
-                            if !r_text.is_empty() {
-                                if !in_think {
-                                    in_think = true;
-                                    on_delta("<think>");
-                                }
-                                on_delta(r_text);
-                                fallback_reason.push_str(r_text);
-                            }
-                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
-                                if !text.is_empty() {
-                                    if in_think {
-                                        in_think = false;
-                                        on_delta("</think>");
-                                    }
-                                    saw_text = true;
-                                    on_delta(text);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            line.clear();
-        }
-        if in_think {
-            on_delta("</think>");
-        }
-        if !saw_text && !fallback_reason.trim().is_empty() {
-            on_delta(fallback_reason.trim());
-            saw_text = true;
-        }
-        if saw_text {
-            return Ok(());
-        }
-    }
-    Err("HF Frontier Cluster stream ended without output".to_string())
+    stream_oai_targets("HF Frontier Cluster", targets, system, messages, false, 90, cancel, on_delta)
 }
 
 /// Stream from VLM Run Gateway (`https://gateway.vlm.run/v1/openai/chat/completions`, zero-key DiffusionGemma 26B A4B VL / Qwen 3.5 VL / GLM-OCR).
