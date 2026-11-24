@@ -5,6 +5,11 @@ import { nativeAvailable, nativeMcp, nativeMemory, openWorkspaceByPath } from ".
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { ArtifactWorkbench } from "./components/ArtifactWorkbench";
+import {
+  OpenDesignBrandSystemsView,
+  OpenDesignDeliverablesView,
+  OpenDesignSkillsView,
+} from "./components/OpenDesignViews";
 import { SettingsDialog } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { Home } from "./components/Home";
@@ -18,6 +23,7 @@ export default function App() {
   const sidebarOpen = useStore((s) => s.ui.sidebarOpen);
   const showCanvas = useStore((s) => s.ui.showCanvas);
   const leftTab = useStore((s) => s.ui.leftTab);
+  const odTab = useStore((s) => s.ui.odTab ?? "studio");
   const toast = useStore((s) => s.ui.toast);
   const hasMessages = useStore((s) => activeConv(s).messages.length > 0);
   const patchUI = useStore((s) => s.patchUI);
@@ -87,7 +93,13 @@ export default function App() {
             <IconBtn label="Show sidebar" size={36} onClick={() => patchUI({ sidebarOpen: true })}><Icon name="left_panel_open" size={20} /></IconBtn>
           </div>
         )}
-        {split ? (
+        {odTab === "design-systems" ? (
+          <OpenDesignBrandSystemsView />
+        ) : odTab === "skills" ? (
+          <OpenDesignSkillsView />
+        ) : odTab === "deliverables" ? (
+          <OpenDesignDeliverablesView />
+        ) : split ? (
           <>
             {!collapsed && (
               <>

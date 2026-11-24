@@ -367,7 +367,36 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-3.5 pb-1.5 pt-1">
+      <div className="flex flex-col gap-0.5 border-b border-outline-variant/60 px-2 pb-2">
+        <NavItem
+          icon="auto_awesome"
+          label="Studio & Agent"
+          active={(ui.odTab ?? "studio") === "studio"}
+          onClick={() => patchUI({ odTab: "studio" })}
+        />
+        <NavItem
+          icon="palette"
+          label="Brand & DESIGN.md"
+          active={ui.odTab === "design-systems"}
+          onClick={() => patchUI({ odTab: "design-systems" })}
+          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant">16</span>}
+        />
+        <NavItem
+          icon="movie"
+          label="HyperFrames & Skills"
+          active={ui.odTab === "skills"}
+          onClick={() => patchUI({ odTab: "skills" })}
+          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-primary">VIDEO</span>}
+        />
+        <NavItem
+          icon="grid_view"
+          label="All Deliverables"
+          active={ui.odTab === "deliverables"}
+          onClick={() => patchUI({ odTab: "deliverables" })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between px-3.5 pb-1.5 pt-2">
         <span className="text-[11.5px] font-semibold uppercase tracking-wider text-on-surface-variant">Projects</span>
         <button
           onClick={() => pickProjectFolder()}

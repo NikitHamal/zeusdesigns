@@ -4,6 +4,8 @@ import { Icon } from "./Icon";
 import { Dropdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { focusArtboard } from "../lib/actions";
 import { openWorkspace, openWorkspaceByPath } from "../lib/bridge";
+import { OpenDesignCreationBar } from "./OpenDesignViews";
+import { STARTER_HYPERFRAMES_VIDEO_HTML, STARTER_OPEN_SLIDE_DECK_HTML } from "../lib/openDesign";
 
 const STARTERS = [
   { i: "terminal", t: "Build a feature", p: "Build a feature in this project: " },
@@ -120,11 +122,47 @@ export function Home() {
           </button>
         </div>
 
+        <div className="mb-3 flex justify-center">
+          <OpenDesignCreationBar />
+        </div>
+
         <div className="-mx-3"><Composer hero /></div>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              const st = useStore.getState();
+              const created = st.addArtboard({
+                name: "HyperFrames Launch Video",
+                device: "web",
+                html: STARTER_HYPERFRAMES_VIDEO_HTML,
+              });
+              st.setSel([created.id]);
+              st.patchUI({ showCanvas: true, odTab: "studio" });
+            }}
+            className="state flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-semibold text-on-primary"
+          >
+            <Icon name="movie" size={17} />
+            HyperFrames Code-to-Video Studio
+          </button>
+          <button
+            onClick={() => {
+              const st = useStore.getState();
+              const created = st.addArtboard({
+                name: "Open-Slide 1920 Architecture Deck",
+                device: "web",
+                html: STARTER_OPEN_SLIDE_DECK_HTML,
+              });
+              st.setSel([created.id]);
+              st.patchUI({ showCanvas: true, odTab: "studio" });
+            }}
+            className="state flex h-9 items-center gap-2 rounded-lg border border-outline-variant/70 bg-surface-container px-3.5 text-xs font-semibold text-on-surface"
+          >
+            <Icon name="slideshow" size={17} />
+            Open-Slide 1920×1080 Deck Studio
+          </button>
           {STARTERS.map((s) => (
-            <button key={s.t} onClick={() => window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: s.p }))} className="state flex h-9 items-center gap-2 rounded-lg bg-surface-container px-3 text-sm font-medium text-on-surface">
-              <Icon name={s.i} size={18} />{s.t}
+            <button key={s.t} onClick={() => window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: s.p }))} className="state flex h-9 items-center gap-2 rounded-lg bg-surface-container px-3 text-xs font-medium text-on-surface">
+              <Icon name={s.i} size={16} />{s.t}
             </button>
           ))}
         </div>
