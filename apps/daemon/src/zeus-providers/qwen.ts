@@ -113,48 +113,107 @@ async function signin(email: string, password: string, device: string): Promise<
   return j.data.token;
 }
 
-async function provision(): Promise<Account> {
-  const sess = randomUUID();
-  const device = `ai${md5(randomBytes(16))}`;
-  const mh = { 'X-Session-Id': sess };
+interface Mailbox {
+  address: string;
+  bodies(): Promise<string[]>;
+  close(): void;
+}
+
+async function openZeroMail(): Promise<Mailbox> {
+  const mh = { 'X-Session-Id': randomUUID() };
   const domains = (await (await fetch(`${MAIL}/domains`, { headers: mh, signal: AbortSignal.timeout(15_000) })).json()) as { domain: string; available?: boolean; premium?: boolean }[];
-  const ok = domains.filter((d) => d.available && !d.premium && !BAD_MAIL.has(d.domain)).map((d) => d.domain);
+  const ok = (Array.isArray(domains) ? domains : []).filter((d) => d.available && !d.premium && !BAD_MAIL.has(d.domain)).map((d) => d.domain);
   if (!ok.length) throw new Error('temporary mail has no open domain');
-  const inboxRes = await fetch(`${MAIL}/inboxes`, {
+  const res = await fetch(`${MAIL}/inboxes`, {
     method: 'POST',
     headers: { ...mh, 'Content-Type': 'application/json' },
     body: JSON.stringify({ domain: ok[randomInt(0, ok.length)] }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!inboxRes.ok) throw new Error(`mailbox creation failed (${inboxRes.status})`);
-  const inbox = (await inboxRes.json()) as { id: string; address: string };
-  const email = inbox.address;
+  if (!res.ok) throw new Error(`mailbox creation failed (${res.status})`);
+  const inbox = (await res.json()) as { id: string; address: string };
+  return {
+    address: inbox.address,
+    async bodies() {
+      const msgs = (await (await fetch(`${MAIL}/inboxes/${inbox.id}/messages`, { headers: mh, signal: AbortSignal.timeout(15_000) })).json()) as { body?: string }[];
+      return (Array.isArray(msgs) ? msgs : []).map((m) => m.body ?? '');
+    },
+    close() { fetch(`${MAIL}/inboxes/${inbox.id}`, { method: 'DELETE', headers: mh }).catch(() => undefined); },
+  };
+}
+
+// Fallback disposable mailbox (mail.tm) for when 0mail is unreachable.
+const MAILTM = 'https://api.mail.tm';
+async function openMailTm(): Promise<Mailbox> {
+  const dj = (await (await fetch(`${MAILTM}/domains`, { signal: AbortSignal.timeout(15_000) })).json()) as { 'hydra:member'?: { domain: string; isActive?: boolean }[] };
+  const domains = (dj['hydra:member'] ?? []).filter((d) => d.isActive !== false && !BAD_MAIL.has(d.domain)).map((d) => d.domain);
+  if (!domains.length) throw new Error('mail.tm has no open domain');
+  const local = `zeus${randomBytes(6).toString('hex')}`;
+  const address = `${local}@${domains[randomInt(0, domains.length)]}`;
+  const password = randomBytes(12).toString('hex');
+  const json = { 'Content-Type': 'application/json' };
+  const ar = await fetch(`${MAILTM}/accounts`, { method: 'POST', headers: json, body: JSON.stringify({ address, password }), signal: AbortSignal.timeout(15_000) });
+  if (!ar.ok) throw new Error(`mail.tm account creation failed (${ar.status})`);
+  const acct = (await ar.json()) as { id: string };
+  const tr = await fetch(`${MAILTM}/token`, { method: 'POST', headers: json, body: JSON.stringify({ address, password }), signal: AbortSignal.timeout(15_000) });
+  const token = ((await tr.json()) as { token?: string }).token;
+  if (!token) throw new Error('mail.tm token refused');
+  const auth = { Authorization: `Bearer ${token}` };
+  return {
+    address,
+    async bodies() {
+      const list = (await (await fetch(`${MAILTM}/messages`, { headers: auth, signal: AbortSignal.timeout(15_000) })).json()) as { 'hydra:member'?: { id: string }[] };
+      const out: string[] = [];
+      for (const m of list['hydra:member'] ?? []) {
+        const full = (await (await fetch(`${MAILTM}/messages/${m.id}`, { headers: auth, signal: AbortSignal.timeout(15_000) })).json()) as { text?: string; html?: string[] | string };
+        out.push(`${full.text ?? ''}\n${Array.isArray(full.html) ? full.html.join('\n') : full.html ?? ''}`);
+      }
+      return out;
+    },
+    close() { fetch(`${MAILTM}/accounts/${acct.id}`, { method: 'DELETE', headers: auth }).catch(() => undefined); },
+  };
+}
+
+async function openMailbox(): Promise<Mailbox> {
+  try { return await openZeroMail(); } catch (e1) {
+    try { return await openMailTm(); } catch (e2) {
+      throw new Error(`no temporary mailbox available (${(e1 as Error).message}; ${(e2 as Error).message})`);
+    }
+  }
+}
+
+async function provision(): Promise<Account> {
+  const device = `ai${md5(randomBytes(16))}`;
+  const box = await openMailbox();
+  const email = box.address;
   const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const password = `Aa1!${Array.from({ length: 14 }, () => alphabet[randomInt(0, alphabet.length)]).join('')}`;
-  const su = await fetch(`${BASE}/auths/signup`, {
-    method: 'POST',
-    headers: gwHeaders(undefined, device, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ email, password: sha256(password), name: `Zeus ${email.slice(0, 5)}` }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const sj = (await su.json().catch(() => ({}))) as { success?: boolean; data?: unknown };
-  if (!sj.success) throw new Error(`Qwen signup refused: ${JSON.stringify(sj.data ?? '').slice(0, 160)}`);
-  let link: string | null = null;
-  for (let i = 0; i < 30 && !link; i++) {
-    await sleep(1200);
-    try {
-      const msgs = (await (await fetch(`${MAIL}/inboxes/${inbox.id}/messages`, { headers: mh, signal: AbortSignal.timeout(15_000) })).json()) as { body?: string }[];
-      for (const m of Array.isArray(msgs) ? msgs : []) {
-        const hit = /https?:\/\/[^"'<>\s]*auths\/activate[^"'<>\s]*/.exec(m.body ?? '');
-        if (hit) { link = hit[0].replace(/&amp;/g, '&'); break; }
-      }
-    } catch { /* keep polling */ }
+  try {
+    const su = await fetch(`${BASE}/auths/signup`, {
+      method: 'POST',
+      headers: gwHeaders(undefined, device, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ email, password: sha256(password), name: `Zeus ${email.slice(0, 5)}` }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const sj = (await su.json().catch(() => ({}))) as { success?: boolean; data?: unknown };
+    if (!sj.success) throw new Error(`Qwen signup refused: ${JSON.stringify(sj.data ?? '').slice(0, 160)}`);
+    let link: string | null = null;
+    for (let i = 0; i < 40 && !link; i++) {
+      await sleep(1500);
+      try {
+        for (const body of await box.bodies()) {
+          const hit = /https?:\/\/[^"'<>\s\])]*auths\/activate[^"'<>\s\])]*/.exec(body);
+          if (hit) { link = hit[0].replace(/&amp;/g, '&'); break; }
+        }
+      } catch { /* keep polling */ }
+    }
+    if (!link) throw new Error('Qwen activation mail never arrived');
+    { const ar = await fetch(link, { headers: gwHeaders(undefined, device), redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => undefined); if (process.env.ZEUS_DEBUG) console.error('activate', link, ar?.status, ar?.headers.get('location')); }
+    const token = await signin(email, password, device);
+    return { email, password, device, token, created: nowSec(), cool_until: 0, used: 0 };
+  } finally {
+    box.close();
   }
-  if (!link) throw new Error('Qwen activation mail never arrived');
-  await fetch(link, { headers: gwHeaders(undefined, device), redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => undefined);
-  const token = await signin(email, password, device);
-  fetch(`${MAIL}/inboxes/${inbox.id}`, { method: 'DELETE', headers: mh }).catch(() => undefined);
-  return { email, password, device, token, created: nowSec(), cool_until: 0, used: 0 };
 }
 
 let making: Promise<Account> | null = null;
