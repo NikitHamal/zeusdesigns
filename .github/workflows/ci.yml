@@ -16,5 +16,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --ignore-scripts --filter "@open-design/daemon..." --filter "@open-design/web..."
+      - run: pnpm --filter "@open-design/daemon^..." build
       - run: pnpm --filter @open-design/daemon build
+      - run: pnpm --filter @open-design/daemon exec vitest run tests/zeus-tool-emulation.test.ts
+      - run: pnpm --filter "@open-design/web^..." build
       - run: pnpm --filter @open-design/web build
