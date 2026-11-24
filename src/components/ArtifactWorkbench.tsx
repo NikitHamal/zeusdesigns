@@ -44,6 +44,18 @@ export function ArtifactWorkbench() {
   const [playing, setPlaying] = useState(true);
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [showNotes, setShowNotes] = useState(true);
+  const [inspectOn, setInspectOn] = useState(false);
+  const [selectedEl, setSelectedEl] = useState<{
+    index: number;
+    tag: string;
+    text: string;
+    color: string;
+    bg: string;
+    fontSize: string;
+    padding: string;
+    radius: string;
+  } | null>(null);
+  const [agentNote, setAgentNote] = useState("");
   const [exportProgress, setExportProgress] = useState<VideoExportProgress | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -79,11 +91,116 @@ export function ArtifactWorkbench() {
         if (typeof d.playing === "boolean") setPlaying(d.playing);
       } else if (d.type === "zeus:slide-state") {
         if (typeof d.slideIndex === "number") setActiveSlideIdx(d.slideIndex);
+      } else if (d.type === "zeus:dom-selected") {
+        setSelectedEl({
+          index: Number(d.index ?? 0),
+          tag: String(d.tag ?? "div"),
+          text: String(d.text ?? ""),
+          color: String(d.color ?? ""),
+          bg: String(d.bg ?? ""),
+          fontSize: String(d.fontSize ?? ""),
+          padding: String(d.padding ?? ""),
+          radius: String(d.radius ?? ""),
+        });
+      } else if (d.type === "zeus:dom-updated" && typeof d.html === "string" && active) {
+        updateArtboard(active.id, { html: d.html, version: active.version + 1 });
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [active, updateArtboard]);
+
+  const srcDocWithInspector = useMemo(() => {
+    if (!inspectOn) return codeValue;
+    const bridge = `<script>
+(function(){
+  const all = () => Array.from(document.body.querySelectorAll('h1,h2,h3,h4,p,span,button,a,div,section,li,td,th'));
+  let hi = null;
+  document.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    const t = e.target;
+    if (!t || t === document.body || t === document.documentElement) return;
+    if (hi) hi.style.outline = '';
+    hi = t;
+    t.style.outline = '1px solid #D97757';
+    const list = all();
+    const idx = list.indexOf(t);
+    const cs = window.getComputedStyle(t);
+    window.parent.postMessage({
+      type: 'zeus:dom-selected',
+      index: idx,
+      tag: t.tagName.toLowerCase(),
+      text: (t.childElementCount === 0 ? t.textContent : t.getAttribute('data-label') || t.textContent || '').trim().slice(0, 160),
+      color: cs.color,
+      bg: cs.backgroundColor,
+      fontSize: cs.fontSize,
+      padding: cs.padding,
+      radius: cs.borderRadius
+    }, '*');
+  }, true);
+  window.addEventListener('message', function(ev){
+    const m = ev.data;
+    if (!m || m.type !== 'zeus:dom-patch') return;
+    const list = all();
+    const el = list[m.index];
+    if (!el) return;
+    if (typeof m.text === 'string' && el.childElementCount === 0) el.textContent = m.text;
+    if (m.color) el.style.color = m.color;
+    if (m.bg) el.style.backgroundColor = m.bg;
+    if (m.fontSize) el.style.fontSize = m.fontSize;
+    if (m.padding) el.style.padding = m.padding;
+    if (m.radius) el.style.borderRadius = m.radius;
+    if (hi) hi.style.outline = '';
+    window.parent.postMessage({
+      type: 'zeus:dom-updated',
+      html: '<!DOCTYPE html>\\n' + document.documentElement.outerHTML
+    }, '*');
+  });
+})();
+</script>`;
+    return codeValue.includes("</body>")
+      ? codeValue.replace("</body>", `${bridge}</body>`)
+      : `${codeValue}\n${bridge}`;
+  }, [codeValue, inspectOn]);
+
+  const applyElementPatch = (patch: Partial<NonNullable<typeof selectedEl>>) => {
+    if (!selectedEl) return;
+    const next = { ...selectedEl, ...patch };
+    setSelectedEl(next);
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: "zeus:dom-patch",
+        index: next.index,
+        text: next.text,
+        color: next.color,
+        bg: next.bg,
+        fontSize: next.fontSize,
+        padding: next.padding,
+        radius: next.radius,
+      },
+      "*"
+    );
+  };
+
+  const handleExportHyperFramesJson = () => {
+    if (!active) return;
+    const manifest = {
+      schema: "open-design.hyperframes.v1",
+      name: active.name,
+      aspect: videoAspect,
+      totalDurationMs: hyperFrames.totalDurationMs,
+      frames: hyperFrames.frames,
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(active.name || "hyperframes").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.hyperframes.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify("Exported Remotion / HyperFrames JSON manifest");
+  };
 
   const gotoHyperFrame = (idx: number, keepPlaying = false) => {
     setActiveFrameIdx(idx);
@@ -313,13 +430,42 @@ export function ArtifactWorkbench() {
           )}
 
           {deliverableKind === "hyperframes" && (
+            <>
+              <button
+                onClick={handleExportVideo}
+                disabled={Boolean(exportProgress)}
+                className="state inline-flex h-7 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-on-primary disabled:opacity-60"
+              >
+                <Icon name="movie" size={14} />
+                <span>{exportProgress ? `${exportProgress.percent}%` : "Export Video"}</span>
+              </button>
+              <button
+                onClick={handleExportHyperFramesJson}
+                className="state inline-flex h-7 items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface px-2 text-xs font-medium text-on-surface"
+                title="Export Remotion / HyperFrames JSON manifest"
+              >
+                <Icon name="code" size={13} />
+                <span>JSON</span>
+              </button>
+            </>
+          )}
+
+          {mode !== "code" && (
             <button
-              onClick={handleExportVideo}
-              disabled={Boolean(exportProgress)}
-              className="state inline-flex h-7 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-on-primary disabled:opacity-60"
+              onClick={() => {
+                setInspectOn(!inspectOn);
+                if (inspectOn) setSelectedEl(null);
+              }}
+              className={cn(
+                "state inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-xs font-medium",
+                inspectOn
+                  ? "border-primary bg-primary text-on-primary"
+                  : "border-outline-variant/60 bg-surface text-on-surface"
+              )}
+              title="Click any element in the preview to edit text, colors, or spacing directly"
             >
-              <Icon name="movie" size={14} />
-              <span>{exportProgress ? `${exportProgress.percent}%` : "Export Video"}</span>
+              <Icon name="ads_click" size={13} />
+              <span>Inspect</span>
             </button>
           )}
 
@@ -449,7 +595,7 @@ export function ArtifactWorkbench() {
                 <iframe
                   ref={iframeRef}
                   title={active.name}
-                  srcDoc={codeValue}
+                  srcDoc={srcDocWithInspector}
                   sandbox="allow-scripts allow-same-origin allow-forms"
                   className="h-full w-full border-0"
                 />
@@ -583,6 +729,113 @@ export function ArtifactWorkbench() {
               spellCheck={false}
               className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-relaxed text-on-surface outline-none"
             />
+          </div>
+        )}
+
+        {/* OpenDesign Direct DOM Element & Token Inspector */}
+        {inspectOn && mode !== "code" && (
+          <div className="flex w-72 shrink-0 flex-col border-l border-outline-variant/60 bg-surface-low p-3 overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-outline-variant/50 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface">
+                <Icon name="ads_click" size={14} className="text-primary" />
+                <span>Direct DOM Inspector</span>
+              </div>
+              <button
+                onClick={() => {
+                  setInspectOn(false);
+                  setSelectedEl(null);
+                }}
+                className="state rounded-md px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant"
+              >
+                ESC
+              </button>
+            </div>
+
+            {!selectedEl ? (
+              <div className="mt-6 text-center text-xs text-on-surface-variant">
+                Click any element inside the live preview to inspect and edit its text, colors, typography, or spacing.
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3 text-xs">
+                <div className="flex items-center justify-between rounded-lg bg-surface-container px-2.5 py-1.5 font-mono text-[11px]">
+                  <span className="font-bold text-primary">&lt;{selectedEl.tag}&gt;</span>
+                  <span className="text-on-surface-variant">node #{selectedEl.index}</span>
+                </div>
+
+                <div>
+                  <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Text Content</label>
+                  <textarea
+                    rows={2}
+                    value={selectedEl.text}
+                    onChange={(e) => applyElementPatch({ text: e.target.value })}
+                    className="w-full rounded-lg border border-outline-variant/60 bg-surface p-2 text-xs text-on-surface outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Text Color</label>
+                    <input
+                      value={selectedEl.color}
+                      onChange={(e) => applyElementPatch({ color: e.target.value })}
+                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Background</label>
+                    <input
+                      value={selectedEl.bg}
+                      onChange={(e) => applyElementPatch({ bg: e.target.value })}
+                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Font Size</label>
+                    <input
+                      value={selectedEl.fontSize}
+                      onChange={(e) => applyElementPatch({ fontSize: e.target.value })}
+                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Padding</label>
+                    <input
+                      value={selectedEl.padding}
+                      onChange={(e) => applyElementPatch({ padding: e.target.value })}
+                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-outline-variant/50 pt-3">
+                  <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">
+                    Ask Agent to Refine Element
+                  </label>
+                  <input
+                    value={agentNote}
+                    onChange={(e) => setAgentNote(e.target.value)}
+                    placeholder="e.g. Convert this card into a 3-column metric table"
+                    className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 text-xs text-on-surface outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!agentNote.trim()) return;
+                      window.dispatchEvent(
+                        new CustomEvent("zeus:prefill", {
+                          detail: `In "${active.name}", update the <${selectedEl.tag}> element ("${selectedEl.text.slice(0, 60)}"): ${agentNote.trim()}`,
+                        })
+                      );
+                      setAgentNote("");
+                      notify("Queued element refinement in chat composer");
+                    }}
+                    className="state mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-on-primary"
+                  >
+                    <Icon name="auto_awesome" size={14} />
+                    Send to Agent Composer
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
