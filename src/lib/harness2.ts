@@ -547,6 +547,75 @@ export class HarnessBudgetLedger {
   }
 }
 
+export type ImprovementDimension = "INV" | "DOM" | "CMP";
+
+export interface ScoredRollout {
+  taskId: string;
+  mode: string;
+  k: number;
+  label: string;
+  chosenIsBase: boolean;
+  nPassed: number;
+  nCriteria: number;
+  allPass: boolean;
+  frac: number | null;
+  dimension: ImprovementDimension;
+  proposedPatch: Record<string, string>;
+}
+
+/**
+ * Ported from Google Research `harness2/core/judge.py` & `harness2/core/recursion.py`:
+ * Scores a completed rollout trajectory and classifies any failure along the `INV` (invariants /
+ * tool protocol) vs `DOM` (domain workflow / skill) vs `CMP` (composition) dimensions.
+ */
+export function scoreAndProposeRecursiveStage(opts: {
+  taskId: string;
+  providerId: string;
+  modelId: string;
+  tools: ToolCall[];
+  nudged?: boolean;
+}): ScoredRollout {
+  const totalTools = opts.tools.length;
+  const okTools = opts.tools.filter((t) => t.status === "ok").length;
+  const errTools = opts.tools.filter((t) => t.status === "error");
+  const hasProtocolError = errTools.some(
+    (t) => t.output?.includes("Unknown tool") || t.output?.includes("SEARCH block")
+  );
+
+  const dimension: ImprovementDimension = hasProtocolError || opts.nudged
+    ? "INV"
+    : errTools.length > 0
+    ? "DOM"
+    : "CMP";
+
+  const nCriteria = Math.max(1, totalTools);
+  const nPassed = totalTools === 0 ? 1 : okTools;
+  const allPass = errTools.length === 0 && !opts.nudged;
+  const proposedPatch: Record<string, string> = {};
+
+  if (dimension === "INV") {
+    proposedPatch[".zeusdesigns/harness/tool_guidance.md"] =
+      `# Tool Guidance Patch (${opts.modelId})\n- Emit canonical <zeus_tool> calls immediately in Round 0.\n- Prefer write_file or exact 3-line edit_file SEARCH blocks.\n`;
+  } else if (dimension === "DOM") {
+    proposedPatch[".zeusdesigns/harness/guardrails.md"] =
+      `# Guardrails Patch (${opts.modelId})\n- Verify every code mutation with a non-interactive shell or python test run before concluding.\n`;
+  }
+
+  return {
+    taskId: opts.taskId,
+    mode: "sequential",
+    k: 1,
+    label: dimension.toLowerCase(),
+    chosenIsBase: allPass,
+    nPassed,
+    nCriteria,
+    allPass,
+    frac: nCriteria > 0 ? nPassed / nCriteria : null,
+    dimension,
+    proposedPatch,
+  };
+}
+
 export async function materializeHarnessTree(ws: Workspace, providerId: string, modelId: string): Promise<string[]> {
   const tree = buildDefaultHarnessTree(providerId, modelId);
   validateAndAutotriggerHarnessTree(tree);
