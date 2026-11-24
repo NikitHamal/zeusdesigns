@@ -1,7 +1,8 @@
-// Modular Per-Model Coding & Agent Harness Architecture.
-// Profiles every provider + model into its optimal execution strategy (bash/python-first,
-// hybrid-fast diffusion/multimodal, or guided-compact), tool-calling protocol, context budget,
-// and anti-failure guardrails.
+// Modular Per-Model Coding & Agent Harness Architecture (Zeus Harness²).
+// Classifies every provider + model into:
+//   1. Its native tool protocol (`openai_tools`, `anthropic_tool_use`, or `scraper_xml_dsl`)
+//   2. Its model family (`claude`, `gpt`, `deepseek`, `kimi`, `glm`, `qwen`, `mercury`, `gemini`, `nemotron`, `mistral`, `grok`, `frontier_moe`, `compact_open`)
+//   3. Its execution strategy (`bash_python_first`, `hybrid_fast`, `guided_compact`)
 
 import type { Effort } from "../types";
 import { findProvider } from "./providers";
@@ -26,12 +27,18 @@ export type ToolExecutionStyle =
   | "hybrid_fast"
   | "guided_compact";
 
+export type NativeToolProtocol =
+  | "openai_tools"
+  | "anthropic_tool_use"
+  | "scraper_xml_dsl";
+
 export interface CodingHarnessProfile {
   providerId: string;
   modelId: string;
   modelLabel: string;
   family: ModelFamily;
   style: ToolExecutionStyle;
+  nativeToolProtocol: NativeToolProtocol;
   maxToolRounds: number;
   maxToolOutputChars: number;
   preferBashPython: boolean;
@@ -40,6 +47,37 @@ export interface CodingHarnessProfile {
   familyDirective: string;
   workflowDirective: string;
   toolExamples: string;
+}
+
+const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
+  "freellmhub",
+  "litellmhub",
+  "kilo",
+  "nimcloud",
+  "ovhcloud",
+  "blockrun",
+  "vireonix",
+  "llm7",
+  "opencodezen",
+  "together2api",
+  "hfcluster",
+  "gemma4pro",
+  "frontierlab",
+  "liquidai",
+  "koboldcloud",
+  "bonsaicloud",
+  "unslothcloud",
+]);
+
+export function detectNativeToolProtocol(providerId: string, modelId: string): NativeToolProtocol {
+  const m = modelId.toLowerCase();
+  if (providerId === "freecc") return "anthropic_tool_use";
+  if (providerId.startsWith("custom:")) return "openai_tools";
+  if (providerId === "aibridge") {
+    return m.includes("claude") || m.includes("grok") ? "scraper_xml_dsl" : "openai_tools";
+  }
+  if (NATIVE_OPENAI_TOOLS_PROVIDERS.has(providerId)) return "openai_tools";
+  return "scraper_xml_dsl";
 }
 
 export function detectModelFamily(providerId: string, modelId: string, label = ""): ModelFamily {
@@ -77,6 +115,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
   const model = prov.models.find((m) => m.id === modelId) ?? prov.models[0];
   const modelLabel = model?.label ?? modelId;
   const family = detectModelFamily(providerId, modelId, modelLabel);
+  const nativeToolProtocol = detectNativeToolProtocol(providerId, modelId);
 
   const isSmallOpen =
     family === "compact_open" &&
@@ -97,7 +136,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
       ? "high"
       : "medium";
 
-  const familyDirective = buildFamilyDirective(family, modelLabel);
+  const familyDirective = buildFamilyDirective(family, modelLabel, nativeToolProtocol);
   const workflowDirective = buildWorkflowDirective(style, family);
   const toolExamples = buildToolExamples(style);
 
@@ -107,6 +146,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
     modelLabel,
     family,
     style,
+    nativeToolProtocol,
     maxToolRounds,
     maxToolOutputChars,
     preferBashPython,
@@ -118,70 +158,77 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
   };
 }
 
-function buildFamilyDirective(family: ModelFamily, label: string): string {
+function buildFamilyDirective(family: ModelFamily, label: string, protocol: NativeToolProtocol): string {
+  const protoTag =
+    protocol === "openai_tools"
+      ? "Native OpenAI Function-Calling + XML Bridge"
+      : protocol === "anthropic_tool_use"
+      ? "Native Anthropic tool_use + XML Bridge"
+      : "Specialized Scraper XML DSL Bridge";
+
   switch (family) {
     case "mercury":
-      return `## Model Harness: ${label} (Diffusion High-Speed Architect)
+      return `## Model Harness²: ${label} (${protoTag} · Diffusion Architect)
 - Never emit \`<zeus_tool>\` or \`<tool_call>\` tags inside \`<think>...</think>\`. Keep \`<think>\` pure plain-text reasoning.
 - When asked to create or write a file (such as \`AGENTS.md\`, \`README.md\`, a script, or a module), emit \`<zeus_tool name="write_file" path="...">...</zeus_tool>\` immediately in your first turn. Do NOT call \`list_dir\` before writing a requested file when the target path is already known.
 - Never repeat the same \`list_dir\` or \`read_file\` call if it returned empty or you already saw the result.`;
 
     case "claude":
-      return `## Model Harness: ${label} (Claude Code Bash & Python Specialist)
+      return `## Model Harness²: ${label} (${protoTag} · Claude Code Bash & Python Specialist)
 - Operate with Claude Code discipline: prefer \`<zeus_tool name="shell">\` (bash) and \`<zeus_tool name="python">\` to inspect, transform, test, and verify code in minimal turns.
 - Combine shell exploration into single compound commands (e.g., \`rg -n "symbol" src/ && git status -sb\`) instead of sequential single-file reads when mapping a codebase.
 - Use \`edit_file\` for targeted single-file changes or \`python\` scripts for multi-file deterministic refactoring.`;
 
     case "gpt":
-      return `## Model Harness: ${label} (OpenAI Codex CLI Bash & Python Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Codex CLI Bash & Python Profile)
 - Operate like Codex CLI: you have full local \`shell\` (bash/cmd) and \`python\` execution inside the workspace.
 - Prefer fast \`shell\` pipelines (\`rg\`, \`sed -n\`, \`git diff\`, test runners) and \`python\` scripts for complex code transformations, data processing, and verification.
 - Make complete, root-cause fixes on the first pass and verify them by running the project's build or test suite.`;
 
     case "deepseek":
-      return `## Model Harness: ${label} (DeepSeek V4/R1 Bash & Python Agent Profile)
+      return `## Model Harness²: ${label} (${protoTag} · DeepSeek V4/R1 Bash & Python Agent Profile)
 - Keep \`<think>\` focused and never write literal \`<zeus_tool>\` tags inside \`<think>\`; emit tool tags only in your final response after \`</think>\`.
 - Leverage your strong \`shell\` (bash) and \`python\` training: use \`<zeus_tool name="shell">\` for ripgrep/git/test commands and \`<zeus_tool name="python">\` for programmatic multi-hunk edits, AST/JSON inspection, and algorithmic verification.
 - When creating a new file, call \`write_file\` directly without preliminary directory listing.`;
 
     case "kimi":
-      return `## Model Harness: ${label} (Moonshot Kimi K2.7/K3 SWE-Agent Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Moonshot Kimi K2.7/K3 SWE-Agent Profile)
 - Use your SWE-agent strengths: prefer compound \`shell\` commands (\`rg -n\`, \`find\`, \`pytest\`, \`npm test\`, \`cargo check\`) and \`python\` execution over slow file-by-file browsing.
 - Emit raw \`<zeus_tool name="...">...</zeus_tool>\` blocks outside \`<think>\`. Do not re-run \`list_dir\` on directories already shown in \`## Project\`.`;
 
     case "glm":
-      return `## Model Harness: ${label} (Z.ai GLM-5 Agentic Coder Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Z.ai GLM-5 Agentic Coder Profile)
 - Emit \`<zeus_tool>\` blocks directly as top-level XML (never wrap \`<zeus_tool>\` inside \`\`\`xml markdown fences).
 - Prefer \`<zeus_tool name="shell">\` and \`<zeus_tool name="python">\` for fast workspace inspection, batch edits, and running tests/typechecks.`;
 
     case "qwen":
-      return `## Model Harness: ${label} (Qwen Coder Bash & Python Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Qwen Coder Bash & Python Profile)
 - Prefer \`<zeus_tool name="shell">\` (bash) and \`<zeus_tool name="python">\` for rapid code search, multi-file edits, and test verification, alongside \`edit_file\` and \`write_file\`.
 - Top-level project files are already listed in \`## Project\`; jump straight to reading/editing target files or running shell/python commands.`;
 
     case "gemini":
-      return `## Model Harness: ${label} (Gemini Long-Context Engineering Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Gemini Long-Context Engineering Profile)
 - Act decisively without asking permission: inspect target files directly, apply complete changes via \`write_file\`, \`edit_file\`, or \`python\`/\`shell\`, and run verification commands.`;
 
     case "nemotron":
-      return `## Model Harness: ${label} (NVIDIA Nemotron 3 Software Engineering Profile)
+      return `## Model Harness²: ${label} (${protoTag} · NVIDIA Nemotron 3 Software Engineering Profile)
 - Keep \`<think>\` concise and never place \`<zeus_tool>\` tags inside \`<think>\`.
 - Use \`shell\`, \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` directly; never call \`list_dir\` if the target file path is already known.`;
 
     case "mistral":
-      return `## Model Harness: ${label} (Mistral / Codestral Precision Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Mistral / Codestral Precision Profile)
 - Focus on high-speed, surgical code edits using \`edit_file\`, \`write_file\`, \`shell\`, and \`python\`. Verify changes with a build or test command before finishing.`;
 
     case "grok":
-      return `## Model Harness: ${label} (xAI Grok 4 Engineering Profile)
+      return `## Model Harness²: ${label} (${protoTag} · xAI Grok 4 Engineering Profile)
 - Use \`shell\` and \`python\` aggressively to inspect, edit, and test code in minimal turns. Verify your work with real command output.`;
 
     case "frontier_moe":
-      return `## Model Harness: ${label} (Frontier Agentic Engineering Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Frontier Agentic Engineering Profile)
 - Use \`shell\` (bash), \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` to solve tasks in minimal rounds. Never emit \`<zeus_tool>\` inside \`<think>\`.`;
 
     case "compact_open":
-      return `## Model Harness: ${label} (Compact High-Speed Agent Profile)
+      return `## Model Harness²: ${label} (${protoTag} · Compact High-Speed Agent Profile)
 - Work in direct, single-step actions. When asked to create a file, use \`<zeus_tool name="write_file" path="filename">content</zeus_tool>\` immediately. When asked to run a command or test, use \`<zeus_tool name="shell">command</zeus_tool>\`.`;
   }
 }
@@ -198,33 +245,24 @@ function buildWorkflowDirective(style: ToolExecutionStyle, family: ModelFamily):
   return `## Coding & Agent Execution Protocol (${style === "bash_python_first" ? "Bash & Python-First" : "High-Speed Hybrid"} · ${family.toUpperCase()})
 1. **Zero Wasted Turns**: Top-level files are already shown in \`## Project\`. Never call \`list_dir\` on \`.\` unless \`## Project\` is missing. When asked to create a new file (like \`AGENTS.md\` or a new module), write it immediately on Turn 1 unless you specifically need to inspect an existing file first.
 2. **Bash & Python Power Tools**: You have full local \`shell\` (bash/cmd) and \`python\` (Python 3) execution in the workspace.
-   - Use \`<zeus_tool name="shell">rg -n "pattern" src/ && git status -sb</zeus_tool>\` to combine search, git status, and file inspection in one turn.
-   - Use \`<zeus_tool name="python">...</zeus_tool>\` whenever a Python script is faster or more reliable than manual text replacement (e.g., complex multi-file edits, regex/AST refactoring, JSON/CSV manipulation, math/algorithm checks, or test generation).
-3. **Surgical File Edits**:
-   - For new files or full rewrites: \`<zeus_tool name="write_file" path="relative/path">...full content...</zeus_tool>\`
-   - For targeted edits to existing files: \`<zeus_tool name="edit_file" path="relative/path"><<<<<<< SEARCH\\nexact lines\\n=======\\nnew lines\\n>>>>>>> REPLACE</zeus_tool>\` (or use \`python\` for programmatic multi-hunk edits).
-4. **Verify Before Finishing**: Run the relevant build, typecheck, linter, or test command via \`<zeus_tool name="shell">\` or \`<zeus_tool name="python">\`, inspect the output, and fix any errors before concluding.
-5. **Concise Completion**: Once verified, stop calling tools and answer in 1 to 3 crisp sentences stating what changed and where. Never dump full files you already wrote to disk.`;
+   - Use \`<zeus_tool name="shell">\` for \`rg\`, \`git\`, \`find\`, test suites (\`npm test\`, \`pytest\`, \`cargo check\`, \`node --test\`), and compound shell pipelines.
+   - Use \`<zeus_tool name="python">\` to execute multi-line Python 3 scripts via stdin for complex multi-file edits, JSON/AST analysis, data transformation, and algorithmic verification.
+3. **Surgical File Edits**: Use \`write_file\` to create new files or replace small files completely, and \`edit_file\` (\`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE\`) for targeted changes in existing files.
+4. **Verify & Conclude**: After modifying code, run the relevant test or verification command when one exists. Once verified, stop calling tools and answer in 1-3 concise sentences.`;
 }
 
 function buildToolExamples(style: ToolExecutionStyle): string {
+  const base = [
+    `- \`<zeus_tool name="shell">rg -n "handleSubmit" src/ && git status -sb</zeus_tool>\` (alias: \`name="bash"\`) — run any bash/sh/cmd pipeline, git, ripgrep, test, or build command in the project root`,
+    `- \`<zeus_tool name="python">import pathlib, json\nprint(len(list(pathlib.Path(".").rglob("*.ts"))))</zeus_tool>\` — run a multi-line Python 3 script directly in the project root via stdin`,
+    `- \`<zeus_tool name="write_file" path="AGENTS.md"># Project Guidelines\n\nBuild and test instructions...</zeus_tool>\` — create or overwrite a file in one step`,
+    `- \`<zeus_tool name="edit_file" path="src/app.ts"><<<<<<< SEARCH\nconst port = 3000;\n=======\nconst port = Number(process.env.PORT) || 3000;\n>>>>>>> REPLACE</zeus_tool>\` — surgical search/replace edit (or JSON \`{"oldString":"...","newString":"..."}\`)`,
+    `- \`<zeus_tool name="read_file" path="src/app.ts" start="1" end="200"></zeus_tool>\` — read a file (optional 1-indexed line range)`,
+    `- \`<zeus_tool name="search_code">functionName</zeus_tool>\` — fast substring/symbol search across workspace files`,
+    `- \`<zeus_tool name="list_dir" path="src"></zeus_tool>\` — list files in a specific subdirectory (never re-list root \`""\` if already shown in \`## Project\`)`,
+  ];
   if (style === "guided_compact") {
-    return [
-      `- Run shell command: \`<zeus_tool name="shell">git status -sb</zeus_tool>\``,
-      `- Run Python script: \`<zeus_tool name="python">import os; print(os.listdir('.'))</zeus_tool>\``,
-      `- Read file: \`<zeus_tool name="read_file" path="src/index.ts" start="1" end="150"></zeus_tool>\``,
-      `- Write file: \`<zeus_tool name="write_file" path="AGENTS.md"># Agents Guide...</zeus_tool>\``,
-      `- Edit file: \`<zeus_tool name="edit_file" path="src/index.ts"><<<<<<< SEARCH\\nold line\\n=======\\nnew line\\n>>>>>>> REPLACE</zeus_tool>\``,
-    ].join("\n");
+    return base.slice(0, 5).join("\n");
   }
-
-  return [
-    `- \`<zeus_tool name="shell">command</zeus_tool>\` (alias: \`name="bash"\`) — run any bash/sh/cmd pipeline, git, ripgrep (\`rg\`), npm/cargo/pytest, or build command`,
-    `- \`<zeus_tool name="python">python3_code</zeus_tool>\` — run multi-line Python 3 code directly via stdin (ideal for complex file edits, AST/JSON transforms, data analysis, and automated checks)`,
-    `- \`<zeus_tool name="read_file" path="relative/file" start="1" end="250"></zeus_tool>\` — read file lines with line bounds`,
-    `- \`<zeus_tool name="write_file" path="relative/file">complete file content</zeus_tool>\` — create or overwrite a file in 1 step`,
-    `- \`<zeus_tool name="edit_file" path="relative/file"><<<<<<< SEARCH\\nexisting lines\\n=======\\nreplacement lines\\n>>>>>>> REPLACE</zeus_tool>\` — surgical search/replace (supports multiple SEARCH/REPLACE blocks)`,
-    `- \`<zeus_tool name="search_code">substring_or_symbol</zeus_tool>\` — fast workspace code search (\`path:line: snippet\`)`,
-    `- \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\` — list a subdirectory tree`,
-  ].join("\n");
+  return base.join("\n");
 }

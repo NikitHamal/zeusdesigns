@@ -10,9 +10,9 @@ import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
-import { runOpenCode } from "./opencode";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
+import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { tokensCss } from "./designSystems";
@@ -557,23 +557,12 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
   };
 
-  const useOC = settings.agentRuntime === "opencode" && nativeOn && mode !== "design" && !custom;
   try {
-    if (useOC) {
-      await runOpenCode({
-        convId, title: conv.title, prompt: opts.text, system, signal,
-        onText: (t) => { full += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
-        onReasoning: (t) => { extraThink += t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); },
-        onTool: (t) => {
-          const cur = tools.find((x) => x.id === t.id);
-          if (cur) Object.assign(cur, t); else tools.push(t);
-          if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
-        },
-      });
-    } else if (nativeOn) {
+    if (nativeOn) {
       let current = req;
       let msgs: ChatRequest["messages"] = history;
       let nudged = false;
+      const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
       for (let round = 0; ; round++) {
         const roundTools: ToolCall[] = [];
         const studioRuns = new Map<string, Promise<void>>();
@@ -623,8 +612,23 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               if (studioRuns.has(e.id)) return; // built-in Zeus Studio tools are answered locally
               const t = tools.find((x) => x.id === e.id);
               if (t) {
-                t.status = e.ok ? "ok" : "error";
-                t.output = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output;
+                let parsedPath = "";
+                let parsedBody = "";
+                try {
+                  const j = JSON.parse(t.args ?? "{}");
+                  parsedPath = j.path ?? "";
+                  parsedBody = j.body ?? "";
+                } catch {
+                  parsedBody = t.args ?? "";
+                }
+                const rawOut = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output;
+                const hooked = runPostToolUseHook(
+                  { name: t.name, path: parsedPath, body: parsedBody },
+                  { ok: e.ok, output: rawOut },
+                  mode === "code" ? codingProfile.maxToolOutputChars : 8000
+                );
+                t.status = hooked.ok ? "ok" : "error";
+                t.output = hooked.output;
                 if (t.name.startsWith("memory")) {
                   import("./bridge").then(({ nativeMemory }) =>
                     nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: [...l].reverse() }))
@@ -646,7 +650,6 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           signal.addEventListener("abort", () => resolve());
           nativeChat(current, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
         });
-        const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
         if (signal.aborted || round >= (mode === "code" ? codingProfile.maxToolRounds : mode === "chat" ? 8 : 4)) break;
@@ -763,6 +766,15 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         ];
         current = { ...req, requestId: uid(), messages: msgs };
         full += "\n\n";
+      }
+      if (mode === "code") {
+        recordTrajectoryReflection({
+          projectRoot: st.ui.workspace?.root,
+          providerId: settings.providerId,
+          modelId: settings.modelId,
+          tools,
+          nudged,
+        });
       }
     } else if (custom) {
       await streamCustom(req, onDelta, (r) => { extraThink += r; if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); }); }, signal);

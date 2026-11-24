@@ -1017,8 +1017,8 @@ const AGENT_TASKS = [
 function ProjectWorkspaceCard({ onOpenDock }: { onOpenDock: (tab: "files" | "terminal", filePath?: string) => void }) {
   const ws = useStore((s) => s.ui.workspace);
   const curProject = useStore(activeProject);
-  const runtime = useStore((s) => s.settings.agentRuntime ?? "zeus");
-  const patchSettings = useStore((s) => s.patchSettings);
+  const providerId = useStore((s) => s.settings.providerId);
+  const modelId = useStore((s) => s.settings.modelId);
   const topNodes = (ws?.tree ?? []).slice(0, 12);
 
   return (
@@ -1041,20 +1041,13 @@ function ProjectWorkspaceCard({ onOpenDock }: { onOpenDock: (tab: "files" | "ter
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="flex rounded-full border border-outline-variant/60 bg-surface p-0.5 text-[11.5px] font-semibold">
-              {(["zeus", "opencode"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => patchSettings({ agentRuntime: r })}
-                  className={cn(
-                    "h-7 rounded-full px-2.5 transition-colors",
-                    runtime === r ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
-                  )}
-                >
-                  {r === "zeus" ? "Zeus" : "OpenCode SDK"}
-                </button>
-              ))}
-            </div>
+            <span
+              title={`Zeus Harness² active for ${providerId}/${modelId}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-outline-variant/60 bg-surface px-3 text-[11.5px] font-semibold text-primary"
+            >
+              <Icon name="bolt" size={14} />
+              Zeus Harness²
+            </span>
             <button
               onClick={() => onOpenDock("files")}
               className="state inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-high px-3 text-xs font-medium text-on-surface"
