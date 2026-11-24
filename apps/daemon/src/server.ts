@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { startZeusGateway } from './zeus-providers/gateway.js';
 import { recordStrategyTaskRunLifecycle } from './strategies/task-display.js';
 import { observeDiscoveryEvent } from './strategies/od-next/discovery-observation.js';
 import { assertCommentFileNotPending } from './collab/comment-file-retirements.js';
@@ -18919,6 +18920,14 @@ export async function startServer({
           console.log(`[od] daemon listening on ${url}`);
         }
         daemonUrl = url;
+        // Zeus keyless provider gateway (OpenAI-compatible, loopback only).
+        void startZeusGateway()
+          .then(({ port: gatewayPort }) => {
+            if (!returnServer) console.log(`[zeus] provider gateway on http://127.0.0.1:${gatewayPort}`);
+          })
+          .catch((err: unknown) => {
+            console.warn(`[zeus] provider gateway unavailable: ${(err as Error).message}`);
+          });
         resolve(returnServer ? {
           url,
           server,

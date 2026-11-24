@@ -44,9 +44,8 @@ export const k2horizon: ZeusProvider = {
       stream: true,
       model,
       messages,
-      params: {},
+      params: { reasoning_effort: req.effort ?? 'medium' },
       features: { web_search: false },
-      extra_body: { chat_template_kwargs: { reasoning_effort: req.effort ?? 'medium' } },
     };
     let prevReasoning = '';
     let prevAnswer = '';

@@ -1,4 +1,5 @@
 import type { ByokChatProviderConfig } from '@open-design/contracts';
+import { isZeusGatewayUrl } from '../zeus-providers/keyless.js';
 
 export const BYOK_OPENCODE_AGENT_ID = 'byok-opencode';
 export const BYOK_OPENCODE_PROVIDER_ID = 'open-design-byok';
@@ -131,6 +132,7 @@ function requiresApiKey(
 ): boolean {
   const protocol = provider.protocol;
   if (provider.requiresApiKey === false) return false;
+  if (isZeusGatewayUrl(baseUrl)) return false;
   return protocol !== 'ollama' || !isLocalOllamaBaseUrl(baseUrl);
 }
 

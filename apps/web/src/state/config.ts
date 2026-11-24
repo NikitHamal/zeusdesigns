@@ -140,6 +140,63 @@ export interface KnownProvider {
 // presets and are reconciled with the live account catalogue before automatic
 // selection. They are not a replacement for provider model discovery.
 export const KNOWN_PROVIDERS: KnownProvider[] = [
+  // Zeus keyless providers: served by the daemon's loopback gateway.
+  {
+    label: 'Mercury 3 (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/mercury3/v1',
+    preferredModels: ['mercury-3'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'ChatJimmy (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/chatjimmy/v1',
+    preferredModels: ['llama3.1-8B'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'Qwen (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/qwen/v1',
+    preferredModels: ['qwen3.8-max'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'K2 Horizon (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/k2horizon/v1',
+    preferredModels: ['IFM/K2-Horizon-375B-A23B'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'Motif (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/motif/v1',
+    preferredModels: ['motif-102b', 'motif-12-7b-reasoning', 'motif-12-7b', 'motif-tiny'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'DeepAI (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/deepai/v1',
+    preferredModels: ['qwen3.8-flash', 'claude-haiku-5-5', 'gpt-6-luna', 'deepseek-v4.1-flash', 'gemma-4'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'LongCat (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/longcat/v1',
+    preferredModels: ['longcat/LongCat-2.5'],
+    requiresApiKey: false,
+  },
+  {
+    label: 'Gemini Web (Zeus, free)',
+    protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:17873/geminiweb/v1',
+    preferredModels: ['geminiweb/gemini-flash-lite'],
+    requiresApiKey: false,
+  },
   {
     label: 'Anthropic (Claude)',
     protocol: 'anthropic',

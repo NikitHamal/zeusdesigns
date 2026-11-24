@@ -34,6 +34,7 @@ import {
 import { isSafeId as isSafeProjectId } from '../projects.js';
 import { projectKindToTracking } from '@open-design/contracts/analytics';
 import { proxyDispatcherRequestInit, validateUserProviderBaseUrl } from '../connectionTest.js';
+import { isZeusGatewayUrl, ZEUS_KEYLESS_TOKEN } from '../zeus-providers/keyless.js';
 import { isKnownReasoningEffort, resolveModelForServiceTier } from '../runtimes/models.js';
 import { googleStreamGenerateContentUrl } from '../integrations/google-models.js';
 import { createRoleMarkerGuard } from '../role-marker-guard.js';
@@ -65,6 +66,19 @@ export interface RegisterChatRoutesDeps extends RouteDeps<'db' | 'design' | 'htt
 }
 
 export function registerChatRoutes(app: Express, ctx: RegisterChatRoutesDeps) {
+  // Zeus keyless gateway: fill a placeholder bearer so the BYOK proxy, model
+  // discovery and connection-test routes accept key-less loopback providers.
+  app.use(
+    ['/api/proxy/openai/stream', '/api/provider/models', '/api/test/connection'],
+    (req, _res, next) => {
+      const body = req.body as { baseUrl?: unknown; apiKey?: unknown } | undefined;
+      if (body && typeof body === 'object' && isZeusGatewayUrl(body.baseUrl) && !(typeof body.apiKey === 'string' && body.apiKey.trim())) {
+        body.apiKey = ZEUS_KEYLESS_TOKEN;
+      }
+      next();
+    },
+  );
+
   const { db, design } = ctx;
   const { sendApiError, createSseResponse } = ctx.http;
   const { readAppConfig } = ctx.appConfig;

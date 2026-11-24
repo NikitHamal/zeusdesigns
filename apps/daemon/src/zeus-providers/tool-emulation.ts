@@ -64,28 +64,52 @@ export function rewriteForTools(messages: RawMessage[]): RawMessage[] {
   });
 }
 
-const CALL_RE = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
 export const CALL_OPEN = '<tool_call>';
+const CALL_CLOSE = '</tool_call>';
 
 export function stripThink(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, '');
 }
 
+// First balanced {...} starting at `from` (string-aware). Models often drop the
+// closing tag, so the JSON object itself delimits the call.
+function balancedObject(text: string, from: number): { json: string; end: number } | null {
+  const start = text.indexOf('{', from);
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (c === '\\') i++;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') inStr = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return { json: text.slice(start, i + 1), end: i + 1 };
+  }
+  return null;
+}
+
 export function parseToolCalls(text: string): { content: string; calls: ParsedToolCall[] } {
   const clean = stripThink(text);
   const calls: ParsedToolCall[] = [];
-  let i = 0;
-  const content = clean
-    .replace(CALL_RE, (_all, body: string) => {
-      try {
-        const obj = JSON.parse(body) as { name?: string; arguments?: unknown };
-        if (obj && typeof obj.name === 'string') {
-          const args = typeof obj.arguments === 'string' ? obj.arguments : JSON.stringify(obj.arguments ?? {});
-          calls.push({ id: `call_${Date.now().toString(36)}_${i++}`, name: obj.name, arguments: args });
-        }
-      } catch { /* malformed call: dropped */ }
-      return '';
-    })
-    .trim();
-  return { content, calls };
+  let content = '';
+  let pos = 0;
+  for (;;) {
+    const at = clean.indexOf(CALL_OPEN, pos);
+    if (at < 0) { content += clean.slice(pos); break; }
+    content += clean.slice(pos, at);
+    const obj = balancedObject(clean, at + CALL_OPEN.length);
+    if (!obj) { pos = at + CALL_OPEN.length; continue; }
+    try {
+      const parsed = JSON.parse(obj.json) as { name?: string; arguments?: unknown };
+      if (parsed && typeof parsed.name === 'string') {
+        const args = typeof parsed.arguments === 'string' ? parsed.arguments : JSON.stringify(parsed.arguments ?? {});
+        calls.push({ id: `call_${Date.now().toString(36)}_${calls.length}`, name: parsed.name, arguments: args });
+      }
+    } catch { /* malformed call: dropped */ }
+    pos = obj.end;
+    if (clean.startsWith(CALL_CLOSE, pos)) pos += CALL_CLOSE.length;
+  }
+  return { content: content.trim(), calls };
 }

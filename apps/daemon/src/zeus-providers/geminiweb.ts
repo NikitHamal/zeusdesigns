@@ -1,4 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto';
+import https from 'node:https';
 import type { ZeusChunk, ZeusProvider, ZeusRequest } from './types.js';
 import { flattenTranscript } from './types.js';
 import { errorBody, timeoutSignal } from './http.js';
@@ -19,14 +20,32 @@ interface Identity {
 
 let identity: Identity | null = null;
 
-async function warm(signal?: AbortSignal): Promise<Identity | null> {
-  const res = await fetch(`${BASE}/app`, {
-    headers: { 'user-agent': UA, accept: 'text/html' },
-    signal: timeoutSignal(60_000, signal),
+// Google answers /app with very large Set-Cookie headers that overflow Node's
+// default 16 KB header limit, so the warm-up uses https with a raised limit.
+function getRaw(url: string, headers: Record<string, string>, signal?: AbortSignal): Promise<{ status: number; body: string; cookie: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers, maxHeaderSize: 256 * 1024, signal: timeoutSignal(60_000, signal) } as https.RequestOptions, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => {
+        const set = res.headers['set-cookie'] ?? [];
+        resolve({
+          status: res.statusCode ?? 0,
+          body: Buffer.concat(chunks).toString('utf8'),
+          cookie: set.map((c) => c.split(';')[0]).join('; '),
+        });
+      });
+      res.on('error', reject);
+    });
+    req.on('error', reject);
   });
-  if (!res.ok) return null;
-  const html = await res.text();
-  const cookie = res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+}
+
+async function warm(signal?: AbortSignal): Promise<Identity | null> {
+  const res = await getRaw(`${BASE}/app`, { 'user-agent': UA, accept: 'text/html' }, signal);
+  if (res.status !== 200) return null;
+  const html = res.body;
+  const cookie = res.cookie;
   const fsid = /"FdrFJe":"([0-9-]+)"/.exec(html)?.[1] ?? '';
   const bl =
     /"cfb2h":"([^"]+)"/.exec(html)?.[1] ??
