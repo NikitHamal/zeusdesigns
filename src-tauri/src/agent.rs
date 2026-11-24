@@ -2,8 +2,8 @@ use crate::providers::{
     catalog, chatjimmy_complete, dispatch_stream, ChatRequest, ProviderEngine, ProviderInfo,
 };
 use crate::workspace::{
-    fs_delete, fs_read, fs_write, python_run, search_workspace_code, shell_run, walk_workspace,
-    FileNode,
+    fs_delete, fs_read, fs_write, python_run, safe_join, search_workspace_code, shell_run,
+    walk_workspace, FileNode,
 };
 use serde_json::{json, Value};
 use std::path::Path;
@@ -884,12 +884,13 @@ fn execute_inline_workspace_tools(
             continue;
         }
 
+        let req_tag = event_topic.rsplit('/').next().unwrap_or("r");
         let dedup_key = format!("{}|{}|{}|{}", inv.offset, name, path_arg, body);
         if executed_ids.contains(&dedup_key) {
             continue;
         }
         executed_ids.insert(dedup_key);
-        let tool_id = format!("tool-{}-{}", executed_ids.len(), inv.offset);
+        let tool_id = format!("tool-{}-{}-{}", req_tag, executed_ids.len(), inv.offset);
 
         let _ = app.emit(
             event_topic,
@@ -1041,18 +1042,16 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         }
         "list_dir" | "ls" | "dir" | "list_files" | "glob" | "find_files" => {
             let p = Path::new(&eff_root);
-            if path_arg.contains("..") {
-                (false, "list_dir: path must stay inside the project".to_string())
+            let trimmed_arg = path_arg.trim();
+            let target_res = if trimmed_arg.is_empty() || trimmed_arg == "." || trimmed_arg == "./" || trimmed_arg == ".\\" {
+                Ok(p.to_path_buf())
             } else {
-                let clean_rel = path_arg
-                    .trim()
-                    .trim_matches(|c| c == '.' || c == '/' || c == '\\');
-                let target = if clean_rel.is_empty() {
-                    p.to_path_buf()
-                } else {
-                    p.join(clean_rel)
-                };
-                let tree = walk_workspace(p, &target, 2);
+                safe_join(&eff_root, trimmed_arg)
+            };
+            match target_res {
+                Err(e) => (false, e),
+                Ok(target) => {
+                    let tree = walk_workspace(p, &target, 2);
                 if tree.is_empty() {
                     (
                         true,
@@ -1063,6 +1062,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     let mut out = String::new();
                     format_tree_compact(&tree, 0, &mut out);
                     (true, out.trim_end().to_string())
+                }
                 }
             }
         }

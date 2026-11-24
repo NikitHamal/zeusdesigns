@@ -2431,6 +2431,7 @@ where
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
         let mut saw_text = false;
+        let mut saw_think = false;
         let mut in_think = false;
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
@@ -2450,6 +2451,7 @@ where
                                     in_think = true;
                                     on_delta("<think>");
                                 }
+                                saw_think = true;
                                 on_delta(delta);
                             }
                         }
@@ -2472,7 +2474,7 @@ where
         if in_think {
             on_delta("</think>");
         }
-        if saw_text {
+        if saw_text || saw_think {
             return Ok(());
         }
     }

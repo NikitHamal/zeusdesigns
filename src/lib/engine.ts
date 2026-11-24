@@ -547,9 +547,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   const system = mode === "design"
     ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
     : [agentPrompt(mode, opts.text), toolsText].filter(Boolean).join("\n\n");
+  const activeProjRoot = st.projects.find((p) => p.id === st.activeProjectId)?.root;
+  const effectiveWorkspaceRoot = st.ui.workspace?.root || activeProjRoot;
   const req: ChatRequest = {
     requestId: uid(), provider: custom ? "custom" : settings.providerId, model: custom ? custom.model : settings.modelId, effort: settings.effort,
-    system, messages: history, workspaceRoot: st.ui.workspace?.root,
+    system, messages: history, workspaceRoot: effectiveWorkspaceRoot,
     custom: custom ? { baseUrl: custom.baseUrl, apiKey: custom.apiKey, format: custom.format } : undefined,
   };
   const device: Device = target?.device ?? "mobile";
@@ -612,7 +614,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
               sync(); }
             else if (e.type === "tool_result") {
               if (studioRuns.has(e.id)) return; // built-in Zeus Studio tools are answered locally
-              const t = tools.find((x) => x.id === e.id);
+              const t = roundTools.find((x) => x.id === e.id) ?? [...tools].reverse().find((x) => x.id === e.id);
               if (t) {
                 let parsedPath = "";
                 let parsedBody = "";
@@ -635,7 +637,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
                   import("./bridge").then(({ nativeMemory }) =>
                     nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: [...l].reverse() }))
                   ).catch(() => {});
-                } else if (/^(write_file|write|create_file|edit_file|edit|patch_file|shell|bash|python|python3)$/.test(t.name)) {
+                } else if (/^(write_file|write|create_file|delete_file|remove_file|rm|del|unlink|edit_file|edit|patch_file|shell|bash|python|python3)$/.test(t.name)) {
                   const curWs = useStore.getState().ui.workspace;
                   if (curWs) {
                     import("./bridge").then(({ refreshTree }) =>
@@ -651,6 +653,11 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
           };
           signal.addEventListener("abort", () => resolve());
           nativeChat(current, onEvent).then((c) => { nativeCancel = c; }).catch(reject);
+        }).finally(() => {
+          if (!signal.aborted) {
+            try { nativeCancel?.(); } catch { /* ignore */ }
+            nativeCancel = null;
+          }
         });
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";

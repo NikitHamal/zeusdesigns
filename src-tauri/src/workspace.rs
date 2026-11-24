@@ -96,7 +96,7 @@ pub fn detect_language(ext: &str) -> (&'static str, bool) {
     }
 }
 
-fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
+pub fn safe_join(root: &str, rel_path: &str) -> Result<PathBuf, String> {
     let root_path = Path::new(root)
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(root));
@@ -502,6 +502,107 @@ fn try_builtin_posix_shell(workdir: &Path, clean_cmd: &str) -> Option<Value> {
             "stdout": format!("{}\n", workdir.display()),
             "stderr": ""
         })),
+        "ls" => {
+            let mut target_arg = String::new();
+            for t in &tokens[1..] {
+                if !t.starts_with('-') {
+                    target_arg = t.clone();
+                    break;
+                }
+            }
+            let dir_path = if target_arg.is_empty() || target_arg == "." {
+                workdir.to_path_buf()
+            } else {
+                safe_join(&root_str, &target_arg).ok()?
+            };
+            let entries = fs::read_dir(&dir_path).ok()?;
+            let mut names = Vec::new();
+            for e in entries.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                let is_dir = e.path().is_dir();
+                names.push(if is_dir { format!("{}/", name) } else { name });
+            }
+            names.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+            Some(json!({
+                "code": 0,
+                "stdout": if names.is_empty() { "(empty directory)\n".to_string() } else { format!("{}\n", names.join("\n")) },
+                "stderr": ""
+            }))
+        }
+        "cat" => {
+            let mut files = Vec::new();
+            for t in &tokens[1..] {
+                if !t.starts_with('-') {
+                    files.push(t.clone());
+                }
+            }
+            if files.is_empty() {
+                return None;
+            }
+            let mut out = String::new();
+            let mut errs = Vec::new();
+            for f in files {
+                match fs_read(root_str.clone(), f) {
+                    Ok(c) => {
+                        out.push_str(&c);
+                        if !c.ends_with('\n') {
+                            out.push('\n');
+                        }
+                    }
+                    Err(e) => errs.push(e),
+                }
+            }
+            Some(json!({
+                "code": if errs.is_empty() { 0 } else { 1 },
+                "stdout": out,
+                "stderr": errs.join("\n")
+            }))
+        }
+        "touch" => {
+            let mut files = Vec::new();
+            for t in &tokens[1..] {
+                if !t.starts_with('-') {
+                    files.push(t.clone());
+                }
+            }
+            if files.is_empty() {
+                return None;
+            }
+            for f in &files {
+                let target = safe_join(&root_str, f).ok()?;
+                if let Some(p) = target.parent() {
+                    let _ = fs::create_dir_all(p);
+                }
+                if !target.exists() {
+                    let _ = fs::write(&target, "");
+                }
+            }
+            Some(json!({
+                "code": 0,
+                "stdout": format!("Touched {}\n", files.join(", ")),
+                "stderr": ""
+            }))
+        }
+        "mkdir" => {
+            let mut dirs = Vec::new();
+            for t in &tokens[1..] {
+                if !t.starts_with('-') {
+                    dirs.push(t.clone());
+                }
+            }
+            if dirs.is_empty() {
+                return None;
+            }
+            for d in &dirs {
+                let target = safe_join(&root_str, d).ok()?;
+                fs::create_dir_all(&target).ok()?;
+            }
+            Some(json!({
+                "code": 0,
+                "stdout": format!("Created directory {}\n", dirs.join(", ")),
+                "stderr": ""
+            }))
+        }
         _ => None,
     }
 }
