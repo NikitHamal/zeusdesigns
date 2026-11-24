@@ -4,13 +4,21 @@ import { Dialog, IconBtn, Segmented, Thumb, Toggle } from "./ui";
 import { PROVIDERS } from "../lib/providers";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { SKILLS } from "../lib/skills";
+import {
+  BUILTIN_HARNESS_SKILLS,
+  BUILTIN_SUBAGENTS,
+  getActiveHarnessSummary,
+  getProjectHarnessLessons,
+  materializeHarnessTree,
+  ZEUS_SURFACE,
+} from "../lib/harness2";
 import { ACCENTS } from "../lib/theme";
 import { renderScreen } from "../lib/templates";
 import { DEVICE_SIZE } from "../types";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
-import { download, nativePerf, nativeServer, type PerfStats, type ServerStatus } from "../lib/bridge";
+import { download, nativePerf, nativeServer, refreshTree, type PerfStats, type ServerStatus } from "../lib/bridge";
 import { Icon } from "./Icon";
 import { MemoryTab } from "./MemoryPanel";
 import { ConnectorsTab } from "./Connectors";
@@ -18,9 +26,9 @@ import { ConnectorsTab } from "./Connectors";
 const TABS = [
   { id: "appearance", label: "Appearance", icon: "palette", group: "General" },
   { id: "providers", label: "Models", icon: "memory", group: "General" },
+  { id: "library", label: "Harness² & Skills", icon: "bolt", group: "Capabilities" },
   { id: "server", label: "Local server", icon: "dns", group: "Capabilities" },
   { id: "memory", label: "Memory", icon: "psychology", group: "Your Zeus" },
-  { id: "library", label: "Design library", icon: "local_library", group: "Capabilities" },
   { id: "mcp", label: "Connectors", icon: "extension", group: "Capabilities" },
   { id: "updates", label: "Updates", icon: "system_update", group: "App" },
   { id: "about", label: "About", icon: "info", group: "App" },
@@ -133,67 +141,147 @@ function ProvidersTab() {
   );
 }
 
-/* ---------------- Library ---------------- */
+/* ---------------- Harness² & Skills ---------------- */
 function LibraryTab() {
-  const { settings } = useStore();
+  const { settings, ui } = useStore();
   const patch = useStore((s) => s.patchSettings);
-  const [sub, setSub] = useState<"ds" | "skills">("ds");
+  const notify = useStore((s) => s.notify);
+  const [sub, setSub] = useState<"harness" | "skills">("harness");
   const [q, setQ] = useState("");
+  const [writingTree, setWritingTree] = useState(false);
   const skills = useMemo(() => SKILLS.filter((s) => (s.name + s.desc + s.category).toLowerCase().includes(q.toLowerCase())), [q]);
-  const addSample = (id: string, device: "mobile" | "web") => {
-    const ds = getDS(id);
-    const st = useStore.getState();
-    const ab = st.addArtboard({ name: `${ds.name} · sample`, device, w: DEVICE_SIZE[device].w, h: DEVICE_SIZE[device].h, html: renderScreen(ds, device === "web" ? "landing" : "dashboard", 0, device, ds.name) });
-    st.patchUI({ settingsOpen: false });
-    st.setView("canvas"); st.setSel([ab.id]);
-    setTimeout(() => canvasApi.fit([ab.id]), 80);
+  const summary = getActiveHarnessSummary(settings.providerId, settings.modelId);
+  const lessons = getProjectHarnessLessons(ui.workspace?.root);
+  void DESIGN_SYSTEMS; void getDS; void renderScreen; void DEVICE_SIZE; void canvasApi; void Thumb;
+
+  const handleMaterialize = async () => {
+    if (!ui.workspace) {
+      notify("Open a project folder first to write .zeusdesigns/harness/");
+      return;
+    }
+    setWritingTree(true);
+    try {
+      const files = await materializeHarnessTree(ui.workspace, settings.providerId, settings.modelId);
+      const tree = await refreshTree(ui.workspace);
+      useStore.getState().patchUI({ workspace: { ...ui.workspace, tree } });
+      notify(`Materialized ${files.length} Harness² files into ${ui.workspace.name}`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to materialize Harness² tree");
+    } finally {
+      setWritingTree(false);
+    }
   };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented value={sub} onChange={setSub} options={[{ id: "ds", label: `Design systems · ${DESIGN_SYSTEMS.length}`, icon: <Icon name="palette" size={14} /> }, { id: "skills", label: `Skills · ${SKILLS.length}`, icon: <Icon name="menu_book" size={14} /> }]} />
+        <Segmented
+          value={sub}
+          onChange={setSub}
+          options={[
+            { id: "harness", label: "Harness² Surface (c1..c8)", icon: <Icon name="bolt" size={14} /> },
+            { id: "skills", label: `Skills · ${BUILTIN_HARNESS_SKILLS.length + SKILLS.length}`, icon: <Icon name="menu_book" size={14} /> },
+          ]}
+        />
         {sub === "skills" && (
-          <div className="relative min-w-52 flex-1"><Icon name="search" size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant" /><input className={cn(field, "pl-10")} placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <div className="relative min-w-52 flex-1">
+            <Icon name="search" size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <input className={cn(field, "pl-10")} placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
         )}
       </div>
-      {sub === "ds" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {DESIGN_SYSTEMS.map((d) => {
-            const active = settings.designSystemId === d.id;
-            return (
-              <div key={d.id} className={cn("flex flex-col overflow-hidden rounded-[28px] border transition-all", active ? "border-primary bg-primary-container/50" : "border-outline-variant/60 bg-surface-container")}>
-                <div className="flex justify-center bg-surface-dim pt-4"><div className="overflow-hidden rounded-t-[22px]"><Thumb html={renderScreen(d, "dashboard", 0, "mobile", d.name)} w={390} h={844} width={150} className="!h-[190px]" /></div></div>
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display text-base font-semibold">{d.name}</span>
-                  </div>
-                  <p className="flex-1 text-xs text-on-surface-variant">{d.tagline}</p>
-                  <div className="flex gap-1">{[d.tokens.primary, d.tokens.container, d.tokens.tertiary, d.tokens.secondary].map((c, i) => <span key={i} className="size-5 rounded-full ring-1 ring-black/10" style={{ background: c }} />)}</div>
-                  <div className="mt-1 flex gap-2">
-                    <button onClick={() => patch({ designSystemId: d.id })} className={cn("state morph h-9 flex-1 rounded-full text-[13px] font-semibold", active ? "bg-primary text-on-primary" : "bg-secondary-container text-on-secondary-container")}>{active ? "In use" : "Use"}</button>
-                    <button onClick={() => addSample(d.id, d.tags.includes("Web") && !d.tags.includes("Android") && !d.tags.includes("iOS") ? "web" : "mobile")} title="Add a sample screen to the canvas" className="state grid size-9 place-items-center rounded-full bg-surface-high text-on-surface-variant"><Icon name="add" size={16} /></button>
-                  </div>
-                </div>
+      {sub === "harness" ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-outline-variant bg-surface-container p-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 font-display text-base font-semibold text-on-surface">
+                <Icon name="bolt" size={18} className="text-primary" />
+                <span>Zeus Harness² ({summary.version})</span>
+                <span className="rounded-full bg-primary-container px-2.5 py-0.5 font-mono text-xs text-on-primary-container">
+                  {summary.family.toUpperCase()} · {summary.style}
+                </span>
               </div>
-            );
-          })}
+              <div className="text-xs text-on-surface-variant">
+                Protocol: <span className="font-mono text-on-surface">{summary.protocol}</span> · Max rounds: <span className="font-mono text-on-surface">{summary.maxToolRounds}</span> · Always-on cap: <span className="font-mono text-on-surface">{summary.alwaysOnMax.toLocaleString()} chars</span>
+              </div>
+            </div>
+            <button
+              onClick={handleMaterialize}
+              disabled={writingTree}
+              className="state morph flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary disabled:opacity-50"
+            >
+              <Icon name="save" size={15} />
+              {writingTree ? "Writing…" : "Materialize c1..c8 in Project"}
+            </button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Always-On Surface (c1..c4)</div>
+              <div className="space-y-1.5 font-mono text-xs text-on-surface">
+                {ZEUS_SURFACE.alwaysOn.map((p) => (
+                  <div key={p} className="flex items-center gap-2 rounded-lg bg-surface-high px-2.5 py-1.5">
+                    <Icon name="description" size={14} className="text-primary" />
+                    <span className="truncate">{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">In-Loop Middleware & Subagents (c5..c8)</div>
+              <div className="space-y-1.5 text-xs text-on-surface-variant">
+                <div className="rounded-lg bg-surface-high px-2.5 py-1.5 font-mono text-on-surface">
+                  c8: PreToolUse &amp; PostToolUse (CREATE_NO_WINDOW + POSIX + Self-Heal)
+                </div>
+                {BUILTIN_SUBAGENTS.map((sa) => (
+                  <div key={sa.name} className="rounded-lg bg-surface-high px-2.5 py-1.5">
+                    <span className="font-mono font-semibold text-on-surface">c5: {sa.name}</span> — {sa.description}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {lessons.length > 0 && (
+            <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Learned Project Trajectory Lessons (c3)</div>
+              <ul className="space-y-1 text-xs text-on-surface">
+                {lessons.map((l, i) => (
+                  <li key={i} className="rounded-lg bg-surface-high px-3 py-1.5 font-mono">{l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {skills.map((s) => {
-            const on = settings.skills.includes(s.id);
-            return (
-              <div key={s.id} className="flex items-start gap-3 rounded-[24px] bg-surface-container p-4">
-                <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-surface-high text-on-surface-variant"><Icon name={s.icon} size={22} /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-on-surface">{s.name}</div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">{s.category}</div>
-                  <p className="mt-0.5 text-xs text-on-surface-variant">{s.desc}</p>
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {BUILTIN_HARNESS_SKILLS.map((sk) => (
+              <div key={sk.name} className="flex flex-col gap-1.5 rounded-[22px] border border-primary/40 bg-surface-container p-4">
+                <div className="flex items-center gap-2">
+                  <Icon name="bolt" size={16} className="text-primary" />
+                  <span className="font-mono text-xs font-semibold text-on-surface">{sk.name}</span>
                 </div>
-                <Toggle on={on} onChange={(v) => patch({ skills: v ? [...settings.skills, s.id] : settings.skills.filter((x) => x !== s.id) })} />
+                <p className="text-xs text-on-surface-variant">{sk.description}</p>
               </div>
-            );
-          })}
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {skills.map((s) => {
+              const on = settings.skills.includes(s.id);
+              return (
+                <div key={s.id} className="flex items-start gap-3 rounded-[24px] bg-surface-container p-4">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-[16px] bg-surface-high text-on-surface-variant"><Icon name={s.icon} size={22} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-on-surface">{s.name}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">{s.category}</div>
+                    <p className="mt-0.5 text-xs text-on-surface-variant">{s.desc}</p>
+                  </div>
+                  <Toggle on={on} onChange={(v) => patch({ skills: v ? [...settings.skills, s.id] : settings.skills.filter((x) => x !== s.id) })} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -283,7 +371,7 @@ function UpdatesTab() {
       <div className="flex items-center gap-4 rounded-[28px] bg-surface-container p-5">
         <span className={cn("grid size-12 place-items-center rounded-[18px]", info?.available ? "bg-primary text-on-primary" : "bg-surface-high text-on-surface-variant")}><Icon name={info?.available ? "system_update" : "check_circle"} size={26} fill /></span>
         <div className="min-w-0 flex-1">
-          <div className="font-display text-lg font-semibold">{info?.available ? `Version ${info.latest} is ready` : info ? "You are up to date" : "ZeusDesigns"}</div>
+          <div className="font-display text-lg font-semibold">{info?.available ? `Version ${info.latest} is ready` : info ? "You are up to date" : "Zeus Codes"}</div>
           <div className="text-sm text-on-surface-variant">Installed {version || "dev"}{info && !info.available ? ` · latest ${info.latest}` : ""}</div>
         </div>
         {info?.available ? (
@@ -584,7 +672,7 @@ function AboutTab() {
   return (
     <div className="grid place-items-center gap-3 py-10 text-center">
       <img src="/app-icon.png" alt="" className="size-24 rounded-[28px]" />
-      <h3 className="font-display text-3xl font-semibold">ZeusDesigns</h3>
+      <h3 className="font-display text-3xl font-semibold">Zeus Codes</h3>
       <div className="flex gap-2">
         <span className="rounded-full bg-surface-high px-3 py-1 text-xs font-semibold text-on-surface-variant">{version || "dev"}</span>
         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", ready ? "bg-tertiary-container text-on-tertiary-container" : "bg-surface-high text-on-surface-variant")}>{ready ? "Native engine" : "Demo engine"}</span>

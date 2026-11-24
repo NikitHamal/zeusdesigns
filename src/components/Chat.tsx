@@ -5,7 +5,6 @@ import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
 import { supportsAttachments } from "../lib/providers";
 import { ModelPicker } from "./ModelPicker";
-import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { focusArtboard } from "../lib/actions";
 import {
   nativeMemory,
@@ -253,11 +252,11 @@ function ContextWindowPill() {
           </div>
           <div className="space-y-1.5 rounded-xl bg-surface-low p-2.5 text-[11.5px] text-on-surface-variant">
             <div className="flex items-center justify-between">
-              <span>System & Component Kit</span>
+              <span>Harness² System Surface (c1..c4)</span>
               <span className="font-mono text-on-surface">{fmtTok(stats.systemTokens)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Live Canvas ({stats.canvasScreenCount} screen{stats.canvasScreenCount === 1 ? "" : "s"})</span>
+              <span>Artifacts & Previews ({stats.canvasScreenCount})</span>
               <span className="font-mono text-on-surface">{fmtTok(stats.canvasTokens)}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -265,7 +264,7 @@ function ContextWindowPill() {
               <span className="font-mono text-on-surface">{fmtTok(stats.historyTokens)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Memory Index & Studio MCP</span>
+              <span>On-Demand Memory & MCP</span>
               <span className="font-mono text-on-surface">{fmtTok(stats.memoryTokens)}</span>
             </div>
           </div>
@@ -352,10 +351,8 @@ const readFile = (f: File): Promise<Attachment> => new Promise((res) => {
 
 export function Composer({ hero }: { hero?: boolean }) {
   const busy = useStore((s) => s.busy);
-  const dsId = useStore((s) => s.settings.designSystemId);
   const providerId = useStore((s) => s.settings.providerId);
   const modelId = useStore((s) => s.settings.modelId);
-  const patch = useStore((s) => s.patchSettings);
   const patchUI = useStore((s) => s.patchUI);
   const ws = useStore((s) => s.ui.workspace);
   const sel = useStore((s) => s.sel);
@@ -366,7 +363,6 @@ export function Composer({ hero }: { hero?: boolean }) {
   const [drag, setDrag] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const ds = getDS(dsId);
   const selected = boards.find((b) => sel.includes(b.id));
   const canAttach = supportsAttachments(providerId, modelId);
 
@@ -450,7 +446,7 @@ export function Composer({ hero }: { hero?: boolean }) {
           ref={ta} value={text} rows={1} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
           onPaste={(e) => { const f = Array.from(e.clipboardData.files); if (f.length) { e.preventDefault(); addFiles(f); } }}
-          placeholder={hero ? "Ask Zeus to build, debug, refactor, or design in your project…" : selected ? `Reply about “${selected.name}”` : "Reply or ask Zeus to edit code, run bash/python, or design…"}
+          placeholder={hero ? "Ask Zeus Codes to build, debug, refactor, or run bash/python in your project…" : selected ? `Reply about “${selected.name}”` : "Ask Zeus Codes to edit files, run bash/python, debug, or build…"}
           className={hero ? "block max-h-[260px] min-h-[84px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-[16px] text-on-surface outline-none placeholder:text-on-surface-variant/60" : "block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60"}
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pb-2">
@@ -468,21 +464,14 @@ export function Composer({ hero }: { hero?: boolean }) {
               </Dropdown>
             </>
           )}
-          <Dropdown up width={290} trigger={({ toggle }) => (
-            <button onClick={toggle} title="Design system" className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-on-surface-variant">
-              <Icon name="palette" size={15} /><span className="hidden max-w-[110px] truncate @[520px]:inline">{ds.name}</span>
-            </button>
-          )}>
-            {(close) => (
-              <>
-                <MenuLabel>Design system</MenuLabel>
-                {DESIGN_SYSTEMS.map((d) => (
-                  <MenuItem key={d.id} label={d.name} active={d.id === dsId} icon={<span className="size-4 rounded-full border border-outline-variant" style={{ background: d.tokens.primary }} />} onClick={() => { patch({ designSystemId: d.id }); close(); }} />
-                ))}
-                <MenuItem icon={<Icon name="chevron_right" size={15} />} label="Browse library & skills…" onClick={() => { patchUI({ settingsOpen: true, settingsTab: "library" }); close(); }} />
-              </>
-            )}
-          </Dropdown>
+          <button
+            onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })}
+            title={`Zeus Harness² active (${providerId}/${modelId}) — Click to configure Harness² & Skills`}
+            className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium text-on-surface-variant hover:text-on-surface"
+          >
+            <Icon name="bolt" size={15} className="text-primary" />
+            <span className="hidden max-w-[130px] truncate @[520px]:inline">Harness²</span>
+          </button>
           <span className="min-w-2 flex-1" />
           <ModelPicker />
           {busy ? (

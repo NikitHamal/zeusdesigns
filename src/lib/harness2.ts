@@ -384,3 +384,62 @@ export function getActiveHarnessSummary(providerId: string, modelId: string) {
     subagentsCount: BUILTIN_SUBAGENTS.length,
   };
 }
+
+/**
+ * Ported from Google Research `harness2/core/tree.py` (`autotrigger`, `validate`, `write_tree`):
+ * Builds and validates the complete c1..c8 editable Harness² tree and materializes it into
+ * the active project workspace under `.zeusdesigns/harness/`.
+ */
+export function buildDefaultHarnessTree(providerId: string, modelId: string): Record<string, string> {
+  const profile = getCodingHarnessProfile(providerId, modelId);
+  const tree: Record<string, string> = {
+    "AGENTS.md": `# Zeus Codes — Project Agent Charter (Harness² c1)\n\n${profile.familyDirective}\n\n${profile.workflowDirective}\n`,
+    ".zeusdesigns/harness/guardrails.md": `# Guardrails & Skill Auto-Triggers (Harness² c2)\n\n${EVIDENCE_BOUNDARY}\n\n## Skill Triggers\n${BUILTIN_HARNESS_SKILLS.map((s) => `- When ${s.description}, load the \`${s.name}\` skill.`).join("\n")}\n`,
+    ".zeusdesigns/harness/tool_guidance.md": `# Tool Guidance (Harness² c4 · ${profile.nativeToolProtocol})\n\n${profile.toolExamples}\n`,
+    ".zeusdesigns/harness/hooks.json": JSON.stringify(
+      {
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: "shell|bash|read_file|list_dir",
+              hooks: [{ type: "command", command: "zeus-harness2-pre-tool-guard" }],
+            },
+          ],
+          PostToolUse: [
+            {
+              matcher: "*",
+              hooks: [{ type: "command", command: "zeus-harness2-post-tool-reflector" }],
+            },
+          ],
+        },
+      },
+      null,
+      2
+    ),
+  };
+  for (const sk of BUILTIN_HARNESS_SKILLS) {
+    tree[`.zeusdesigns/harness/skills/${sk.name}/SKILL.md`] = `---\nname: ${sk.name}\ndescription: ${sk.description}\n---\n\n${sk.body}\n`;
+  }
+  for (const sub of BUILTIN_SUBAGENTS) {
+    tree[`.zeusdesigns/harness/sub_agents/${sub.name}/AGENT.md`] = `---\nmode: subagent\ndescription: ${sub.description}\n---\n\n${sub.systemPrompt}\n`;
+  }
+  return tree;
+}
+
+export async function materializeHarnessTree(ws: Workspace, providerId: string, modelId: string): Promise<string[]> {
+  const tree = buildDefaultHarnessTree(providerId, modelId);
+  const written: string[] = [];
+  for (const [rel, content] of Object.entries(tree)) {
+    if (rel === "AGENTS.md") {
+      try {
+        const existing = await readWorkspaceFile(ws, "AGENTS.md");
+        if (existing && existing.trim().length > 0) continue;
+      } catch {
+        /* write fresh AGENTS.md */
+      }
+    }
+    await writeWorkspaceFile(ws, rel, content);
+    written.push(rel);
+  }
+  return written;
+}

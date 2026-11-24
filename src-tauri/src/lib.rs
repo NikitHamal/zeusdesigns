@@ -33,7 +33,7 @@ fn app_info() -> serde_json::Value {
         }
     };
     json!({
-        "name": "ZeusDesigns",
+        "name": "Zeus Codes",
         "version": env!("CARGO_PKG_VERSION"),
         "cppEngineVersion": cpp_ver,
         "native": true,

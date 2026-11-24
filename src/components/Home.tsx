@@ -7,10 +7,10 @@ import { openWorkspace, openWorkspaceByPath } from "../lib/bridge";
 
 const STARTERS = [
   { i: "terminal", t: "Build a feature", p: "Build a feature in this project: " },
-  { i: "bug_report", t: "Fix a bug", p: "Find and fix this bug: " },
-  { i: "manage_search", t: "Explain codebase", p: "Map the architecture of this project and explain how it works." },
-  { i: "phone_iphone", t: "Design a screen", p: "Design a mobile app home screen for " },
-  { i: "web", t: "Landing page", p: "Design a landing page for " },
+  { i: "bug_report", t: "Fix a bug & test", p: "Find and fix this bug, then run tests to verify: " },
+  { i: "manage_search", t: "Map codebase", p: "Map the architecture of this project and explain how it works." },
+  { i: "code", t: "Refactor module", p: "Refactor and optimize this module while keeping all tests passing: " },
+  { i: "description", t: "Generate AGENTS.md", p: "Inspect this project and write a comprehensive AGENTS.md file." },
 ];
 
 function greeting() {
@@ -22,12 +22,12 @@ function greeting() {
 }
 
 export function Home() {
-  const boards = useStore((s) => s.artboards);
   const projects = useStore((s) => s.projects);
   const curProject = useStore(activeProject);
   const patchUI = useStore((s) => s.patchUI);
   const notify = useStore((s) => s.notify);
-  const recent = boards.slice(-3).reverse();
+  void Thumb; void focusArtboard;
+  const recent: never[] = [];
 
   const pickFolder = () => {
     openWorkspace()

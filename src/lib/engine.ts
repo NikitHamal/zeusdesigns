@@ -462,10 +462,8 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
         if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml); else S.updateArtboard(id, { html: finalHtml });
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
-        if (out.fixes.length && !linted.has(i)) {
-          linted.add(i);
-          tools.push({ id: uid(), name: "design_lint", args: b.attrs.name || "screen", status: "ok", output: out.fixes.join("\n") });
-        }
+        void out.fixes;
+        void linted;
       } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
         const partialHtml = harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html;
         S.updateArtboard(id, { html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml });
@@ -513,6 +511,7 @@ export async function sendMessage(opts: { text: string; attachments?: Attachment
   };
 
   const selfCheck = async () => {
+    return;
     if (!useStore.getState().settings.selfCheck || signal.aborted) return;
     for (const id of [...new Set(idMap.values())].slice(0, 4)) {
       if (signal.aborted) return;

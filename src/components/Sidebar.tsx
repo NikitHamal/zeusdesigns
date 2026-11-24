@@ -269,7 +269,7 @@ function AccountMenu() {
     <Dropdown up width={248} className="w-full" trigger={({ toggle, open }) => (
       <button onClick={toggle} className={cn("state flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left", open && "bg-surface-high")}>
         <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-primary-container text-[13px] font-semibold text-on-primary-container">Z{update?.available && <i className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface-dim bg-primary" />}</span>
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-on-surface">Zeus</span><span className="block truncate text-xs text-on-surface-variant">{sub}</span></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-on-surface">Zeus Codes</span><span className="block truncate text-xs text-on-surface-variant">{sub}</span></span>
         <Icon name="expand_more" size={16} className="text-on-surface-variant" />
       </button>
     )}>
@@ -359,7 +359,7 @@ export function Sidebar() {
       <div className="flex h-14 shrink-0 items-center justify-between gap-1 px-3">
         <div className="flex items-center gap-1">
           <IconBtn label="Hide sidebar" size={34} onClick={() => patchUI({ sidebarOpen: false })}><Icon name="left_panel_close" size={20} /></IconBtn>
-          <span className="px-1 font-display text-[20px] font-semibold tracking-tight text-on-surface">Zeus</span>
+          <span className="px-1 font-display text-[19px] font-semibold tracking-tight text-on-surface">Zeus Codes</span>
         </div>
         <div className="flex items-center gap-0.5">
           <IconBtn label="Search chats" size={32} onClick={() => setSearch(true)}><Icon name="search" size={18} /></IconBtn>
@@ -409,7 +409,7 @@ export function Sidebar() {
           active={ui.leftTab === "terminal"}
           onClick={() => patchUI({ leftTab: ui.leftTab === "terminal" ? "chat" : "terminal", chatCollapsed: false })}
         />
-        <NavItem icon="local_library" label="Design library" onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })} />
+        <NavItem icon="bolt" label="Harness² & Skills" onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })} />
         <NavItem icon="extension" label="Connectors" onClick={() => patchUI({ settingsOpen: true, settingsTab: "mcp" })} />
         <NavItem
           icon="dns"
