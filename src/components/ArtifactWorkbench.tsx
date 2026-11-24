@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { activeConv, useStore } from "../store";
 import { writeWorkspaceFile, refreshTree } from "../lib/bridge";
 import {
+  buildHyperFramesCompositionBundle,
+  computeHyperFramesAnimationMap,
   detectDeliverableKind,
   parseHyperFramesDocument,
   parseOpenSlideDeck,
@@ -56,6 +58,7 @@ export function ArtifactWorkbench() {
     radius: string;
   } | null>(null);
   const [agentNote, setAgentNote] = useState("");
+  const [showAnimMap, setShowAnimMap] = useState(false);
   const [exportProgress, setExportProgress] = useState<VideoExportProgress | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -80,7 +83,38 @@ export function ArtifactWorkbench() {
   const codeValue = draftHtml ?? active?.html ?? "";
   const deliverableKind = useMemo(() => detectDeliverableKind(codeValue), [codeValue]);
   const hyperFrames = useMemo(() => parseHyperFramesDocument(codeValue), [codeValue]);
+  const animMap = useMemo(() => computeHyperFramesAnimationMap(codeValue), [codeValue]);
   const slideDeck = useMemo(() => parseOpenSlideDeck(codeValue), [codeValue]);
+
+  const handleScaffoldHyperFramesBundle = async () => {
+    if (!active) return;
+    const bundle = buildHyperFramesCompositionBundle({
+      html: codeValue,
+      title: active.name,
+      aspect: videoAspect,
+    });
+    if (workspace) {
+      try {
+        for (const [relPath, content] of Object.entries(bundle.files)) {
+          await writeWorkspaceFile(workspace, relPath, content);
+        }
+        const refreshed = await refreshTree(workspace);
+        if (refreshed) patchUI({ workspace: { ...workspace, tree: refreshed } });
+        notify(`Scaffolded ${bundle.cacheDir} (hyperframes.json + meta.json + index.html)`);
+        return;
+      } catch {
+        /* fallback to JSON download */
+      }
+    }
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${bundle.slug}.hyperframes-bundle.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(`Downloaded ${bundle.slug}.hyperframes-bundle.json`);
+  };
 
   useEffect(() => {
     const onMessage = (ev: MessageEvent) => {
@@ -447,6 +481,27 @@ export function ArtifactWorkbench() {
                 <Icon name="code" size={13} />
                 <span>JSON</span>
               </button>
+              <button
+                onClick={handleScaffoldHyperFramesBundle}
+                className="state inline-flex h-7 items-center gap-1 rounded-lg border border-outline-variant/60 bg-surface px-2 text-xs font-medium text-on-surface"
+                title="Scaffold OpenDesign .hyperframes-cache bundle (hyperframes.json + meta.json + index.html)"
+              >
+                <Icon name="folder_open" size={13} />
+                <span>Bundle</span>
+              </button>
+              <button
+                onClick={() => setShowAnimMap(!showAnimMap)}
+                className={cn(
+                  "state inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-xs font-medium",
+                  showAnimMap
+                    ? "border-primary bg-primary text-on-primary"
+                    : "border-outline-variant/60 bg-surface text-on-surface"
+                )}
+                title="Inspect HyperFrames Animation Map & Contrast Report"
+              >
+                <Icon name="insights" size={13} />
+                <span>AnimMap</span>
+              </button>
             </>
           )}
 
@@ -601,6 +656,48 @@ export function ArtifactWorkbench() {
                 />
               </div>
             </div>
+
+            {/* HyperFrames Animation Map & Contrast Audit Drawer */}
+            {deliverableKind === "hyperframes" && showAnimMap && (
+              <div className="flex shrink-0 flex-col gap-2 border-t border-outline-variant/60 bg-surface-container/60 px-3.5 py-2.5 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-on-surface">
+                    <Icon name="insights" size={14} className="text-primary" />
+                    <span>
+                      HyperFrames Animation Map ({animMap.sceneCount} scenes · {animMap.totalDurationSec}s)
+                    </span>
+                    <span className="rounded-md bg-surface-high px-2 py-0.5 text-[10px] text-primary">
+                      {animMap.contrastPass ? "WCAG AA & ZERO-SHADOW PASS" : "CHECK FLAGS"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowAnimMap(false)}
+                    className="state rounded-md px-1.5 py-0.5 text-[10.5px] text-on-surface-variant"
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="max-h-28 overflow-y-auto rounded-lg border border-outline-variant/50 bg-surface p-2 text-[11px] leading-relaxed text-on-surface">
+                  {animMap.asciiTimeline.map((line, i) => (
+                    <div key={i} className="truncate">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+                {animMap.flags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {animMap.flags.map((fl, i) => (
+                      <span
+                        key={i}
+                        className="rounded-md border border-outline-variant/60 bg-surface px-2 py-0.5 text-[10.5px] text-on-surface-variant"
+                      >
+                        {fl}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* HyperFrames Multi-Scene Video Timeline & Frame Sequencer */}
             {deliverableKind === "hyperframes" && hyperFrames.frames.length > 0 && (
