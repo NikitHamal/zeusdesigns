@@ -4,8 +4,7 @@ import { applyTheme } from "./lib/theme";
 import { nativeAvailable, nativeMcp, nativeMemory, openWorkspaceByPath } from "./lib/bridge";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
-import { CanvasPane } from "./components/CanvasPane";
-import { M3ePane } from "./components/M3ePane";
+import { ArtifactWorkbench } from "./components/ArtifactWorkbench";
 import { SettingsDialog } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { Home } from "./components/Home";
@@ -98,7 +97,7 @@ export default function App() {
                 </div>
               </>
             )}
-            <div className="min-w-0 flex-1 p-2 pl-0">{m3eOpen ? <M3ePane /> : <CanvasPane />}</div>
+            <div className="min-w-0 flex-1 p-2 pl-0"><ArtifactWorkbench /></div>
           </>
         ) : hasMessages || leftTab !== "chat" || Boolean(activeRoot) ? (
           <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full"><ChatPane /></div></div>
