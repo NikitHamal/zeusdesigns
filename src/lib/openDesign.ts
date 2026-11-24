@@ -353,6 +353,130 @@ export function getOpenDesignBrand(id?: string): OpenDesignBrandSystem {
 }
 
 /* ------------------------------------------------------------------ */
+/* HyperFrames Visual Style Library (ported from visual-styles.md)    */
+/* ------------------------------------------------------------------ */
+export interface HyperFramesVisualStyle {
+  id: string;
+  name: string;
+  tradition: string;
+  mood: string;
+  bestFor: string;
+  primaryTransition: string;
+  gsapEase: string;
+  bg: string;
+  ink: string;
+  accent: string;
+  promptRule: string;
+}
+
+export const HYPERFRAMES_VISUAL_STYLES: HyperFramesVisualStyle[] = [
+  {
+    id: "swiss-pulse",
+    name: "Swiss Pulse",
+    tradition: "Josef Müller-Brockmann",
+    mood: "Clinical, precise",
+    bestFor: "SaaS dashboards, developer tools, APIs, metrics",
+    primaryTransition: "Geometric Iris / Hard Cut",
+    gsapEase: "expo.out",
+    bg: "#121316",
+    ink: "#F4F5F8",
+    accent: "#FFB300",
+    promptRule: "Grid-locked 12-column composition. Numbers dominate the frame at 80-120px with tabular-nums. Fast snapping entries.",
+  },
+  {
+    id: "velvet-standard",
+    name: "Velvet Standard",
+    tradition: "Massimo Vignelli",
+    mood: "Premium, timeless",
+    bestFor: "Enterprise software, keynotes, investor decks",
+    primaryTransition: "Cross-Fade Wipe",
+    gsapEase: "sine.inOut",
+    bg: "#0D0D0F",
+    ink: "#F5F3EE",
+    accent: "#C9A84C",
+    promptRule: "Generous negative space, thin ALL CAPS labels with 0.15em letter-spacing, sequential reveals with deliberate holds.",
+  },
+  {
+    id: "deconstructed",
+    name: "Deconstructed Industrial",
+    tradition: "Neville Brody",
+    mood: "Industrial, raw",
+    bestFor: "Developer launches, security products, deep-tech reveals",
+    primaryTransition: "Whip Cut",
+    gsapEase: "back.out(2.0)",
+    bg: "#161616",
+    ink: "#F0F0F0",
+    accent: "#D4501E",
+    promptRule: "Dark carbon #161616 + rust orange #D4501E. Exposed technical hairlines, bold industrial weight, high-velocity text slams.",
+  },
+  {
+    id: "maximalist-type",
+    name: "Maximalist Type",
+    tradition: "Paula Scher",
+    mood: "Loud, kinetic",
+    bestFor: "Product launches, milestone announcements, hype reels",
+    primaryTransition: "Hard Cut",
+    gsapEase: "expo.out",
+    bg: "#0A0A0A",
+    ink: "#FFFFFF",
+    accent: "#FFD60A",
+    promptRule: "Typography IS the visual—filling 65-80% of the frame with extreme scale contrast and rapid 2.5s scene cadence.",
+  },
+  {
+    id: "data-drift",
+    name: "Data Drift Telemetry",
+    tradition: "Edward Tufte",
+    mood: "Analytical, high-density",
+    bestFor: "AI benchmarks, quantitative research, financial ledgers",
+    primaryTransition: "Horizontal Wipe",
+    gsapEase: "power3.out",
+    bg: "#F5EFE4",
+    ink: "#161312",
+    accent: "#B14A2C",
+    promptRule: "Warm editorial paper #F5EFE4, ink #161312, rust accent #B14A2C on the leading bar/metric only, hairline rules.",
+  },
+  {
+    id: "soft-signal",
+    name: "Soft Signal Editorial",
+    tradition: "Kinfolk / Literary Press",
+    mood: "Intimate, warm",
+    bestFor: "Brand stories, case studies, annual reviews",
+    primaryTransition: "Dissolve",
+    gsapEase: "power2.out",
+    bg: "#191816",
+    ink: "#F2EFE9",
+    accent: "#C96442",
+    promptRule: "Literary serif display headlines paired with clean sans data labels and warm terracotta accents.",
+  },
+  {
+    id: "folk-frequency",
+    name: "Field Instrument",
+    tradition: "Dieter Rams / Braun",
+    mood: "Tactile, functional",
+    bestFor: "Hardware interfaces, audio tools, engineering workflows",
+    primaryTransition: "Mechanical Step",
+    gsapEase: "power4.out",
+    bg: "#E6E4E0",
+    ink: "#141414",
+    accent: "#FF5500",
+    promptRule: "Anodized aluminum surface #E6E4E0, stark #141414 ink, safety orange #FF5500 indicators, 1px instrument rules.",
+  },
+  {
+    id: "shadow-cut",
+    name: "Shadow Cut Monochrome",
+    tradition: "Swiss Brutalism",
+    mood: "Stark, architectural",
+    bestFor: "Infrastructure, compilers, zero-latency systems",
+    primaryTransition: "Instant Cut",
+    gsapEase: "expo.out",
+    bg: "#000000",
+    ink: "#EDEDED",
+    accent: "#3ECF8E",
+    promptRule: "Pure monochrome structural grid with 1px #222222 crosshairs and emerald telemetry readout.",
+  },
+];
+
+/* ------------------------------------------------------------------ */
 /* Pre-Built Starter HTML Deliverables (HyperFrames, Deck, Prototype) */
 /* ------------------------------------------------------------------ */
 export const STARTER_HYPERFRAMES_VIDEO_HTML = `<!DOCTYPE html>
@@ -1122,6 +1246,36 @@ export function parseHyperFramesDocument(html: string): ParsedHyperFrames {
     idx++;
   }
 
+  // Also support OpenDesign's native `[data-composition-id]` + `[data-track-index]` clip format
+  if (frames.length === 0 && /data-composition-id=/i.test(html)) {
+    const compMatch = /<[^>]+data-composition-id=["'][^"']+["']([^>]*)>/i.exec(html);
+    if (compMatch) {
+      const attrs = compMatch[1] ?? "";
+      const wAttr = Number(/data-width=["'](\d+)["']/i.exec(attrs)?.[1] ?? 1920);
+      const hAttr = Number(/data-height=["'](\d+)["']/i.exec(attrs)?.[1] ?? 1080);
+      if (wAttr && hAttr) {
+        width = wAttr;
+        height = hAttr;
+        aspect = wAttr < hAttr ? "9:16" : wAttr === hAttr ? "1:1" : "16:9";
+      }
+    }
+    const clipRe = /<([a-z0-9]+)\b([^>]*data-start=["']([^"']+)["'][^>]*data-duration=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+    let cm: RegExpExecArray | null;
+    let cIdx = 0;
+    while ((cm = clipRe.exec(html)) !== null) {
+      const durSec = Number(cm[4] ?? 3) || 3;
+      const innerText = (cm[5] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      frames.push({
+        index: cIdx,
+        durationMs: Math.round(durSec * 1000),
+        transition: "cut",
+        sceneTitle: innerText.slice(0, 56) || `Clip ${String(cIdx + 1).padStart(2, "0")}`,
+        snippetText: innerText.slice(0, 120),
+      });
+      cIdx++;
+    }
+  }
+
   const totalDurationMs = frames.reduce((acc, f) => acc + f.durationMs, 0);
   return {
     isHyperFrames: frames.length > 0,
@@ -1130,6 +1284,57 @@ export function parseHyperFramesDocument(html: string): ParsedHyperFrames {
     height,
     totalDurationMs,
     frames,
+  };
+}
+
+/**
+ * Ported from `nexu-io/open-design/design-templates/hyperframes/scripts/animation-map.mjs`
+ * and `contrast-report.mjs`:
+ * Analyzes a HyperFrames composition for scene pacing, ASCII Gantt timeline, WCAG AA contrast,
+ * and choreography flags (`paced-fast`, `paced-slow`, `empty-scene`, `shadow-violation`).
+ */
+export interface HyperFramesAnimationMapReport {
+  totalDurationSec: number;
+  sceneCount: number;
+  asciiTimeline: string[];
+  flags: string[];
+  contrastPass: boolean;
+}
+
+export function computeHyperFramesAnimationMap(html: string): HyperFramesAnimationMapReport {
+  const parsed = parseHyperFramesDocument(html);
+  const totalSec = +(parsed.totalDurationMs / 1000).toFixed(2);
+  const flags: string[] = [];
+  const asciiTimeline: string[] = [];
+
+  if (/box-shadow\s*:\s*(?!none)/i.test(html)) {
+    flags.push("shadow-violation: non-zero box-shadow detected (Zeus law requires 0 box-shadows)");
+  }
+
+  let cursorMs = 0;
+  for (const f of parsed.frames) {
+    const startSec = (cursorMs / 1000).toFixed(1);
+    const endSec = ((cursorMs + f.durationMs) / 1000).toFixed(1);
+    const barBlocks = Math.max(2, Math.min(24, Math.round(f.durationMs / 250)));
+    const bar = "█".repeat(barBlocks);
+    asciiTimeline.push(`[${startSec.padStart(4, " ")}s–${endSec.padStart(4, " ")}s] ${bar} ${f.sceneTitle}`);
+    if (f.durationMs < 1200) {
+      flags.push(`paced-fast: Scene ${f.index + 1} (${f.durationMs}ms) is under 1.2s minimum readable hold`);
+    } else if (f.durationMs > 8000) {
+      flags.push(`paced-slow: Scene ${f.index + 1} (${f.durationMs}ms) exceeds 8.0s without scene cut`);
+    }
+    if (!f.snippetText && !f.sceneTitle) {
+      flags.push(`empty-scene: Scene ${f.index + 1} has no visible text headline`);
+    }
+    cursorMs += f.durationMs;
+  }
+
+  return {
+    totalDurationSec: totalSec,
+    sceneCount: parsed.frames.length,
+    asciiTimeline,
+    flags,
+    contrastPass: !flags.some((f) => f.startsWith("shadow-violation")),
   };
 }
 
