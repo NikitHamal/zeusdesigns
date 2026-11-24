@@ -2502,11 +2502,18 @@ pub fn stream_k2horizon<F>(
 where
     F: FnMut(&str),
 {
+    let wants_tools = is_agent_tool_request(system);
     let mut repaired = Vec::new();
     if !system.trim().is_empty() {
-        repaired.push(json!({ "role": "system", "content": system }));
+        let sys_content = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), system)
+        } else {
+            system.to_string()
+        };
+        repaired.push(json!({ "role": "system", "content": sys_content }));
     }
-    for m in messages {
+    let last_idx = messages.len().saturating_sub(1);
+    for (idx, m) in messages.iter().enumerate() {
         if m.role == "assistant" {
             repaired.push(json!({
                 "role": "assistant",
@@ -2514,9 +2521,14 @@ where
                 "reasoning": ""
             }));
         } else {
+            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
+                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
+            } else {
+                m.content.clone()
+            };
             repaired.push(json!({
                 "role": m.role,
-                "content": m.content
+                "content": content
             }));
         }
     }
@@ -4323,14 +4335,26 @@ where
         _ => "claude-opus-5-5",
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let mut convo = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(22000).collect();
+        let sys_raw: String = system.chars().take(20000).collect();
+        let sys_safe = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+        } else {
+            sys_raw
+        };
         convo.push(json!({ "role": "system", "content": sys_safe }));
     }
-    for m in messages {
+    let last_idx = messages.len().saturating_sub(1);
+    for (idx, m) in messages.iter().enumerate() {
         if !m.content.trim().is_empty() {
-            convo.push(json!({ "role": m.role, "content": m.content }));
+            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
+                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
+            } else {
+                m.content.clone()
+            };
+            convo.push(json!({ "role": m.role, "content": content }));
         }
     }
 
@@ -4544,14 +4568,26 @@ where
         _ => "openai-fast",
     };
 
+    let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(20000).collect();
+        let sys_raw: String = system.chars().take(18000).collect();
+        let sys_safe = if wants_tools {
+            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+        } else {
+            sys_raw
+        };
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
-    for m in messages {
+    let last_idx = messages.len().saturating_sub(1);
+    for (idx, m) in messages.iter().enumerate() {
         if !m.content.trim().is_empty() {
-            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
+                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
+            } else {
+                m.content.clone()
+            };
+            oai_msgs.push(json!({ "role": m.role, "content": content }));
         }
     }
 
@@ -5196,7 +5232,13 @@ where
         }
     }
 
-    let sys_safe: String = system.chars().take(26000).collect();
+    let wants_tools = is_agent_tool_request(system);
+    let sys_raw: String = system.chars().take(24000).collect();
+    let sys_safe = if wants_tools {
+        format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+    } else {
+        sys_raw
+    };
     let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
     if eff_model.contains("/gemini/") {
         candidate_routes.push((
@@ -5245,13 +5287,16 @@ where
         let Ok(client) = build_client(timeout_secs) else {
             continue;
         };
-        let payload = json!({
+        let mut payload = json!({
             "model": route_model,
             "max_tokens": 16384,
             "stream": true,
             "system": sys_safe,
             "messages": anth_msgs
         });
+        if wants_tools {
+            payload["tools"] = build_native_anthropic_agent_tools();
+        }
         let resp = match client
             .post(format!("{}/v1/messages", host))
             .header("Content-Type", "application/json")
@@ -5268,6 +5313,7 @@ where
         let mut line = String::new();
         let mut in_think = false;
         let mut saw_text = false;
+        let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
 
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
@@ -5276,6 +5322,7 @@ where
             if let Some(raw) = line.trim().strip_prefix("data:") {
                 let raw = raw.trim();
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    accumulate_anthropic_tool_use(&ev, &mut streamed_tool_calls);
                     if ev.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
                         if let Some(delta) = ev.get("delta") {
                             if let Some(th) = delta.get("thinking").and_then(|t| t.as_str()) {
@@ -5304,6 +5351,9 @@ where
         }
         if in_think {
             on_delta("</think>");
+        }
+        if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+            saw_text = true;
         }
         if saw_text {
             return Ok(());
@@ -6733,6 +6783,51 @@ fn flush_oai_tool_calls<F: FnMut(&str)>(
     emitted
 }
 
+fn build_native_anthropic_agent_tools() -> Value {
+    let oai = build_native_oai_agent_tools();
+    let mut anth = Vec::new();
+    if let Some(arr) = oai.as_array() {
+        for item in arr {
+            if let Some(func) = item.get("function") {
+                anth.push(json!({
+                    "name": func.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                    "description": func.get("description").and_then(|v| v.as_str()).unwrap_or(""),
+                    "input_schema": func.get("parameters").cloned().unwrap_or_else(|| json!({"type": "object", "properties": {}}))
+                }));
+            }
+        }
+    }
+    Value::Array(anth)
+}
+
+fn accumulate_anthropic_tool_use(ev: &Value, streamed_tool_calls: &mut Vec<(String, String, String)>) {
+    let etype = ev.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    if etype == "content_block_start" {
+        if let Some(cb) = ev.get("content_block") {
+            if cb.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                let id = cb.get("id").and_then(|x| x.as_str()).unwrap_or("toolu_0").to_string();
+                let name = cb.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let initial_input = cb
+                    .get("input")
+                    .filter(|v| v.is_object() && !v.as_object().map(|o| o.is_empty()).unwrap_or(true))
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                streamed_tool_calls.push((id, name, initial_input));
+            }
+        }
+    } else if etype == "content_block_delta" {
+        if let Some(delta) = ev.get("delta") {
+            if delta.get("type").and_then(|t| t.as_str()) == Some("input_json_delta") {
+                if let Some(pj) = delta.get("partial_json").and_then(|x| x.as_str()) {
+                    if let Some(last) = streamed_tool_calls.last_mut() {
+                        last.2.push_str(pj);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Helper to detect fake 200 error strings returned inside SSE text deltas by broken proxy servers.
 fn is_upstream_error_text(s: &str) -> bool {
     let t = s.trim();
@@ -7733,13 +7828,17 @@ where
                 }));
             }
         }
-        let payload = json!({
+        let wants_tools = is_agent_tool_request(system);
+        let mut payload = json!({
             "model": model,
             "max_tokens": 16000,
             "stream": true,
             "system": system,
             "messages": anth_msgs
         });
+        if wants_tools {
+            payload["tools"] = build_native_anthropic_agent_tools();
+        }
         let resp = client
             .post(format!("{}/v1/messages", base))
             .header("Content-Type", "application/json")
@@ -7755,6 +7854,7 @@ where
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
         let mut in_think = false;
+        let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -7762,6 +7862,7 @@ where
             if let Some(raw) = line.trim().strip_prefix("data:") {
                 let raw = raw.trim();
                 if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    accumulate_anthropic_tool_use(&ev, &mut streamed_tool_calls);
                     if ev.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
                         if let Some(delta) = ev.get("delta") {
                             if let Some(th) = delta.get("thinking").and_then(|t| t.as_str()) {
@@ -7790,8 +7891,10 @@ where
         if in_think {
             on_delta("</think>");
         }
+        flush_oai_tool_calls(&streamed_tool_calls, on_delta);
         Ok(())
     } else {
+        let wants_tools = is_agent_tool_request(system);
         let mut oai_msgs = Vec::new();
         if !system.trim().is_empty() {
             oai_msgs.push(json!({ "role": "system", "content": system }));
@@ -7820,6 +7923,9 @@ where
             "stream": true,
             "messages": oai_msgs
         });
+        if wants_tools {
+            payload["tools"] = build_native_oai_agent_tools();
+        }
         if effort != "medium" {
             payload["reasoning_effort"] = json!(if effort == "max" { "high" } else { effort });
         }
@@ -7843,6 +7949,7 @@ where
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
         let mut in_think = false;
+        let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
         while reader.read_line(&mut line).unwrap_or(0) > 0 {
             if cancel.load(Ordering::Relaxed) {
                 return Ok(());
@@ -7870,6 +7977,7 @@ where
                             }
                             on_delta(r_text);
                         }
+                        accumulate_oai_tool_calls(delta, &mut streamed_tool_calls);
                         if let Some(text) = delta.get("content").and_then(|t| t.as_str()) {
                             if !text.is_empty() {
                                 if in_think {
@@ -7887,6 +7995,7 @@ where
         if in_think {
             on_delta("</think>");
         }
+        flush_oai_tool_calls(&streamed_tool_calls, on_delta);
         Ok(())
     }
 }
