@@ -368,6 +368,7 @@ pub fn fs_write(root: String, path: String, content: String) -> Result<(), Strin
 
 #[tauri::command(async)]
 pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
+    use std::process::Stdio;
     let workdir = if root.trim().is_empty() {
         std::env::current_dir().map_err(|e| e.to_string())?
     } else {
@@ -375,21 +376,30 @@ pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
     };
 
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd")
-        .args(["/C", &cmd])
-        .current_dir(&workdir)
-        .output()
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
+    let output = {
+        use std::os::windows::process::CommandExt;
+        Command::new("cmd")
+            .args(["/C", &cmd])
+            .current_dir(&workdir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(0x08000000)
+            .output()
+            .map_err(|e| format!("Failed to execute command: {}", e))?
+    };
 
     #[cfg(not(target_os = "windows"))]
     let output = Command::new("bash")
         .args(["-lc", &cmd])
         .current_dir(&workdir)
+        .stdin(Stdio::null())
         .output()
         .or_else(|_| {
             Command::new("sh")
                 .args(["-lc", &cmd])
                 .current_dir(&workdir)
+                .stdin(Stdio::null())
                 .output()
         })
         .map_err(|e| format!("Failed to execute command: {}", e))?;
