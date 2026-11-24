@@ -14,6 +14,7 @@ import {
   type VideoAspectRatio,
 } from "../lib/openDesign";
 import { exportHyperFramesToVideo, type VideoExportProgress } from "../lib/videoExporter";
+import { DomInspectorPanel, type SelectedDomTarget } from "./DomInspectorPanel";
 import { Icon } from "./Icon";
 import { IconBtn } from "./ui";
 import { cn } from "../utils/cn";
@@ -49,17 +50,9 @@ export function ArtifactWorkbench() {
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [showNotes, setShowNotes] = useState(true);
   const [inspectOn, setInspectOn] = useState(false);
-  const [selectedEl, setSelectedEl] = useState<{
-    index: number;
-    tag: string;
-    text: string;
-    color: string;
-    bg: string;
-    fontSize: string;
-    padding: string;
-    radius: string;
-  } | null>(null);
-  const [agentNote, setAgentNote] = useState("");
+  const [selectedEl, setSelectedEl] = useState<SelectedDomTarget | null>(null);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
   const [showAnimMap, setShowAnimMap] = useState(false);
   const [exportProgress, setExportProgress] = useState<VideoExportProgress | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -130,68 +123,162 @@ export function ArtifactWorkbench() {
       } else if (d.type === "zeus:dom-selected") {
         setSelectedEl({
           index: Number(d.index ?? 0),
+          domPath: String(d.domPath ?? ""),
           tag: String(d.tag ?? "div"),
+          className: String(d.className ?? ""),
           text: String(d.text ?? ""),
           color: String(d.color ?? ""),
           bg: String(d.bg ?? ""),
           fontSize: String(d.fontSize ?? ""),
           padding: String(d.padding ?? ""),
           radius: String(d.radius ?? ""),
+          outerHtml: String(d.outerHtml ?? ""),
+          parentOuterHtml: String(d.parentOuterHtml ?? ""),
+          hasParent: Boolean(d.hasParent),
         });
       } else if (d.type === "zeus:dom-updated" && typeof d.html === "string" && active) {
+        setUndoStack((prev) => [...prev.slice(-19), active.html]);
+        setRedoStack([]);
         updateArtboard(active.id, { html: d.html, version: active.version + 1 });
+        const targetRel = active.source || (/\.\w+$/.test(active.name) ? active.name : "");
+        if (workspace && targetRel) {
+          void writeWorkspaceFile(workspace, targetRel, d.html).catch(() => {});
+        }
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [active, updateArtboard]);
+  }, [active, updateArtboard, workspace]);
 
   const srcDocWithInspector = useMemo(() => {
     if (!inspectOn) return codeValue;
-    const bridge = `<script>
+    const bridge = `<script data-od-edit-bridge="true">
 (function(){
-  const all = () => Array.from(document.body.querySelectorAll('h1,h2,h3,h4,p,span,button,a,div,section,li,td,th'));
+  const SELECTOR = 'main,nav,section,article,aside,header,footer,div,h1,h2,h3,h4,h5,h6,p,a,button,img,ul,ol,li,td,th,blockquote,figure,figcaption,label,span';
+  const all = () => Array.from(document.body.querySelectorAll(SELECTOR)).filter((n) => !n.hasAttribute('data-od-edit-bridge'));
   let hi = null;
-  document.addEventListener('click', function(e){
-    e.preventDefault();
-    e.stopPropagation();
-    const t = e.target;
+  function domPathFor(el) {
+    const parts = [];
+    let node = el;
+    while (node && node !== document.body) {
+      const p = node.parentElement;
+      if (!p) break;
+      const ch = Array.from(p.children).filter((c) => !c.hasAttribute('data-od-edit-bridge'));
+      parts.unshift(ch.indexOf(node));
+      node = p;
+    }
+    return parts.length ? 'path-' + parts.join('-') : 'root';
+  }
+  function cleanSerialize() {
+    if (hi) hi.style.outline = '';
+    const clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll('[data-od-edit-bridge]').forEach((n) => n.remove());
+    return '<!DOCTYPE html>\\n' + clone.outerHTML;
+  }
+  function selectElement(t) {
     if (!t || t === document.body || t === document.documentElement) return;
     if (hi) hi.style.outline = '';
     hi = t;
-    t.style.outline = '1px solid #D97757';
     const list = all();
     const idx = list.indexOf(t);
     const cs = window.getComputedStyle(t);
+    const cleanOuter = t.outerHTML;
+    const parentEl = t.parentElement && t.parentElement !== document.body ? t.parentElement : null;
+    const parentOuter = parentEl ? parentEl.outerHTML : '';
+    t.style.outline = '1px solid #D97757';
     window.parent.postMessage({
       type: 'zeus:dom-selected',
       index: idx,
+      domPath: domPathFor(t),
       tag: t.tagName.toLowerCase(),
+      className: typeof t.className === 'string' ? t.className : '',
       text: (t.childElementCount === 0 ? t.textContent : t.getAttribute('data-label') || t.textContent || '').trim().slice(0, 160),
       color: cs.color,
       bg: cs.backgroundColor,
       fontSize: cs.fontSize,
       padding: cs.padding,
-      radius: cs.borderRadius
+      radius: cs.borderRadius,
+      outerHtml: cleanOuter.slice(0, 800),
+      parentOuterHtml: parentOuter.slice(0, 900),
+      hasParent: Boolean(parentEl)
     }, '*');
+  }
+  document.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    selectElement(e.target);
   }, true);
   window.addEventListener('message', function(ev){
     const m = ev.data;
-    if (!m || m.type !== 'zeus:dom-patch') return;
+    if (!m) return;
     const list = all();
     const el = list[m.index];
     if (!el) return;
-    if (typeof m.text === 'string' && el.childElementCount === 0) el.textContent = m.text;
-    if (m.color) el.style.color = m.color;
-    if (m.bg) el.style.backgroundColor = m.bg;
-    if (m.fontSize) el.style.fontSize = m.fontSize;
-    if (m.padding) el.style.padding = m.padding;
-    if (m.radius) el.style.borderRadius = m.radius;
-    if (hi) hi.style.outline = '';
-    window.parent.postMessage({
-      type: 'zeus:dom-updated',
-      html: '<!DOCTYPE html>\\n' + document.documentElement.outerHTML
-    }, '*');
+    if (m.type === 'zeus:dom-patch') {
+      if (typeof m.text === 'string') {
+        if (el.childElementCount === 0) {
+          el.textContent = m.text;
+        } else {
+          for (const node of Array.from(el.childNodes)) {
+            if (node.nodeType === 3 && node.textContent.trim()) {
+              node.textContent = m.text;
+              break;
+            }
+          }
+        }
+      }
+      if (m.color) el.style.color = m.color;
+      if (m.bg) el.style.backgroundColor = m.bg;
+      if (m.fontSize) el.style.fontSize = m.fontSize;
+      if (m.padding) el.style.padding = m.padding;
+      if (m.radius) el.style.borderRadius = m.radius;
+      window.parent.postMessage({ type: 'zeus:dom-updated', html: cleanSerialize() }, '*');
+      selectElement(el);
+    } else if (m.type === 'zeus:dom-action') {
+      if (m.action === 'select-parent') {
+        if (el.parentElement && el.parentElement !== document.body) {
+          selectElement(el.parentElement);
+        }
+      } else if (m.action === 'remove-element') {
+        const nextFocus = el.parentElement && el.parentElement !== document.body ? el.parentElement : null;
+        el.remove();
+        hi = null;
+        window.parent.postMessage({ type: 'zeus:dom-updated', html: cleanSerialize() }, '*');
+        if (nextFocus) selectElement(nextFocus);
+      } else if (m.action === 'strip-decorative-line') {
+        let styleEl = document.getElementById('zeus-od-no-line');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'zeus-od-no-line';
+          document.head.appendChild(styleEl);
+        }
+        const uidAttr = 'od-noline-' + Math.random().toString(36).slice(2, 7);
+        el.setAttribute('data-od-noline', uidAttr);
+        if (el.parentElement && el.parentElement !== document.body) {
+          el.parentElement.setAttribute('data-od-noline-parent', uidAttr);
+        }
+        styleEl.textContent += '\\n[data-od-noline="' + uidAttr + '"]::before,[data-od-noline="' + uidAttr + '"]::after,[data-od-noline-parent="' + uidAttr + '"]::before,[data-od-noline-parent="' + uidAttr + '"]::after{content:none!important;display:none!important;width:0!important;border:0!important;}';
+        const checkTargets = [el, ...(el.parentElement ? Array.from(el.parentElement.children) : []), ...Array.from(el.children)];
+        checkTargets.forEach((c) => {
+          if (c !== el && c.childElementCount === 0 && (c.textContent || '').trim().replace(/[-—–_]/g, '') === '') {
+            c.remove();
+          }
+        });
+        el.textContent = (el.textContent || '').replace(/^\\s*[-—–]{1,4}\\s*/, '');
+        window.parent.postMessage({ type: 'zeus:dom-updated', html: cleanSerialize() }, '*');
+        selectElement(el);
+      } else if (m.action === 'set-outer-html' && typeof m.value === 'string') {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = m.value.trim();
+        const replacement = wrapper.firstElementChild;
+        if (replacement && el.parentElement) {
+          el.replaceWith(replacement);
+          hi = null;
+          window.parent.postMessage({ type: 'zeus:dom-updated', html: cleanSerialize() }, '*');
+          selectElement(replacement);
+        }
+      }
+    }
   });
 })();
 </script>`;
@@ -200,7 +287,7 @@ export function ArtifactWorkbench() {
       : `${codeValue}\n${bridge}`;
   }, [codeValue, inspectOn]);
 
-  const applyElementPatch = (patch: Partial<NonNullable<typeof selectedEl>>) => {
+  const applyElementPatch = (patch: Partial<SelectedDomTarget>) => {
     if (!selectedEl) return;
     const next = { ...selectedEl, ...patch };
     setSelectedEl(next);
@@ -217,6 +304,50 @@ export function ArtifactWorkbench() {
       },
       "*"
     );
+  };
+
+  const triggerDomAction = (
+    action: "select-parent" | "remove-element" | "strip-decorative-line" | "set-outer-html",
+    value?: string
+  ) => {
+    if (!selectedEl) return;
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        type: "zeus:dom-action",
+        index: selectedEl.index,
+        action,
+        value,
+      },
+      "*"
+    );
+    if (action === "remove-element") {
+      setSelectedEl(null);
+      notify("Removed element from document");
+    } else if (action === "strip-decorative-line") {
+      notify("Removed decorative line / ::before / ::after");
+    }
+  };
+
+  const handleUndoDom = () => {
+    if (!active || !undoStack.length) return;
+    const prevHtml = undoStack[undoStack.length - 1];
+    setUndoStack((s) => s.slice(0, -1));
+    setRedoStack((s) => [...s, active.html]);
+    updateArtboard(active.id, { html: prevHtml, version: Math.max(1, active.version - 1) });
+    if (workspace && active.source) {
+      void writeWorkspaceFile(workspace, active.source, prevHtml).catch(() => {});
+    }
+  };
+
+  const handleRedoDom = () => {
+    if (!active || !redoStack.length) return;
+    const nextHtml = redoStack[redoStack.length - 1];
+    setRedoStack((s) => s.slice(0, -1));
+    setUndoStack((s) => [...s, active.html]);
+    updateArtboard(active.id, { html: nextHtml, version: active.version + 1 });
+    if (workspace && active.source) {
+      void writeWorkspaceFile(workspace, active.source, nextHtml).catch(() => {});
+    }
   };
 
   const applyHyperFramesPalette = (pal: HyperFramesPaletteSpec) => {
@@ -864,109 +995,21 @@ export function ArtifactWorkbench() {
 
         {/* OpenDesign Direct DOM Element & Token Inspector */}
         {inspectOn && mode !== "code" && (
-          <div className="flex w-72 shrink-0 flex-col border-l border-outline-variant/60 bg-surface-low p-3 overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-outline-variant/50 pb-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-on-surface">
-                <Icon name="ads_click" size={14} className="text-primary" />
-                <span>Direct DOM Inspector</span>
-              </div>
-              <button
-                onClick={() => {
-                  setInspectOn(false);
-                  setSelectedEl(null);
-                }}
-                className="state rounded-md px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant"
-              >
-                ESC
-              </button>
-            </div>
-
-            {!selectedEl ? (
-              <div className="mt-6 text-center text-xs text-on-surface-variant">
-                Click any element inside the live preview to inspect and edit its text, colors, typography, or spacing.
-              </div>
-            ) : (
-              <div className="mt-3 space-y-3 text-xs">
-                <div className="flex items-center justify-between rounded-lg bg-surface-container px-2.5 py-1.5 font-mono text-[11px]">
-                  <span className="font-bold text-primary">&lt;{selectedEl.tag}&gt;</span>
-                  <span className="text-on-surface-variant">node #{selectedEl.index}</span>
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Text Content</label>
-                  <textarea
-                    rows={2}
-                    value={selectedEl.text}
-                    onChange={(e) => applyElementPatch({ text: e.target.value })}
-                    className="w-full rounded-lg border border-outline-variant/60 bg-surface p-2 text-xs text-on-surface outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Text Color</label>
-                    <input
-                      value={selectedEl.color}
-                      onChange={(e) => applyElementPatch({ color: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Background</label>
-                    <input
-                      value={selectedEl.bg}
-                      onChange={(e) => applyElementPatch({ bg: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Font Size</label>
-                    <input
-                      value={selectedEl.fontSize}
-                      onChange={(e) => applyElementPatch({ fontSize: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">Padding</label>
-                    <input
-                      value={selectedEl.padding}
-                      onChange={(e) => applyElementPatch({ padding: e.target.value })}
-                      className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 font-mono text-[11px] text-on-surface outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t border-outline-variant/50 pt-3">
-                  <label className="mb-1 block font-mono text-[10.5px] text-on-surface-variant">
-                    Ask Agent to Refine Element
-                  </label>
-                  <input
-                    value={agentNote}
-                    onChange={(e) => setAgentNote(e.target.value)}
-                    placeholder="e.g. Convert this card into a 3-column metric table"
-                    className="h-8 w-full rounded-lg border border-outline-variant/60 bg-surface px-2 text-xs text-on-surface outline-none"
-                  />
-                  <button
-                    onClick={() => {
-                      if (!agentNote.trim()) return;
-                      window.dispatchEvent(
-                        new CustomEvent("zeus:prefill", {
-                          detail: `In "${active.name}", update the <${selectedEl.tag}> element ("${selectedEl.text.slice(0, 60)}"): ${agentNote.trim()}`,
-                        })
-                      );
-                      setAgentNote("");
-                      notify("Queued element refinement in chat composer");
-                    }}
-                    className="state mt-2 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-on-primary"
-                  >
-                    <Icon name="auto_awesome" size={14} />
-                    Send to Agent Composer
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <DomInspectorPanel
+            artifactName={active.name}
+            artifactSource={active.source}
+            selectedEl={selectedEl}
+            canUndo={undoStack.length > 0}
+            canRedo={redoStack.length > 0}
+            onUndo={handleUndoDom}
+            onRedo={handleRedoDom}
+            onClose={() => {
+              setInspectOn(false);
+              setSelectedEl(null);
+            }}
+            onPatchElement={applyElementPatch}
+            onAction={triggerDomAction}
+          />
         )}
       </div>
     </div>
