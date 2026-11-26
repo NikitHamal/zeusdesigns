@@ -3,6 +3,8 @@
 // Turn 1 plants a word, turn 2 asks for it back. A model passes only if it answers both turns and recalls the word.
 // Use it before trusting a catalog change: dead models and context-less gateways show up as FAIL.
 const GATEWAYS = {
+  antigravity: { base: "https://w902287-firebase-gemini-proxy.hf.space/ag/v1", key: "sk-antigravity" },
+  gemini4: "https://chenian233-gemini-web2api.hf.space/v1",
   freellmhub: "https://bun008-freellmapi.hf.space/v1",
   aibridge: "https://w902287-ai-bridge.hf.space/v1",
   litellmhub: "https://alchoholpad-litellm.hf.space/v1",
