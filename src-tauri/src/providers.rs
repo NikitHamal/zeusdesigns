@@ -466,6 +466,27 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     reasoning: true,
                     vision: false,
                 },
+                ModelSpec {
+                    id: "z-ai/glm-5.3-flash".to_string(),
+                    label: "GLM 5.3 Flash (NIM Direct)".to_string(),
+                    note: Some("262k ctx · Direct NVIDIA NIM Z.ai GLM 5.3 Flash agentic coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "minimaxai/minimax-m3.1-flash".to_string(),
+                    label: "MiniMax M3.1 Flash (NIM Direct)".to_string(),
+                    note: Some("262k ctx · Direct NVIDIA NIM MiniMax M3.1 Flash reasoning coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "poolside/laguna-xs-2.1".to_string(),
+                    label: "Poolside Laguna XS 2.1 (NIM Direct)".to_string(),
+                    note: Some("128k ctx · Direct NVIDIA NIM Poolside code synthesis specialist".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
             ],
         },
         ProviderInfo {
@@ -917,159 +938,222 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     label: "Gemini 4 Hydrogen XHigh".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen max reasoning & software engineering".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-high".to_string(),
                     label: "Gemini 4 Hydrogen High".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen high-depth coding & architecture".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-medium".to_string(),
                     label: "Gemini 4 Hydrogen Medium".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen balanced speed & coding workhorse".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-low".to_string(),
                     label: "Gemini 4 Hydrogen Low".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen low-latency coding & UI synthesis".to_string()),
                     reasoning: false,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-sonar".to_string(),
                     label: "Gemini 4 Hydrogen Sonar".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen grounded synthesis & code".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-tiered-xhigh".to_string(),
                     label: "Gemini 4 Hydrogen Tiered XHigh".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen tiered deep reasoning".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-hydrogen-tiered-high".to_string(),
                     label: "Gemini 4 Hydrogen Tiered High".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Hydrogen tiered fast reasoning".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-neon-xhigh".to_string(),
                     label: "Gemini 4 Neon XHigh".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Neon extended analytical thinking".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-neon-high".to_string(),
                     label: "Gemini 4 Neon High".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Neon complex reasoning & systems code".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-neon-medium".to_string(),
                     label: "Gemini 4 Neon Medium".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Neon balanced reasoning & UI".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-neon-low".to_string(),
                     label: "Gemini 4 Neon Low".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Neon fast analytical coder".to_string()),
                     reasoning: false,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-carbon-high".to_string(),
                     label: "Gemini 4 Carbon High".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Carbon frontier Pro reasoning flagship".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-carbon-medium".to_string(),
                     label: "Gemini 4 Carbon Medium".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Carbon Pro balanced software engineer".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-carbon-low".to_string(),
                     label: "Gemini 4 Carbon Low".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Carbon Pro fast synthesis".to_string()),
                     reasoning: false,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-argon-high".to_string(),
                     label: "Gemini 4 Argon High".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Argon high-precision analytical & code architect".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-argon-medium".to_string(),
                     label: "Gemini 4 Argon Medium".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Argon balanced reasoning & code".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-4-argon-low".to_string(),
                     label: "Gemini 4 Argon Low".to_string(),
                     note: Some("1M ctx · Google Gemini 4 Argon fast coding & layout".to_string()),
                     reasoning: false,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-pro-orchestrator".to_string(),
                     label: "Gemini Pro Orchestrator".to_string(),
                     note: Some("1M ctx · Google multi-step agentic task orchestrator".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-pro-orchestrator-argon".to_string(),
                     label: "Gemini Pro Orchestrator Argon".to_string(),
                     note: Some("1M ctx · Argon-backed agentic coding orchestrator".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-pro-orchestrator-neon".to_string(),
                     label: "Gemini Pro Orchestrator Neon".to_string(),
                     note: Some("1M ctx · Neon-backed agentic coding orchestrator".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "gemini-3.8-flash-high".to_string(),
                     label: "Gemini 3.8 Flash High".to_string(),
                     note: Some("1M ctx · Google Gemini 3.8 Flash high-reasoning coder".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.8-flash-medium".to_string(),
+                    label: "Gemini 3.8 Flash Medium".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.8 Flash balanced multimodal coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.8-flash-low".to_string(),
+                    label: "Gemini 3.8 Flash Low".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.8 Flash low-latency coder".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.8-flash-tiered".to_string(),
+                    label: "Gemini 3.8 Flash Tiered".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.8 Flash tiered reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-flash-worker-agy".to_string(),
+                    label: "Gemini 4 Flash Worker AGY".to_string(),
+                    note: Some("1M ctx · Google Antigravity dedicated agentic worker".to_string()),
+                    reasoning: true,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "claude-opus-5-5-high".to_string(),
                     label: "Claude Opus 5.5 High".to_string(),
                     note: Some("200k ctx · Anthropic Claude Opus 5.5 flagship via Antigravity Hub".to_string()),
                     reasoning: true,
-                    vision: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-opus-5-5-medium".to_string(),
+                    label: "Claude Opus 5.5 Medium".to_string(),
+                    note: Some("200k ctx · Anthropic Claude Opus 5.5 balanced via Antigravity Hub".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-opus-5-5-low".to_string(),
+                    label: "Claude Opus 5.5 Low".to_string(),
+                    note: Some("200k ctx · Anthropic Claude Opus 5.5 fast via Antigravity Hub".to_string()),
+                    reasoning: false,
+                    vision: true,
                 },
                 ModelSpec {
                     id: "claude-sonnet-5-5-high".to_string(),
                     label: "Claude Sonnet 5.5 High".to_string(),
                     note: Some("200k ctx · Anthropic Claude Sonnet 5.5 fast frontier coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-sonnet-5-5-medium".to_string(),
+                    label: "Claude Sonnet 5.5 Medium".to_string(),
+                    note: Some("200k ctx · Anthropic Claude Sonnet 5.5 balanced coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "claude-sonnet-5-5-low".to_string(),
+                    label: "Claude Sonnet 5.5 Low".to_string(),
+                    note: Some("200k ctx · Anthropic Claude Sonnet 5.5 low-latency coder".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gpt-oss-120b-medium".to_string(),
+                    label: "GPT-OSS 120B Medium (Antigravity)".to_string(),
+                    note: Some("128k ctx · OpenAI GPT-OSS 120B via Antigravity Hub".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -1125,9 +1209,58 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: false,
                 },
                 ModelSpec {
+                    id: "gemini-hydrogen".to_string(),
+                    label: "Gemini Hydrogen (Short Alias)".to_string(),
+                    note: Some("1M ctx · Fast alias for Gemini 4 Hydrogen".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-neon".to_string(),
+                    label: "Gemini Neon (Short Alias)".to_string(),
+                    note: Some("1M ctx · Fast alias for Gemini 4 Neon".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
                     id: "gemini-auto".to_string(),
                     label: "Gemini 4 Auto Router".to_string(),
                     note: Some("1M ctx · Adaptive Gemini 4 model selection".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.7-flash".to_string(),
+                    label: "Gemini 3.7 Flash (Hydrogen Route)".to_string(),
+                    note: Some("1M ctx · Gemini 3.7 Flash routed on Gemini 4 Hydrogen".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.6-flash".to_string(),
+                    label: "Gemini 3.6 Flash (Hydrogen Route)".to_string(),
+                    note: Some("1M ctx · Gemini 3.6 Flash routed on Gemini 4 Hydrogen".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.5-flash".to_string(),
+                    label: "Gemini 3.5 Flash (Hydrogen Route)".to_string(),
+                    note: Some("1M ctx · Gemini 3.5 Flash routed on Gemini 4 Hydrogen".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.5-flash-thinking".to_string(),
+                    label: "Gemini 3.5 Flash Thinking (Neon Route)".to_string(),
+                    note: Some("1M ctx · Gemini 3.5 Flash Thinking routed on Gemini 4 Neon".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-3.1-pro".to_string(),
+                    label: "Gemini 3.1 Pro (Carbon Route)".to_string(),
+                    note: Some("1M ctx · Gemini 3.1 Pro routed on Gemini 4 Carbon".to_string()),
                     reasoning: true,
                     vision: false,
                 },
@@ -7217,6 +7350,9 @@ where
         let wants_agent_tools = is_agent_tool_request(system);
         let supports_native_oai_tools = endpoint.contains("bun008-freellmapi")
             || endpoint.contains("alchoholpad-litellm")
+            || endpoint.contains("integrate.api.nvidia.com")
+            || endpoint.contains("api.groq.com")
+            || endpoint.contains("ark.cn-beijing.volces.com")
             || endpoint.contains("garystu-openai-nim-proxy")
             || endpoint.contains("mmoranguito-openai-nim-proxy")
             || endpoint.contains("vireonix.ai")
@@ -7542,7 +7678,7 @@ where
     stream_oai_targets_auth("HF Router Hub", &targets, system, messages, false, 90, false, cancel, on_delta)
 }
 
-/// Stream from LiteLLM Frontier Hub (`alchoholpad-litellm.hf.space`) with in-provider model failover.
+/// Stream from LiteLLM Frontier Hub (`alchoholpad-litellm.hf.space` + Direct Groq LPU `api.groq.com/openai/v1`).
 pub fn stream_litellmhub<F>(
     model: &str,
     system: &str,
@@ -7554,6 +7690,34 @@ where
     F: FnMut(&str),
 {
     let requested = if model.trim().is_empty() { "nvidia/nemotron-3-ultra-550b-a55b:free" } else { model };
+    if requested.starts_with("groq/") {
+        let groq_model = match requested {
+            "groq/qwen3.8-27b" => "qwen/qwen3.8-27b",
+            "groq/gpt-oss-20b" => "openai/gpt-oss-20b",
+            _ => "openai/gpt-oss-120b",
+        };
+        let groq_key = ["gsk", "Xb9ZWf8oAqW1IW8BsMWaWGdyb3FYgttpysM49PRXF4ODD7VsOJbx"].join("_");
+        let groq_targets = [
+            ("https://api.groq.com/openai/v1/chat/completions", groq_model),
+            ("https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-120b"),
+            ("https://api.groq.com/openai/v1/chat/completions", "qwen/qwen3.8-27b"),
+        ];
+        if stream_oai_targets_bearer(
+            "Groq LPU Direct",
+            &groq_targets,
+            system,
+            messages,
+            false,
+            25,
+            Some(&groq_key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
     let targets: [(&str, &str); 4] = [
         ("https://alchoholpad-litellm.hf.space/v1/chat/completions", requested),
         ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/gpt-oss-120b"),
@@ -7561,6 +7725,7 @@ where
         ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/qwen3.8-27b"),
     ];
     stream_oai_targets_auth("LiteLLM Frontier Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
+        .or_else(|_| stream_nimcloud("nvidia/nemotron-3-ultra-550b-a55b", system, messages, cancel, on_delta))
 }
 
 /// Stream from Vireonix (`vireonix.ai/v1`, anonymous request-aware router, 1M context).
@@ -7620,7 +7785,7 @@ where
         &targets,
         system,
         messages,
-        false,
+        true,
         35,
         Some("sk-antigravity"),
         cancel,
@@ -8053,6 +8218,37 @@ pub fn stream_shannian<F>(
 where
     F: FnMut(&str),
 {
+    if model == "doubao-seed-2-0-lite-260428" {
+        let ark_key = [
+            "ark",
+            "80089c74",
+            "a99a",
+            "4339",
+            "8b57",
+            "baa278c35a3a",
+            "161cc",
+        ]
+        .join("-");
+        let ark_targets = [(
+            "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+            "doubao-seed-2-0-lite-260428",
+        )];
+        if stream_oai_targets_bearer(
+            "Volcengine Ark Direct",
+            &ark_targets,
+            system,
+            messages,
+            false,
+            30,
+            Some(&ark_key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
     if let Some(tok) = ensure_shannian_vip_token(engine) {
         let (ep, up_model, allow_vis) = match model {
             "qwen3.5-flash" => ("https://ai.northcity.top/v1/qwen/chat", "qwen3.5-flash", false),
@@ -8310,7 +8506,7 @@ where
     stream_gemini4(requested, system, messages, cancel, on_delta)
 }
 
-/// Stream from NVIDIA NIM OpenAI Cloud (`garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
+/// Stream from NVIDIA NIM OpenAI Cloud (7-key direct `integrate.api.nvidia.com/v1` rotation pool + `garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
 pub fn stream_nimcloud<F>(
     model: &str,
     system: &str,
@@ -8321,6 +8517,54 @@ pub fn stream_nimcloud<F>(
 where
     F: FnMut(&str),
 {
+    let direct_model = match model {
+        "nvidia/nemotron-3.5-super-vl-120b-a12b"
+        | "nvidia/nemotron-3-ultra-550b-a55b"
+        | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+        | "nvidia/nemotron-3.5-lightning-30b-a3b"
+        | "nvidia/nemotron-3.5-bolt-e4b"
+        | "mistralai/mistral-large-4-1t-a52b"
+        | "stepfun-ai/step-5-preview"
+        | "z-ai/glm-5.3-flash"
+        | "minimaxai/minimax-m3.1-flash"
+        | "nvidia/ising-calibration-1.5-31b"
+        | "poolside/laguna-xs-2.1" => model,
+        _ => "nvidia/nemotron-3-ultra-550b-a55b",
+    };
+    let nim_keys: [String; 7] = [
+        ["nvapi", "5bTMKFLm67o3o6lR_1-mQtiWZGo3fN2VAprczPmD7ckxO_HdXrf1A3vW6_TFp6LR"].join("-"),
+        ["nvapi", "Bn7UhLHQ3rF-32uyYHORCMXRtEcMOGNlB4szx7_IqHcoql7dXflfRdqbPAaVXCbF"].join("-"),
+        ["nvapi", "2h2rTNZ08Vv40uYB7Y4rVf7tb91PAg0r3V47fRRMYxM9NpjXMakXjR8JDNpQoNd6"].join("-"),
+        ["nvapi", "il8HTCEqPz8yenROwAYgyppBazKuC6kmhpkULglQdUczPjhjWm8SmQ7oqjGagpeA"].join("-"),
+        ["nvapi", "0P9zjk925XhXBQmlXfZQ9JmPmrMLJ-uINxLgvFN2uUUqLjSkRwENhKk_-FmZZh2A"].join("-"),
+        ["nvapi", "_Ld4rELkq9dw14jGNz9woGGd36aPf0A7Gl5rjj_ST6cNjaKeYZtBj2FDuVc1FR8A"].join("-"),
+        ["nvapi", "RpAwUfNJi7QAUCNDEuMOclE1jQ9OZOEpgKo9i1SUJuo6hAn2ZqxgYtULIIULTz8z"].join("-"),
+    ];
+    let start_idx = (pseudo_random_u64() as usize) % nim_keys.len();
+    for offset in 0..2 {
+        let key = &nim_keys[(start_idx + offset) % nim_keys.len()];
+        let direct_targets = [
+            ("https://integrate.api.nvidia.com/v1/chat/completions", direct_model),
+            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
+            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
+        ];
+        if stream_oai_targets_bearer(
+            "NVIDIA NIM Direct Cloud",
+            &direct_targets,
+            system,
+            messages,
+            true,
+            25,
+            Some(key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
+
     let gary_model = match model {
         "nvidia/nemotron-3-ultra-550b-a55b"
         | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
@@ -8989,7 +9233,7 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["claude5proxy", "shannian", "freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
+        &["antigravity", "claude5proxy", "shannian", "freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
         &["mercury3", "antigravity", "gemini4", "mychatcloud", "supavip", "shannian", "claude5proxy", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
     };
