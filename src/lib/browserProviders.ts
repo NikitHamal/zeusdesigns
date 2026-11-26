@@ -5,6 +5,12 @@ import type { ChatRequest } from "./bridge";
 
 export const BROWSER_FALLBACK_PROVIDER_IDS = new Set([
   "kilo",
+  "antigravity",
+  "gemini4",
+  "mychatcloud",
+  "supavip",
+  "shannian",
+  "claude5proxy",
   "opencodezen",
   "nimcloud",
   "colibriqwen",
@@ -179,6 +185,18 @@ export function resolveBrowserGatewayConfig(
     freellmhub: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "" },
     aibridge: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
     opencodezen: { baseUrl: "https://opencode.ai/zen/v1", apiKey: "public" },
+    antigravity: { baseUrl: "https://w902287-firebase-gemini-proxy.hf.space/ag/v1", apiKey: "sk-antigravity" },
+    gemini4: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
+    mychatcloud: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
+    supavip: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
+    shannian: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
+    claude5proxy: {
+      baseUrl: modelId.startsWith("glm-")
+        ? "https://sun14728-ai-proxy.hf.space/v1"
+        : "https://dherain24-claude-proxy.hf.space",
+      apiKey: modelId.startsWith("glm-") ? "" : "free",
+      format: modelId.startsWith("glm-") ? "openai" : "anthropic",
+    },
     hfrouter: { baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", apiKey: "" },
     litellmhub: { baseUrl: "https://alchoholpad-litellm.hf.space/v1", apiKey: "" },
     gemweb2api: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
