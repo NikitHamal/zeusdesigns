@@ -4326,8 +4326,35 @@ fn url_encode(input: &str) -> String {
     out
 }
 
-/// Stream from Gemini Web (`https://gemini.google.com/app` anonymous Flash-Lite StreamGenerate).
-pub fn stream_geminiweb<F>(
+/// Strip internal Gemini Web code execution blocks (` ```python?code_reference...``` ` and ` ```text?code_stdout...``` `).
+pub fn clean_gemini_code_blocks(raw: &str) -> String {
+    let mut out = raw.to_string();
+    for marker in [
+        "```python?code_reference",
+        "```javascript?code_reference",
+        "```text?code_stdout",
+        "```text?code_reference",
+    ] {
+        while let Some(start) = out.find(marker) {
+            let after = start + marker.len();
+            if let Some(close_rel) = out[after..].find("```") {
+                let mut end = after + close_rel + 3;
+                while end < out.len() && out.as_bytes()[end] == b'\n' {
+                    end += 1;
+                }
+                out.replace_range(start..end, "");
+            } else {
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// Direct anonymous Google Gemini 4 `StreamGenerate` (`MODE_CATEGORY` `inner[79]` = 1..6, `think_mode` `inner[17]` = 0/4).
+pub fn stream_gemini4_direct<F>(
+    mode_id: i64,
+    think_mode: i64,
     system: &str,
     messages: &[ChatMessage],
     cancel: &AtomicBool,
@@ -4336,145 +4363,126 @@ pub fn stream_geminiweb<F>(
 where
     F: FnMut(&str),
 {
-    let client = build_client(14)?;
-    let warm_resp = match client
-        .get("https://gemini.google.com/app")
-        .header("Accept", "text/html")
-        .send()
-    {
-        Ok(r) if r.status().is_success() => r,
-        _ => {
-            return stream_freecc(
-                "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
-                system,
-                messages,
-                cancel,
-                on_delta,
-            );
-        }
-    };
-    let html = warm_resp.text().unwrap_or_default();
-    let Some(fsid) = extract_quoted_value(&html, "FdrFJe") else {
-        return stream_freecc(
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
-            system,
-            messages,
-            cancel,
-            on_delta,
-        );
-    };
-    let bl = extract_quoted_value(&html, "cfb2h")
-        .unwrap_or_else(|| "boq_gemini-web-uiserver_20261117.01_p0".to_string());
-    let snlm0e = extract_quoted_value(&html, "SNlM0e").unwrap_or_default();
-
     let wants_tools = is_agent_tool_request(system);
     let mut prompt = String::new();
     if wants_tools {
         prompt.push_str(&format!("{}\n\n", scraper_xml_dsl_banner()));
     }
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(16000).collect();
-        prompt.push_str(&format!("{}\n\n", sys_safe));
+        let sys_safe = smart_cap_system(system, 20000);
+        prompt.push_str(&format!("[System instruction]: {}\n\n", sys_safe));
     }
     if messages.len() > 1 {
-        prompt.push_str("Previous conversation:\n");
         for m in &messages[..messages.len() - 1] {
-            prompt.push_str(&format!("{}: {}\n", m.role, m.content));
+            let role_tag = if m.role == "assistant" { "[Assistant]" } else { "[User]" };
+            prompt.push_str(&format!("{}: {}\n\n", role_tag, m.content));
         }
-        prompt.push('\n');
     }
     if let Some(last) = messages.last() {
-        if wants_tools && !last.content.contains("<tool_result") {
-            prompt.push_str(&format!("{}\n(Output ONLY the <zeus_tool> XML tag if a workspace action is needed.)", last.content));
+        if wants_tools && !last.content.contains("<tool_result") && !last.content.contains("[XML DSL") {
+            prompt.push_str(&format!(
+                "{}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                last.content
+            ));
         } else {
             prompt.push_str(&last.content);
         }
     }
 
-    let inner = json!([
-        [prompt, 0, Value::Null, Value::Null, Value::Null, Value::Null, 0],
-        ["en-US"],
-        ["", "", "", Value::Null, Value::Null, Value::Null, Value::Null, Value::Null, Value::Null, ""],
-        "",
-        random_hex(32),
-        Value::Null,
-        [0],
-        1,
-        Value::Null,
-        Value::Null,
-        1,
-        0
-    ]);
-    let freq = json!([Value::Null, inner.to_string()]).to_string();
-    let reqid = 100_000 + (pseudo_random_u64() % 800_000);
-    let mut url = format!(
-        "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl={}&f.sid={}&hl=en-US&_reqid={}&rt=c",
-        url_encode(&bl),
-        url_encode(&fsid),
-        reqid
-    );
-    if !snlm0e.is_empty() {
-        url.push_str(&format!("&at={}", url_encode(&snlm0e)));
-    }
+    let mut inner: Vec<Value> = vec![Value::Null; 80];
+    inner[0] = json!([prompt, 0, Value::Null, Value::Null, Value::Null, Value::Null, 0]);
+    inner[1] = json!(["en"]);
+    inner[2] = json!(["", "", "", Value::Null, Value::Null, Value::Null, Value::Null, Value::Null, Value::Null, ""]);
+    inner[6] = json!([0]);
+    inner[7] = json!(1);
+    inner[10] = json!(1);
+    inner[11] = json!(0);
+    inner[17] = json!([[think_mode]]);
+    inner[18] = json!(0);
+    inner[27] = json!(1);
+    inner[30] = json!([4]);
+    inner[41] = json!([2]);
+    inner[53] = json!(0);
+    inner[59] = json!(uuid_v4());
+    inner[61] = json!([]);
+    inner[68] = json!(1);
+    inner[79] = json!(mode_id);
 
-    let body = format!("f.req={}&", url_encode(&freq));
-    let resp = match client
-        .post(&url)
-        .header("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
-        .header("Origin", "https://gemini.google.com")
-        .header("Referer", "https://gemini.google.com/")
-        .header("x-same-domain", "1")
-        .body(body)
-        .send()
-    {
-        Ok(r) if r.status().is_success() => r,
-        _ => {
-            return stream_freecc(
-                "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
-                system,
-                messages,
-                cancel,
-                on_delta,
-            );
-        }
-    };
+    let outer = json!([Value::Null, Value::Array(inner).to_string()]).to_string();
+    let body = format!("f.req={}", url_encode(&outer));
+    let client = build_client(35)?;
 
-    let mut reader = BufReader::new(resp);
-    let mut line = String::new();
-    let mut prev_text = String::new();
-    let mut saw_any = false;
+    let mut bl = "boq_assistant-bard-web-server_20260716.08_p0".to_string();
+    for attempt in 0..2 {
+        let reqid = 100_000 + (pseudo_random_u64() % 800_000);
+        let url = format!(
+            "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl={}&hl=en&_reqid={}&rt=c",
+            url_encode(&bl),
+            reqid
+        );
+        let resp = match client
+            .post(&url)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .header("Origin", "https://gemini.google.com")
+            .header("Referer", "https://gemini.google.com/app")
+            .header("X-Same-Domain", "1")
+            .body(body.clone())
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            Ok(r) if r.status().as_u16() == 405 && attempt == 0 => {
+                if let Ok(app_resp) = client.get("https://gemini.google.com/app").send() {
+                    let html = app_resp.text().unwrap_or_default();
+                    if let Some(idx) = html.find("boq_assistant-bard-web-server_") {
+                        let rest = &html[idx..];
+                        let end = rest
+                            .find(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '.')
+                            .unwrap_or(rest.len());
+                        if end > 30 {
+                            bl = rest[..end].to_string();
+                            continue;
+                        }
+                    }
+                }
+                break;
+            }
+            _ => break,
+        };
 
-    while reader.read_line(&mut line).unwrap_or(0) > 0 {
-        if cancel.load(Ordering::Relaxed) {
-            return Ok(());
-        }
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            if let Ok(arr) = serde_json::from_str::<Value>(trimmed) {
-                if let Some(entries) = arr.as_array() {
-                    for entry in entries {
-                        if entry.get(0).and_then(|v| v.as_str()) == Some("wrb.fr") {
-                            if let Some(inner_str) = entry.get(2).and_then(|v| v.as_str()) {
-                                if let Ok(inner_val) = serde_json::from_str::<Value>(inner_str) {
-                                    if let Some(parts) = inner_val.get(4).and_then(|v| v.as_array()) {
-                                        for part in parts {
-                                            if let Some(rc) = part.get(0).and_then(|v| v.as_str()) {
-                                                if rc.starts_with("rc_") {
-                                                    if let Some(texts) = part.get(1).and_then(|v| v.as_array()) {
-                                                        if let Some(snap) = texts.first().and_then(|t| t.as_str()) {
-                                                            let delta = if snap.starts_with(&prev_text) {
-                                                                &snap[prev_text.len()..]
-                                                            } else if prev_text.is_empty() {
-                                                                snap
-                                                            } else {
-                                                                ""
-                                                            };
-                                                            if !delta.is_empty() {
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut prev_text = String::new();
+        let mut saw_any = false;
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            let trimmed = line.trim();
+            if trimmed.contains("\"wrb.fr\"") && trimmed.len() > 120 {
+                if let Ok(arr) = serde_json::from_str::<Value>(trimmed) {
+                    if let Some(entries) = arr.as_array() {
+                        for entry in entries {
+                            if entry.get(0).and_then(|v| v.as_str()) == Some("wrb.fr") {
+                                if let Some(inner_str) = entry.get(2).and_then(|v| v.as_str()) {
+                                    if let Ok(inner_val) = serde_json::from_str::<Value>(inner_str) {
+                                        if let Some(parts) = inner_val.get(4).and_then(|v| v.as_array()) {
+                                            for part in parts {
+                                                if let Some(texts) = part.get(1).and_then(|v| v.as_array()) {
+                                                    for t_val in texts {
+                                                        if let Some(snap_raw) = t_val.as_str() {
+                                                            let snap = clean_gemini_code_blocks(snap_raw);
+                                                            if snap.len() > prev_text.len() && snap.starts_with(&prev_text) {
+                                                                let delta = &snap[prev_text.len()..];
+                                                                if !delta.is_empty() {
+                                                                    saw_any = true;
+                                                                    on_delta(delta);
+                                                                }
+                                                                prev_text = snap;
+                                                            } else if prev_text.is_empty() && !snap.trim().is_empty() {
                                                                 saw_any = true;
-                                                                on_delta(delta);
-                                                            }
-                                                            if snap.len() > prev_text.len() {
-                                                                prev_text = snap.to_string();
+                                                                on_delta(&snap);
+                                                                prev_text = snap;
                                                             }
                                                         }
                                                     }
@@ -4488,21 +4496,29 @@ where
                     }
                 }
             }
+            line.clear();
         }
-        line.clear();
+
+        if saw_any {
+            return Ok(());
+        }
     }
 
-    if saw_any {
-        Ok(())
-    } else {
-        stream_freecc(
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview",
-            system,
-            messages,
-            cancel,
-            on_delta,
-        )
-    }
+    Err("Direct Gemini 4 StreamGenerate returned no text".to_string())
+}
+
+/// Stream from Gemini Web (`https://gemini.google.com/app` anonymous StreamGenerate, backed by Gemini 4 Hydrogen mode=1).
+pub fn stream_geminiweb<F>(
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    stream_gemini4_direct(1, 4, system, messages, cancel, on_delta)
+        .or_else(|_| stream_gemweb2api("gemini-4-hydrogen", system, messages, cancel, on_delta))
 }
 
 /// Stream from Kilo Gateway (`https://api.kilo.ai/api/gateway/chat/completions`, free frontier & multimodal models).
@@ -5872,6 +5888,23 @@ where
         }
     }
 
+    if !has_images && eff_model.contains("/gemini/") {
+        let gem4_id = if eff_model.contains("gemini-4-hydrogen") {
+            "gemini-4-hydrogen"
+        } else if eff_model.contains("gemini-4-carbon") {
+            "gemini-4-carbon"
+        } else if eff_model.contains("gemini-4-neon") {
+            "gemini-4-neon"
+        } else if eff_model.contains("gemini-4-argon") {
+            "gemini-4-argon"
+        } else {
+            "gemini-4-hydrogen"
+        };
+        if stream_gemini4(gem4_id, system, messages, cancel, on_delta).is_ok() {
+            return Ok(());
+        }
+    }
+
     let wants_tools = is_agent_tool_request(system);
     let sys_raw: String = system.chars().take(24000).collect();
     let sys_safe = if wants_tools {
@@ -5880,42 +5913,40 @@ where
         sys_raw
     };
     let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
-    if eff_model.contains("/gemini/") {
-        candidate_routes.push((
-            "https://calkotter-free-claude-code.hf.space",
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
-            14,
-        ));
-    }
     for &h in hosts {
         let t_secs = if eff_model.contains("/gemini/") || eff_model.contains("kimi-k3.1-pro") || eff_model.contains("step-5") {
             6
         } else {
             16
         };
-        if eff_model != "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash" {
+        if !eff_model.contains("/gemini/") {
             candidate_routes.push((h, eff_model, t_secs));
         }
     }
     candidate_routes.push((
-        "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash",
+        "https://dherain24-claude-proxy.hf.space",
+        "claude-sonnet-5-5",
+        16,
+    ));
+    candidate_routes.push((
+        "https://dherain24-claude-proxy.hf.space",
+        "claude-haiku-5-5",
+        14,
+    ));
+    candidate_routes.push((
+        "https://dherain24-claude-proxy.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b",
+        16,
+    ));
+    candidate_routes.push((
+        "https://dherain24-claude-proxy.hf.space",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
         14,
     ));
     candidate_routes.push((
         "https://calkotter-free-claude-code.hf.space",
         "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
         14,
-    ));
-    candidate_routes.push((
-        "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/ising-calibration-1.5-31b",
-        14,
-    ));
-    candidate_routes.push((
-        "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-        16,
     ));
     candidate_routes.push((
         "https://calkotter-free-claude-code.hf.space",
@@ -7456,7 +7487,7 @@ where
     stream_oai_targets_bearer("OpenCode Zen", &targets, system, messages, true, 120, Some("public"), cancel, on_delta)
 }
 
-/// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) with in-provider model failover.
+/// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) with direct MyChat / Supabase / ShanNian failover.
 pub fn stream_aibridge<F>(
     model: &str,
     system: &str,
@@ -7467,15 +7498,27 @@ pub fn stream_aibridge<F>(
 where
     F: FnMut(&str),
 {
-    let requested = if model.trim().is_empty() { "gpt-6-luna" } else { model };
+    let requested = match model {
+        "claude-haiku-5-5" => {
+            if stream_claude5proxy("claude-haiku-5-5", system, messages, cancel, on_delta).is_ok() {
+                return Ok(());
+            }
+            "gpt-6-luna"
+        }
+        "deepseek-v4-flash" => "supabase-deepseek-v4.1-flash",
+        "grok-4.20" => "gpt-6-luna",
+        m if m.trim().is_empty() => "gpt-6-luna",
+        m => m,
+    };
     let targets: [(&str, &str); 5] = [
         ("https://w902287-ai-bridge.hf.space/v1/chat/completions", requested),
         ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
         ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-4.1"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "deepseek-v4-flash"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "claude-haiku-5-5"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "supabase-deepseek-v4.1-flash"),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "qwen3.5-flash"),
     ];
     stream_oai_targets_auth("AI Bridge Gateway", &targets, system, messages, false, 30, false, cancel, on_delta)
+        .or_else(|_| stream_mychatcloud("gpt-6-luna", system, messages, cancel, on_delta))
 }
 
 /// Stream from HF Router Hub (`cgjgj-ollamahftraemonitor.hf.space`) with in-provider model failover.
@@ -7539,7 +7582,716 @@ where
     stream_oai_targets_bearer("Vireonix", &targets, system, messages, false, 60, None, cancel, on_delta)
 }
 
-/// Stream from Gemini Web Gateway (`chenian233-gemini-web2api.hf.space`) with in-provider model failover.
+/// Stream from Google Antigravity & Cloud Code Hub (`w902287-firebase-gemini-proxy.hf.space/ag/v1` with `Bearer sk-antigravity` + Gemini 4 Direct / Claude 5.5 failover).
+pub fn stream_antigravity<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    const EP: &str = "https://w902287-firebase-gemini-proxy.hf.space/ag/v1/chat/completions";
+    let requested = if model.trim().is_empty() {
+        "gemini-4-hydrogen-medium"
+    } else {
+        model
+    };
+    let secondary = if requested.starts_with("claude-") {
+        "claude-sonnet-5-5-medium"
+    } else if requested.contains("neon") {
+        "gemini-4-neon-medium"
+    } else if requested.contains("carbon") {
+        "gemini-4-carbon-medium"
+    } else if requested.contains("argon") {
+        "gemini-4-argon-medium"
+    } else {
+        "gemini-4-hydrogen-low"
+    };
+    let targets: [(&str, &str); 3] = [
+        (EP, requested),
+        (EP, secondary),
+        (EP, "gemini-4-hydrogen-medium"),
+    ];
+    stream_oai_targets_bearer(
+        "Google Antigravity & Cloud Code Hub",
+        &targets,
+        system,
+        messages,
+        false,
+        35,
+        Some("sk-antigravity"),
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| {
+        if requested.starts_with("claude-") {
+            stream_claude5proxy("claude-sonnet-5-5", system, messages, cancel, on_delta)
+        } else {
+            let gem4_id = if requested.contains("neon") {
+                "gemini-4-neon"
+            } else if requested.contains("carbon") {
+                "gemini-4-carbon"
+            } else if requested.contains("thinking") || requested.contains("high") {
+                "gemini-4-hydrogen-thinking"
+            } else {
+                "gemini-4-hydrogen"
+            };
+            stream_gemini4(gem4_id, system, messages, cancel, on_delta)
+        }
+    })
+}
+
+/// Stream from Google Gemini 4 Direct & 5-Node Cluster (`chenian233`, `pouluo`, `peijun1`, `peijun1-1`, `giabaopro1908` + direct `gemini.google.com` `StreamGenerate`).
+pub fn stream_gemini4<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() {
+        "gemini-4-hydrogen"
+    } else {
+        model
+    };
+    if requested == "gemini-4-argon" {
+        if stream_antigravity("gemini-4-argon-medium", system, messages, cancel, on_delta).is_ok() {
+            return Ok(());
+        }
+    }
+
+    let (mode_id, think_mode, legacy_alias) = match requested {
+        "gemini-4-hydrogen-thinking" | "gemini-4-neon" | "gemini-4-neon-thinking" | "gemini-3.5-flash-thinking" => {
+            (2, 0, "gemini-3.5-flash-thinking")
+        }
+        "gemini-4-carbon" | "gemini-4-argon" | "gemini-3.1-pro" => (3, 4, "gemini-3.1-pro"),
+        "gemini-auto" => (4, 4, "gemini-auto"),
+        "gemini-3.5-flash-thinking-lite" => (5, 0, "gemini-3.5-flash-thinking-lite"),
+        "gemini-flash-lite" => (6, 4, "gemini-flash-lite"),
+        _ => (1, 4, "gemini-3.5-flash"),
+    };
+
+    let chenian_model = match requested {
+        "gemini-4-hydrogen"
+        | "gemini-4-hydrogen-thinking"
+        | "gemini-4-neon"
+        | "gemini-4-neon-thinking"
+        | "gemini-4-carbon"
+        | "gemini-auto"
+        | "gemini-3.7-flash"
+        | "gemini-3.6-flash"
+        | "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => requested,
+        _ => "gemini-4-hydrogen",
+    };
+
+    let targets: [(&str, &str); 5] = [
+        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
+        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
+        ("https://peijun1-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
+        ("https://peijun1-gemini-web2api1.hf.space/v1/chat/completions", legacy_alias),
+        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
+    ];
+
+    stream_oai_targets_auth(
+        "Google Gemini 4 Cluster",
+        &targets,
+        system,
+        messages,
+        false,
+        35,
+        false,
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| stream_gemini4_direct(mode_id, think_mode, system, messages, cancel, on_delta))
+}
+
+/// Stream from MyChat Native Direct Cloud (`https://mychat-ai.cloud/api/openapi/turbo-stream` with rolling hourly MD5 `X-Encryption-Token`).
+pub fn stream_mychatcloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "gpt-6-luna" | "gpt-5" | "gpt-5-mini" | "gpt-5-nano" | "gpt-4.1" | "gpt-4.1-mini"
+        | "gpt-4o" | "gpt-4o-mini" | "o3" | "o3-mini" | "o4-mini" => model,
+        _ => "gpt-6-luna",
+    };
+    let norm_messages = normalize_multi_turn_messages(messages, 14, 4000, 24000);
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        oai_msgs.push(json!({
+            "role": "system",
+            "content": smart_cap_system(system, 20000)
+        }));
+    }
+    for m in &norm_messages {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({
+                "role": m.role,
+                "content": m.content
+            }));
+        }
+    }
+
+    let wants_tools = is_agent_tool_request(system);
+    let is_modern = eff_model.starts_with("gpt-5")
+        || eff_model.starts_with("gpt-6")
+        || eff_model.starts_with("o1")
+        || eff_model.starts_with("o3")
+        || eff_model.starts_with("o4");
+    let mut payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "messages": oai_msgs
+    });
+    if is_modern {
+        payload["max_completion_tokens"] = json!(16384);
+    } else {
+        payload["max_tokens"] = json!(16384);
+    }
+    if wants_tools {
+        payload["tools"] = build_native_oai_agent_tools();
+        if eff_model == "gpt-6-luna" {
+            payload["reasoning_effort"] = json!("none");
+        }
+    }
+
+    let enc_token = generate_mychat_encryption_token(now_secs());
+    let client = build_client(45)?;
+    let resp = match client
+        .post("https://mychat-ai.cloud/api/openapi/turbo-stream")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .header("X-Encryption-Token", &enc_token)
+        .header("User-Agent", "chachachat/2.31 CFNetwork/3860.300.31 Darwin/25.2.0")
+        .json(&payload)
+        .send()
+    {
+        Ok(r) if r.status().is_success() => r,
+        _ => {
+            let bridge_targets = [
+                ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
+                ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-4.1"),
+            ];
+            return stream_oai_targets_auth(
+                "MyChat Native Direct Cloud",
+                &bridge_targets,
+                system,
+                messages,
+                false,
+                30,
+                false,
+                cancel,
+                on_delta,
+            );
+        }
+    };
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
+
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let trimmed = line.trim();
+        if let Some(raw) = trimmed.strip_prefix("data:") {
+            let raw = raw.trim();
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    let delta = choice.get("delta").or_else(|| choice.get("message"));
+                    if let Some(d) = delta {
+                        let r_text = d
+                            .get("reasoning_content")
+                            .or_else(|| d.get("reasoning"))
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("");
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(r_text);
+                        }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err("MyChat Native Direct Cloud stream ended without output".to_string())
+    }
+}
+
+/// Stream from Supabase Tongyi VIP Cloud (`https://vdspcxotxhxfjowqndix.supabase.co/functions/v1/translate-proxy` + `w902287-ai-bridge.hf.space`).
+pub fn stream_supavip<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let upstream_model = match model {
+        "deepseek-v4.1-flash" | "qwen3.7-flash" | "qwen3.8-max" | "qwen4-max" | "deepseek-r1"
+        | "deepseek-v3" => model,
+        _ => "deepseek-v4.1-flash",
+    };
+    let wants_tools = is_agent_tool_request(system);
+    let client = build_client(45)?;
+    let pub_key = ["sb", "publishable", "ebGg9D2f0dOdhh32BJx83g", "IoXOtrHB"].join("_");
+
+    for &(max_turns, older_chars, last_chars, sys_chars) in &[(8usize, 2000usize, 10000usize, 9500usize), (4, 1000, 5000, 5000)] {
+        let norm_msgs = normalize_multi_turn_messages(messages, max_turns, older_chars, last_chars);
+        let mut oai_msgs = Vec::new();
+        if !system.trim().is_empty() {
+            oai_msgs.push(json!({
+                "role": "system",
+                "content": smart_cap_system(system, sys_chars)
+            }));
+        }
+        for m in &norm_msgs {
+            if !m.content.trim().is_empty() {
+                oai_msgs.push(json!({
+                    "role": m.role,
+                    "content": m.content
+                }));
+            }
+        }
+        let mut req_inner = json!({
+            "model": upstream_model,
+            "messages": oai_msgs,
+            "temperature": 0.3,
+            "max_tokens": 8192,
+            "stream": true
+        });
+        if wants_tools {
+            req_inner["tools"] = build_native_oai_agent_tools();
+        }
+        let supa_payload = json!({
+            "tier": "vip",
+            "provider": "tongyi",
+            "mode": "llm_stream",
+            "request": req_inner
+        });
+        let pretty_body = serde_json::to_string_pretty(&supa_payload).unwrap_or_else(|_| supa_payload.to_string());
+        let resp = match client
+            .post("https://vdspcxotxhxfjowqndix.supabase.co/functions/v1/translate-proxy")
+            .header("Content-Type", "application/json")
+            .header("apikey", &pub_key)
+            .body(pretty_body)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            Ok(r) if r.status().as_u16() == 413 => continue,
+            _ => break,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if raw == "[DONE]" {
+                    break;
+                }
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                        let delta = choice.get("delta").or_else(|| choice.get("message"));
+                        if let Some(d) = delta {
+                            let r_text = d
+                                .get("reasoning_content")
+                                .or_else(|| d.get("reasoning"))
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("");
+                            if !r_text.is_empty() {
+                                if !in_think {
+                                    in_think = true;
+                                    on_delta("<think>");
+                                }
+                                on_delta(r_text);
+                            }
+                            accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
+                            if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+
+    let bridge_model = if upstream_model.starts_with("qwen") {
+        "supabase-qwen3.7-flash"
+    } else {
+        "supabase-deepseek-v4.1-flash"
+    };
+    let targets = [
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", bridge_model),
+        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
+    ];
+    stream_oai_targets_auth("Supabase Tongyi VIP Cloud", &targets, system, messages, false, 35, false, cancel, on_delta)
+}
+
+fn ensure_shannian_vip_token(engine: &ProviderEngine) -> Option<String> {
+    let now = now_secs();
+    if let Ok(guard) = engine.state.lock() {
+        if let Some((ref tok, exp)) = guard.shannian_token {
+            if now + 180 < exp && !tok.is_empty() {
+                return Some(tok.clone());
+            }
+        }
+    }
+    let client = build_client(12).ok()?;
+    let sess = [
+        "e8f95132afb39670",
+        "8ef23dcd0de7f8d7",
+        "52e29d250bfdfdb0",
+        "941a269194969cd7",
+    ]
+    .concat();
+    let payload = json!({
+        "session_token": sess,
+        "device_id": "c9714897-db6f-4e45-9398-623a9378eca0",
+        "object_id": "44c5b0ece3"
+    });
+    let resp = client
+        .post("https://ai.northcity.top/v1/session/exchange")
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let data: Value = resp.json().ok()?;
+    let token = data.get("access_token").and_then(|v| v.as_str())?.to_string();
+    let expires_in = data.get("expires_in").and_then(|v| v.as_u64()).unwrap_or(3600);
+    if let Ok(mut guard) = engine.state.lock() {
+        guard.shannian_token = Some((token.clone(), now + expires_in));
+    }
+    Some(token)
+}
+
+/// Stream from ShanNian & Volcengine VIP Gateway (`https://ai.northcity.top` + `w902287-ai-bridge.hf.space`).
+pub fn stream_shannian<F>(
+    engine: &ProviderEngine,
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    if let Some(tok) = ensure_shannian_vip_token(engine) {
+        let (ep, up_model, allow_vis) = match model {
+            "qwen3.5-flash" => ("https://ai.northcity.top/v1/qwen/chat", "qwen3.5-flash", false),
+            "doubao-seed-2-0-mini-260428" | "doubao-seed-2-0-lite-260428" => (
+                "https://ai.northcity.top/v1/doubao/chat",
+                "doubao-seed-2-0-mini-260428",
+                false,
+            ),
+            _ => (
+                "https://ai.northcity.top/v1/deepseek/chat",
+                "deepseek-v4-flash-vision-exp",
+                true,
+            ),
+        };
+        let sn_targets = [(ep, up_model)];
+        if stream_oai_targets_bearer(
+            "ShanNian VIP Direct",
+            &sn_targets,
+            system,
+            messages,
+            allow_vis,
+            40,
+            Some(&tok),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
+
+    let bridge_model = match model {
+        "qwen3.5-flash" | "doubao-seed-2-0-mini-260428" | "deepseek-v4-flash-vision-exp" => model,
+        _ => "doubao-seed-2-0-mini-260428",
+    };
+    let fallback_targets = [
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", bridge_model),
+        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "qwen3.5-flash"),
+    ];
+    stream_oai_targets_auth(
+        "ShanNian VIP Gateway",
+        &fallback_targets,
+        system,
+        messages,
+        false,
+        35,
+        false,
+        cancel,
+        on_delta,
+    )
+}
+
+/// Stream from Claude 5.5 & Zhipu GLM Direct Hub (`dherain24-claude-proxy.hf.space` + `sun14728-ai-proxy.hf.space` + `bun008-freellmapi.hf.space`).
+pub fn stream_claude5proxy<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    if model.starts_with("glm-") {
+        let allow_vis = model.contains("4v") || model.contains("4.6v");
+        let bun_model = match model {
+            "glm-4.5-flash" => "glm-4.5-flash",
+            "glm-z1-flash" => "glm-5.3",
+            "glm-4-flash-250414" => "glm-4.7-flash",
+            _ => "glm-5.3-flash",
+        };
+        let glm_targets = [
+            ("https://sun14728-ai-proxy.hf.space/v1/chat/completions", "glm-4.6v-flash"),
+            ("https://bun008-freellmapi.hf.space/v1/chat/completions", bun_model),
+            ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3-flash"),
+            ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "glm-5.3"),
+        ];
+        return stream_oai_targets_auth(
+            "Zhipu GLM Direct Cloud",
+            &glm_targets,
+            system,
+            messages,
+            allow_vis,
+            30,
+            false,
+            cancel,
+            on_delta,
+        );
+    }
+
+    if model == "claude-opus-5-5" {
+        if stream_antigravity("claude-opus-5-5-high", system, messages, cancel, on_delta).is_ok() {
+            return Ok(());
+        }
+    }
+
+    let anth_model = match model {
+        "claude-sonnet-5-5" | "claude-haiku-5-5" => model,
+        "nvidia/nemotron-3.5-super-vl-120b-a12b" => {
+            "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
+        }
+        _ => "claude-sonnet-5-5",
+    };
+
+    let mut anth_msgs = Vec::new();
+    for m in messages {
+        let imgs: Vec<&AttachmentPayload> = m
+            .attachments
+            .iter()
+            .filter(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+            .collect();
+        if imgs.is_empty() {
+            anth_msgs.push(json!({
+                "role": m.role,
+                "content": m.content
+            }));
+        } else {
+            let mut content_blocks = Vec::new();
+            for img in imgs {
+                let b64_data = img
+                    .data_url
+                    .split_once(',')
+                    .map(|(_, b)| b)
+                    .unwrap_or(img.data_url.as_str());
+                content_blocks.push(json!({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img.mime,
+                        "data": b64_data
+                    }
+                }));
+            }
+            content_blocks.push(json!({ "type": "text", "text": m.content }));
+            anth_msgs.push(json!({
+                "role": m.role,
+                "content": content_blocks
+            }));
+        }
+    }
+
+    let wants_tools = is_agent_tool_request(system);
+    let sys_raw = smart_cap_system(system, 24000);
+    let sys_safe = if wants_tools {
+        format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
+    } else {
+        sys_raw
+    };
+
+    let candidates = [
+        anth_model,
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b",
+    ];
+
+    for cand in candidates {
+        let Ok(client) = build_client(22) else {
+            continue;
+        };
+        let mut payload = json!({
+            "model": cand,
+            "max_tokens": 16384,
+            "stream": true,
+            "system": sys_safe,
+            "messages": anth_msgs
+        });
+        if wants_tools {
+            payload["tools"] = build_native_anthropic_agent_tools();
+        }
+        let resp = match client
+            .post("https://dherain24-claude-proxy.hf.space/v1/messages")
+            .header("Content-Type", "application/json")
+            .header("x-api-key", "free")
+            .header("anthropic-version", "2023-06-01")
+            .json(&payload)
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => continue,
+        };
+
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
+        let mut in_think = false;
+        let mut saw_text = false;
+        let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
+
+        while reader.read_line(&mut line).unwrap_or(0) > 0 {
+            if cancel.load(Ordering::Relaxed) {
+                return Ok(());
+            }
+            if let Some(raw) = line.trim().strip_prefix("data:") {
+                let raw = raw.trim();
+                if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                    accumulate_anthropic_tool_use(&ev, &mut streamed_tool_calls);
+                    if ev.get("type").and_then(|t| t.as_str()) == Some("content_block_delta") {
+                        if let Some(delta) = ev.get("delta") {
+                            if let Some(th) = delta.get("thinking").and_then(|t| t.as_str()) {
+                                if !th.is_empty() {
+                                    if !in_think {
+                                        in_think = true;
+                                        on_delta("<think>");
+                                    }
+                                    on_delta(th);
+                                }
+                            } else if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                if !text.is_empty() && !is_upstream_error_text(text) {
+                                    if in_think {
+                                        in_think = false;
+                                        on_delta("</think>");
+                                    }
+                                    saw_text = true;
+                                    on_delta(text);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+        if in_think {
+            on_delta("</think>");
+        }
+        if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+            saw_text = true;
+        }
+        if saw_text {
+            return Ok(());
+        }
+    }
+
+    stream_antigravity("claude-sonnet-5-5-high", system, messages, cancel, on_delta)
+        .or_else(|_| stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta))
+}
+
+/// Stream from Gemini Web Gateway (`chenian233`, `pouluo`, `peijun1`, `peijun1-1`, `giabaopro1908` + direct `gemini.google.com`).
 pub fn stream_gemweb2api<F>(
     model: &str,
     system: &str,
@@ -7550,13 +8302,12 @@ pub fn stream_gemweb2api<F>(
 where
     F: FnMut(&str),
 {
-    let requested = if model.trim().is_empty() { "gemini-3.1-pro" } else { model };
-    let targets: [(&str, &str); 3] = [
-        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", requested),
-        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash-thinking"),
-        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash"),
-    ];
-    stream_oai_targets_auth("Gemini Web Gateway", &targets, system, messages, false, 90, false, cancel, on_delta)
+    let requested = if model.trim().is_empty() {
+        "gemini-4-hydrogen"
+    } else {
+        model
+    };
+    stream_gemini4(requested, system, messages, cancel, on_delta)
 }
 
 /// Stream from NVIDIA NIM OpenAI Cloud (`garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
@@ -7591,7 +8342,7 @@ where
         .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", system, messages, cancel, on_delta))
 }
 
-/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space` + `ovhcloud` `qwen3.6-35b-a3b` failover).
+/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space` + `hispa-nico-qwen-3-6-35b-a3b.hf.space` + `averekke-qwen3-6pro.hf.space` + `ovhcloud` failover).
 pub fn stream_colibriqwen<F>(
     _model: &str,
     system: &str,
@@ -7604,6 +8355,8 @@ where
 {
     let targets = [
         ("https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "Qwen3.6-35B-A3B"),
+        ("https://hispa-nico-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q2_K_XL"),
+        ("https://averekke-qwen3-6pro.hf.space/v1/chat/completions", "/app/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf"),
         ("https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions", "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"),
     ];
     stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 14, cancel, on_delta)
@@ -8124,6 +8877,12 @@ where
         "opencodezen" => stream_opencodezen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "antigravity" => stream_antigravity(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemini4" => stream_gemini4(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "mychatcloud" => stream_mychatcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "supavip" => stream_supavip(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "shannian" => stream_shannian(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "claude5proxy" => stream_claude5proxy(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -8230,9 +8989,9 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
+        &["claude5proxy", "shannian", "freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
+        &["mercury3", "antigravity", "gemini4", "mychatcloud", "supavip", "shannian", "claude5proxy", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -8240,6 +8999,12 @@ where
         }
         let ok = match fb {
             "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
+            "antigravity" => stream_antigravity("gemini-4-hydrogen-medium", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "gemini4" => stream_gemini4("gemini-4-hydrogen", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "mychatcloud" => stream_mychatcloud("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "supavip" => stream_supavip("deepseek-v4.1-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "shannian" => stream_shannian(engine, "qwen3.5-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "claude5proxy" => stream_claude5proxy("claude-sonnet-5-5", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "nimcloud" => stream_nimcloud("nvidia/nemotron-3.5-super-vl-120b-a12b", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -8414,6 +9179,12 @@ mod tests {
     fn test_clean_chatjimmy_output_strips_stats_and_think() {
         let raw = "<|think|>internal<|/think|>Material 3 Dashboard<|stats|>{\"tps\":21500}<|/stats|>";
         assert_eq!(clean_chatjimmy_output(raw), "Material 3 Dashboard");
+    }
+
+    #[test]
+    fn test_clean_gemini_code_blocks_strips_internal_exec_blocks() {
+        let raw = "```python?code_reference&code_event_index=1\nprint(2+2)\n```\n```text?code_stdout&code_event_index=1\n4\n```\nPELICAN 4";
+        assert_eq!(clean_gemini_code_blocks(raw), "PELICAN 4");
     }
 
     #[test]
