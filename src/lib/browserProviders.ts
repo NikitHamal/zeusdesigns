@@ -393,6 +393,18 @@ export function resolveBrowserGatewayConfig(
         : modelId === "gemma-4-e2b-q4ks"
         ? "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S"
         : "unsloth/Qwen3.5-4B-GGUF:Q6_K"
+      : providerId === "supavip"
+      ? modelId.startsWith("qwen")
+        ? "supabase-qwen3.7-flash"
+        : "supabase-deepseek-v4.1-flash"
+      : providerId === "shannian"
+      ? modelId === "doubao-seed-2-0-lite-260428"
+        ? "doubao-seed-2-0-mini-260428"
+        : modelId
+      : providerId === "mychatcloud"
+      ? modelId === "gpt-5" || modelId === "gpt-5-mini" || modelId === "o3" || modelId === "o4-mini"
+        ? "gpt-6-luna"
+        : modelId
       : modelId;
 
   return {

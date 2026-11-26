@@ -510,7 +510,7 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             "gemini4".to_string(),
             "gemini-4-hydrogen".to_string(),
         ),
-        "gemini-4-hydrogen-thinking" | "gemini-4-neon" | "gemini-4-neon-thinking" | "gemini-4-carbon" | "gemini-auto" => (
+        "gemini-4-hydrogen-thinking" | "gemini-4-neon" | "gemini-4-neon-thinking" | "gemini-4-carbon" | "gemini-hydrogen" | "gemini-neon" | "gemini-auto" => (
             "gemini4".to_string(),
             trimmed.to_string(),
         ),
@@ -539,25 +539,38 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
         | "gemini-pro-orchestrator-argon"
         | "gemini-pro-orchestrator-neon"
         | "gemini-3.8-flash-high"
+        | "gemini-3.8-flash-medium"
+        | "gemini-3.8-flash-low"
+        | "gemini-3.8-flash-tiered"
+        | "gemini-flash-worker-agy"
         | "claude-opus-5-5-high"
-        | "claude-sonnet-5-5-high" => (
+        | "claude-opus-5-5-medium"
+        | "claude-opus-5-5-low"
+        | "claude-sonnet-5-5-high"
+        | "claude-sonnet-5-5-medium"
+        | "claude-sonnet-5-5-low"
+        | "gpt-oss-120b-medium" => (
             "antigravity".to_string(),
             trimmed.to_string(),
         ),
-        "claude-sonnet-5-5" | "claude-haiku-5-5" => (
+        "claude-sonnet-5-5" | "claude-haiku-5-5" | "claude-opus-5-5" => (
             "claude5proxy".to_string(),
             trimmed.to_string(),
         ),
-        "gpt-6-luna" => (
+        "gpt-6-luna" | "gpt-5" | "gpt-5-mini" | "o3" | "o4-mini" => (
             "mychatcloud".to_string(),
-            "gpt-6-luna".to_string(),
+            trimmed.to_string(),
         ),
         "deepseek-v4.1-flash" | "qwen3.7-flash" => (
             "supavip".to_string(),
             trimmed.to_string(),
         ),
-        "qwen3.5-flash" | "deepseek-v4-flash-vision-exp" => (
+        "qwen3.5-flash" | "deepseek-v4-flash-vision-exp" | "doubao-seed-2-0-lite-260428" | "doubao-seed-2-0-mini-260428" => (
             "shannian".to_string(),
+            trimmed.to_string(),
+        ),
+        "z-ai/glm-5.3-flash" | "minimaxai/minimax-m3.1-flash" | "poolside/laguna-xs-2.1" => (
+            "nimcloud".to_string(),
             trimmed.to_string(),
         ),
         "gemini-3.5-flash" | "gemini/models/gemini-3.5-flash" => (
@@ -568,7 +581,7 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             "freecc".to_string(),
             "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview".to_string(),
         ),
-        "claude-opus-5-5" | "gpt-6.1-sol" | "gpt-6-astra" | "deepseek-v4-flash" => {
+        "gpt-6.1-sol" | "gpt-6-astra" | "deepseek-v4-flash" => {
             ("unikey".to_string(), trimmed.to_string())
         }
         "qwen3.8-flash" => {
