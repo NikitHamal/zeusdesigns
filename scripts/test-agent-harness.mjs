@@ -14,7 +14,13 @@ import { execSync, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 
 const TARGET_MODELS = [
-  // Category A: Native OpenAI / Anthropic `tools` API Gateways
+  // Category A: Native OpenAI / Anthropic `tools` API & Flagship Gateways
+  { providerId: "antigravity", modelId: "gemini-4-hydrogen-medium", baseUrl: "https://w902287-firebase-gemini-proxy.hf.space/ag/v1", apiKey: "sk-antigravity", nativeTools: false, label: "Gemini 4 Hydrogen Medium (Google Antigravity Hub · XML DSL)" },
+  { providerId: "gemini4", modelId: "gemini-4-hydrogen", baseUrl: "https://w902287-firebase-gemini-proxy.hf.space/ag/v1", apiKey: "sk-antigravity", nativeTools: false, label: "Gemini 4 Hydrogen (Google Gemini 4 Cluster + Antigravity · XML DSL)" },
+  { providerId: "mychatcloud", modelId: "gpt-6-luna", baseUrl: "https://w902287-ai-bridge.hf.space/v1", nativeTools: true, label: "GPT-6 Luna Direct (MyChat Cloud · Native OpenAI tools)" },
+  { providerId: "supavip", modelId: "supabase-deepseek-v4.1-flash", baseUrl: "https://w902287-ai-bridge.hf.space/v1", nativeTools: true, label: "DeepSeek V4.1 Flash VIP (Supabase Tongyi VIP · Native OpenAI tools)" },
+  { providerId: "shannian", modelId: "deepseek-v4-flash-vision-exp", baseUrl: "https://w902287-ai-bridge.hf.space/v1", nativeTools: true, label: "DeepSeek V4 Flash Vision VIP (ShanNian VIP · Native OpenAI tools)" },
+  { providerId: "claude5proxy", modelId: "claude-sonnet-5-5", baseUrl: "https://dherain24-claude-proxy.hf.space", nativeTools: true, label: "Claude Sonnet 5.5 (Claude 5.5 Direct Hub · Native Anthropic tool_use)" },
   { providerId: "aibridge", modelId: "gpt-6-luna", baseUrl: "https://w902287-ai-bridge.hf.space/v1", nativeTools: true, label: "GPT-6 Luna (AI Bridge · Native OpenAI tools)" },
   { providerId: "freellmhub", modelId: "glm-5.3", baseUrl: "https://bun008-freellmapi.hf.space/v1", nativeTools: true, label: "GLM 5.3 (FreeLLMHub · Native OpenAI tools + XML)" },
   { providerId: "freellmhub", modelId: "kimi-k2.7-code", baseUrl: "https://bun008-freellmapi.hf.space/v1", nativeTools: true, label: "Kimi K2.7 Code (FreeLLMHub · Native OpenAI tools)" },
@@ -144,6 +150,21 @@ function parseToolCallsFromSegment(clean, strictPlaceholderCheck = false) {
     let p = extractAttr(header, "path") || extractAttr(header, "file") || extractAttr(header, "id") || extractAttr(header, "category") || extractAttr(header, "key") || extractAttr(header, "query") || extractAttr(header, "cmd") || extractAttr(header, "command");
     if (!body) {
       body = extractAttr(header, "content") || extractAttr(header, "text") || extractAttr(header, "fact") || extractAttr(header, "value") || extractAttr(header, "code") || extractAttr(header, "script") || "";
+    }
+    if (/<(?:parameter|param|antml:parameter)\b/i.test(body)) {
+      let bodyOut = "";
+      const paramRe = /<(?:parameter|param|antml:parameter)(?:\s+name=["']?([^"'>]+)["']?|=([^"'>]+))?>([\s\S]*?)<\/(?:parameter|param|antml:parameter)>/gi;
+      let m;
+      let saw = false;
+      while ((m = paramRe.exec(body)) !== null) {
+        saw = true;
+        const pname = (m[1] || m[2] || "").trim();
+        const pval = (m[3] || "").trim();
+        if (["path", "file", "filePath", "id", "category", "url"].includes(pname) && !p) p = pval;
+        else if (["content", "body", "command", "cmd", "script", "code", "query", "pattern", "text", "fact", "value"].includes(pname)) bodyOut = pval;
+        else if (!bodyOut && !p) bodyOut = pval;
+      }
+      if (saw) body = bodyOut;
     }
     if (body.startsWith("{") && body.endsWith("}")) {
       try {
@@ -811,7 +832,8 @@ async function callModel(target, system, messages, mode = "code") {
       case "k2horizon": return callK2Horizon(system, messages, wantsTools);
       case "motif": return callMotif(system, messages, wantsTools);
       case "deepai": return callDeepAI(target.modelId, system, messages, wantsTools);
-      case "freecc": return callFreeCCAnthropic(target.baseUrl, target.modelId, system, messages, wantsTools);
+      case "freecc":
+      case "claude5proxy": return callFreeCCAnthropic(target.baseUrl, target.modelId, system, messages, wantsTools);
       default: return callOpenAICompat(target.baseUrl, target.apiKey, target.modelId, system, messages, target.nativeTools, wantsTools);
     }
   };

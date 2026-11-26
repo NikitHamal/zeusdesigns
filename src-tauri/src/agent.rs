@@ -378,8 +378,8 @@ pub fn parse_inline_invocations_segment(
             .or_else(|| extract_attr(header, "command"))
             .or_else(|| extract_attr(header, "url"))
             .unwrap_or_default();
-        let start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
-        let end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
+        let mut start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
+        let mut end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
         let mut eff_body = if body.is_empty() {
             extract_attr(header, "content")
                 .or_else(|| extract_attr(header, "text"))
@@ -391,6 +391,56 @@ pub fn parse_inline_invocations_segment(
         } else {
             body.to_string()
         };
+
+        // If the model placed `<parameter name="...">...</parameter>` tags inside `<zeus_tool>`, unpack them
+        if eff_body.contains("<parameter") || eff_body.contains("<param") || eff_body.contains("<antml:parameter") {
+            let mut body_out = String::new();
+            let mut saw_params = false;
+            for ptag in ["parameter", "param", "antml:parameter"] {
+                let p_open = format!("<{}", ptag);
+                let p_close = format!("</{}>", ptag);
+                let mut pfrom = 0;
+                while let Some(ps) = eff_body[pfrom..].find(&p_open) {
+                    let pstart = pfrom + ps;
+                    let prest = &eff_body[pstart..];
+                    let Some(pgt) = prest.find('>') else { break };
+                    let phead = &prest[p_open.len()..pgt];
+                    if !phead.is_empty()
+                        && !phead.starts_with(char::is_whitespace)
+                        && !phead.starts_with('=')
+                    {
+                        pfrom = pstart + pgt + 1;
+                        continue;
+                    }
+                    let Some(pend) = prest.find(&p_close) else { break };
+                    let pval = prest[pgt + 1..pend].trim();
+                    let pname = extract_attr(phead, "name")
+                        .or_else(|| {
+                            phead
+                                .trim()
+                                .strip_prefix('=')
+                                .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                        })
+                        .unwrap_or_default();
+                    saw_params = true;
+                    if matches!(pname.as_str(), "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
+                        path_arg = pval.to_string();
+                    } else if pname == "start" {
+                        start_line = pval.parse::<usize>().ok();
+                    } else if pname == "end" {
+                        end_line = pval.parse::<usize>().ok();
+                    } else if matches!(pname.as_str(), "content" | "body" | "command" | "cmd" | "script" | "code" | "query" | "pattern" | "text" | "fact" | "value") {
+                        body_out = pval.to_string();
+                    } else if body_out.is_empty() && path_arg.is_empty() {
+                        body_out = pval.to_string();
+                    }
+                    pfrom = pstart + pend + p_close.len();
+                }
+            }
+            if saw_params {
+                eff_body = body_out;
+            }
+        }
 
         // If the model placed a JSON object inside `<zeus_tool>`, unpack common fields
         if eff_body.starts_with('{') && eff_body.ends_with('}') {

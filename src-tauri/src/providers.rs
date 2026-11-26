@@ -8006,8 +8006,17 @@ where
     } else {
         model
     };
-    if requested == "gemini-4-argon" {
-        if stream_antigravity("gemini-4-argon-medium", system, messages, cancel, on_delta).is_ok() {
+    if requested == "gemini-4-argon" || is_agent_tool_request(system) {
+        let ag_model = match requested {
+            "gemini-4-argon" => "gemini-4-argon-medium",
+            "gemini-4-carbon" | "gemini-3.1-pro" => "gemini-4-carbon-medium",
+            "gemini-4-neon" | "gemini-neon" | "gemini-3.5-flash-thinking" => "gemini-4-neon-medium",
+            "gemini-4-neon-thinking" => "gemini-4-neon-high",
+            "gemini-4-hydrogen-thinking" => "gemini-4-hydrogen-high",
+            "gemini-flash-lite" => "gemini-4-hydrogen-low",
+            _ => "gemini-4-hydrogen-medium",
+        };
+        if stream_antigravity(ag_model, system, messages, cancel, on_delta).is_ok() {
             return Ok(());
         }
     }
