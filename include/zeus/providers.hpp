@@ -24,6 +24,12 @@ enum class ProviderFormat {
     SCRAPER_AIBRIDGE, // AI Bridge Gateway (w902287-ai-bridge.hf.space)
     SCRAPER_HFROUTER, // HF Router Hub (cgjgj-ollamahftraemonitor.hf.space)
     SCRAPER_LITELLMHUB, // LiteLLM Frontier Hub (alchoholpad-litellm.hf.space)
+    SCRAPER_ANTIGRAVITY,// Google Antigravity & Cloud Code Hub (w902287-firebase-gemini-proxy.hf.space/ag/v1)
+    SCRAPER_GEMINI4,    // Google Gemini 4 Direct & 5-Node Cluster (gemini.google.com StreamGenerate + 5-node gemini-web2api)
+    SCRAPER_MYCHATCLOUD,// MyChat Native Direct Cloud (mychat-ai.cloud/api/openapi/turbo-stream)
+    SCRAPER_SUPAVIP,    // Supabase Tongyi VIP Cloud (vdspcxotxhxfjowqndix.supabase.co/functions/v1/translate-proxy)
+    SCRAPER_SHANNIAN,   // ShanNian & Volcengine VIP Gateway (ai.northcity.top)
+    SCRAPER_CLAUDE5PROXY,// Claude 5.5 & Zhipu GLM Direct Hub (dherain24-claude-proxy.hf.space + sun14728-ai-proxy)
     SCRAPER_GEMWEB2API, // Gemini Web Gateway (chenian233-gemini-web2api.hf.space)
     SCRAPER_VIREONIX,   // Vireonix (vireonix.ai/v1) anonymous request-aware router, 1M context
     SCRAPER_OPENCODEZEN,// OpenCode Zen (opencode.ai/zen/v1) free tier, Bearer public
