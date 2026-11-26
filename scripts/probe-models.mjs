@@ -51,8 +51,10 @@ const jobs = [];
 for (const [g, cfg] of Object.entries(GATEWAYS)) {
   if (wanted.length && !wanted.includes(g)) continue;
   const { base, key, only } = typeof cfg === "string" ? { base: cfg } : cfg;
-  const list = await fetch(`${base}/models`, { signal: AbortSignal.timeout(20000) }).then((r) => r.json()).catch(() => null);
-  const ids = (list?.data ?? list ?? []).map((m) => m.id).filter((id) => id && !SKIP.test(id) && (!only || only.test(id)));
+  const headers = key ? { Authorization: `Bearer ${key}` } : {};
+  const list = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(20000) }).then((r) => r.json()).catch(() => null);
+  const arr = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+  const ids = arr.map((m) => (typeof m === "string" ? m : m?.id)).filter((id) => id && !SKIP.test(id) && (!only || only.test(id)));
   if (!ids.length) console.log(`${g}: model list unavailable`);
   for (const id of ids) jobs.push({ g, base, key, id });
 }
