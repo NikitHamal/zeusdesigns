@@ -12,9 +12,11 @@ const BLOCK = /<m3e\b([^>]*)>([\s\S]*?)(?:<\/m3e>|$)/gi;
 export function splitM3e(text: string): { text: string; docs: M3eDoc[] } {
   if (!/<m3e\b/i.test(text)) return { text, docs: [] };
   const docs: M3eDoc[] = [];
-  const clean = text.replace(BLOCK, (all, attrs: string, body: string) => {
-    const title = /title\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? "M3E sketch";
+  const clean = text.replace(BLOCK, (all, attrs: string, body: string, offset: number, whole: string) => {
+    if (offset > 0 && whole[offset - 1] === "`") return all;
     const json = body.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    if (!json.startsWith("{")) return all;
+    const title = /title\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? "M3E sketch";
     docs.push({ title, json, complete: /<\/m3e>\s*$/i.test(all) });
     return "";
   });

@@ -34,22 +34,35 @@ export function parseAttrs(s: string): Record<string, string> {
  * so `<artboard>` or `<artifact>` examples inside code blocks are never parsed as live screens.
  * Adapted from `nexu-io/open-design/apps/web/src/artifacts/markdown-context.ts`.
  */
-export function computeMarkdownCodeSkipRanges(text: string): Array<[number, number]> {
+export function computeMarkdownCodeSkipRanges(text: string, includeInline = true): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
   const fenceRe = /(^|\n)(`{3,}|~{3,})([^\n]*)\n/g;
   let m: RegExpExecArray | null;
   while ((m = fenceRe.exec(text)) !== null) {
     const lang = (m[3] ?? "").trim().toLowerCase();
-    // If the model wrapped a raw <!doctype html> or <artboard> in ```html, allow normalizeStream to unpack it first
-    if (lang === "xml" || lang === "markdown" || lang === "md" || lang === "txt") {
-      const fence = m[2];
-      const start = m.index + m[1].length;
-      const closeIdx = text.indexOf(`\n${fence}`, start + m[0].length - m[1].length);
-      if (closeIdx >= 0) {
-        const end = closeIdx + 1 + fence.length;
-        ranges.push([start, end]);
-        fenceRe.lastIndex = end;
-      }
+    const fence = m[2];
+    const start = m.index + m[1].length;
+    const bodyStart = start + m[0].length - m[1].length;
+    const closeIdx = text.indexOf(`\n${fence}`, bodyStart);
+    const end = closeIdx >= 0 ? closeIdx + 1 + fence.length : text.length;
+    const inner = text.slice(bodyStart, closeIdx >= 0 ? closeIdx : text.length).trim();
+    // Allow top-level ```html fences that wrap a full <!doctype html> or <artboard> document to be unpacked by normalizeStream
+    const isUnpackableHtmlFence =
+      lang === "html" && /^(?:<!doctype\s+html|<html[\s>]|<artboard\b|<artifact\b)/i.test(inner);
+    if (!isUnpackableHtmlFence) {
+      ranges.push([start, end]);
+    }
+    if (closeIdx >= 0) {
+      fenceRe.lastIndex = end;
+    } else {
+      break;
+    }
+  }
+  if (includeInline) {
+    const inlineRe = /`[^`\n]+`/g;
+    let im: RegExpExecArray | null;
+    while ((im = inlineRe.exec(text)) !== null) {
+      ranges.push([im.index, im.index + im[0].length]);
     }
   }
   return ranges;
@@ -65,26 +78,32 @@ function isInsideRanges(pos: number, ranges: Array<[number, number]>): boolean {
 /** Normalize <artifact ...>...</artifact> (OpenDesign/Claude format) or bare HTML documents into <artboard> blocks. */
 export function normalizeStream(full: string): string {
   if (full.includes("<artifact ") || full.includes("<artifact>")) {
+    const skip = computeMarkdownCodeSkipRanges(full, true);
     full = full
-      .replace(/<artifact\b([^>]*)>/gi, (_m, rawAttrs: string) => {
+      .replace(/<artifact\b([^>]*)>/gi, (m, rawAttrs: string, offset: number) => {
+        if (isInsideRanges(offset, skip)) return m;
         const attrs = parseAttrs(rawAttrs);
         const name = (attrs.title || attrs.name || attrs.identifier || "Artifact").replace(/"/g, "'");
         const mode = attrs.mode || "new";
         return `<artboard name="${name}" device="web" mode="${mode}">`;
       })
-      .replace(/<\/artifact>/gi, "</artboard>");
+      .replace(/<\/artifact>/gi, (m, offset: number) => (isInsideRanges(offset, skip) ? m : "</artboard>"));
   }
   if (full.includes("<artboard")) return full;
-  const m = /(```(?:html)?[ \t]*\n)?(<!doctype html|<html[\s>])/i.exec(full);
+  const m = /(^|\n)(```(?:html)?[ \t]*\n)?[ \t]*(<!doctype html|<html[\s>])/i.exec(full);
   if (!m) return full;
-  const rest = full.slice(m.index + (m[1]?.length ?? 0));
+  const matchStart = m.index + (m[1]?.length ?? 0);
+  const skip = computeMarkdownCodeSkipRanges(full, true);
+  if (isInsideRanges(matchStart, skip)) return full;
+  const rest = full.slice(matchStart + (m[2]?.length ?? 0));
+  if (!/<(?:head|body|style|div|main|section)\b/i.test(rest)) return full;
   const title = /<title>([^<]{1,60})<\/title>/i.exec(rest)?.[1]?.trim() || "Screen";
   const open = `<artboard name="${title.replace(/"/g, "'")}" mode="new">\n`;
   const end = /<\/html>/i.exec(rest);
-  if (!end) return full.slice(0, m.index) + open + rest;
+  if (!end) return full.slice(0, matchStart) + open + rest;
   const stop = end.index + end[0].length;
   return (
-    full.slice(0, m.index) +
+    full.slice(0, matchStart) +
     open +
     rest.slice(0, stop) +
     "\n</artboard>" +
@@ -156,6 +175,10 @@ export function extractReasoningFromRaw(
     const lower = working.toLowerCase();
     const closeIdx = lower.indexOf(closeTag);
     if (closeIdx >= 0) {
+      // Ignore `</think>` if it is quoted inside inline backticks (e.g. `` `</think>` ``)
+      const charBefore = closeIdx > 0 ? working[closeIdx - 1] : "";
+      const charAfter = working[closeIdx + closeTag.length] ?? "";
+      if (charBefore === "`" || charAfter === "`") continue;
       const beforeClose = working.slice(0, closeIdx);
       if (!openRe.test(beforeClose)) {
         const orphanText = cleanReasoningProse(beforeClose);
@@ -165,13 +188,16 @@ export function extractReasoningFromRaw(
     }
   }
 
-  // 2. Paired or unclosed-tail reasoning blocks
+  // 2. Paired or unclosed-tail reasoning blocks (ignoring inline-quoted `<think>` tags inside backticks)
   const pairedRe =
     /<(think|thinking|thought|reasoning)\b[^>]*>([\s\S]*?)(<\/\1>|$)|<\|begin_of_thought\|>([\s\S]*?)(<\|end_of_thought\|>|$)|<details\b[^>]*type=["']?reasoning["']?[^>]*>([\s\S]*?)(<\/details>|$)|<\|start\|>assistant<\|channel\|>(?:analysis|thought)(?:<\|message\|>)?([\s\S]*?)(<\|end\|>|<\|start\|>|$)/gi;
 
   working = working.replace(
     pairedRe,
-    (_full, _tag1, body1, close1, body2, close2, body3, close3, body4, close4) => {
+    (fullMatch, _tag1, body1, close1, body2, close2, body3, close3, body4, close4, offset: number, whole: string) => {
+      if (offset > 0 && whole[offset - 1] === "`") {
+        return fullMatch;
+      }
       const content = (body1 ?? body2 ?? body3 ?? body4 ?? "").trim();
       const closeTok = close1 ?? close2 ?? close3 ?? close4 ?? "";
       if (closeTok === "") {
@@ -206,31 +232,49 @@ export function stripToolMarkupFromText(input: string): string {
   const shorthandTags =
     "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
 
+  const notBackticked =
+    (fn: (m: string) => string) =>
+    (m: string, ...args: unknown[]) => {
+      const offset = typeof args[args.length - 2] === "number" ? (args[args.length - 2] as number) : 0;
+      const whole = typeof args[args.length - 1] === "string" ? (args[args.length - 1] as string) : "";
+      if (offset > 0 && whole[offset - 1] === "`") return m;
+      return fn(m);
+    };
+
   return input
     .replace(
       new RegExp(
-        `\`\`\`(?:xml|json|tool_call|bash|sh|python)?\\s*<(?:${shorthandTags})\\b[\\s\\S]*?(?:<\\/(?:${shorthandTags})>|\\/>)\\s*\`\`\``,
+        `\`\`\`(?:xml|json|tool_call|bash|sh|python)?[ \\t]*\\n?\\s*<(?:${shorthandTags})\\b[^\`]*?(?:<\\/(?:${shorthandTags})>|\\/>)[ \\t]*\\n?\`\`\``,
         "gi"
       ),
       ""
     )
     .replace(/<\|start\|>assistant<\|channel\|>commentary[\s\S]*?(?:<\|end\|>|<\|return\|>|<\|call\|>|$)/gi, "")
-    .replace(/<zeus_tool[^>]*\/>/gi, "")
-    .replace(/<(?:read_file|list_dir|delete_file|memory_search)\b[^>]*\/>/gi, "")
-    .replace(/<zeus_tool[\s\S]*?(<\/zeus_tool>|$)/gi, "")
-    .replace(/<tool_call[\s\S]*?(<\/tool_call>|$)/gi, "")
-    .replace(/<function_call[\s\S]*?(<\/function_call>|$)/gi, "")
-    .replace(/<function(?:=|\s+name=)[\s\S]*?(<\/function>|$)/gi, "")
-    .replace(/<(?:antml:)?invoke\s+name=[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, "")
-    .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, "")
-    .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, "")
+    .replace(/<zeus_tool[^>]*\/>/gi, notBackticked(() => ""))
+    .replace(/<(?:read_file|list_dir|delete_file|memory_search)\b[^>]*\/>/gi, notBackticked(() => ""))
+    .replace(/<zeus_tool(?:\s+[^>]*|\s*)>[\s\S]*?(<\/zeus_tool>|$)/gi, notBackticked(() => ""))
+    .replace(/<tool_call>[\s\S]*?(<\/tool_call>|$)/gi, notBackticked(() => ""))
+    .replace(/<function_call>[\s\S]*?(<\/function_call>|$)/gi, notBackticked(() => ""))
+    .replace(/<function(?:=|\s+name=)[^>]*>[\s\S]*?(<\/function>|$)/gi, notBackticked(() => ""))
+    .replace(/<(?:antml:)?invoke\s+name=[^>]*>[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, notBackticked(() => ""))
+    .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, notBackticked(() => ""))
+    .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, notBackticked(() => ""))
     .replace(/<\|open\|>tools[\s\S]*?(?:<\|close\|>tools(?:<\|sep\|>)?|$)/gi, "")
     .replace(/<\|open\|>call[\s\S]*?(?:<\|close\|>call(?:<\|sep\|>)?|$)/gi, "")
     .replace(
-      /<(bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(?:\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
-      ""
+      /<(bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
+      (m, _tag: string, attrs: string | undefined, closeTok: string | undefined, offset: number, whole: string) => {
+        if (offset > 0 && whole[offset - 1] === "`") return m;
+        // If there is no closing tag yet, only strip if it starts on its own line or has tool attributes (not inline prose)
+        if (!closeTok && !attrs) {
+          const lineStart = whole.lastIndexOf("\n", offset - 1) + 1;
+          const prefixOnLine = whole.slice(lineStart, offset).trim();
+          if (prefixOnLine.length > 0) return m;
+        }
+        return "";
+      }
     )
-    .replace(/<\/?(?:think|thinking|thought|reasoning|zeus_tool|tool_call|function_call)\b[^>]*>/gi, "");
+    .replace(/<\/?(?:think|thinking|thought|reasoning|zeus_tool|tool_call|function_call)\b[^>]*>/gi, notBackticked(() => ""));
 }
 
 export function parseStream(
@@ -239,7 +283,7 @@ export function parseStream(
 ): ParsedStreamResult {
   const { withoutReasoning, reasoning, thinkOpen } = extractReasoningFromRaw(rawFull, extraThink);
   const full = normalizeStream(stripToolMarkupFromText(withoutReasoning));
-  const skipRanges = computeMarkdownCodeSkipRanges(full);
+  const skipRanges = computeMarkdownCodeSkipRanges(full, true);
 
   let text = "";
   const blocks: ParsedBlock[] = [];
@@ -257,7 +301,10 @@ export function parseStream(
     }
     text += full.slice(i, s);
     const gt = full.indexOf(">", s);
-    if (gt < 0) break;
+    if (gt < 0) {
+      text += full.slice(s);
+      break;
+    }
     const attrs = parseAttrs(full.slice(s + 9, gt));
     const e = full.indexOf("</artboard>", gt + 1);
     const clean = (h: string) =>
@@ -275,12 +322,16 @@ export function parseStream(
       const candidate = clean(full.slice(gt + 1));
       if (isRealHtmlBlock(candidate, attrs)) {
         blocks.push({ attrs, html: candidate, closed: false });
+      } else {
+        text += full.slice(s);
       }
       break;
     }
     const candidate = clean(full.slice(gt + 1, e));
     if (isRealHtmlBlock(candidate, attrs)) {
       blocks.push({ attrs, html: candidate, closed: true });
+    } else {
+      text += full.slice(s, e + 11);
     }
     i = e + 11;
   }
