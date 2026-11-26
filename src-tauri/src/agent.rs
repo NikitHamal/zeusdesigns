@@ -94,9 +94,19 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
         ("<reasoning>", "</reasoning>"),
         ("<|begin_of_thought|>", "<|end_of_thought|>"),
     ] {
+        let mut search_from = 0usize;
         loop {
             let lower = out.to_ascii_lowercase();
-            let Some(start) = lower.find(open_tag) else { break };
+            if search_from >= lower.len() {
+                break;
+            }
+            let Some(rel_start) = lower[search_from..].find(open_tag) else { break };
+            let start = search_from + rel_start;
+            // Ignore `<think>` if quoted inside inline backticks (e.g. `` `<think>` ``)
+            if start > 0 && out.as_bytes()[start - 1] == b'`' {
+                search_from = start + open_tag.len();
+                continue;
+            }
             let after_open = start + open_tag.len();
             if let Some(rel_end) = lower[after_open..].find(close_tag) {
                 let end = after_open + rel_end + close_tag.len();
@@ -111,6 +121,9 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
     for close_tag in ["</think>", "</thinking>", "</thought>", "</reasoning>", "<|end_of_thought|>"] {
         let lower = out.to_ascii_lowercase();
         if let Some(end_idx) = lower.find(close_tag) {
+            if end_idx > 0 && out.as_bytes()[end_idx - 1] == b'`' {
+                continue;
+            }
             let drain_to = end_idx + close_tag.len();
             out.replace_range(0..drain_to, "");
         }
@@ -649,6 +662,10 @@ pub fn parse_inline_invocations_segment(
             let mut from = 0;
             while let Some(rel_s) = clean_text[from..].find(&open_pat) {
                 let start = from + rel_s;
+                if start > 0 && clean_text.as_bytes()[start - 1] == b'`' {
+                    from = start + open_pat.len();
+                    continue;
+                }
                 let rest = &clean_text[start..];
                 let Some(gt) = rest.find('>') else { break };
                 let header = &rest[open_pat.len()..gt];
@@ -664,7 +681,7 @@ pub fn parse_inline_invocations_segment(
                     ("", start + gt + 1)
                 } else if let Some(end_rel) = rest.find(&close_pat) {
                     (rest[gt + 1..end_rel].trim(), start + end_rel + close_pat.len())
-                } else if allow_unclosed_tail && rest.len() > gt + 2 {
+                } else if allow_unclosed_tail && rest.len() > gt + 2 && !header.trim().is_empty() {
                     (rest[gt + 1..].trim(), clean_text.len())
                 } else {
                     break;

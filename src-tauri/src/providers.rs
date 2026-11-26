@@ -212,11 +212,17 @@ pub fn normalize_multi_turn_messages(
     } else {
         0
     };
+    let has_xml_prefill = messages
+        .first()
+        .map(|m| m.content.contains("[XML DSL Output Mode"))
+        .unwrap_or(false);
 
     let mut normalized: Vec<ChatMessage> = Vec::new();
 
     for (idx, m) in messages.iter().enumerate() {
-        if idx > 0 && idx < keep_from {
+        // Always keep idx 0..=2 when the synthetic XML DSL prefill is present so the user's real request at idx == 2 is never dropped
+        let is_protected_initial = idx == 0 || (has_xml_prefill && idx <= 2);
+        if !is_protected_initial && idx < keep_from {
             continue;
         }
         let role = if m.role == "assistant" {
@@ -2982,8 +2988,8 @@ pub fn stream_mercury3<F>(
 where
     F: FnMut(&str),
 {
-    let has_tool_results = messages.iter().any(|m| m.content.contains("<tool_result"));
-    let inc_effort = if has_tool_results {
+    let real_tool_rounds = messages.iter().filter(|m| m.content.contains("<tool_result")).count();
+    let inc_effort = if real_tool_rounds > 1 {
         "low"
     } else {
         match effort {
@@ -4227,6 +4233,7 @@ where
     let mut line = String::new();
     let mut saw_text = false;
     let mut in_think = false;
+    let mut seen_summary_thoughts = 0usize;
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -4241,7 +4248,39 @@ where
                 {
                     let phase = delta.get("phase").and_then(|p| p.as_str()).unwrap_or("answer");
                     let content = delta.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                    if (phase == "think" || phase == "thinking") && !content.is_empty() {
+                    let r_extra = delta
+                        .get("reasoning_content")
+                        .or_else(|| delta.get("reasoning"))
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("");
+                    if phase == "thinking_summary" {
+                        if let Some(items) = delta
+                            .get("extra")
+                            .and_then(|e| e.get("summary_thought"))
+                            .and_then(|s| s.get("content"))
+                            .and_then(|c| c.as_array())
+                        {
+                            for item in items.iter().skip(seen_summary_thoughts) {
+                                if let Some(t_str) = item.as_str() {
+                                    if !t_str.trim().is_empty() {
+                                        if !in_think {
+                                            in_think = true;
+                                            on_delta("<think>");
+                                        }
+                                        on_delta(t_str);
+                                        on_delta("\n");
+                                    }
+                                }
+                            }
+                            seen_summary_thoughts = seen_summary_thoughts.max(items.len());
+                        }
+                    } else if !r_extra.is_empty() {
+                        if !in_think {
+                            in_think = true;
+                            on_delta("<think>");
+                        }
+                        on_delta(r_extra);
+                    } else if (phase == "think" || phase == "thinking" || phase == "thought") && !content.is_empty() {
                         if !in_think {
                             in_think = true;
                             on_delta("<think>");
@@ -4459,7 +4498,8 @@ fn url_encode(input: &str) -> String {
     out
 }
 
-/// Strip internal Gemini Web code execution blocks (` ```python?code_reference...``` ` and ` ```text?code_stdout...``` `).
+/// Strip internal Gemini Web code execution blocks (` ```python?code_reference...``` ` and ` ```text?code_stdout...``` `),
+/// including unclosed trailing internal blocks during mid-stream snapshots so `prev_text` prefix matching never breaks.
 pub fn clean_gemini_code_blocks(raw: &str) -> String {
     let mut out = raw.to_string();
     for marker in [
@@ -4477,6 +4517,7 @@ pub fn clean_gemini_code_blocks(raw: &str) -> String {
                 }
                 out.replace_range(start..end, "");
             } else {
+                out.truncate(start);
                 break;
             }
         }
@@ -4605,6 +4646,9 @@ where
                                                     for t_val in texts {
                                                         if let Some(snap_raw) = t_val.as_str() {
                                                             let snap = clean_gemini_code_blocks(snap_raw);
+                                                            if snap.is_empty() {
+                                                                continue;
+                                                            }
                                                             if snap.len() > prev_text.len() && snap.starts_with(&prev_text) {
                                                                 let delta = &snap[prev_text.len()..];
                                                                 if !delta.is_empty() {
@@ -4615,6 +4659,38 @@ where
                                                             } else if prev_text.is_empty() && !snap.trim().is_empty() {
                                                                 saw_any = true;
                                                                 on_delta(&snap);
+                                                                prev_text = snap;
+                                                            } else if snap.len() > prev_text.len() {
+                                                                // Handle Gemini StreamGenerate snapshot rewrites (e.g. markdown backticks/links)
+                                                                // without ever freezing at the first snapshot ("The `").
+                                                                let common_bytes = prev_text
+                                                                    .chars()
+                                                                    .zip(snap.chars())
+                                                                    .take_while(|(a, b)| a == b)
+                                                                    .map(|(a, _)| a.len_utf8())
+                                                                    .sum::<usize>();
+                                                                let tail_anchor: String = prev_text
+                                                                    .chars()
+                                                                    .rev()
+                                                                    .take(12)
+                                                                    .collect::<Vec<_>>()
+                                                                    .into_iter()
+                                                                    .rev()
+                                                                    .collect();
+                                                                let resume_from = if !tail_anchor.is_empty() {
+                                                                    snap.rfind(&tail_anchor)
+                                                                        .map(|pos| pos + tail_anchor.len())
+                                                                        .unwrap_or(common_bytes)
+                                                                } else {
+                                                                    common_bytes
+                                                                };
+                                                                if resume_from < snap.len() {
+                                                                    let delta = &snap[resume_from..];
+                                                                    if !delta.is_empty() {
+                                                                        saw_any = true;
+                                                                        on_delta(delta);
+                                                                    }
+                                                                }
                                                                 prev_text = snap;
                                                             }
                                                         }
@@ -6924,7 +7000,45 @@ fn is_agent_tool_request(system: &str) -> bool {
 }
 
 fn scraper_xml_dsl_banner() -> &'static str {
-    "[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local Zeus Codes C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown ```bash code blocks.\nWhenever an action is needed, translate the request into a raw XML tag outside <think>:\n- <zeus_tool name=\"shell\">command</zeus_tool>\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete content</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>."
+    "[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local Zeus Codes C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown ```bash code blocks.\nFirst write a brief step-by-step reasoning trace inside <think>...</think>, and whenever a workspace action is needed, emit a raw XML tag outside <think>:\n- <zeus_tool name=\"shell\">command</zeus_tool>\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete content</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>."
+}
+
+/// Extract reasoning text from any OpenAI/vLLM/OpenRouter/Kilo/Tongyi/ShanNian/Anthropic-bridge delta object.
+fn extract_delta_reasoning(d: &Value) -> String {
+    for key in ["reasoning_content", "reasoning", "thinking", "thought"] {
+        if let Some(val) = d.get(key) {
+            if let Some(s) = val.as_str() {
+                if !s.is_empty() {
+                    return s.to_string();
+                }
+            } else if let Some(obj) = val.as_object() {
+                for subk in ["text", "content", "thinking", "summary"] {
+                    if let Some(s) = obj.get(subk).and_then(|v| v.as_str()) {
+                        if !s.is_empty() {
+                            return s.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if let Some(details) = d.get("reasoning_details").and_then(|v| v.as_array()) {
+        let mut combined = String::new();
+        for item in details {
+            if let Some(s) = item
+                .get("text")
+                .or_else(|| item.get("thinking"))
+                .or_else(|| item.get("summary"))
+                .and_then(|v| v.as_str())
+            {
+                combined.push_str(s);
+            }
+        }
+        if !combined.is_empty() {
+            return combined;
+        }
+    }
+    String::new()
 }
 
 fn accumulate_oai_tool_calls(d: &Value, streamed_tool_calls: &mut Vec<(String, String, String)>) {
@@ -7299,7 +7413,7 @@ where
     let norm_messages = if deep {
         normalize_multi_turn_messages(messages, 60, 24000, 160000)
     } else {
-        normalize_multi_turn_messages(messages, 10, 3200, 22000)
+        normalize_multi_turn_messages(messages, 20, 5000, 36000)
     };
     let has_freellmhub = targets.iter().any(|(ep, _)| ep.contains("bun008-freellmapi"));
     let mut oai_msgs = Vec::new();
@@ -7385,7 +7499,7 @@ where
                         }),
                         json!({
                             "role": "assistant",
-                            "content": "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
+                            "content": "<think>Workspace is connected. I will check the directory listing first.</think>\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
                         }),
                     ],
                 );
@@ -7395,13 +7509,13 @@ where
                     if let Some(orig) = last_m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()) {
                         if endpoint.contains("gemini-web2api") && !orig.contains("[XML DSL Output Mode") {
                             last_m["content"] = json!(format!(
-                                "{}\n\n{}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                                "{}\n\n{}\n(First think briefly inside <think>...</think>, then if a workspace action is needed, output the <zeus_tool> XML tag outside <think>.)",
                                 scraper_xml_dsl_banner(),
                                 orig
                             ));
                         } else if !orig.contains("<tool_result") && !orig.contains("[XML DSL") {
                             last_m["content"] = json!(format!(
-                                "{}\n\n[XML DSL Reminder: If this request needs a shell command, python script, file read/write/edit, or memory lookup, emit ONLY the <zeus_tool> XML block outside <think> and stop immediately.]",
+                                "{}\n\n[XML DSL Reminder: First write your brief reasoning inside <think>...</think>, then if this request needs a shell command, python script, file read/write/edit, or memory lookup, emit the <zeus_tool> XML block outside <think> and stop immediately.]",
                                 orig
                             ));
                         }
@@ -7415,6 +7529,9 @@ where
             "max_tokens": max_tok,
             "messages": target_msgs
         });
+        if endpoint.contains("ai.northcity.top") {
+            payload["enable_thinking"] = json!(true);
+        }
         if wants_agent_tools && supports_native_oai_tools {
             payload["tools"] = build_native_oai_agent_tools();
         }
@@ -7462,18 +7579,14 @@ where
                     if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                         let delta = choice.get("delta").or_else(|| choice.get("message"));
                         if let Some(d) = delta {
-                            let r_text = d
-                                .get("reasoning_content")
-                                .or_else(|| d.get("reasoning"))
-                                .and_then(|t| t.as_str())
-                                .unwrap_or("");
+                            let r_text = extract_delta_reasoning(d);
                             if !r_text.is_empty() {
                                 if !in_think {
                                     in_think = true;
                                     on_delta("<think>");
                                 }
-                                on_delta(r_text);
-                                fallback_reason.push_str(r_text);
+                                on_delta(&r_text);
+                                fallback_reason.push_str(&r_text);
                             }
                             if let Some(tcs) = d.get("tool_calls").and_then(|v| v.as_array()) {
                                 for (pos, tc) in tcs.iter().enumerate() {
@@ -7565,8 +7678,77 @@ where
             continue;
         }
         if !saw_text && !fallback_reason.trim().is_empty() && !is_upstream_error_text(&fallback_reason) {
-            // Never re-emit `fallback_reason` outside `<think>` because it was already streamed inside `<think>...</think>`.
-            // Only mark `saw_text = true` so `agent.rs` can inspect `<think>` via end-of-stream tool fallback if a tool call was placed inside reasoning.
+            // If the upstream reasoning model cut off right after `<think>` without emitting visible content or tool calls,
+            // issue an immediate continuation request with thinking disabled so the user always gets a complete answer.
+            if !fallback_reason.contains("<zeus_tool")
+                && !fallback_reason.contains("<tool_call>")
+                && !cancel.load(Ordering::Relaxed)
+            {
+                let mut cont_msgs = target_msgs.clone();
+                let summary: String = fallback_reason.chars().take(1200).collect();
+                cont_msgs.push(json!({
+                    "role": "assistant",
+                    "content": format!("<think>{}</think>", summary)
+                }));
+                cont_msgs.push(json!({
+                    "role": "user",
+                    "content": "You finished your internal reasoning. Now output your complete visible answer to the user (or the next <zeus_tool> XML block if a workspace action is required) outside <think>."
+                }));
+                let mut cont_payload = json!({
+                    "model": upstream_model,
+                    "stream": true,
+                    "max_tokens": max_tok,
+                    "messages": cont_msgs
+                });
+                if endpoint.contains("ai.northcity.top") {
+                    cont_payload["enable_thinking"] = json!(false);
+                }
+                if wants_agent_tools && supports_native_oai_tools {
+                    cont_payload["tools"] = build_native_oai_agent_tools();
+                }
+                let mut rb2 = client
+                    .post(endpoint)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "text/event-stream, application/json");
+                if let Some(token) = bearer {
+                    rb2 = rb2.header("Authorization", format!("Bearer {}", token));
+                }
+                if let Ok(r2) = rb2.json(&cont_payload).send() {
+                    if r2.status().is_success() {
+                        let mut reader2 = BufReader::new(r2);
+                        let mut line2 = String::new();
+                        let mut cont_tcs: Vec<(String, String, String)> = Vec::new();
+                        while reader2.read_line(&mut line2).unwrap_or(0) > 0 {
+                            if cancel.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            let tr2 = line2.trim();
+                            if let Some(raw2) = tr2.strip_prefix("data:").map(|s| s.trim()) {
+                                if raw2 == "[DONE]" {
+                                    break;
+                                }
+                                if let Ok(ev2) = serde_json::from_str::<Value>(raw2) {
+                                    if let Some(ch2) = ev2.get("choices").and_then(|c| c.get(0)) {
+                                        if let Some(d2) = ch2.get("delta").or_else(|| ch2.get("message")) {
+                                            accumulate_oai_tool_calls(d2, &mut cont_tcs);
+                                            if let Some(t2) = d2.get("content").and_then(|t| t.as_str()) {
+                                                if !t2.is_empty() && !is_upstream_error_text(t2) {
+                                                    saw_text = true;
+                                                    on_delta(t2);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            line2.clear();
+                        }
+                        if flush_oai_tool_calls(&cont_tcs, on_delta) {
+                            saw_text = true;
+                        }
+                    }
+                }
+            }
             saw_text = true;
         }
         if saw_text {
@@ -7775,10 +7957,9 @@ where
     } else {
         "gemini-4-hydrogen-low"
     };
-    let targets: [(&str, &str); 3] = [
+    let targets: [(&str, &str); 2] = [
         (EP, requested),
         (EP, secondary),
-        (EP, "gemini-4-hydrogen-medium"),
     ];
     stream_oai_targets_bearer(
         "Google Antigravity & Cloud Code Hub",
@@ -7786,7 +7967,7 @@ where
         system,
         messages,
         true,
-        35,
+        15,
         Some("sk-antigravity"),
         cancel,
         on_delta,
@@ -7931,9 +8112,6 @@ where
     }
     if wants_tools {
         payload["tools"] = build_native_oai_agent_tools();
-        if eff_model == "gpt-6-luna" {
-            payload["reasoning_effort"] = json!("none");
-        }
     }
 
     let enc_token = generate_mychat_encryption_token(now_secs());
@@ -8071,6 +8249,7 @@ where
             "messages": oai_msgs,
             "temperature": 0.3,
             "max_tokens": 8192,
+            "enable_thinking": true,
             "stream": true
         });
         if wants_tools {
@@ -8114,17 +8293,13 @@ where
                     if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                         let delta = choice.get("delta").or_else(|| choice.get("message"));
                         if let Some(d) = delta {
-                            let r_text = d
-                                .get("reasoning_content")
-                                .or_else(|| d.get("reasoning"))
-                                .and_then(|t| t.as_str())
-                                .unwrap_or("");
+                            let r_text = extract_delta_reasoning(d);
                             if !r_text.is_empty() {
                                 if !in_think {
                                     in_think = true;
                                     on_delta("<think>");
                                 }
-                                on_delta(r_text);
+                                on_delta(&r_text);
                             }
                             accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                             if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
@@ -9209,8 +9384,14 @@ where
                     stream_ptero("agnes-2.5-flash:agnes", &req.system, &req.messages, cancel, &mut on_delta)
                         .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", &req.system, &req.messages, cancel, &mut on_delta))
                 } else {
-                    stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta)
+                    let supa_qwen = match req.model.as_str() {
+                        "qwen4-max" | "qwen3.8-max" | "qwen3.7-flash" => req.model.as_str(),
+                        _ => "qwen4-max",
+                    };
+                    stream_supavip(supa_qwen, &req.system, &req.messages, cancel, &mut on_delta)
+                        .or_else(|_| stream_shannian(engine, "qwen3.5-flash", &req.system, &req.messages, cancel, &mut on_delta))
                         .or_else(|_| stream_colibriqwen("Qwen3.6-35B-A3B", &req.system, &req.messages, cancel, &mut on_delta))
+                        .or_else(|_| stream_deepai("qwen3.8-flash", &req.system, &req.messages, cancel, &mut on_delta))
                 }
             }),
         "chatjimmy" => {

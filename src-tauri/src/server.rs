@@ -928,15 +928,56 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
     (system_parts.join("\n\n"), chat_msgs)
 }
 
-/// Split `<think>...</think>` and `<thinking>...</thinking>` blocks from raw model output into `(reasoning, answer)`.
+/// Split `<think>...</think>`, `<thinking>...</thinking>`, `<thought>...</thought>`, `<reasoning>...</reasoning>`,
+/// `<|begin_of_thought|>...<|end_of_thought|>`, and orphan closing `</think>` blocks from raw model output into `(reasoning, answer)`.
 pub fn split_thinking_and_content(raw: &str) -> (String, String) {
     let mut reasoning = Vec::new();
     let mut rest = raw.to_string();
 
-    for (open_tag, close_tag) in [("<think>", "</think>"), ("<thinking>", "</thinking>")] {
+    // 1. Handle orphan closing tags when an upstream template pre-opened `<think>` on the server
+    for (open_tag, close_tag) in [
+        ("<think>", "</think>"),
+        ("<thinking>", "</thinking>"),
+        ("<thought>", "</thought>"),
+        ("<reasoning>", "</reasoning>"),
+        ("<|begin_of_thought|>", "<|end_of_thought|>"),
+    ] {
+        let lower = rest.to_ascii_lowercase();
+        if let Some(close_idx) = lower.find(close_tag) {
+            if close_idx > 0 && rest.as_bytes()[close_idx - 1] == b'`' {
+                continue;
+            }
+            let before = &lower[..close_idx];
+            if !before.contains(open_tag) {
+                let orphan = rest[..close_idx].trim();
+                if !orphan.is_empty() {
+                    reasoning.push(orphan.to_string());
+                }
+                rest.replace_range(0..close_idx + close_tag.len(), "");
+            }
+        }
+    }
+
+    // 2. Handle paired or unclosed-tail reasoning blocks (ignoring backtick-quoted tags)
+    for (open_tag, close_tag) in [
+        ("<think>", "</think>"),
+        ("<thinking>", "</thinking>"),
+        ("<thought>", "</thought>"),
+        ("<reasoning>", "</reasoning>"),
+        ("<|begin_of_thought|>", "<|end_of_thought|>"),
+    ] {
+        let mut search_from = 0usize;
         loop {
             let lower = rest.to_ascii_lowercase();
-            let Some(start) = lower.find(open_tag) else { break };
+            if search_from >= lower.len() {
+                break;
+            }
+            let Some(rel_start) = lower[search_from..].find(open_tag) else { break };
+            let start = search_from + rel_start;
+            if start > 0 && rest.as_bytes()[start - 1] == b'`' {
+                search_from = start + open_tag.len();
+                continue;
+            }
             let after_open = start + open_tag.len();
             if let Some(end_rel) = lower[after_open..].find(close_tag) {
                 let end = after_open + end_rel;
@@ -1238,30 +1279,57 @@ fn strip_tool_xml_for_oc(raw: &str) -> String {
         ("<invoke", "</invoke>"),
         ("<ifm|tool_calls>", "</ifm|tool_calls>"),
         ("<ifm|tool_call>", "</ifm|tool_call>"),
-        ("<bash>", "</bash>"),
-        ("<shell>", "</shell>"),
-        ("<python>", "</python>"),
-        ("<memory_search>", "</memory_search>"),
+        ("<bash", "</bash>"),
+        ("<shell", "</shell>"),
+        ("<python", "</python>"),
+        ("<read_file", "</read_file>"),
+        ("<write_file", "</write_file>"),
+        ("<edit_file", "</edit_file>"),
+        ("<delete_file", "</delete_file>"),
+        ("<search_code", "</search_code>"),
+        ("<list_dir", "</list_dir>"),
+        ("<web_fetch", "</web_fetch>"),
+        ("<memory_search", "</memory_search>"),
         ("<memory_save", "</memory_save>"),
         ("<memory_edit", "</memory_edit>"),
         ("<memory_delete", "</memory_delete>"),
     ] {
+        let mut search_from = 0usize;
         loop {
-            let Some(start) = out.find(open_tag) else { break };
+            if search_from >= out.len() {
+                break;
+            }
+            let Some(rel_start) = out[search_from..].find(open_tag) else { break };
+            let start = search_from + rel_start;
+            // Never strip or truncate if the tag is inside inline backticks (e.g. `` `<bash>` ``)
+            if start > 0 && out.as_bytes()[start - 1] == b'`' {
+                search_from = start + open_tag.len();
+                continue;
+            }
             let rest = &out[start..];
-            if open_tag == "<zeus_tool" {
-                if let Some(gt) = rest.find('>') {
-                    if rest[..gt].trim_end().ends_with('/') {
-                        out.replace_range(start..start + gt + 1, "");
-                        continue;
-                    }
+            if let Some(gt) = rest.find('>') {
+                let header = &rest[open_tag.len()..gt];
+                if !open_tag.ends_with('>')
+                    && !header.is_empty()
+                    && !header.starts_with(char::is_whitespace)
+                    && !header.starts_with('/')
+                    && !header.starts_with('=')
+                {
+                    search_from = start + gt + 1;
+                    continue;
+                }
+                if rest[..gt].trim_end().ends_with('/') {
+                    out.replace_range(start..start + gt + 1, "");
+                    continue;
                 }
             }
             if let Some(rel_end) = rest.find(close_tag) {
                 out.replace_range(start..start + rel_end + close_tag.len(), "");
-            } else {
+            } else if matches!(open_tag, "<zeus_tool" | "<tool_call>" | "<function_call>" | "<ifm|tool_call>") {
                 out.truncate(start);
                 break;
+            } else {
+                search_from = start + open_tag.len();
             }
         }
     }
@@ -1409,13 +1477,13 @@ fn handle_opencode_session_message(
             },
             ChatMessage {
                 role: "assistant".to_string(),
-                content: "<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>".to_string(),
+                content: "<think>Workspace is connected. I will check the directory listing first, then reason inside <think>...</think> and execute the required <zeus_tool> actions.</think>\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>".to_string(),
                 attachments: Vec::new(),
             },
             ChatMessage {
                 role: "user".to_string(),
                 content: format!(
-                    "Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n{}\n</tool_result>\n\nUser request: {}\n(Emit <zeus_tool name=\"shell\">...</zeus_tool>, <zeus_tool name=\"python\">...</zeus_tool>, <zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>, <zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>, <zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>, or <zeus_tool name=\"memory_search\">...</zeus_tool> outside <think> now to execute this request.)",
+                    "Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n{}\n</tool_result>\n\nUser request: {}\n(First write your brief step-by-step reasoning inside <think>...</think>, then emit <zeus_tool name=\"shell\">...</zeus_tool>, <zeus_tool name=\"python\">...</zeus_tool>, <zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>, <zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>, <zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>, or <zeus_tool name=\"memory_search\">...</zeus_tool> outside <think> to execute this request.)",
                     top_listing, orig_user
                 ),
                 attachments: Vec::new(),
@@ -1424,7 +1492,7 @@ fn handle_opencode_session_message(
     }
 
     let tool_sys = format!(
-        "You are Zeus running inside the ZeusDesigns Native OpenCode SDK Agent Runtime.\nOpen project folder: {}.\n## Agent tools\nEmit tool blocks outside <think> and stop immediately after </zeus_tool>:\n- <zeus_tool name=\"shell\">command</zeus_tool> (alias: name=\"bash\")\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete file content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nexisting\\n=======\\nreplacement\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>",
+        "You are Zeus running inside the ZeusDesigns Native OpenCode SDK Agent Runtime.\nOpen project folder: {}.\n## Agent tools\nFirst write a concise reasoning trace inside <think>...</think>, then emit tool blocks outside <think> and stop immediately after </zeus_tool>:\n- <zeus_tool name=\"shell\">command</zeus_tool> (alias: name=\"bash\")\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete file content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nexisting\\n=======\\nreplacement\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>",
         eff_dir
     );
     let system_prompt = if custom_sys.trim().is_empty() {
@@ -1433,9 +1501,16 @@ fn handle_opencode_session_message(
         format!("{}\n\n{}", custom_sys, tool_sys)
     };
 
+    let req_effort = req_json
+        .get("effort")
+        .and_then(|e| e.as_str())
+        .unwrap_or("high")
+        .to_string();
+
     let mut final_clean_answer = String::new();
+    let mut final_reasoning = String::new();
     let mut nudged = false;
-    for round in 0..12usize {
+    for round in 0..14usize {
         if cancel_flag.load(Ordering::Relaxed) {
             break;
         }
@@ -1443,7 +1518,7 @@ fn handle_opencode_session_message(
             request_id: format!("oc-{}-{}", session_id, round),
             provider: provider_id.clone(),
             model: upstream_model.clone(),
-            effort: "medium".to_string(),
+            effort: if round > 0 { "low".to_string() } else { req_effort.clone() },
             system: system_prompt.clone(),
             messages: history.clone(),
             workspace_root: if workdir.is_empty() { None } else { Some(workdir.clone()) },
@@ -1507,6 +1582,15 @@ fn handle_opencode_session_message(
             break;
         }
 
+        if !prev_rsn.trim().is_empty() {
+            if final_reasoning.is_empty() {
+                final_reasoning = prev_rsn.trim().to_string();
+            } else if !final_reasoning.contains(prev_rsn.trim()) {
+                final_reasoning.push_str("\n\n");
+                final_reasoning.push_str(prev_rsn.trim());
+            }
+        }
+
         let clean_no_think = crate::agent::strip_thinking_blocks(&round_raw);
         let mut invocations = crate::agent::parse_inline_invocations_segment(&clean_no_think, true, true);
         if invocations.is_empty() && clean_no_think.trim().len() < 80 {
@@ -1539,18 +1623,31 @@ fn handle_opencode_session_message(
         }
 
         if invocations.is_empty() {
-            if !is_greeting && !nudged && round == 0 {
+            if !is_greeting && !nudged && (round == 0 || vis_final.trim().is_empty()) {
                 nudged = true;
-                history.push(ChatMessage {
-                    role: "assistant".to_string(),
-                    content: "Understood. I will emit the `<zeus_tool>` XML block now to execute the workspace action directly.".to_string(),
-                    attachments: Vec::new(),
-                });
-                history.push(ChatMessage {
-                    role: "user".to_string(),
-                    content: "Your reply stopped after planning without emitting a `<zeus_tool>` block, so no command or file operation ran. Output ONLY `<zeus_tool name=\"shell\">...</zeus_tool>`, `<zeus_tool name=\"python\">...</zeus_tool>`, `<zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>`, `<zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>`, or `<zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>` now.".to_string(),
-                    attachments: Vec::new(),
-                });
+                if round == 0 {
+                    history.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: "Understood. I will emit the `<zeus_tool>` XML block now to execute the workspace action directly.".to_string(),
+                        attachments: Vec::new(),
+                    });
+                    history.push(ChatMessage {
+                        role: "user".to_string(),
+                        content: "Your reply stopped after planning without emitting a `<zeus_tool>` block, so no command or file operation ran. Output ONLY `<zeus_tool name=\"shell\">...</zeus_tool>`, `<zeus_tool name=\"python\">...</zeus_tool>`, `<zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>`, `<zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>`, or `<zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>` now.".to_string(),
+                        attachments: Vec::new(),
+                    });
+                } else {
+                    history.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: format!("<think>{}</think>", prev_rsn.chars().take(600).collect::<String>()),
+                        attachments: Vec::new(),
+                    });
+                    history.push(ChatMessage {
+                        role: "user".to_string(),
+                        content: "You finished reasoning about the tool results above. Now provide your clear, complete visible answer to the user outside `<think>` (or emit the next `<zeus_tool>` block if another workspace action is required).".to_string(),
+                        attachments: Vec::new(),
+                    });
+                }
                 continue;
             }
             history.push(ChatMessage {
@@ -1641,6 +1738,24 @@ fn handle_opencode_session_message(
         "properties": { "sessionID": session_id }
     }));
 
+    let mut final_parts = Vec::new();
+    if !final_reasoning.is_empty() {
+        final_parts.push(json!({
+            "id": format!("prt_rsn_final_{}", random_hex(6)),
+            "sessionID": session_id,
+            "messageID": asst_msg_id,
+            "type": "reasoning",
+            "text": final_reasoning
+        }));
+    }
+    final_parts.push(json!({
+        "id": format!("prt_final_{}", random_hex(6)),
+        "sessionID": session_id,
+        "messageID": asst_msg_id,
+        "type": "text",
+        "text": final_clean_answer
+    }));
+
     write_json_response(
         stream,
         "200 OK",
@@ -1650,15 +1765,7 @@ fn handle_opencode_session_message(
                 "sessionID": session_id,
                 "role": "assistant"
             },
-            "parts": [
-                {
-                    "id": format!("prt_final_{}", random_hex(6)),
-                    "sessionID": session_id,
-                    "messageID": asst_msg_id,
-                    "type": "text",
-                    "text": final_clean_answer
-                }
-            ]
+            "parts": final_parts
         }),
     );
 }
@@ -1842,6 +1949,36 @@ fn handle_http_connection(
         if segs.len() >= 2 && segs[0] == "session" {
             let sid = segs[1].to_string();
             let action = segs.get(2).copied().unwrap_or("");
+            if method == "GET" && action.is_empty() {
+                let info = server_state
+                    .oc_sessions
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.get(&sid).cloned());
+                if let Some(s) = info {
+                    write_json_response(
+                        &mut stream,
+                        "200 OK",
+                        &json!({
+                            "id": s.id,
+                            "title": s.title,
+                            "directory": s.directory,
+                            "version": "1.0.0",
+                            "time": { "created": s.created, "updated": now_secs() }
+                        }),
+                    );
+                } else {
+                    write_json_response(&mut stream, "404 Not Found", &json!({ "error": "Session not found" }));
+                }
+                return;
+            }
+            if method == "DELETE" && action.is_empty() {
+                if let Ok(mut guard) = server_state.oc_sessions.lock() {
+                    guard.remove(&sid);
+                }
+                write_json_response(&mut stream, "200 OK", &json!(true));
+                return;
+            }
             if method == "POST" && (action == "abort" || action == "interrupt") {
                 if let Ok(guard) = server_state.oc_cancels.lock() {
                     if let Some(flag) = guard.get(&sid) {
