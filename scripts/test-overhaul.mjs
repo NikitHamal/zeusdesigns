@@ -82,8 +82,8 @@ const providersRs = fs.readFileSync(
   "utf8"
 );
 assert.ok(
-  providersRs.includes("let has_tool_results = messages.iter().any(|m| m.content.contains(\"<tool_result\"));"),
-  "stream_mercury3 must step down reasoningEffort when <tool_result> is already in context"
+  providersRs.includes("let real_tool_rounds = messages.iter().filter(|m| m.content.contains(\"<tool_result\")).count();"),
+  "stream_mercury3 must step down reasoningEffort on round 1+ after real tool execution"
 );
 assert.ok(
   providersRs.includes("if !saw_text && saw_think && !think_buf.contains(\"<zeus_tool\")"),
@@ -102,10 +102,48 @@ assert.ok(
 );
 console.log("[PASS] 4. search_workspace_code returns multi-line context around matches");
 
+// Verify Session 26: Native Qwen/ShanNian/Supavip reasoning, Gemini snapshot tail-anchor recovery, and OpenCode SDK client
+assert.ok(
+  providersRs.includes("fn extract_delta_reasoning(d: &Value) -> String"),
+  "providers.rs must define universal extract_delta_reasoning helper"
+);
+assert.ok(
+  providersRs.includes('"enable_thinking": true'),
+  "providers.rs must enable native thinking on Supavip/ShanNian Qwen & DeepSeek streams"
+);
+assert.ok(
+  providersRs.includes("let is_protected_initial = idx == 0 || (has_xml_prefill && idx <= 2);"),
+  "normalize_multi_turn_messages must protect idx 0..=2 when XML DSL prefill is present so user prompt is never dropped"
+);
+assert.ok(
+  providersRs.includes("let tail_anchor: String = prev_text"),
+  "stream_gemini4_direct must recover from wrb.fr snapshot rewrites without freezing at 'The `'"
+);
+console.log("[PASS] 5. Qwen/ShanNian/Supavip native thinking, multi-turn prompt protection, and Gemini snapshot recovery verified");
+
+// Verify OpenCode SDK zero-dependency client & engine wiring
+const opencodeSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/opencode.ts"), "utf8");
+const engineSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/engine.ts"), "utf8");
+assert.ok(
+  opencodeSrc.includes("export function createOpencodeClient") &&
+    opencodeSrc.includes("export async function runOpenCode"),
+  "src/lib/opencode.ts must export createOpencodeClient and runOpenCode"
+);
+assert.ok(
+  engineSrc.includes("useOpenCodeRuntime") && engineSrc.includes("runOpenCode("),
+  "src/lib/engine.ts must wire settings.agentRuntime === 'opencode' to runOpenCode"
+);
+assert.ok(
+  engineSrc.includes("isInspectionPrompt") && engineSrc.includes("visibleAnnouncementOnly"),
+  "src/lib/engine.ts must preserve final answers after tool execution without false-positive nudges"
+);
+console.log("[PASS] 6. Zero-dependency OpenCode SDK client and post-tool answer preservation verified");
+
 // Verify Modularization line budgets
 const moduleFiles = [
   "src/lib/engine.ts",
   "src/lib/streamParser.ts",
+  "src/lib/opencode.ts",
   "src/lib/demoEngine.ts",
   "src/lib/browserProviders.ts",
   "src/lib/openDesign.ts",
@@ -125,6 +163,6 @@ for (const rel of moduleFiles) {
   assert.ok(lines < 1000, `Module ${rel} (${lines} lines) must be under 1,000 lines`);
   console.log(`  - ${rel}: ${lines} lines`);
 }
-console.log("[PASS] 5. All refactored frontend & harness modules are modular and under 1,000 lines");
+console.log("[PASS] 7. All refactored frontend & harness modules are modular and under 1,000 lines");
 
-console.log("=== ALL 5 OVERHAUL VERIFICATION CHECKS PASSED ===");
+console.log("=== ALL 7 OVERHAUL VERIFICATION CHECKS PASSED ===");

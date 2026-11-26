@@ -540,32 +540,20 @@ export async function sendMessage(opts: {
         title: conv.title || opts.text.slice(0, 48),
         prompt: opts.text,
         system,
-        onText: (d) => onDelta(d),
+        onText: onDelta,
         onReasoning: (r) => {
           extraThink += r;
-          if (!raf) {
-            raf = requestAnimationFrame(() => {
-              raf = 0;
-              sync();
-            });
-          }
+          if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
         },
         onTool: (tc) => {
           const idx = tools.findIndex((x) => x.id === tc.id);
-          if (idx >= 0) {
-            tools[idx] = { ...tools[idx], ...tc };
-          } else {
-            tools.push(tc);
-          }
+          if (idx >= 0) tools[idx] = { ...tools[idx], ...tc };
+          else tools.push(tc);
           if (tc.status === "ok" && /^(write_file|write|create_file|edit_file|edit|patch_file)$/.test(tc.name)) {
             try {
               const p = JSON.parse(tc.args ?? "{}").path;
-              if (p && /\.html?$/i.test(p)) {
-                void syncHtmlFileToWorkbench(p, convId, asstId, syncedWorkspaceBoardIds);
-              }
-            } catch {
-              /* ignore */
-            }
+              if (p && /\.html?$/i.test(p)) void syncHtmlFileToWorkbench(p, convId, asstId, syncedWorkspaceBoardIds);
+            } catch { /* ignore */ }
           }
           sync();
         },
@@ -585,26 +573,15 @@ export async function sendMessage(opts: {
           const onEvent = (e: ChatEvent) => {
             if (e.type === "delta") {
               const outsideThink = (s: string) =>
-                s
-                  .replace(/<think>[\s\S]*?(<\/think>|$)/gi, (m) => " ".repeat(m.length))
-                  .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, (m) => " ".repeat(m.length));
+                s.replace(/<(?:think|thinking)>[\s\S]*?(<\/(?:think|thinking)>|$)/gi, (m) => " ".repeat(m.length));
               const findFakeResult = (s: string): number => {
                 const clean = outsideThink(s);
-                const hasPriorToolTag =
-                  roundTools.length > 0 ||
-                  /<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file)>/i.test(
-                    clean
-                  );
-                if (!hasPriorToolTag) return -1;
+                if (!roundTools.length && !/<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file)>/i.test(clean)) return -1;
                 for (const tag of ["<tool_result", "<tool_response"]) {
-                  let searchFrom = 0;
-                  for (;;) {
-                    const i = clean.indexOf(tag, searchFrom);
+                  for (let from = 0; ; ) {
+                    const i = clean.indexOf(tag, from);
                     if (i < 0) break;
-                    if (i > 0 && clean[i - 1] === "`") {
-                      searchFrom = i + tag.length;
-                      continue;
-                    }
+                    if (i > 0 && clean[i - 1] === "`") { from = i + tag.length; continue; }
                     return i;
                   }
                 }
