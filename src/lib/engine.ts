@@ -545,9 +545,23 @@ export async function sendMessage(opts: {
                   .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, (m) => " ".repeat(m.length));
               const findFakeResult = (s: string): number => {
                 const clean = outsideThink(s);
+                const hasPriorToolTag =
+                  roundTools.length > 0 ||
+                  /<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file)>/i.test(
+                    clean
+                  );
+                if (!hasPriorToolTag) return -1;
                 for (const tag of ["<tool_result", "<tool_response"]) {
-                  const i = clean.indexOf(tag);
-                  if (i >= 0) return i;
+                  let searchFrom = 0;
+                  for (;;) {
+                    const i = clean.indexOf(tag, searchFrom);
+                    if (i < 0) break;
+                    if (i > 0 && clean[i - 1] === "`") {
+                      searchFrom = i + tag.length;
+                      continue;
+                    }
+                    return i;
+                  }
                 }
                 return -1;
               };
@@ -736,39 +750,57 @@ export async function sendMessage(opts: {
           const parsedRound = parseStream(roundText, extraThink);
           const cleanVisibleRound = parsedRound.text.trim();
           const hasFileOrMemMutation = tools.some((t) =>
-            /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|memory_save|memory_edit|memory_delete)$/.test(
+            /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(
               t.name
             )
           );
+          const isInspectionPrompt =
+            /\b(what'?s\s+going\s+on|see\s+what'?s|explain|summarize|summary|status|check|inspect|analyze|review|why|how\s+does|show\s+me|fetch\s+latest)\b/i.test(
+              opts.text
+            ) && !/\b(edit_file|write_file|remove\s+that|delete\s+the|in\s+["'`][\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md)["'`]\s*,\s*(?:update|remove|change|replace|fix))\b/i.test(opts.text);
           const asksForMutation =
+            !isInspectionPrompt &&
             /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
               opts.text
             );
-          const stoppedAfterReadOnly = asksForMutation && !hasFileOrMemMutation && tools.length > 0;
+          const stoppedAfterReadOnly =
+            asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
           const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning));
           const dumpedCodeWithoutWrite =
+            tools.length === 0 &&
+            asksForMutation &&
             !hasFileOrMemMutation &&
             (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) ||
               /\bwith\s+open\s*\(/.test(cleanVisibleRound));
+          // Only treat visible prose as "statedPlanOnly" when no tools have run yet (or prose is a short 1-line announcement)
+          const visibleAnnouncementOnly =
+            tools.length === 0 &&
+            cleanVisibleRound.length < 240 &&
+            /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|test|create|write|edit|delete|save|update|remove)|we\s+need\s+to\s+(call|pull|list|check|run|read|inspect|update|fix|delete|save|remove)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test|edit|update|write))\b/i.test(
+              cleanVisibleRound
+            );
           const statedPlanOnly =
             cutOffAfterThink ||
             stoppedAfterReadOnly ||
             dumpedCodeWithoutWrite ||
-            /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|see|test|create|write|edit|delete|save|continue|update|remove)|we\s+need\s+to\s+(continue|call|pull|list|check|run|read|inspect|update|fix|delete|save|remove)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test|edit|update|write))\b/i.test(
-              `${roundText} ${extraThink}`
-            );
+            visibleAnnouncementOnly;
 
           if (
             (mode === "code" || Boolean(st.ui.workspace)) &&
             !produced &&
             nudgeCount < 2 &&
-            (round === 0 || statedPlanOnly) &&
+            (round === 0 ? (tools.length === 0 && (statedPlanOnly || !cleanVisibleRound)) : (cutOffAfterThink || stoppedAfterReadOnly)) &&
             (statedPlanOnly ||
               /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md|pull|push|fetch|clone|git|github|status|diff|check|inspect|list|read|search|find|grep)\b/i.test(
                 opts.text
               ))
           ) {
             nudgeCount++;
+            // Preserve any reasoning emitted during this round before trimming roundText from `full`
+            const roundOnlyParsed = parseStream(roundText, "");
+            if (roundOnlyParsed.reasoning) {
+              extraThink = [extraThink, roundOnlyParsed.reasoning].filter(Boolean).join("\n\n");
+            }
             if (roundText && full.endsWith(roundText)) {
               full = full.slice(0, full.length - roundText.length);
             }
@@ -785,14 +817,20 @@ export async function sendMessage(opts: {
               inspectedFiles[0] ||
               opts.text.match(/["'`]([\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md))["'`]/i)?.[1] ||
               "";
-            const specificInstruction = stoppedAfterReadOnly
-              ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification yet. Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` outside \`<think>\` right now to apply the change.`
-              : `Your reply stopped without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` now.`;
+            const specificInstruction =
+              cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly
+                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete answer to the user outside \`<think>\` now (or emit the next \`<zeus_tool>\` block if another workspace action is required).`
+                : stoppedAfterReadOnly
+                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification yet. Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` outside \`<think>\` right now to apply the change.`
+                : `Your reply stopped without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` now.`;
             msgs = [
               ...msgs,
               {
                 role: "assistant",
-                content: "Understood. I will emit the `<zeus_tool>` XML block now to apply the change directly.",
+                content:
+                  cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly
+                    ? `<think>${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}</think>`
+                    : "Understood. I will emit the `<zeus_tool>` XML block now to apply the change directly.",
               },
               {
                 role: "user",

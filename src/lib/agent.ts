@@ -138,10 +138,14 @@ export function buildPlainContext(opts: {
           content: `[XML DSL Output Mode — Required by Client Parser]\nWorkspace${ws?.name ? ` "${ws.name}"` : ""}${ws?.root ? ` (${ws.root})` : ""} is connected. List top-level entries to verify the <zeus_tool> bridge.`,
           attachments: [],
         },
-        { role: "assistant", content: `<zeus_tool name="list_dir" path=""></zeus_tool>`, attachments: [] },
+        {
+          role: "assistant",
+          content: `<think>Workspace is connected. I will check the top-level directory listing first, then reason inside <think>...</think> and execute the required <zeus_tool> actions.</think>\n<zeus_tool name="list_dir" path=""></zeus_tool>`,
+          attachments: [],
+        },
         {
           role: "user",
-          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\n\nUser request: ${last.content}\n(Emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, <zeus_tool name="write_file" path="...">...</zeus_tool>, or <zeus_tool name="memory_search">...</zeus_tool> outside <think> now to execute this request.)`,
+          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\n\nUser request: ${last.content}\n(First write your brief step-by-step reasoning inside <think>...</think>, then emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, <zeus_tool name="write_file" path="...">...</zeus_tool>, or <zeus_tool name="memory_search">...</zeus_tool> outside <think> to execute this request.)`,
           attachments: last.attachments,
         }
       );
