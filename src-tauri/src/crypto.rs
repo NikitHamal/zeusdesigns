@@ -215,6 +215,22 @@ pub fn md5_reversed_hex(input: &[u8]) -> String {
     hex.chars().rev().collect()
 }
 
+/// Standard RFC 1321 MD5 lowercase hex digest.
+pub fn md5_hex(input: &[u8]) -> String {
+    md5_reversed_hex(input).chars().rev().collect()
+}
+
+/// Generate MyChat Native Direct Cloud's rolling hourly `X-Encryption-Token` (`md5("GPT_KEYBOARD_IS_AWESOME|" + "YYYY-MM-DD HH")`).
+pub fn generate_mychat_encryption_token(unix_secs: u64) -> String {
+    let (full, date_part) = iso8601_utc_compact(unix_secs);
+    let hour = full.get(9..11).unwrap_or("00");
+    let yr = date_part.get(0..4).unwrap_or("2026");
+    let mo = date_part.get(4..6).unwrap_or("01");
+    let dy = date_part.get(6..8).unwrap_or("01");
+    let raw = format!("GPT_KEYBOARD_IS_AWESOME|{}-{}-{} {}", yr, mo, dy, hour);
+    md5_hex(raw.as_bytes())
+}
+
 /// Generate DeepAI's current `generateIslandKey` (`tryit-{rand}-{reversed_md5}`) for chat & attachment uploads.
 pub fn generate_deepai_island_key(user_agent: &str) -> String {
     const SALT: &str = "hackers_become_a_little_stinkier_every_time_they_hack";
