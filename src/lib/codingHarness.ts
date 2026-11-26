@@ -50,6 +50,8 @@ export interface CodingHarnessProfile {
 }
 
 const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
+  "mychatcloud",
+  "supavip",
   "freellmhub",
   "litellmhub",
   "kilo",
@@ -72,6 +74,7 @@ const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
 export function detectNativeToolProtocol(providerId: string, modelId: string): NativeToolProtocol {
   const m = modelId.toLowerCase();
   if (providerId === "freecc") return "anthropic_tool_use";
+  if (providerId === "claude5proxy") return m.startsWith("glm-") ? "scraper_xml_dsl" : "anthropic_tool_use";
   if (providerId.startsWith("custom:")) return "openai_tools";
   if (providerId === "aibridge") {
     return m.includes("claude") || m.includes("grok") ? "scraper_xml_dsl" : "openai_tools";

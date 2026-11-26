@@ -165,11 +165,74 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
         ),
         (
             "gemini-4-hydrogen",
-            "freecc",
-            "Gemini 4 Hydrogen (Zeus FreeCC)",
+            "gemini4",
+            "Gemini 4 Hydrogen (Zeus Gemini 4 Direct + 5-Node Cluster)",
+            false,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-hydrogen-thinking",
+            "gemini4",
+            "Gemini 4 Hydrogen Thinking (Zeus Gemini 4 Direct)",
             true,
             false,
-            262144,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-hydrogen-high",
+            "antigravity",
+            "Gemini 4 Hydrogen High (Zeus Antigravity Hub)",
+            true,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-hydrogen-xhigh",
+            "antigravity",
+            "Gemini 4 Hydrogen XHigh (Zeus Antigravity Hub)",
+            true,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-neon",
+            "gemini4",
+            "Gemini 4 Neon (Zeus Gemini 4 Cluster)",
+            true,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-carbon",
+            "gemini4",
+            "Gemini 4 Carbon (Zeus Gemini 4 Cluster)",
+            true,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "gemini-4-argon",
+            "antigravity",
+            "Gemini 4 Argon High (Zeus Antigravity Hub)",
+            true,
+            false,
+            1000000,
+            32768,
+        ),
+        (
+            "claude-sonnet-5-5",
+            "claude5proxy",
+            "Claude Sonnet 5.5 (Zeus Claude 5.5 Hub)",
+            true,
+            true,
+            200000,
             16384,
         ),
         (
@@ -183,8 +246,8 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
         ),
         (
             "claude-opus-5-5",
-            "unikey",
-            "Claude Opus 5.5 (Zeus Unikey)",
+            "claude5proxy",
+            "Claude Opus 5.5 (Zeus Claude 5.5 & Antigravity Hub)",
             true,
             false,
             200000,
@@ -444,21 +507,71 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             "nvidia/nemotron-3.5-super-vl:free".to_string(),
         ),
         "gemini-4-hydrogen" | "gemini/models/gemini-4-hydrogen" | "anthropic/gemini/models/gemini-4-hydrogen" => (
-            "freecc".to_string(),
-            "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen".to_string(),
+            "gemini4".to_string(),
+            "gemini-4-hydrogen".to_string(),
+        ),
+        "gemini-4-hydrogen-thinking" | "gemini-4-neon" | "gemini-4-neon-thinking" | "gemini-4-carbon" | "gemini-auto" => (
+            "gemini4".to_string(),
+            trimmed.to_string(),
+        ),
+        "gemini-4-argon" => (
+            "antigravity".to_string(),
+            "gemini-4-argon-high".to_string(),
+        ),
+        "gemini-4-hydrogen-high"
+        | "gemini-4-hydrogen-xhigh"
+        | "gemini-4-hydrogen-medium"
+        | "gemini-4-hydrogen-low"
+        | "gemini-4-hydrogen-sonar"
+        | "gemini-4-hydrogen-tiered-high"
+        | "gemini-4-hydrogen-tiered-xhigh"
+        | "gemini-4-neon-high"
+        | "gemini-4-neon-xhigh"
+        | "gemini-4-neon-medium"
+        | "gemini-4-neon-low"
+        | "gemini-4-carbon-high"
+        | "gemini-4-carbon-medium"
+        | "gemini-4-carbon-low"
+        | "gemini-4-argon-high"
+        | "gemini-4-argon-medium"
+        | "gemini-4-argon-low"
+        | "gemini-pro-orchestrator"
+        | "gemini-pro-orchestrator-argon"
+        | "gemini-pro-orchestrator-neon"
+        | "gemini-3.8-flash-high"
+        | "claude-opus-5-5-high"
+        | "claude-sonnet-5-5-high" => (
+            "antigravity".to_string(),
+            trimmed.to_string(),
+        ),
+        "claude-sonnet-5-5" | "claude-haiku-5-5" => (
+            "claude5proxy".to_string(),
+            trimmed.to_string(),
+        ),
+        "gpt-6-luna" => (
+            "mychatcloud".to_string(),
+            "gpt-6-luna".to_string(),
+        ),
+        "deepseek-v4.1-flash" | "qwen3.7-flash" => (
+            "supavip".to_string(),
+            trimmed.to_string(),
+        ),
+        "qwen3.5-flash" | "deepseek-v4-flash-vision-exp" => (
+            "shannian".to_string(),
+            trimmed.to_string(),
         ),
         "gemini-3.5-flash" | "gemini/models/gemini-3.5-flash" => (
-            "freecc".to_string(),
-            "claude-3-freecc-no-thinking/gemini/models/gemini-3.5-flash".to_string(),
+            "gemini4".to_string(),
+            "gemini-4-hydrogen".to_string(),
         ),
         "gemini-3-flash-preview" | "gemini-3-flash" | "gemini/models/gemini-3-flash-preview" => (
             "freecc".to_string(),
             "claude-3-freecc-no-thinking/gemini/models/gemini-3-flash-preview".to_string(),
         ),
-        "claude-opus-5-5" | "gpt-6.1-sol" | "gpt-6-astra" | "gpt-6-luna" | "deepseek-v4-flash" => {
+        "claude-opus-5-5" | "gpt-6.1-sol" | "gpt-6-astra" | "deepseek-v4-flash" => {
             ("unikey".to_string(), trimmed.to_string())
         }
-        "claude-haiku-5-5" | "deepseek-v4.1-flash" | "qwen3.8-flash" => {
+        "qwen3.8-flash" => {
             ("deepai".to_string(), trimmed.to_string())
         }
         "qwen4-max" | "qwen3.8-max" | "qwen3.8-omni-flash" | "qwen3.5-omni-plus" | "qwen3.7-max" | "qwen3.7-plus" => {

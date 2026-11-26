@@ -26,6 +26,12 @@ export interface ProviderSpecialization {
 
 const SCRAPER_PROVIDERS = new Set([
   "mercury3",
+  "antigravity",
+  "gemini4",
+  "mychatcloud",
+  "supavip",
+  "shannian",
+  "claude5proxy",
   "kilo",
   "nimcloud",
   "colibriqwen",
