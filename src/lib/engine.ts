@@ -21,6 +21,7 @@ import { toolsPrompt } from "./tools";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
+import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { isStudioTool, runStudioTool, studioBrief } from "./studio";
@@ -526,7 +527,51 @@ export async function sendMessage(opts: {
   };
 
   try {
-    if (nativeOn) {
+    const useOpenCodeRuntime =
+      nativeOn &&
+      settings.agentRuntime === "opencode" &&
+      mode !== "design" &&
+      !isGreeting &&
+      !(opts.attachments && opts.attachments.length > 0);
+
+    if (useOpenCodeRuntime) {
+      await runOpenCode({
+        convId,
+        title: conv.title || opts.text.slice(0, 48),
+        prompt: opts.text,
+        system,
+        onText: (d) => onDelta(d),
+        onReasoning: (r) => {
+          extraThink += r;
+          if (!raf) {
+            raf = requestAnimationFrame(() => {
+              raf = 0;
+              sync();
+            });
+          }
+        },
+        onTool: (tc) => {
+          const idx = tools.findIndex((x) => x.id === tc.id);
+          if (idx >= 0) {
+            tools[idx] = { ...tools[idx], ...tc };
+          } else {
+            tools.push(tc);
+          }
+          if (tc.status === "ok" && /^(write_file|write|create_file|edit_file|edit|patch_file)$/.test(tc.name)) {
+            try {
+              const p = JSON.parse(tc.args ?? "{}").path;
+              if (p && /\.html?$/i.test(p)) {
+                void syncHtmlFileToWorkbench(p, convId, asstId, syncedWorkspaceBoardIds);
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          sync();
+        },
+        signal,
+      });
+    } else if (nativeOn) {
       let current = req;
       let msgs: ChatRequest["messages"] = history;
       let nudgeCount = 0;
