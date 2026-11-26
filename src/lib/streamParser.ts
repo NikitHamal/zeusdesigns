@@ -371,6 +371,9 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
   const commands: string[] = [];
   const read: string[] = [];
 
+  const commandSnippets: string[] = [];
+  let lastCommandOutput = "";
+
   for (const t of tools) {
     if (t.status !== "ok") continue;
     const p = parsePath(t);
@@ -382,6 +385,20 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
       if (!deleted.includes(p)) deleted.push(p);
     } else if (/^(shell|bash|python|python3)$/.test(t.name)) {
       commands.push(t.name);
+      try {
+        const j = JSON.parse(t.args ?? "{}");
+        const cmd = String(j.body || j.command || j.path || "").trim().split("\n")[0]?.slice(0, 72);
+        if (cmd && !commandSnippets.includes(cmd)) commandSnippets.push(cmd);
+      } catch {
+        const rawCmd = (t.args ?? "").trim().split("\n")[0]?.slice(0, 72);
+        if (rawCmd && !commandSnippets.includes(rawCmd)) commandSnippets.push(rawCmd);
+      }
+      if (t.output && !t.output.includes("(no output)")) {
+        lastCommandOutput = t.output
+          .replace(/\n\n\.\.\.\s*\[Harness²[\s\S]*$/, "")
+          .trim()
+          .slice(0, 600);
+      }
     } else if (/^(read_file|read|cat)$/.test(t.name) && p) {
       if (!read.includes(p)) read.push(p);
     }
@@ -392,10 +409,18 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
   if (edited.length) parts.push(`Updated ${edited.map((f) => `\`${f}\``).join(", ")}`);
   if (deleted.length) parts.push(`Deleted ${deleted.map((f) => `\`${f}\``).join(", ")}`);
   if (!parts.length && commands.length) {
-    parts.push(`Executed ${commands.length} workspace command${commands.length > 1 ? "s" : ""}`);
+    const cmdList = commandSnippets.slice(-3).map((c) => `\`${c}\``).join(", ");
+    parts.push(
+      `Executed ${commands.length} workspace command${commands.length > 1 ? "s" : ""}${cmdList ? ` (${cmdList})` : ""}`
+    );
   }
   if (!parts.length && read.length) {
     parts.push(`Inspected ${read.map((f) => `\`${f}\``).join(", ")}`);
   }
-  return parts.length ? `${parts.join(" and ")}.` : "";
+  if (!parts.length) return "";
+  const headline = `${parts.join(" and ")}.`;
+  if (!written.length && !edited.length && !deleted.length && lastCommandOutput) {
+    return `${headline}\n\n\`\`\`text\n${lastCommandOutput}\n\`\`\``;
+  }
+  return headline;
 }
