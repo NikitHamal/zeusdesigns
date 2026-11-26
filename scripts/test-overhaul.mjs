@@ -139,6 +139,14 @@ assert.ok(
 );
 console.log("[PASS] 6. Zero-dependency OpenCode SDK client and post-tool answer preservation verified");
 
+// Verify backtick-quoted tags ("The `<bash>`...", "The `<think>`...", "The `<html>`...") never truncate at "The `"
+assert.ok(
+  streamParserSrc.includes('if (offset > 0 && whole[offset - 1] === "`") return m;') &&
+    streamParserSrc.includes("includeInline = true"),
+  "streamParser.ts must protect inline backtick-quoted tags from truncation"
+);
+console.log("[PASS] 7. Inline backtick-quoted tags ('The `<bash>`...') are protected from truncation across all parsers");
+
 // Verify Modularization line budgets
 const moduleFiles = [
   "src/lib/engine.ts",
