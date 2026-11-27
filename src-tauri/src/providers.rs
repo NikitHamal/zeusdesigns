@@ -5379,11 +5379,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -5758,11 +5755,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -5990,11 +5984,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -6189,11 +6180,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -6375,11 +6363,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -6893,11 +6878,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -7023,11 +7005,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -8846,11 +8825,8 @@ where
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     let delta = choice.get("delta").or_else(|| choice.get("message"));
                     if let Some(d) = delta {
-                        let r_text = d
-                            .get("reasoning_content")
-                            .or_else(|| d.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(d);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
@@ -10123,11 +10099,8 @@ where
                         .and_then(|c| c.get(0))
                         .and_then(|c0| c0.get("delta"))
                     {
-                        let r_text = delta
-                            .get("reasoning_content")
-                            .or_else(|| delta.get("reasoning"))
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("");
+                        let r_text_owned = extract_delta_reasoning(delta);
+                        let r_text = r_text_owned.as_str();
                         if !r_text.is_empty() {
                             if !in_think {
                                 in_think = true;
