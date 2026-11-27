@@ -52,6 +52,12 @@ export interface CodingHarnessProfile {
 const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
   "mychatcloud",
   "supavip",
+  "agnescloud",
+  "volcark",
+  "zhipudirect",
+  "logfarehub",
+  "antigravity",
+  "gemini4hydrogen",
   "freellmhub",
   "litellmhub",
   "kilo",
