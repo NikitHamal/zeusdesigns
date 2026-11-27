@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { activeConv, activeProject, convArtifactCount, uid, useStore } from "../store";
-import type { Attachment, FileNode, Message, Quote } from "../types";
+import { useEffect, useRef, useState } from "react";
+import { activeConv, activeProject, convArtifactCount, useStore } from "../store";
+import type { Attachment, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
 import { supportsAttachments } from "../lib/providers";

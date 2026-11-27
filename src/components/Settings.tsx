@@ -61,7 +61,7 @@ const field = "h-11 w-full rounded-2xl bg-surface-high px-4 text-sm text-on-surf
 
 /* ---------------- Providers ---------------- */
 function ProvidersTab() {
-  const { settings, ui } = useStore();
+  const { settings } = useStore();
   const patch = useStore((s) => s.patchSettings);
   const [form, setForm] = useState({ name: "", format: "openai" as "openai" | "anthropic", baseUrl: "", apiKey: "", model: "" });
   const [fpBusy, setFpBusy] = useState(false);
