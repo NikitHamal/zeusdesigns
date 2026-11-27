@@ -2197,23 +2197,37 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 ),
             )
         }
-        "load_skill" | "skill" => {
-            let skill_name = if !path_arg.is_empty() {
-                path_arg.trim()
+        "load_skill" | "use_skill" | "get_skill" | "read_skill" | "skill" => {
+            let mut skill_name = if !path_arg.is_empty() {
+                path_arg.trim().to_string()
             } else {
-                body.trim()
+                body.trim().to_string()
             };
-            let rel = format!(".zeusdesigns/harness/skills/{}/SKILL.md", skill_name);
-            if let Ok(custom_skill) = fs_read(eff_root.clone(), rel) {
-                (true, format!("[Harness² Skill '{}']\n{}", skill_name, custom_skill))
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(n) = j.get("name").or_else(|| j.get("skill")).or_else(|| j.get("topic")).and_then(|v| v.as_str()) {
+                        skill_name = n.trim().to_string();
+                    }
+                }
+            }
+            let slug = skill_name.to_lowercase().replace('_', "-");
+            let zeus_rel = format!(".zeusdesigns/harness/skills/{}/SKILL.md", skill_name);
+            let oro_rel = format!(".oro/skills/{}.md", slug);
+            if let Ok(custom_skill) = fs_read(eff_root.clone(), zeus_rel).or_else(|_| fs_read(eff_root.clone(), oro_rel)) {
+                (true, format!("[Skill '{}']\n{}", skill_name, custom_skill))
             } else {
-                let builtin = match skill_name {
-                    "bug_hunt_verify" => "1. Read the failing test or target module directly with read_file or search_code.\n2. Identify the exact mathematical/logical mismatch.\n3. Patch in one pass with edit_file or write_file.\n4. Run the verification command via shell or python and confirm exit code 0.",
-                    "python_data_pipeline" => "1. Run a single <zeus_tool name=\"python\"> script that reads the input file, deduplicates/filters/aggregates in memory, writes the output file, and prints a verification summary.",
-                    "multi_file_refactor" => "1. Inspect coupled modules first.\n2. Update each file deterministically and run the test suite before finishing.",
+                let builtin = match slug.as_str() {
+                    "bug-hunt-verify" => "1. Read the failing test or target module directly with read_file or search_code.\n2. Identify the exact mathematical/logical mismatch.\n3. Patch in one pass with edit_file or write_file.\n4. Run the verification command via shell or python and confirm exit code 0.",
+                    "python-data-pipeline" => "1. Run a single <zeus_tool name=\"python\"> script that reads the input file, deduplicates/filters/aggregates in memory, writes the output file, and prints a verification summary.",
+                    "multi-file-refactor" => "1. Inspect coupled modules first.\n2. Update each file deterministically and run the test suite before finishing.",
+                    "landing-page-starter" | "landing-page" => "1. Create semantic landmarks (<header>, <nav>, <main>, <footer>) with a skip link to #main.\n2. Define CSS custom properties on :root and [data-theme=\"dark\"] with no box shadows, no emojis, and no blue/purple gradients.\n3. Wire mobile menu and theme toggle in app.js and verify with check_syntax.",
+                    "dark-mode" => "1. Move every color into CSS custom properties on :root (--surface, --surface-low, --on-surface, --primary, --outline-variant).\n2. Add [data-theme=\"dark\"] and [data-theme=\"light\"] overrides.\n3. Add an accessible theme toggle button that updates document.documentElement.dataset.theme and persists to localStorage.",
+                    "seo-basics" => "1. Ensure every page has a unique <title>, <meta name=\"description\">, <html lang=\"en\">, and viewport meta.\n2. Keep a single <h1> and ordered headings; add alt attributes on every <img>.\n3. Run check_syntax to confirm zero defects.",
+                    "accessibility-pass" => "1. Use semantic landmarks (<header>, <nav>, <main>, <footer>).\n2. Add visible :focus-visible outlines on links, buttons, and inputs.\n3. Ensure icon-only buttons have aria-label and respect prefers-reduced-motion.",
+                    "design-system" | "ui-states" => "1. Use Material 3 Expressive surface hierarchy (--surface, --surface-low, --surface-high, --primary, --outline-variant) with 1px solid borders, 0 box shadows, 0 emojis, and 0 blue/purple gradients.\n2. Include empty, loading, error, and active states for interactive views.",
                     _ => "Proceed directly with shell, python, read_file, edit_file, or write_file to complete the task.",
                 };
-                (true, format!("[Harness² Skill '{}']\n{}", skill_name, builtin))
+                (true, format!("[Skill '{}']\n{}", skill_name, builtin))
             }
         }
         "add_ui_kit" | "install_ui_kit" => {

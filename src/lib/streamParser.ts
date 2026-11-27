@@ -6,6 +6,7 @@
 // 4. Deterministic fallback summary generation when an agent completes tool calls without trailing prose
 
 import type { ToolCall } from "../types";
+import { DisplayText } from "./stormyAgent";
 
 export interface ParsedBlock {
   attrs: Record<string, string>;
@@ -288,7 +289,7 @@ export function extractReasoningFromRaw(
  */
 export function stripToolMarkupFromText(input: string): string {
   const shorthandTags =
-    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
+    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|copy_file|create_folder|insert_at_line|append_to_file|prepend_to_file|regex_replace|get_file_info|diff_files|git_status|git_diff|git_log|git_branch|git_stage|git_unstage|git_commit|security_scan|add_ui_kit|subagent|spawn_subagent|request_approval|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
 
   const notBackticked =
     (fn: (m: string) => string) =>
@@ -431,7 +432,7 @@ export function parseStream(
     i = e + 11;
   }
 
-  const cleanedStray = text.replace(/^\s*(?:``|''|,,)+\s*$/gm, "").trim();
+  const cleanedStray = DisplayText.clean(text.replace(/^\s*(?:``|''|,,)+\s*$/gm, "").trim());
   const { cleanText, leakedPlan } = extractLeakedPlan(cleanedStray);
   const mergedReasoning = [reasoning, leakedPlan].filter(Boolean).join("\n\n").trim();
 

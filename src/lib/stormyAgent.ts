@@ -1561,3 +1561,61 @@ export const QualityGate = {
     }
   },
 };
+
+/* ------------------------------------------------------------------ */
+/* 13. DisplayText (Stormy DisplayText.kt — Escaped Prose Repair)      */
+/* ------------------------------------------------------------------ */
+const NAMED_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&apos;": "'",
+  "&#39;": "'",
+  "&nbsp;": " ",
+  "&mdash;": "—",
+  "&ndash;": "–",
+  "&hellip;": "…",
+  "&rarr;": "→",
+  "&larr;": "←",
+  "&times;": "×",
+  "&bull;": "•",
+  "&copy;": "©",
+  "&trade;": "™",
+  "&lsquo;": "‘",
+  "&rsquo;": "’",
+  "&ldquo;": "“",
+  "&rdquo;": "”",
+};
+
+export const DisplayText = {
+  clean(text: string): string {
+    if (!text || (!text.includes("\\") && !text.includes("&"))) return text;
+    const literalNewlines = (text.match(/\\n/g) ?? []).length;
+    const realNewlines = (text.match(/\n/g) ?? []).length;
+    const decodeNewlines = literalNewlines >= 2 && (realNewlines === 0 || literalNewlines > realNewlines * 2);
+    const parts = text.split("`");
+    return parts
+      .map((part, idx) => {
+        if (idx % 2 === 1) return part;
+        let out = part;
+        if (decodeNewlines) {
+          out = out.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+        }
+        if (out.includes("\\u")) {
+          out = out.replace(/\\u([0-9a-fA-F]{4})/g, (_m, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+        }
+        if (out.includes("&")) {
+          out = out.replace(/&#(x[0-9a-fA-F]+|\d+);/g, (m, code: string) => {
+            const cp = code.startsWith("x") ? parseInt(code.slice(1), 16) : parseInt(code, 10);
+            return !Number.isNaN(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+          });
+          for (const [k, v] of Object.entries(NAMED_ENTITIES)) {
+            if (out.includes(k)) out = out.split(k).join(v);
+          }
+        }
+        return out;
+      })
+      .join("`");
+  },
+};
