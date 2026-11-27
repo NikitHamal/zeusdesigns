@@ -628,7 +628,10 @@ export async function sendMessage(opts: {
           const onEvent = (e: ChatEvent) => {
             if (e.type === "delta") {
               const outsideThink = (s: string) =>
-                s.replace(/<(?:think|thinking)>[\s\S]*?(<\/(?:think|thinking)>|$)/gi, (m) => " ".repeat(m.length));
+                s
+                  .replace(/<(think|thinking)>\s*(?:\.{2,}|…)\s*<\/\1>/gi, (m) => " ".repeat(m.length))
+                  .replace(/<(?:think|thinking)>[\s\S]*<\/(?:think|thinking)>/gi, (m) => " ".repeat(m.length))
+                  .replace(/<(?:think|thinking)>[\s\S]*$/gi, (m) => " ".repeat(m.length));
               const findFakeResult = (s: string): number => {
                 const clean = outsideThink(s);
                 if (!roundTools.length && !/<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file)>/i.test(clean)) return -1;
@@ -636,7 +639,10 @@ export async function sendMessage(opts: {
                   for (let from = 0; ; ) {
                     const i = clean.indexOf(tag, from);
                     if (i < 0) break;
-                    if (i > 0 && clean[i - 1] === "`") { from = i + tag.length; continue; }
+                    if (i > 0 && (clean[i - 1] === "`" || clean[i - 1] === '"' || clean[i - 1] === "'")) {
+                      from = i + tag.length;
+                      continue;
+                    }
                     return i;
                   }
                 }
@@ -906,11 +912,11 @@ export async function sendMessage(opts: {
               "";
             const specificInstruction =
               cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
-                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete answer to the user outside \`<think>\` now (or emit the next \`<zeus_tool>\` block if another workspace action is required).`
+                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete visible answer to the user now (or emit the next \`<zeus_tool>\` block if another workspace action is required).`
                 : deferredToUser
-                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now by emitting \`<zeus_tool name="search_code">query</zeus_tool>\`, \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` outside \`<think>\`.`
+                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now by emitting \`<zeus_tool name="search_code">query</zeus_tool>\`, \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\`.`
                 : stoppedAfterReadOnly || dumpedCodeWithoutWrite
-                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification on disk yet (writing markdown code blocks in prose does not modify files). Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` outside \`<think>\` right now to apply the change.`
+                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification on disk yet (writing markdown code blocks in prose does not modify files). Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` right now to apply the change.`
                 : `Your reply stopped without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` now.`;
             msgs = [
               ...msgs,
@@ -918,7 +924,7 @@ export async function sendMessage(opts: {
                 role: "assistant",
                 content:
                   cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
-                    ? `<think>${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}</think>`
+                    ? `Thought summary: ${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}`
                     : "Understood. I will emit the `<zeus_tool>` XML block now to execute the next step directly.",
               },
               {
@@ -958,10 +964,10 @@ export async function sendMessage(opts: {
           opts.text
         );
         const nextStepDirective = roundHadError
-          ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately emit a fallback <zeus_tool> (such as <zeus_tool name="search_code">...</zeus_tool>, <zeus_tool name="list_dir" path="..."></zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, or <zeus_tool name="python">...</zeus_tool>) outside <think> to continue.`
+          ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately emit a fallback <zeus_tool> (such as <zeus_tool name="search_code">...</zeus_tool>, <zeus_tool name="list_dir" path="..."></zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, or <zeus_tool name="python">...</zeus_tool>) to continue.`
           : asksMut && !hasMutatedSoFar
-          ? `You have only read/searched files so far and have NOT modified any files on disk yet. Emit <zeus_tool name="edit_file" path="..."><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool> or <zeus_tool name="write_file" path="...">...</zeus_tool> (or <zeus_tool name="read_file" path="..."></zeus_tool> if you need to inspect another file first) outside <think> now. Do NOT output markdown code fences instead of <zeus_tool>.`
-          : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, emit the next <zeus_tool> block outside <think> to finish the remaining steps (never stop mid-inspection to ask "tell me to proceed" and never repeat an identical call).`;
+          ? `You have only read/searched files so far and have NOT modified any files on disk yet. Emit <zeus_tool name="edit_file" path="..."><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool> or <zeus_tool name="write_file" path="...">...</zeus_tool> (or <zeus_tool name="read_file" path="..."></zeus_tool> if you need to inspect another file first) now. Do NOT output markdown code fences instead of <zeus_tool>.`
+          : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, emit the next <zeus_tool> block to finish the remaining steps (never stop mid-inspection to ask "tell me to proceed" and never repeat an identical call).`;
         msgs = [
           ...msgs,
           { role: "assistant", content: said },

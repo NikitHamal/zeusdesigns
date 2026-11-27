@@ -14,7 +14,8 @@ const DESIGN_ASK = /\b(design|redesign|mock-?up|wireframe|prototype|landing page
 const CODE_ASK = /\b(code|bug|fix|implement|refactor|function|class|component|file|files|repo|repository|test|tests|build|compile|npm|pnpm|yarn|pip|cargo|git|github|gitlab|pull|push|fetch|clone|merge|rebase|status|diff|commit|branch|error|exception|stack ?trace|typescript|javascript|python|rust|golang|java|c\+\+|css|html|sql|api|endpoint|script|cli|terminal|command|run|install|debug|lint|deploy|docker|regex|algorithm|read|search|find|grep|edit|write|create|add|remove|rename|update|check|inspect|list|ls|pwd|cat|head|tail|tree|explain|analyze|summarize|review|audit|optimize|clean|format|start|stop|serve|dev|bench|benchmark|overview|structure|architecture|memory|remember|preference|preferences|directory|folder|workspace|execute)\b/i;
 const EDIT_CANVAS = /\b(change|make|switch|apply|tweak|adjust|bigger|smaller|darker|lighter|theme|colou?r|palette|dark mode|light mode|font|spacing|padding|rounder|compact|move|align|swap|replace|add (a|an|the)|remove (the|a))\b/i;
 const NEW_SUBJECT = /\b(new|another|different|from scratch|start over)\b/i;
-const CASUAL_CHAT = /^(thanks|thank you|thx|ty|ok|okay|cool|nice|great|awesome|got it|bye|goodbye|who are you|what model are you|how are you)[!.?\s]*$/i;
+const CASUAL_CHAT =
+  /^(?:thanks|thank you|thx|ty|ok|okay|cool|nice|great|awesome|got it|bye|goodbye|how are you|(?:who|what)\s+(?:are\s+you|r\s+u|made\s+you|built\s+you|created\s+you)|(?:which|what)\s+(?:model|llm|ai|version)\s*(?:are\s+you|r\s+u|is\s+this)?|are\s+you\s+(?:gemini|claude|gpt|qwen|deepseek|agnes|zeus)[a-z0-9\s.-]*)[!.?\s]*$/i;
 
 /** Decide what the user is asking for so a greeting never becomes a design and a bug fix never touches the canvas. */
 export function classifyIntent(text: string, ctx: { boards: number; quote?: boolean; asVariant?: boolean; workspace?: boolean }): Intent {
@@ -140,12 +141,12 @@ export function buildPlainContext(opts: {
         },
         {
           role: "assistant",
-          content: `<think>Workspace is connected. I will check the top-level directory listing first, then reason inside <think>...</think> and execute the required <zeus_tool> actions.</think>\n<zeus_tool name="list_dir" path=""></zeus_tool>`,
+          content: `Workspace is connected. I will check the top-level directory listing first.\n<zeus_tool name="list_dir" path=""></zeus_tool>`,
           attachments: [],
         },
         {
           role: "user",
-          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\n\nUser request: ${last.content}\n(First write your brief step-by-step reasoning inside <think>...</think>, then emit <zeus_tool name="shell">...</zeus_tool>, <zeus_tool name="python">...</zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, <zeus_tool name="edit_file" path="...">...</zeus_tool>, <zeus_tool name="write_file" path="...">...</zeus_tool>, or <zeus_tool name="memory_search">...</zeus_tool> outside <think> to execute this request.)`,
+          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\n\nUser request: ${last.content}\n(If this request needs a workspace command, file read/write/edit, python script, or memory lookup, emit the required <zeus_tool> XML block in your response; if no workspace tool is needed, answer the user directly.)`,
           attachments: last.attachments,
         }
       );

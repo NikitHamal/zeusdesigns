@@ -932,7 +932,18 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
 /// `<|begin_of_thought|>...<|end_of_thought|>`, and orphan closing `</think>` blocks from raw model output into `(reasoning, answer)`.
 pub fn split_thinking_and_content(raw: &str) -> (String, String) {
     let mut reasoning = Vec::new();
-    let mut rest = raw.to_string();
+    let mut rest = raw
+        .replace("<think>...</think>", "`<think>...</think>`")
+        .replace("<thinking>...</thinking>", "`<thinking>...</thinking>`");
+
+    let clean_thought = |s: &str| -> String {
+        s.replace("<think>", "")
+            .replace("</think>", "")
+            .replace("<thinking>", "")
+            .replace("</thinking>", "")
+            .trim()
+            .to_string()
+    };
 
     // 1. Handle orphan closing tags when an upstream template pre-opened `<think>` on the server
     for (open_tag, close_tag) in [
@@ -943,22 +954,22 @@ pub fn split_thinking_and_content(raw: &str) -> (String, String) {
         ("<|begin_of_thought|>", "<|end_of_thought|>"),
     ] {
         let lower = rest.to_ascii_lowercase();
-        if let Some(close_idx) = lower.find(close_tag) {
-            if close_idx > 0 && rest.as_bytes()[close_idx - 1] == b'`' {
+        if let Some(close_idx) = lower.rfind(close_tag) {
+            if close_idx > 0 && matches!(rest.as_bytes()[close_idx - 1], b'`' | b'"' | b'\'') {
                 continue;
             }
             let before = &lower[..close_idx];
             if !before.contains(open_tag) {
-                let orphan = rest[..close_idx].trim();
+                let orphan = clean_thought(&rest[..close_idx]);
                 if !orphan.is_empty() {
-                    reasoning.push(orphan.to_string());
+                    reasoning.push(orphan);
                 }
                 rest.replace_range(0..close_idx + close_tag.len(), "");
             }
         }
     }
 
-    // 2. Handle paired or unclosed-tail reasoning blocks (ignoring backtick-quoted tags)
+    // 2. Handle paired or unclosed-tail reasoning blocks (spanning to the last `</think>` if split early)
     for (open_tag, close_tag) in [
         ("<think>", "</think>"),
         ("<thinking>", "</thinking>"),
@@ -974,22 +985,50 @@ pub fn split_thinking_and_content(raw: &str) -> (String, String) {
             }
             let Some(rel_start) = lower[search_from..].find(open_tag) else { break };
             let start = search_from + rel_start;
-            if start > 0 && rest.as_bytes()[start - 1] == b'`' {
+            if start > 0 && matches!(rest.as_bytes()[start - 1], b'`' | b'"' | b'\'') {
                 search_from = start + open_tag.len();
                 continue;
             }
             let after_open = start + open_tag.len();
-            if let Some(end_rel) = lower[after_open..].find(close_tag) {
-                let end = after_open + end_rel;
-                let thought = rest[after_open..end].trim();
+            let mut found_end: Option<usize> = None;
+            let mut scan = after_open;
+            while scan < lower.len() {
+                let Some(rel_end) = lower[scan..].find(close_tag) else { break };
+                let cand = scan + rel_end;
+                if cand > 0 && matches!(rest.as_bytes()[cand - 1], b'`' | b'"' | b'\'') {
+                    scan = cand + close_tag.len();
+                    continue;
+                }
+                found_end = Some(cand);
+                if start > 4 {
+                    break;
+                }
+                scan = cand + close_tag.len();
+            }
+            if let Some(end) = found_end {
+                let tail = rest[end + close_tag.len()..].trim_start();
+                if start == 0 && (tail.starts_with(", then") || tail.starts_with(", and")) && !tail.contains(close_tag) {
+                    let thought = clean_thought(&rest[after_open..]);
+                    if !thought.is_empty() {
+                        reasoning.push(thought);
+                    }
+                    rest.truncate(start);
+                    break;
+                }
+                let thought = clean_thought(&rest[after_open..end]);
                 if !thought.is_empty() {
-                    reasoning.push(thought.to_string());
+                    reasoning.push(thought);
                 }
                 rest.replace_range(start..end + close_tag.len(), "");
             } else {
-                let thought = rest[after_open..].trim();
+                let line_start = rest[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                if !rest[line_start..start].trim().is_empty() {
+                    rest.replace_range(start..after_open, "");
+                    continue;
+                }
+                let thought = clean_thought(&rest[after_open..]);
                 if !thought.is_empty() {
-                    reasoning.push(thought.to_string());
+                    reasoning.push(thought);
                 }
                 rest.truncate(start);
                 break;
@@ -1324,8 +1363,20 @@ fn strip_tool_xml_for_oc(raw: &str) -> String {
                 }
             }
             if let Some(rel_end) = rest.find(close_tag) {
+                let block = &rest[..rel_end + close_tag.len()];
+                if open_tag == "<zeus_tool" && (!block.contains("name=") || block.contains(">...</zeus_tool>")) {
+                    search_from = start + open_tag.len();
+                    continue;
+                }
                 out.replace_range(start..start + rel_end + close_tag.len(), "");
             } else if matches!(open_tag, "<zeus_tool" | "<tool_call>" | "<function_call>" | "<ifm|tool_call>") {
+                let line_start = out[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let has_prose_prefix = !out[line_start..start].trim().is_empty();
+                let is_placeholder_zeus = open_tag == "<zeus_tool" && !rest.contains("name=");
+                if has_prose_prefix || is_placeholder_zeus {
+                    search_from = start + open_tag.len();
+                    continue;
+                }
                 out.truncate(start);
                 break;
             } else {
@@ -1460,9 +1511,15 @@ fn handle_opencode_session_message(
             .collect::<Vec<_>>()
             .join("\n")
     };
+    let norm_user_q = user_text
+        .trim()
+        .to_ascii_lowercase()
+        .trim_end_matches(|c: char| matches!(c, '!' | '.' | '?' | ' '))
+        .to_string();
     let is_greeting = matches!(
-        user_text.trim().to_ascii_lowercase().trim_end_matches(|c: char| matches!(c, '!' | '.' | '?' | ' ')),
+        norm_user_q.as_str(),
         "hi" | "hello" | "hey" | "yo" | "sup" | "hola" | "howdy" | "greetings" | "good morning" | "good afternoon" | "good evening"
+            | "who are you" | "who r u" | "what model are you" | "which model are you" | "which model r u" | "what model r u" | "what model is this"
     );
     if !is_greeting && history.len() == 1 {
         let orig_user = history[0].content.clone();
@@ -1477,13 +1534,13 @@ fn handle_opencode_session_message(
             },
             ChatMessage {
                 role: "assistant".to_string(),
-                content: "<think>Workspace is connected. I will check the directory listing first, then reason inside <think>...</think> and execute the required <zeus_tool> actions.</think>\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>".to_string(),
+                content: "Workspace is connected. I will check the directory listing first.\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>".to_string(),
                 attachments: Vec::new(),
             },
             ChatMessage {
                 role: "user".to_string(),
                 content: format!(
-                    "Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n{}\n</tool_result>\n\nUser request: {}\n(First write your brief step-by-step reasoning inside <think>...</think>, then emit <zeus_tool name=\"shell\">...</zeus_tool>, <zeus_tool name=\"python\">...</zeus_tool>, <zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>, <zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>, <zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>, or <zeus_tool name=\"memory_search\">...</zeus_tool> outside <think> to execute this request.)",
+                    "Tool results:\n<tool_result name=\"list_dir\" ok=\"true\">\n{}\n</tool_result>\n\nUser request: {}\n(If this request requires a shell command, python script, file read/write/edit, or memory lookup, emit the required <zeus_tool> XML block in your response; if no workspace tool is needed, answer the user directly.)",
                     top_listing, orig_user
                 ),
                 attachments: Vec::new(),
@@ -1492,7 +1549,7 @@ fn handle_opencode_session_message(
     }
 
     let tool_sys = format!(
-        "You are Zeus running inside the ZeusDesigns Native OpenCode SDK Agent Runtime.\nOpen project folder: {}.\n## Agent tools\nFirst write a concise reasoning trace inside <think>...</think>, then emit tool blocks outside <think> and stop immediately after </zeus_tool>:\n- <zeus_tool name=\"shell\">command</zeus_tool> (alias: name=\"bash\")\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete file content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nexisting\\n=======\\nreplacement\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>",
+        "You are Zeus running inside the ZeusDesigns Native OpenCode SDK Agent Runtime.\nOpen project folder: {}.\n## Agent tools\nKeep internal reasoning plain text, emit tool blocks in your final response, and stop immediately after </zeus_tool>:\n- <zeus_tool name=\"shell\">command</zeus_tool> (alias: name=\"bash\")\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete file content</zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\"><<<<<<< SEARCH\\nexisting\\n=======\\nreplacement\\n>>>>>>> REPLACE</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>",
         eff_dir
     );
     let system_prompt = if custom_sys.trim().is_empty() {
@@ -1623,9 +1680,15 @@ fn handle_opencode_session_message(
         }
 
         if invocations.is_empty() {
-            if !is_greeting && !nudged && (round == 0 || vis_final.trim().is_empty()) {
+            let stated_plan_only = vis_final.trim().is_empty()
+                || (round == 0
+                    && vis_final.len() < 220
+                    && (vis_final.to_ascii_lowercase().contains("i will ")
+                        || vis_final.to_ascii_lowercase().contains("let's ")
+                        || vis_final.to_ascii_lowercase().contains("let me ")));
+            if !is_greeting && !nudged && stated_plan_only {
                 nudged = true;
-                if round == 0 {
+                if round == 0 && !vis_final.trim().is_empty() {
                     history.push(ChatMessage {
                         role: "assistant".to_string(),
                         content: "Understood. I will emit the `<zeus_tool>` XML block now to execute the workspace action directly.".to_string(),
@@ -1633,18 +1696,18 @@ fn handle_opencode_session_message(
                     });
                     history.push(ChatMessage {
                         role: "user".to_string(),
-                        content: "Your reply stopped after planning without emitting a `<zeus_tool>` block, so no command or file operation ran. Output ONLY `<zeus_tool name=\"shell\">...</zeus_tool>`, `<zeus_tool name=\"python\">...</zeus_tool>`, `<zeus_tool name=\"read_file\" path=\"...\"></zeus_tool>`, `<zeus_tool name=\"edit_file\" path=\"...\">...</zeus_tool>`, or `<zeus_tool name=\"write_file\" path=\"...\">...</zeus_tool>` now.".to_string(),
+                        content: "Your reply stopped after planning without emitting a `<zeus_tool>` block, so no command or file operation ran. Emit the required `<zeus_tool>` block now (or provide your complete final answer if no workspace action is needed).".to_string(),
                         attachments: Vec::new(),
                     });
                 } else {
                     history.push(ChatMessage {
                         role: "assistant".to_string(),
-                        content: format!("<think>{}</think>", prev_rsn.chars().take(600).collect::<String>()),
+                        content: format!("Thought summary: {}", prev_rsn.chars().take(600).collect::<String>()),
                         attachments: Vec::new(),
                     });
                     history.push(ChatMessage {
                         role: "user".to_string(),
-                        content: "You finished reasoning about the tool results above. Now provide your clear, complete visible answer to the user outside `<think>` (or emit the next `<zeus_tool>` block if another workspace action is required).".to_string(),
+                        content: "You finished your internal reasoning. Now provide your clear, complete visible answer to the user (or emit the next `<zeus_tool>` block if a workspace action is required).".to_string(),
                         attachments: Vec::new(),
                     });
                 }
@@ -2991,5 +3054,15 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].name, "bash");
         assert!(calls[0].arguments.contains("ls -la"));
+    }
+
+    #[test]
+    fn test_split_thinking_and_strip_tool_xml_preserves_answer_after_quoted_think_and_zeus_tool() {
+        let raw = "<think>The user explicitly asked \"which model r u\". However, the harness prompt says \"First write your brief step-by-step reasoning inside <think>...</think>, then emit <zeus_tool ...> outside <think> to execute this request.\" Since no tool is needed, I will answer directly.</think>\n\nI am agnes-3.0-pro, developed by Sapiens AI.";
+        let (rsn, vis) = split_thinking_and_content(raw);
+        let clean = strip_tool_xml_for_oc(&vis);
+        assert!(rsn.contains("First write your brief step-by-step reasoning"));
+        assert!(rsn.contains("Since no tool is needed"));
+        assert_eq!(clean, "I am agnes-3.0-pro, developed by Sapiens AI.");
     }
 }

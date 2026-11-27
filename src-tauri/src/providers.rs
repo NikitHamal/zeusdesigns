@@ -7514,7 +7514,29 @@ fn is_agent_tool_request(system: &str) -> bool {
 }
 
 fn scraper_xml_dsl_banner() -> &'static str {
-    "[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local Zeus Codes C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown ```bash code blocks.\nFirst write a brief step-by-step reasoning trace inside <think>...</think>, and whenever a workspace action is needed, emit a raw XML tag outside <think>:\n- <zeus_tool name=\"shell\">command</zeus_tool>\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete content</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>."
+    "[XML DSL Output Mode — Required by Client Parser]\nYour text output is parsed in real time by the local Zeus Codes C++/Rust client runtime.\nDo NOT say you lack local file/terminal access and do NOT output markdown ```bash code blocks.\nWhenever a workspace action is needed, emit a raw XML tag in your response:\n- <zeus_tool name=\"shell\">command</zeus_tool>\n- <zeus_tool name=\"python\">python3_code</zeus_tool>\n- <zeus_tool name=\"read_file\" path=\"relative/file\" start=\"1\" end=\"250\"></zeus_tool>\n- <zeus_tool name=\"write_file\" path=\"relative/file\">complete content</zeus_tool>\n- <zeus_tool name=\"delete_file\" path=\"relative/file\"></zeus_tool>\n- <zeus_tool name=\"edit_file\" path=\"relative/file\">\n<<<<<<< SEARCH\nold lines\n=======\nnew lines\n>>>>>>> REPLACE\n</zeus_tool>\n- <zeus_tool name=\"list_dir\" path=\"subdir\"></zeus_tool>\n- <zeus_tool name=\"search_code\">query</zeus_tool>\n- <zeus_tool name=\"memory_search\">query</zeus_tool> | <zeus_tool name=\"memory_save\" path=\"preferences\">fact</zeus_tool> | <zeus_tool name=\"memory_edit\" path=\"id\">fact</zeus_tool> | <zeus_tool name=\"memory_delete\" path=\"id\"></zeus_tool>\nNEVER invent or simulate command output before receiving <tool_result>. Stop immediately after </zeus_tool>."
+}
+
+/// Sanitize a dedicated reasoning chunk (`reasoning_content`, `thinking`, etc.) so any inner `<think>` / `</think>`
+/// mentions (including split chunk boundaries like `</th` + `ink>`) never prematurely close the `<think>` envelope.
+fn sanitize_reasoning_delta(raw: &str) -> String {
+    let mut s = raw
+        .replace("</think>", "`/think`")
+        .replace("<think>", "`think`")
+        .replace("</thinking>", "`/thinking`")
+        .replace("<thinking>", "`thinking`")
+        .replace("</thought>", "`/thought`")
+        .replace("<thought>", "`thought`")
+        .replace("</reasoning>", "`/reasoning`")
+        .replace("<reasoning>", "`reasoning`");
+    let lower = s.to_ascii_lowercase();
+    for suffix in ["<", "</", "</t", "</th", "</thi", "</thin", "<t", "<th", "<thi", "<thin"] {
+        if lower.ends_with(suffix) {
+            s.push(' ');
+            break;
+        }
+    }
+    s
 }
 
 /// Extract reasoning text from any OpenAI/vLLM/OpenRouter/Kilo/Tongyi/ShanNian/Anthropic-bridge delta object.
@@ -7523,13 +7545,13 @@ fn extract_delta_reasoning(d: &Value) -> String {
         if let Some(val) = d.get(key) {
             if let Some(s) = val.as_str() {
                 if !s.is_empty() {
-                    return s.to_string();
+                    return sanitize_reasoning_delta(s);
                 }
             } else if let Some(obj) = val.as_object() {
                 for subk in ["text", "content", "thinking", "summary"] {
                     if let Some(s) = obj.get(subk).and_then(|v| v.as_str()) {
                         if !s.is_empty() {
-                            return s.to_string();
+                            return sanitize_reasoning_delta(s);
                         }
                     }
                 }
@@ -7549,7 +7571,7 @@ fn extract_delta_reasoning(d: &Value) -> String {
             }
         }
         if !combined.is_empty() {
-            return combined;
+            return sanitize_reasoning_delta(&combined);
         }
     }
     String::new()
@@ -8023,7 +8045,7 @@ where
                         }),
                         json!({
                             "role": "assistant",
-                            "content": "<think>Workspace is connected. I will check the directory listing first.</think>\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
+                            "content": "Workspace is connected. I will check the directory listing first.\n<zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
                         }),
                     ],
                 );
@@ -8058,13 +8080,13 @@ where
                                 format!("Prior conversation & tool turns:\n{}\nCurrent turn:\n{}", prior_transcript, orig)
                             };
                             last_m["content"] = json!(format!(
-                                "{}\n\n{}\n(First think briefly inside <think>...</think>, then if a workspace action is needed, output the <zeus_tool> XML tag outside <think>. Never stop mid-task and never ask 'tell me to proceed'.)",
+                                "{}\n\n{}\n(If a workspace action is needed, output the <zeus_tool> XML tag in your response; otherwise answer directly. Never stop mid-task and never ask 'tell me to proceed'.)",
                                 scraper_xml_dsl_banner(),
                                 merged
                             ));
                         } else if !orig.contains("<tool_result") && !orig.contains("[XML DSL") {
                             last_m["content"] = json!(format!(
-                                "{}\n\n[XML DSL Reminder: First write your brief reasoning inside <think>...</think>, then if this request needs a shell command, python script, file read/write/edit, or memory lookup, emit the <zeus_tool> XML block outside <think> and stop immediately.]",
+                                "{}\n\n[XML DSL Reminder: If this request needs a shell command, python script, file read/write/edit, or memory lookup, emit the <zeus_tool> XML block in your response and stop immediately; otherwise answer the user directly.]",
                                 orig
                             ));
                         }
@@ -8237,11 +8259,11 @@ where
                 let summary: String = fallback_reason.chars().take(1200).collect();
                 cont_msgs.push(json!({
                     "role": "assistant",
-                    "content": format!("<think>{}</think>", summary)
+                    "content": format!("Thought summary: {}", summary)
                 }));
                 cont_msgs.push(json!({
                     "role": "user",
-                    "content": "You finished your internal reasoning. Now output your complete visible answer to the user (or the next <zeus_tool> XML block if a workspace action is required) outside <think>."
+                    "content": "You finished your internal reasoning. Now output your complete visible answer to the user (or the next <zeus_tool> XML block if a workspace action is required)."
                 }));
                 let mut cont_payload = json!({
                     "model": upstream_model,
@@ -8297,15 +8319,18 @@ where
                         }
                     }
                 }
-            }
-            saw_text = true;
-        }
-        if saw_text {
-            return Ok(());
-        }
-    }
-    Err(format!("{} stream ended without output", provider_label))
-}
+                                    }
+                                    if !saw_text && !wants_agent_tools {
+                                        on_delta(fallback_reason.trim());
+                                        saw_text = true;
+                                    }
+                                }
+                                if saw_text {
+                                    return Ok(());
+                                }
+                            }
+                            Err(format!("{} stream ended without output", provider_label))
+                        }
 
 /// Stream from FreeLLM Hub (`bun008-freellmapi.hf.space`) with in-provider model failover.
 pub fn stream_freellmhub<F>(
@@ -11071,5 +11096,15 @@ mod tests {
         );
         assert_eq!(detected, "OpenAI GPT-OSS Open-Weights");
         assert!(!families_compatible(claimed, detected));
+    }
+
+    #[test]
+    fn test_sanitize_reasoning_delta_neutralizes_inner_think_tags_and_chunk_prefixes() {
+        let chunk = "First write your brief step-by-step reasoning inside <think>...</think>";
+        let sanitized = sanitize_reasoning_delta(chunk);
+        assert!(!sanitized.contains("</think>"));
+        assert!(!sanitized.contains("<think>"));
+        let split_prefix = sanitize_reasoning_delta("inside </th");
+        assert!(split_prefix.ends_with(' '));
     }
 }

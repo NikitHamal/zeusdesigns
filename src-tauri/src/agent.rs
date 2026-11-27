@@ -93,10 +93,13 @@ pub fn chat_cancel(
     Ok(())
 }
 
-/// Strip `<think>...</think>` and `<thinking>...</thinking>` blocks (including unclosed trailing think blocks)
+/// Strip `<think>...</think>` and `<thinking>...</thinking>` blocks (including unclosed trailing think blocks
+/// and multi-part reasoning split by upstream vLLM servers on quoted `<think>...</think>`)
 /// so tool tags mentioned inside a model's internal reasoning trace are never executed as real tools.
 pub fn strip_thinking_blocks(raw: &str) -> String {
-    let mut out = raw.to_string();
+    let mut out = raw
+        .replace("<think>...</think>", "`<think>...</think>`")
+        .replace("<thinking>...</thinking>", "`<thinking>...</thinking>`");
     for (open_tag, close_tag) in [
         ("<think>", "</think>"),
         ("<thinking>", "</thinking>"),
@@ -112,16 +115,43 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
             }
             let Some(rel_start) = lower[search_from..].find(open_tag) else { break };
             let start = search_from + rel_start;
-            // Ignore `<think>` if quoted inside inline backticks (e.g. `` `<think>` ``)
-            if start > 0 && out.as_bytes()[start - 1] == b'`' {
+            // Ignore `<think>` if quoted inside inline backticks or quotes
+            if start > 0 && matches!(out.as_bytes()[start - 1], b'`' | b'"' | b'\'') {
                 search_from = start + open_tag.len();
                 continue;
             }
             let after_open = start + open_tag.len();
-            if let Some(rel_end) = lower[after_open..].find(close_tag) {
-                let end = after_open + rel_end + close_tag.len();
+            // Find the LAST non-backticked closing tag if the stream starts with `<think>` and an upstream server split early
+            let mut found_end: Option<usize> = None;
+            let mut scan = after_open;
+            while scan < lower.len() {
+                let Some(rel_end) = lower[scan..].find(close_tag) else { break };
+                let cand = scan + rel_end;
+                if cand > 0 && matches!(out.as_bytes()[cand - 1], b'`' | b'"' | b'\'') {
+                    scan = cand + close_tag.len();
+                    continue;
+                }
+                found_end = Some(cand);
+                if start > 4 {
+                    break;
+                }
+                scan = cand + close_tag.len();
+            }
+            if let Some(end_pos) = found_end {
+                let end = end_pos + close_tag.len();
+                let tail = out[end..].trim_start();
+                if start == 0 && (tail.starts_with(", then") || tail.starts_with(", and")) && !tail.contains(close_tag) {
+                    out.truncate(start);
+                    break;
+                }
                 out.replace_range(start..end, "");
             } else {
+                // If `<think>` was mentioned mid-line in prose without a closing tag, only remove the tag itself
+                let line_start = out[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                if !out[line_start..start].trim().is_empty() {
+                    out.replace_range(start..after_open, "");
+                    continue;
+                }
                 out.truncate(start);
                 break;
             }
@@ -130,8 +160,8 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
     // Also strip orphan prefix reasoning when an upstream template pre-opened <think> on the server
     for close_tag in ["</think>", "</thinking>", "</thought>", "</reasoning>", "<|end_of_thought|>"] {
         let lower = out.to_ascii_lowercase();
-        if let Some(end_idx) = lower.find(close_tag) {
-            if end_idx > 0 && out.as_bytes()[end_idx - 1] == b'`' {
+        if let Some(end_idx) = lower.rfind(close_tag) {
+            if end_idx > 0 && matches!(out.as_bytes()[end_idx - 1], b'`' | b'"' | b'\'') {
                 continue;
             }
             let drain_to = end_idx + close_tag.len();

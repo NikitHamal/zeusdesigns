@@ -136,15 +136,26 @@ export function extractLeakedPlan(raw: string): { cleanText: string; leakedPlan:
  */
 function cleanReasoningProse(raw: string): string {
   return raw
-    .replace(/<(?:zeus_tool|tool_call|function_call|ifm\|tool_call)[\s\S]*?(?:<\/(?:zeus_tool|tool_call|function_call|ifm\|tool_call)>|$)/gi, "")
+    .replace(/<(?:zeus_tool|tool_call|function_call|ifm\|tool_call)\b[^>]*>[\s\S]*?<\/(?:zeus_tool|tool_call|function_call|ifm\|tool_call)>/gi, "")
     .replace(/<\/?(?:think|thinking|thought|reasoning|details)[^>]*>/gi, "")
     .trim();
+}
+
+/**
+ * Neutralize inline syntax examples like `<think>...</think>` or quoted `"</think>"` so they
+ * never prematurely close an active reasoning block.
+ */
+function neutralizeInlineThinkMentions(input: string): string {
+  return input
+    .replace(/<(think|thinking|thought|reasoning)>\s*(?:\.{2,}|…)\s*<\/\1>/gi, "`<$1>...</$1>`")
+    .replace(/(["'`])<\/?(think|thinking|thought|reasoning)>\1/gi, "`$2`");
 }
 
 /**
  * Universal reasoning extractor and stripper.
  * Captures:
  * 1. Explicit `<think>...</think>`, `<thinking>...</thinking>`, `<thought>...</thought>`, `<reasoning>...</reasoning>`
+ *    including multi-part `<think>...</think>...reasoning...</think>` when an upstream vLLM/SGLang server split `reasoning_content` early on a quoted `</think>`.
  * 2. `<|begin_of_thought|>...<|end_of_thought|>`
  * 3. `<details type="reasoning">...</details>`
  * 4. GPT-OSS Harmony `<|start|>assistant<|channel|>(?:analysis|thought)<|message|>...<|end|>`
@@ -154,13 +165,53 @@ export function extractReasoningFromRaw(
   raw: string,
   extraThink = ""
 ): { withoutReasoning: string; reasoning: string; thinkOpen: boolean } {
-  let working = raw;
+  let working = neutralizeInlineThinkMentions(raw);
   const collected: string[] = [];
   if (extraThink.trim()) {
     collected.push(cleanReasoningProse(extraThink));
   }
 
   let thinkOpen = false;
+
+  // 0. If the stream starts with `<think>` and has a premature `</think>` injected mid-sentence
+  //    (e.g. followed by `, then emit` or followed later by another orphan `</think>`), merge up to the last `</think>`
+  const leadingThinkMatch = /^\s*<(think|thinking|thought|reasoning)\b[^>]*>/i.exec(working);
+  if (leadingThinkMatch) {
+    const tag = leadingThinkMatch[1].toLowerCase();
+    const closeTag = `</${tag}>`;
+    const openEnd = leadingThinkMatch[0].length;
+    const lower = working.toLowerCase();
+    const firstClose = lower.indexOf(closeTag, openEnd);
+    if (firstClose >= 0) {
+      // Find the last non-backticked closing tag that is not preceded by a new structural opening tag at start-of-line
+      let bestClose = firstClose;
+      let searchFrom = firstClose + closeTag.length;
+      while (searchFrom < lower.length) {
+        const nextClose = lower.indexOf(closeTag, searchFrom);
+        if (nextClose < 0) break;
+        if (nextClose > 0 && working[nextClose - 1] === "`") {
+          searchFrom = nextClose + closeTag.length;
+          continue;
+        }
+        bestClose = nextClose;
+        searchFrom = nextClose + closeTag.length;
+      }
+      const afterClose = working.slice(bestClose + closeTag.length);
+      // If `bestClose` was immediately followed by mid-sentence continuation `, then emit` while still streaming
+      const looksMidSentenceSplit = /^\s*,\s*(?:then\b|and\b|or\b)/i.test(afterClose) && !/<\/\s*think>/i.test(afterClose);
+      if (looksMidSentenceSplit) {
+        thinkOpen = true;
+        const cleaned = cleanReasoningProse(working.slice(openEnd));
+        if (cleaned) collected.push(cleaned);
+        working = "";
+      } else if (bestClose > firstClose) {
+        const mergedBody = working.slice(openEnd, bestClose);
+        const cleaned = cleanReasoningProse(mergedBody);
+        if (cleaned) collected.push(cleaned);
+        working = working.slice(bestClose + closeTag.length);
+      }
+    }
+  }
 
   // 1. Handle orphan closing tags first (when no opening tag precedes the first closing tag)
   const orphanPatterns: Array<{ openRe: RegExp; closeTag: string }> = [
@@ -173,9 +224,8 @@ export function extractReasoningFromRaw(
 
   for (const { openRe, closeTag } of orphanPatterns) {
     const lower = working.toLowerCase();
-    const closeIdx = lower.indexOf(closeTag);
+    const closeIdx = lower.lastIndexOf(closeTag);
     if (closeIdx >= 0) {
-      // Ignore `</think>` if it is quoted inside inline backticks (e.g. `` `</think>` ``)
       const charBefore = closeIdx > 0 ? working[closeIdx - 1] : "";
       const charAfter = working[closeIdx + closeTag.length] ?? "";
       if (charBefore === "`" || charAfter === "`") continue;
@@ -198,8 +248,16 @@ export function extractReasoningFromRaw(
       if (offset > 0 && whole[offset - 1] === "`") {
         return fullMatch;
       }
-      const content = (body1 ?? body2 ?? body3 ?? body4 ?? "").trim();
+      // If `<think>` appears mid-sentence in prose (preceded by words on the same line) and has no closing `</think>`, ignore it
       const closeTok = close1 ?? close2 ?? close3 ?? close4 ?? "";
+      if (closeTok === "" && offset > 0) {
+        const lineStart = whole.lastIndexOf("\n", offset - 1) + 1;
+        const prefixOnLine = whole.slice(lineStart, offset).trim();
+        if (prefixOnLine.length > 0) {
+          return "";
+        }
+      }
+      const content = (body1 ?? body2 ?? body3 ?? body4 ?? "").trim();
       if (closeTok === "") {
         thinkOpen = true;
       }
@@ -252,9 +310,42 @@ export function stripToolMarkupFromText(input: string): string {
     .replace(/<\|start\|>assistant<\|channel\|>commentary[\s\S]*?(?:<\|end\|>|<\|return\|>|<\|call\|>|$)/gi, "")
     .replace(/<zeus_tool[^>]*\/>/gi, notBackticked(() => ""))
     .replace(/<(?:read_file|list_dir|delete_file|memory_search)\b[^>]*\/>/gi, notBackticked(() => ""))
-    .replace(/<zeus_tool(?:\s+[^>]*|\s*)>[\s\S]*?(<\/zeus_tool>|$)/gi, notBackticked(() => ""))
-    .replace(/<tool_call>[\s\S]*?(<\/tool_call>|$)/gi, notBackticked(() => ""))
-    .replace(/<function_call>[\s\S]*?(<\/function_call>|$)/gi, notBackticked(() => ""))
+    .replace(
+      /<zeus_tool(\s+[^>]*)?>([\s\S]*?)(<\/zeus_tool>|$)/gi,
+      (m, attrs: string | undefined, body: string, closeTok: string, offset: number, whole: string) => {
+        if (offset > 0 && whole[offset - 1] === "`") return m;
+        const a = (attrs ?? "").trim();
+        // Never truncate to end-of-string on bare `<zeus_tool>` or `<zeus_tool ...>` syntax mentions
+        if (!/(?:name|tool|action|cmd|path)\s*=/i.test(a)) {
+          return closeTok ? "" : m;
+        }
+        if (body.trim() === "..." || a.includes('="..."')) {
+          return closeTok ? "" : m;
+        }
+        if (!closeTok && offset > 0) {
+          const lineStart = whole.lastIndexOf("\n", offset - 1) + 1;
+          const prefixOnLine = whole.slice(lineStart, offset).trim();
+          if (prefixOnLine.length > 0) return m;
+        }
+        return "";
+      }
+    )
+    .replace(
+      /<(tool_call|function_call)>([\s\S]*?)(<\/\1>|$)/gi,
+      (m, _tag: string, body: string, closeTok: string, offset: number, whole: string) => {
+        if (offset > 0 && whole[offset - 1] === "`") return m;
+        if (!closeTok) {
+          const lineStart = offset > 0 ? whole.lastIndexOf("\n", offset - 1) + 1 : 0;
+          const prefixOnLine = whole.slice(lineStart, offset).trim();
+          if (prefixOnLine.length > 0) return m;
+          const trimmedBody = body.trim();
+          if (trimmedBody.length > 0 && !/^[{<`"']|^[a-z0-9_]+\s*\n\s*\{/i.test(trimmedBody)) {
+            return m;
+          }
+        }
+        return "";
+      }
+    )
     .replace(/<function(?:=|\s+name=)[^>]*>[\s\S]*?(<\/function>|$)/gi, notBackticked(() => ""))
     .replace(/<(?:antml:)?invoke\s+name=[^>]*>[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, notBackticked(() => ""))
     .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, notBackticked(() => ""))
@@ -265,7 +356,6 @@ export function stripToolMarkupFromText(input: string): string {
       /<(bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
       (m, _tag: string, attrs: string | undefined, closeTok: string | undefined, offset: number, whole: string) => {
         if (offset > 0 && whole[offset - 1] === "`") return m;
-        // If there is no closing tag yet, only strip if it starts on its own line or has tool attributes (not inline prose)
         if (!closeTok && !attrs) {
           const lineStart = whole.lastIndexOf("\n", offset - 1) + 1;
           const prefixOnLine = whole.slice(lineStart, offset).trim();

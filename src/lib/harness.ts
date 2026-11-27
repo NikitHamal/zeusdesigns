@@ -643,8 +643,8 @@ Tabs, chips, nav items and side items switch their "on" state on click automatic
 ## Icons
 Write <i data-i="name"></i> (add data-fill for the filled form, add class sm, lg or xl to resize). The harness swaps it for the official Material Symbols Rounded glyph. Never draw icons by hand, never use emoji, never use letters as icons. Safe names: ${ICON_HINT}.`,
 
-    `## Think first (mandatory internal plan inside <think>...</think>)
-If you write a plan, wrap it strictly inside <think>...</think> (4 lines max: target user, section anatomy, component kit classes to use, and 5 specific data rows). NEVER output "Font pairing:", "Signature move:", "Sections:", or "Data points:" outside <think>...</think>. Your visible reply before <artboard> must be 1 or 2 crisp sentences only.`,
+    `## Plan silently first
+Keep your internal plan brief (4 lines max: target user, section anatomy, component kit classes to use, and 5 specific data rows). NEVER output "Font pairing:", "Signature move:", "Sections:", or "Data points:" in your visible reply. Your visible reply before <artboard> must be 1 or 2 crisp sentences only.`,
 
     `## Typography (bundled variable fonts, already mapped to var(--font) and var(--heading))
 Use var(--heading) for headings/numerals and var(--font) for body copy — they are pre-configured to ${ds.name}'s authentic bundled font stack (${ds.tokens.heading}). You may also reference bundled families directly when appropriate:

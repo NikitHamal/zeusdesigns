@@ -55,7 +55,7 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
   try { mcp = (await enabledMcpTools()).slice(0, maxMcp); } catch { /* none */ }
   const lines = [
     "## Agent tools",
-    "Emit tool blocks outside `<think>` and stop your turn after the closing tag so the harness can execute and return `<tool_result>`. Never emit a placeholder tool name.",
+    "Emit tool blocks in your final response (never inside internal reasoning) and stop your turn after the closing tag so the harness can execute and return `<tool_result>`. Never emit a placeholder tool name.",
     ws || !opts.design ? profile.toolExamples : "",
     "- `<zeus_tool name=\"web_fetch\" path=\"https://example.com\"></zeus_tool>` | `<zeus_tool name=\"lmfingerprint\" path=\"provider/model\"></zeus_tool>` (verify if a model is genuine direct or routed under the hood) | `<zeus_tool name=\"memory_search\">query</zeus_tool>` | `<zeus_tool name=\"memory_save\" path=\"preferences\">durable fact</zeus_tool>` | `<zeus_tool name=\"memory_edit\" path=\"mem-id\">updated fact</zeus_tool>` | `<zeus_tool name=\"memory_delete\" path=\"mem-id\"></zeus_tool>`",
     opts.design ? studioToolsPrompt() : "",

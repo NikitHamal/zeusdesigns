@@ -178,7 +178,7 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
   switch (family) {
     case "mercury":
       return `## Model Harness²: ${label} (${protoTag} · Diffusion Architect)
-- Never emit \`<zeus_tool>\` or \`<tool_call>\` tags inside \`<think>...</think>\`. Keep \`<think>\` pure plain-text reasoning.
+- Keep internal reasoning plain text and emit tool tags only in your final visible response.
 - When asked to create or write a file (such as \`AGENTS.md\`, \`README.md\`, a script, or a module), emit \`<zeus_tool name="write_file" path="...">...</zeus_tool>\` immediately in your first turn. Do NOT call \`list_dir\` before writing a requested file when the target path is already known.
 - Never repeat the same \`list_dir\` or \`read_file\` call if it returned empty or you already saw the result.`;
 
@@ -196,14 +196,14 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "deepseek":
       return `## Model Harness²: ${label} (${protoTag} · DeepSeek V4/R1 Bash & Python Agent Profile)
-- Keep \`<think>\` focused and never write literal \`<zeus_tool>\` tags inside \`<think>\`; emit tool tags only in your final response after \`</think>\`.
+- Keep internal reasoning focused plain text and emit tool tags only in your final visible response.
 - Leverage your strong \`shell\` (bash) and \`python\` training: use \`<zeus_tool name="shell">\` for ripgrep/git/test commands and \`<zeus_tool name="python">\` for programmatic multi-hunk edits, AST/JSON inspection, and algorithmic verification.
 - When creating a new file, call \`write_file\` directly without preliminary directory listing.`;
 
     case "kimi":
       return `## Model Harness²: ${label} (${protoTag} · Moonshot Kimi K2.7/K3 SWE-Agent Profile)
 - Use your SWE-agent strengths: prefer compound \`shell\` commands (\`rg -n\`, \`find\`, \`pytest\`, \`npm test\`, \`cargo check\`) and \`python\` execution over slow file-by-file browsing.
-- Emit raw \`<zeus_tool name="...">...</zeus_tool>\` blocks outside \`<think>\`. Do not re-run \`list_dir\` on directories already shown in \`## Project\`.`;
+- Emit raw \`<zeus_tool name="...">...</zeus_tool>\` blocks in your final response. Do not re-run \`list_dir\` on directories already shown in \`## Project\`.`;
 
     case "glm":
       return `## Model Harness²: ${label} (${protoTag} · Z.ai GLM-5 Agentic Coder Profile)
@@ -221,7 +221,7 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "nemotron":
       return `## Model Harness²: ${label} (${protoTag} · NVIDIA Nemotron 3 Software Engineering Profile)
-- Keep \`<think>\` concise and never place \`<zeus_tool>\` tags inside \`<think>\`.
+- Keep internal reasoning concise plain text and emit tool tags only in your final visible response.
 - Use \`shell\`, \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` directly; never call \`list_dir\` if the target file path is already known.`;
 
     case "mistral":
@@ -234,7 +234,7 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "frontier_moe":
       return `## Model Harness²: ${label} (${protoTag} · Frontier Agentic Engineering Profile)
-- Use \`shell\` (bash), \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` to solve tasks in minimal rounds. Never emit \`<zeus_tool>\` inside \`<think>\`.`;
+- Use \`shell\` (bash), \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` to solve tasks in minimal rounds. Emit tool tags only in your final visible response.`;
 
     case "compact_open":
       return `## Model Harness²: ${label} (${protoTag} · Compact High-Speed Agent Profile)
