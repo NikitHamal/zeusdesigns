@@ -85,6 +85,8 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
     "- Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; keep terminal output clean.",
     "- Prefer parallelizing independent tool calls in a single turn.",
     "- Treat unfamiliar files or changes as potential user work and investigate with `read_file` before deleting or overwriting them.",
+    "- Use `todowrite` for any task with 3+ steps and keep exactly one item `in_progress`. Use `question` when a decision is genuinely the user's; the answer returns as the tool result.",
+    "- Delegate broad read-only investigation with `subagent` (`explore`, `plan`, `review`) and verification with `verify`; give the child a complete prompt, and pass `sessionID` to continue a child. Prefer `apply_patch` for multi-file changes and `websearch` then `web_fetch` for current information; run `diagnostics` after edits.",
     `- Tool outputs exceeding 2,000 lines or 50 KiB are automatically bounded and saved to a temp \`tool-output/tool_<id>.txt\` file outside the workspace with \`[showing lines 1-N of M; full output saved to <path>]\`.`,
   ].join("\n");
 
@@ -108,6 +110,7 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
         "Emit `<zeus_tool>` blocks in your final response (never inside internal reasoning) and stop your turn after the closing tag so the harness can execute them after stream completion and return `<tool_result>`.",
         openCodeDiscipline,
         ws || !opts.design ? profile.toolExamples : "",
+        "- `<zeus_tool name=\"todowrite\">{\"todos\":[{\"content\":\"step\",\"status\":\"in_progress\"}]}</zeus_tool>` | `<zeus_tool name=\"question\">{\"questions\":[{\"question\":\"Which?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]}</zeus_tool>` | `<zeus_tool name=\"subagent\">{\"agent\":\"explore\",\"prompt\":\"...\",\"description\":\"...\"}</zeus_tool>` | `<zeus_tool name=\"apply_patch\">*** Begin Patch\\n*** Update File: a.ts\\n@@\\n-old\\n+new\\n*** End Patch</zeus_tool>` | `<zeus_tool name=\"websearch\">query</zeus_tool>` | `<zeus_tool name=\"diagnostics\"></zeus_tool>`",
         "- `<zeus_tool name=\"web_fetch\" path=\"https://example.com\"></zeus_tool>` | `<zeus_tool name=\"lmfingerprint\" path=\"provider/model\"></zeus_tool>` | `<zeus_tool name=\"memory_search\">query</zeus_tool>` | `<zeus_tool name=\"memory_save\" path=\"preferences\">durable fact</zeus_tool>` | `<zeus_tool name=\"memory_edit\" path=\"mem-id\">updated fact</zeus_tool>` | `<zeus_tool name=\"memory_delete\" path=\"mem-id\"></zeus_tool>`",
         "",
         "Additional Workspace Tools (pass JSON arguments in body when multiple parameters are needed):",

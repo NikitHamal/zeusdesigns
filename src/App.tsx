@@ -1,3 +1,4 @@
+import { startAgentBridge } from "./lib/agentState";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
@@ -40,6 +41,8 @@ export default function App() {
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
   }, [theme, hue]);
+
+  useEffect(() => { startAgentBridge(); }, []);
 
   useEffect(() => {
     let off: (() => void) | undefined;

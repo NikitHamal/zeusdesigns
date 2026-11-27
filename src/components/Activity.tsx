@@ -62,8 +62,13 @@ const PRESENTATIONS: Record<string, ToolPresentation> = {
   memory_search: { running: "Recalling", done: "Recalled", icon: "psychology", subjectIsPath: false, detail: "Prose" },
   memory_edit: { running: "Updating note", done: "Updated note", icon: "psychology", subjectIsPath: false, detail: "Prose" },
   memory_delete: { running: "Removing note", done: "Removed note", icon: "psychology", subjectIsPath: false, detail: "Prose" },
-  update_plan: { running: "Planning", done: "Updated plan", icon: "checklist", subjectIsPath: false, detail: "Prose" },
-  ask_user: { running: "Asking", done: "Asked", icon: "help", subjectIsPath: false, detail: "Prose" },
+  update_plan: { running: "Updating todos", done: "Updated todos", icon: "checklist", subjectIsPath: false, detail: "Prose" },
+  todoread: { running: "Reading todos", done: "Read todos", icon: "checklist", subjectIsPath: false, detail: "Prose" },
+  apply_patch: { running: "Patching", done: "Patched", icon: "difference", subjectIsPath: false, detail: "Diff" },
+  websearch: { running: "Searching the web", done: "Searched the web", icon: "travel_explore", subjectIsPath: false, detail: "Prose" },
+  session_search: { running: "Searching sessions", done: "Searched sessions", icon: "history", subjectIsPath: false, detail: "Prose" },
+  diagnostics: { running: "Running diagnostics", done: "Ran diagnostics", icon: "bug_report", subjectIsPath: true, detail: "Terminal" },
+  ask_user: { running: "Asking you", done: "Asked", icon: "help", subjectIsPath: false, detail: "Prose" },
   request_approval: { running: "Awaiting approval", done: "Requested approval", icon: "verified_user", subjectIsPath: false, detail: "Prose" },
   spawn_subagent: { running: "Delegating", done: "Delegated", icon: "call_split", subjectIsPath: false, detail: "Prose" },
   add_ui_kit: { running: "Installing UI kit", done: "Installed UI kit", icon: "style", subjectIsPath: false, detail: "Terminal" },
@@ -177,6 +182,20 @@ export function parseToolEntry(t: ToolCall, pres: ToolPresentation): ParsedToolE
       ? body.split("\n")[0]?.slice(0, 72) ?? ""
       : body.slice(0, 56));
   const subject = pres.subjectIsPath && rawSubject ? shortenPath(rawSubject) : rawSubject;
+
+  // 0. apply_patch: one combined diff over every touched file
+  if (t.files && t.files.length) {
+    const lines: ComputedDiff["lines"] = [];
+    let additions = 0;
+    let deletions = 0;
+    for (const f of t.files) {
+      const d = DiffUtils.computeDiff(f.oldContent ?? "", f.newContent ?? "", 3);
+      additions += d.additions;
+      deletions += d.deletions;
+      lines.push({ kind: "hdr", text: f.from && f.from !== f.path ? `${f.from} -> ${f.path}` : f.path }, ...d.lines);
+    }
+    return { subject: t.files.length === 1 ? shortenPath(t.files[0].path) : `${t.files.length} files`, body, additions, deletions, computedDiff: { additions, deletions, lines }, meta: "" };
+  }
 
   // 1. Exact before/after diff from native checkpoint capture
   if (t.oldContent !== undefined || t.newContent !== undefined) {

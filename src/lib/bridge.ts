@@ -17,6 +17,7 @@ export type ChatEvent =
       oldContent?: string;
       newContent?: string;
       checkpointId?: string;
+      files?: Array<{ path: string; from?: string; kind?: string; oldContent?: string | null; newContent?: string | null }>;
     }
   | {
       type: "provider_notice";
@@ -35,6 +36,10 @@ export interface ChatRequest {
   system: string;
   messages: { role: "user" | "assistant"; content: string; attachments?: { name: string; mime: string; dataUrl: string }[] }[];
   workspaceRoot?: string;
+  sessionId?: string;
+  subagentDepth?: number;
+  maxSubagentDepth?: number;
+  toolsPrompt?: string;
   custom?: { baseUrl: string; apiKey: string; format: "openai" | "anthropic" };
 }
 

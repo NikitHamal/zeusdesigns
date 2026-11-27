@@ -289,7 +289,7 @@ export function extractReasoningFromRaw(
  */
 export function stripToolMarkupFromText(input: string): string {
   const shorthandTags =
-    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|copy_file|create_folder|insert_at_line|append_to_file|prepend_to_file|regex_replace|get_file_info|diff_files|git_status|git_diff|git_log|git_branch|git_stage|git_unstage|git_commit|security_scan|add_ui_kit|subagent|spawn_subagent|request_approval|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
+    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|copy_file|create_folder|insert_at_line|append_to_file|prepend_to_file|regex_replace|get_file_info|diff_files|git_status|git_diff|git_log|git_branch|git_stage|git_unstage|git_commit|security_scan|add_ui_kit|subagent|spawn_subagent|request_approval|apply_patch|websearch|todowrite|todoread|question|session_search|diagnostics|task|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
 
   const notBackticked =
     (fn: (m: string) => string) =>
@@ -359,7 +359,7 @@ export function stripToolMarkupFromText(input: string): string {
     .replace(/<\|open\|>tools[\s\S]*?(?:<\|close\|>tools(?:<\|sep\|>)?|$)/gi, "")
     .replace(/<\|open\|>call[\s\S]*?(?:<\|close\|>call(?:<\|sep\|>)?|$)/gi, "")
     .replace(
-      /<(bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
+      /<(bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|apply_patch|websearch|todowrite|todoread|question|session_search|diagnostics|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
       (m, _tag: string, attrs: string | undefined, closeTok: string | undefined, offset: number, whole: string) => {
         if (offset > 0 && whole[offset - 1] === "`") return m;
         if (!closeTok && !attrs) {

@@ -1,6 +1,15 @@
 import { useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
 import { cn } from "../utils/cn";
+import { useStore } from "../store";
+
+const FILE_PILL = /^(?:[\w@.-]+\/)*[\w@.-]+\.(?:tsx?|jsx?|mjs|cjs|css|scss|html?|json|md|mdx|rs|py|toml|ya?ml|go|java|kt|cpp|hpp|c|h|sh|sql|svg|vue|svelte)(?::(\d+)(?:-\d+)?)?$/;
+
+function openFilePill(raw: string) {
+  const path = raw.replace(/:\d+(?:-\d+)?$/, "");
+  useStore.getState().patchUI({ leftTab: "files", chatCollapsed: false });
+  setTimeout(() => window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: path })), 30);
+}
 
 function renderInline(s: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -27,6 +36,21 @@ function renderInline(s: string, keyPrefix: string): ReactNode[] {
       );
     } else if (tok.startsWith("`")) {
       const codeText = tok.slice(1, -1);
+      if (FILE_PILL.test(codeText) && useStore.getState().ui.workspace?.root) {
+        out.push(
+          <button
+            key={k}
+            type="button"
+            title="Open file"
+            onClick={() => openFilePill(codeText)}
+            className="rounded-md border border-outline-variant/45 bg-surface-high px-1.5 py-0.5 font-mono text-[12.5px] text-on-surface underline-offset-2 outline-none hover:bg-surface-highest hover:underline"
+          >
+            {codeText}
+          </button>
+        );
+        last = m.index + tok.length;
+        continue;
+      }
       out.push(
         <code
           key={k}

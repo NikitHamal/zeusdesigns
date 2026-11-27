@@ -17,6 +17,12 @@ import { Dropdown, IconBtn, Markdown, MenuItem, Thumb } from "./ui";
 import { Icon } from "./Icon";
 import { SessionHeader } from "./SessionHeader";
 import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline } from "./Activity";
+import { DockStack } from "./Docks";
+import { ReviewPanel } from "./ReviewPanel";
+import { SubagentDrawer } from "./SubagentRow";
+import { TokenRing } from "./TokenRing";
+import { TurnForkRevert, useTurnUserId } from "./TurnActions";
+import type { DockTab } from "./SessionHeader";
 import { JumpToBottom, TurnDiffs, TurnReadout, TurnTimeline, useTimelineFollow } from "./Timeline";
 import { FilesPanel, GitPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
@@ -142,7 +148,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   }
   if (m.role === "user") {
     return (
-      <div className="anim-pop ml-auto flex max-w-[92%] flex-col items-end gap-1.5">
+      <div className="anim-pop group/user ml-auto flex max-w-[92%] flex-col items-end gap-1.5">
         {m.quote && <div className="w-full max-w-[330px]"><QuoteCard q={m.quote} /></div>}
         {m.attachments && m.attachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-1.5">
@@ -154,12 +160,17 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
           </div>
         )}
         <div className="select-text whitespace-pre-wrap oc-hairline rounded-lg bg-surface-container px-3.5 py-2 text-[14px] leading-[1.55] text-on-surface">{m.text}</div>
+        <div className="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/user:opacity-100">
+          <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
+          <TurnForkRevert msgId={m.id} userMsgId={m.id} />
+        </div>
       </div>
     );
   }
   const activeConvId = useStore((s) => s.activeConvId);
   const ws = useStore((s) => s.ui.workspace);
   const patchUI = useStore((s) => s.patchUI);
+  const turnUserId = useTurnUserId(m.id);
 
   return (
     <div className="anim-pop group min-w-0 space-y-2.5">
@@ -200,6 +211,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
           <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
           <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
+          <TurnForkRevert msgId={m.id} userMsgId={turnUserId} />
           {m.checkpointId && ws?.root && (
             <IconBtn
               label="Restore file checkpoint before this turn"
@@ -262,12 +274,7 @@ function ContextWindowPill() {
           open && "bg-surface-high text-on-surface"
         )}
       >
-        <span className="h-1.5 w-7 overflow-hidden rounded-full bg-surface-highest">
-          <i
-            style={{ width: `${Math.max(8, stats.percentOfBudget)}%` }}
-            className={cn("block h-full rounded-full transition-all", stats.needsCompaction ? "bg-error" : "bg-primary")}
-          />
-        </span>
+        <TokenRing pct={stats.percentOfBudget} hot={stats.needsCompaction} />
         <span className="font-mono tabular-nums">{fmtTok(stats.totalTokens)}</span>
       </button>
     )}>
@@ -704,7 +711,7 @@ export function ChatPane() {
   const showCanvas = useStore((s) => s.ui.showCanvas);
   const m3eOpen = useStore((s) => !!s.ui.m3e);
   const [dockOpen, setDockOpen] = useState(true);
-  const [dockTab, setDockTab] = useState<"files" | "git" | "terminal">("files");
+  const [dockTab, setDockTab] = useState<DockTab>("files");
   const content = useRef<HTMLDivElement>(null);
   const { ref: scroller, following, follow, resume } = useTimelineFollow(conv.id);
   const last = conv.messages[conv.messages.length - 1];
@@ -724,7 +731,7 @@ export function ChatPane() {
   }, [follow, leftTab, conv.messages.length === 0]);
   useEffect(() => { follow(); }, [last?.text, last?.parts, last?.tools, last?.artboardIds?.length, follow]);
 
-  const handleOpenDock = (tab: "files" | "git" | "terminal", filePath?: string) => {
+  const handleOpenDock = (tab: DockTab, filePath?: string) => {
     if (!showCanvas && !m3eOpen) {
       setDockOpen(true);
       setDockTab(tab);
@@ -740,7 +747,8 @@ export function ChatPane() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
+      <SubagentDrawer />
       <SessionHeader
         canDock={canSplitIde}
         dockOpen={dockOpen}
@@ -756,6 +764,8 @@ export function ChatPane() {
         <GitPanel />
       ) : leftTab === "terminal" ? (
         <TerminalPanel />
+      ) : leftTab === "review" ? (
+        <ReviewPanel />
       ) : (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -770,6 +780,7 @@ export function ChatPane() {
             </div>
             {!following && conv.messages.length > 0 && <JumpToBottom onClick={() => resume(true)} />}
             <div className="mx-auto w-full max-w-[840px]">
+              <DockStack convId={conv.id} />
               <Composer />
             </div>
           </div>
@@ -787,6 +798,16 @@ export function ChatPane() {
                   >
                     <Icon name="account_tree" size={14} />
                     Files
+                  </button>
+                  <button
+                    onClick={() => setDockTab("review")}
+                    className={cn(
+                      "state flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium",
+                      dockTab === "review" ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant"
+                    )}
+                  >
+                    <Icon name="difference" size={14} />
+                    Review
                   </button>
                   <button
                     onClick={() => setDockTab("git")}
@@ -814,7 +835,7 @@ export function ChatPane() {
                 </IconBtn>
               </div>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                {dockTab === "files" ? <FilesPanel /> : dockTab === "git" ? <GitPanel /> : <TerminalPanel />}
+                {dockTab === "files" ? <FilesPanel /> : dockTab === "review" ? <ReviewPanel /> : dockTab === "git" ? <GitPanel /> : <TerminalPanel />}
               </div>
             </div>
           )}

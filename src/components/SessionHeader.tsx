@@ -1,15 +1,17 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { activeConv, activeProject, useStore } from "../store";
-import { openWorkspace, openWorkspaceByPath } from "../lib/bridge";
+import { nativeGit, openWorkspace, openWorkspaceByPath } from "../lib/bridge";
+import { forkFromTurn, sessionMarkdown } from "../lib/session";
+import { changedFilesOf } from "./Timeline";
 import { cn } from "../utils/cn";
 import { Dropdown, MenuItem, MenuLabel } from "./ui";
 import { Icon } from "./Icon";
 
-/* icons: code_blocks, account_tree, terminal, commit, folder_open, folder, create_new_folder, expand_more, left_panel_close */
+/* icons: code_blocks, account_tree, terminal, commit, difference, call_split, content_copy, more_horiz, folder_open, folder, create_new_folder, expand_more, left_panel_close */
 
-export type DockTab = "files" | "git" | "terminal";
+export type DockTab = "files" | "git" | "terminal" | "review";
 
-function PaneToggle({ icon, label, on, onClick }: { icon: string; label: string; on: boolean; onClick: () => void }) {
+function PaneToggle({ icon, label, on, onClick, badge }: { icon: string; label: string; on: boolean; onClick: () => void; badge?: number }) {
   return (
     <button
       title={label}
@@ -17,11 +19,12 @@ function PaneToggle({ icon, label, on, onClick }: { icon: string; label: string;
       aria-pressed={on}
       onClick={onClick}
       className={cn(
-        "grid size-7 place-items-center rounded-md outline-none transition-colors",
+        "relative grid size-7 place-items-center rounded-md outline-none transition-colors",
         on ? "bg-surface-container text-on-surface" : "text-on-surface-variant hover:bg-surface-low hover:text-on-surface"
       )}
     >
       <Icon name={icon} size={17} />
+      {badge ? <span className="absolute -top-0.5 -right-0.5 grid min-w-3.5 place-items-center rounded-full bg-on-surface px-1 font-mono text-[9px] leading-[14px] font-semibold text-surface">{badge > 99 ? "99+" : badge}</span> : null}
     </button>
   );
 }
@@ -38,6 +41,17 @@ export function SessionHeader({ canDock, dockOpen, dockTab, setDockOpen, setDock
   const patchUI = useStore((s) => s.patchUI);
   const setTitle = useStore((s) => s.setTitle);
   const [editing, setEditing] = useState(false);
+  const busy = useStore((s) => s.busy);
+  const root = curProject?.root;
+  const [branch, setBranch] = useState("");
+  useEffect(() => {
+    let dead = false;
+    if (!root) { setBranch(""); return; }
+    void nativeGit.status(root).then((g) => !dead && setBranch(g.isRepo ? g.branch : ""));
+    return () => { dead = true; };
+  }, [root, busy]);
+  const changed = useMemo(() => changedFilesOf(conv.messages.flatMap((m) => m.tools ?? [])).length, [conv.messages]);
+  const lastTurn = conv.messages[conv.messages.length - 1];
 
   const switchProject = (id: string) => {
     const st = useStore.getState();
@@ -98,13 +112,35 @@ export function SessionHeader({ canDock, dockOpen, dockTab, setDockOpen, setDock
         </button>
       )}
 
+      {branch && (
+        <span title={`Branch ${branch}`} className="hidden shrink-0 items-center gap-1 rounded-md px-1.5 font-mono text-[11.5px] text-on-surface-variant md:flex">
+          <Icon name="call_split" size={13} />
+          <span className="max-w-[110px] truncate">{branch}</span>
+        </span>
+      )}
+      {busy && <span className="zshine shrink-0 text-[12px] font-medium">Working</span>}
       <span className="flex-1" />
+      {conv.messages.length > 0 && (
+        <Dropdown align="right" width={200} trigger={({ toggle }) => (
+          <button onClick={toggle} title="Session actions" aria-label="Session actions" className="grid size-7 place-items-center rounded-md text-on-surface-variant hover:bg-surface-low hover:text-on-surface">
+            <Icon name="more_horiz" size={17} />
+          </button>
+        )}>
+          {(close) => (
+            <>
+              <MenuItem icon={<Icon name="content_copy" size={16} />} label="Copy as Markdown" onClick={() => { close(); void navigator.clipboard.writeText(sessionMarkdown(conv)); useStore.getState().notify("Copied session"); }} />
+              <MenuItem icon={<Icon name="call_split" size={16} />} label="Fork session" onClick={() => { close(); if (lastTurn) forkFromTurn(conv.id, lastTurn.id); }} />
+            </>
+          )}
+        </Dropdown>
+      )}
       {trailing}
       <div className="flex items-center gap-0.5">
         <PaneToggle icon="code_blocks" label="Canvas" on={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })} />
         <PaneToggle icon="account_tree" label="Files" on={isOn("files")} onClick={() => pane("files")} />
         <PaneToggle icon="terminal" label="Terminal" on={isOn("terminal")} onClick={() => pane("terminal")} />
-        <PaneToggle icon="commit" label="Review diffs" on={isOn("git")} onClick={() => pane("git")} />
+        <PaneToggle icon="difference" label="Review diffs" on={isOn("review")} onClick={() => pane("review")} badge={changed} />
+        <PaneToggle icon="commit" label="Git" on={isOn("git")} onClick={() => pane("git")} />
       </div>
       {showCanvas && <PaneToggle icon="left_panel_close" label="Hide chat" on={false} onClick={() => patchUI({ chatCollapsed: true })} />}
     </div>

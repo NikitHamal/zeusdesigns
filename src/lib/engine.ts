@@ -13,7 +13,7 @@ import { anchorTools, buildParts, listenLiveShell, type PartAnchors } from "./ti
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, getCodingHarnessProfile, MAX_STEPS_PROMPT } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook, runPreToolUseHook } from "./harness2";
-import { AutonomyPolicy, BriefCheck, computeToolBatchWaves, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
+import { BriefCheck, computeToolBatchWaves, DiffUtils, HistoryPruner, ModelProfiles, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
 import { formatRoundToolsForHistory } from "./stormyTools";
 import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
@@ -364,6 +364,10 @@ export async function sendMessage(opts: {
     system,
     messages: history,
     workspaceRoot: effectiveWorkspaceRoot,
+    sessionId: convId,
+    toolsPrompt: mode === "design" ? undefined : toolsText || undefined,
+    subagentDepth: 0,
+    maxSubagentDepth: settings.maxSubagentDepth ?? 2,
     custom: custom ? { baseUrl: custom.baseUrl, apiKey: custom.apiKey, format: custom.format } : undefined,
   };
   const device: Device = target?.device ?? "mobile";
@@ -518,21 +522,8 @@ export async function sendMessage(opts: {
               tools.push(t);
               roundTools.push(t);
               const canon = ToolAliases.canonicalName(e.name);
-              if (canon === "update_plan") {
-                const parsedPlan = parsePlanFromToolCall(t.args ?? "");
-                if (parsedPlan) {
-                  useStore.getState().patchMessage(convId, asstId, { plan: parsedPlan });
-                }
-              } else if (canon === "ask_user") {
-                const parsedQ = parseAskUserFromToolCall(t.id, t.args ?? "");
-                if (parsedQ) {
-                  useStore.getState().patchMessage(convId, asstId, { pendingQuestion: parsedQ });
-                }
-              } else if (canon === "request_approval" || AutonomyPolicy.dangerReason(e.name, t.args)) {
-                const parsedApp = parseApprovalFromToolCall(t.id, e.name, t.args ?? "");
-                if (parsedApp) {
-                  useStore.getState().patchMessage(convId, asstId, { pendingApproval: parsedApp });
-                }
+              if (canon === "update_plan" || canon === "ask_user" || canon === "request_approval") {
+                // Interactive tools run natively: docks come from zeus://question|permission|todo events.
               } else if (isStudioTool(e.name) && preHook.allow) {
                 studioRuns.set(
                   e.id,
@@ -574,22 +565,12 @@ export async function sendMessage(opts: {
                   t.additions = d.additions;
                   t.deletions = d.deletions;
                 }
+                if (e.files?.length) t.files = e.files;
                 if (e.checkpointId) {
                   t.checkpointId = e.checkpointId;
                   useStore.getState().patchMessage(convId, asstId, { checkpointId: e.checkpointId });
                 }
                 const canon = ToolAliases.canonicalName(t.name);
-                if (canon === "update_plan") {
-                  const parsedPlan = parsePlanFromToolCall(t.args || e.output || "");
-                  if (parsedPlan) {
-                    useStore.getState().patchMessage(convId, asstId, { plan: parsedPlan });
-                  }
-                } else if (canon === "ask_user") {
-                  const parsedQ = parseAskUserFromToolCall(t.id, t.args || e.output || "");
-                  if (parsedQ) {
-                    useStore.getState().patchMessage(convId, asstId, { pendingQuestion: parsedQ });
-                  }
-                }
                 if (t.name.startsWith("memory") || canon.startsWith("memory")) {
                   import("./bridge")
                     .then(({ nativeMemory }) =>
@@ -665,16 +646,6 @@ export async function sendMessage(opts: {
         const batchWaves = computeToolBatchWaves(roundTools);
         void batchWaves;
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (
-          roundTools.some(
-            (t) =>
-              ToolAliases.canonicalName(t.name) === "ask_user" ||
-              ToolAliases.canonicalName(t.name) === "request_approval" ||
-              Boolean(AutonomyPolicy.dangerReason(t.name, t.args))
-          )
-        ) {
-          break;
-        }
         const stuckVerdict = stuckDetector.record(roundTools);
         if (stuckVerdict.stop) {
           useStore.getState().patchMessage(convId, asstId, { error: stuckVerdict.stop });

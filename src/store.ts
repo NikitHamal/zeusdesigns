@@ -42,13 +42,14 @@ export interface Settings {
   askBeforeBuilding?: boolean;
   autonomy?: "unleashed" | "leashed";
   agentRuntime?: "zeus" | "opencode";
+  maxSubagentDepth?: number;
 }
 export interface Viewport { x: number; y: number; z: number }
 
 interface UI {
   settingsOpen: boolean;
   settingsTab: string;
-  leftTab: "chat" | "files" | "git" | "terminal";
+  leftTab: "chat" | "files" | "git" | "terminal" | "review";
   odTab?: "studio" | "design-systems" | "skills" | "deliverables";
   compare: string[] | null;
   interactId: string | null;

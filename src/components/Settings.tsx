@@ -356,6 +356,12 @@ function LibraryTab() {
                 >
                   BriefCheck: {settings.askBeforeBuilding ? "Ask first" : "Auto-decide"}
                 </button>
+                <button
+                  onClick={() => patch({ maxSubagentDepth: ((settings.maxSubagentDepth ?? 2) % 4) + 1 })}
+                  className="state rounded-full bg-surface-high px-3 py-1 font-medium text-on-surface"
+                >
+                  Subagent depth: {settings.maxSubagentDepth ?? 2}
+                </button>
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">

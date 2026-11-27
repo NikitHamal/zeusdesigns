@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useStore } from "../store";
 import type { Message, ToolCall } from "../types";
 import { timelineItems, transitionFollow, type FollowEvent, type FollowState } from "../lib/timeline";
+import { DiffUtils, ToolAliases } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
+import { SubagentRow } from "./SubagentRow";
 import { BasicTool, DiffPill, ExploreGroup, ReasoningRow, ToolDetail, ToolRow, getToolPresentation, parseToolEntry, shortenPath } from "./Activity";
 
 /* ------------------------------------------------------------------ */
@@ -23,7 +25,9 @@ export function TurnTimeline({
       {items.map((it) => {
         if (it.kind === "reasoning") return <ReasoningRow key={it.key} text={it.text} ms={it.ms} live={live && it.last} />;
         if (it.kind === "explore") return <ExploreGroup key={it.key} tools={it.tools} />;
-        if (it.kind === "tool") return <ToolRow key={it.key} t={it.tool} />;
+        if (it.kind === "tool") {
+          return ToolAliases.canonicalName(it.tool.name) === "spawn_subagent" ? <SubagentRow key={it.key} t={it.tool} /> : <ToolRow key={it.key} t={it.tool} />;
+        }
         return (
           <div key={it.key} className="py-1">
             {renderText(it.text, it.key, live && it.last)}
@@ -37,7 +41,7 @@ export function TurnTimeline({
 /* ------------------------------------------------------------------ */
 /* Turn diff summary: "N files changed" with inline diffs               */
 /* ------------------------------------------------------------------ */
-interface ChangedFile {
+export interface ChangedFile {
   path: string;
   additions: number;
   deletions: number;
@@ -48,6 +52,17 @@ export function changedFilesOf(tools: ToolCall[]): ChangedFile[] {
   const byPath = new Map<string, ChangedFile>();
   for (const t of tools) {
     if (t.status !== "ok") continue;
+    if (t.files?.length) {
+      for (const f of t.files) {
+        const d = DiffUtils.computeDiff(f.oldContent ?? "", f.newContent ?? "", 0);
+        const prev = byPath.get(f.path) ?? { path: f.path, additions: 0, deletions: 0, tools: [] };
+        prev.additions += d.additions;
+        prev.deletions += d.deletions;
+        if (!prev.tools.includes(t)) prev.tools.push(t);
+        byPath.set(f.path, prev);
+      }
+      continue;
+    }
     const parsed = parseToolEntry(t, getToolPresentation(t.name));
     if (parsed.additions <= 0 && parsed.deletions <= 0) continue;
     let path = parsed.subject;
@@ -67,7 +82,7 @@ export function changedFilesOf(tools: ToolCall[]): ChangedFile[] {
   return [...byPath.values()];
 }
 
-function ChangedFileRow({ f }: { f: ChangedFile }) {
+export function ChangedFileRow({ f }: { f: ChangedFile }) {
   const [open, setOpen] = useState(false);
   const patchUI = useStore((s) => s.patchUI);
   const openFile = () => {

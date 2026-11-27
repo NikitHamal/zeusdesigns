@@ -56,6 +56,7 @@ export interface ToolCall {
   additions?: number;
   deletions?: number;
   checkpointId?: string;
+  files?: Array<{ path: string; from?: string; kind?: string; oldContent?: string | null; newContent?: string | null }>;
 }
 
 export interface PlanTask {

@@ -18,7 +18,7 @@ function useCommands(): Cmd[] {
   return useMemo(() => {
     const st = () => useStore.getState();
     const out: Cmd[] = [];
-    const pane = (tab: "chat" | "files" | "git" | "terminal") => () => st().patchUI({ leftTab: tab, chatCollapsed: false });
+    const pane = (tab: "chat" | "files" | "git" | "terminal" | "review") => () => st().patchUI({ leftTab: tab, chatCollapsed: false });
     out.push({ id: "new", group: "Session", icon: "add", label: "New session", run: () => { st().newConversation(activeProjectId); st().patchUI({ showCanvas: false, leftTab: "chat" }); } });
     out.push({
       id: "open-folder", group: "Session", icon: "create_new_folder", label: "Open project folder",
@@ -29,7 +29,8 @@ function useCommands(): Cmd[] {
     out.push({ id: "p-canvas", group: "View", icon: "code_blocks", label: showCanvas ? "Close canvas" : "Open canvas", run: () => st().patchUI({ showCanvas: !showCanvas }) });
     out.push({ id: "p-files", group: "View", icon: "account_tree", label: "Files", run: pane(leftTab === "files" ? "chat" : "files") });
     out.push({ id: "p-term", group: "View", icon: "terminal", label: "Terminal", run: pane(leftTab === "terminal" ? "chat" : "terminal") });
-    out.push({ id: "p-git", group: "View", icon: "commit", label: "Review diffs", run: pane(leftTab === "git" ? "chat" : "git") });
+    out.push({ id: "p-git", group: "View", icon: "commit", label: "Review diffs", run: pane(leftTab === "review" ? "chat" : "review") });
+    out.push({ id: "p-git2", group: "View", icon: "commit", label: "Git source control", run: pane(leftTab === "git" ? "chat" : "git") });
     if (showCanvas) out.push({ id: "ask", group: "View", icon: "ads_click", label: "Ask about selection", hint: "Ctrl Shift K", run: () => window.dispatchEvent(new Event("zeus:ask")) });
     for (const [id, label, icon] of [["light", "Light theme", "light_mode"], ["dark", "Dark theme", "dark_mode"], ["system", "System theme", "laptop"]] as const)
       out.push({ id: `theme-${id}`, group: "Appearance", icon, label, run: () => st().patchSettings({ theme: id }) });
