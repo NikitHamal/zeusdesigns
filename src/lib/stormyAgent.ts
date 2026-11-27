@@ -10,8 +10,8 @@
 //   - ProjectInstructions & ProjectSnapshot (ORO.md / AGENTS.md / CLAUDE.md + small project file inlining)
 //   - DiffUtils (unified diff computation with +/- counts and context hunks)
 
-import type { AgentPlan, PendingUserQuestion, PlanTask, ToolCall } from "../types";
-import { readWorkspaceFile, type Workspace } from "./bridge";
+import type { AgentPlan, PendingApproval, PendingUserQuestion, PlanTask, ToolCall } from "../types";
+import { nativeAudit, readWorkspaceFile, type Workspace } from "./bridge";
 
 /* ------------------------------------------------------------------ */
 /* 1. ToolAliases (Stormy ToolAliases.kt)                              */
@@ -89,6 +89,15 @@ const NAME_ALIASES: Record<string, string> = {
   recall_memory: "memory_search",
   task: "spawn_subagent",
   subagent: "spawn_subagent",
+  cp: "copy_file",
+  mkdir: "create_folder",
+  create_directory: "create_folder",
+  file_info: "get_file_info",
+  file_outline: "get_file_info",
+  stat: "get_file_info",
+  compare_files: "diff_files",
+  find_secrets: "security_scan",
+  audit_security: "security_scan",
 };
 
 const ARG_ALIASES: Record<string, Record<string, string>> = {
@@ -339,6 +348,72 @@ export const STORMY_TOOLS: StormyToolSpec[] = [
     name: "use_skill",
     signature: "use_skill(name: string)",
     summary: "Load a domain craft or engineering skill playbook on demand.",
+    readOnly: true,
+  },
+  {
+    name: "add_ui_kit",
+    signature: "add_ui_kit()",
+    summary: "Install Stormy's oro-ui/oro.css and oro-ui/oro.js design token & theme kit into the project.",
+    readOnly: false,
+  },
+  {
+    name: "spawn_subagent",
+    signature: "spawn_subagent(agent_type: \"explore\"|\"review\"|\"verify\", prompt: string)",
+    summary: "Delegate bounded codebase exploration or static review to an isolated Stormy subagent.",
+    readOnly: true,
+  },
+  {
+    name: "copy_file",
+    signature: "copy_file(source: string, destination: string, overwrite?: boolean)",
+    summary: "Copy a file inside the project workspace.",
+    readOnly: false,
+  },
+  {
+    name: "create_folder",
+    signature: "create_folder(path: string)",
+    summary: "Create a directory (and any parent directories) inside the project.",
+    readOnly: false,
+  },
+  {
+    name: "insert_at_line",
+    signature: "insert_at_line(path: string, line: int, content: string)",
+    summary: "Insert lines at a 1-indexed line number in a file.",
+    readOnly: false,
+  },
+  {
+    name: "get_file_info",
+    signature: "get_file_info(path: string)",
+    summary: "Return file size and a one-line symbol outline of a file.",
+    readOnly: true,
+  },
+  {
+    name: "diff_files",
+    signature: "diff_files(path1: string, path2: string)",
+    summary: "Compute a unified line diff between two files in the workspace.",
+    readOnly: true,
+  },
+  {
+    name: "git_status",
+    signature: "git_status()",
+    summary: "Inspect current Git branch and modified/staged/untracked files.",
+    readOnly: true,
+  },
+  {
+    name: "git_diff",
+    signature: "git_diff(path?: string)",
+    summary: "Show Git diff for the workspace or a specific file.",
+    readOnly: true,
+  },
+  {
+    name: "git_log",
+    signature: "git_log()",
+    summary: "Show recent Git commit history.",
+    readOnly: true,
+  },
+  {
+    name: "security_scan",
+    signature: "security_scan(path?: string)",
+    summary: "Scan project files for hardcoded secrets, unsafe eval(), or unsanitized innerHTML.",
     readOnly: true,
   },
 ];
@@ -1316,3 +1391,173 @@ export function parseAskUserFromToolCall(toolId: string, argsOrOutput: string): 
     return null;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 11. AutonomyPolicy & ApprovalSheet (Stormy Autonomy.kt)             */
+/* ------------------------------------------------------------------ */
+const MUTATING_TOOLS = new Set([
+  "write_file",
+  "edit_file",
+  "multi_edit",
+  "delete_file",
+  "move_file",
+  "copy_file",
+  "insert_at_line",
+  "append_to_file",
+  "prepend_to_file",
+  "regex_replace",
+  "add_ui_kit",
+]);
+
+const SENSITIVE_FILE_RE = /(^|\/)(\.env(\..*)?|.*\.(pem|key|p12|jks|keystore)|id_rsa.*|\.npmrc|\.git\/.*)$/i;
+const RISKY_MCP_RE = /delete|drop|remove|destroy|merge|push|deploy|execute|sql|transfer|revoke|archive/i;
+
+export const AutonomyPolicy = {
+  isChange(toolName: string): boolean {
+    const n = ToolAliases.canonicalName(toolName);
+    return MUTATING_TOOLS.has(n) || n === "open_pull_request" || toolName.startsWith("mcp:");
+  },
+
+  dangerReason(toolName: string, argsRaw = ""): string | undefined {
+    const n = ToolAliases.canonicalName(toolName);
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(argsRaw || "{}");
+    } catch {
+      parsed = { body: argsRaw };
+    }
+    const path = String(parsed.path ?? parsed.source ?? "").trim();
+    const dest = String(parsed.destination ?? "").trim();
+    if (n === "delete_file" && (!path || path === "." || path === "/")) {
+      return "Delete the whole project";
+    }
+    if (n === "open_pull_request") {
+      return `Open a pull request${parsed.repo ? ` (${String(parsed.repo)})` : ""}`;
+    }
+    if (n === "move_file" && String(parsed.overwrite) === "true" && dest) {
+      return `Overwrite existing file ${dest}`;
+    }
+    if (MUTATING_TOOLS.has(n) && (SENSITIVE_FILE_RE.test(path) || SENSITIVE_FILE_RE.test(dest))) {
+      return `Modify sensitive file (${path || dest})`;
+    }
+    if (toolName.startsWith("mcp:") && RISKY_MCP_RE.test(toolName)) {
+      return `Run external MCP action ${toolName}`;
+    }
+    return undefined;
+  },
+
+  describe(toolName: string, argsRaw = ""): { action: string; detail?: string } {
+    const n = ToolAliases.canonicalName(toolName);
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(argsRaw || "{}");
+    } catch {
+      parsed = { body: argsRaw };
+    }
+    const path = String(parsed.path ?? "").trim();
+    const body = String(parsed.body ?? parsed.content ?? "").trim();
+    switch (n) {
+      case "write_file":
+        return {
+          action: `${parsed.append ? "Append to" : "Write"} ${path || "file"}`,
+          detail: body.split("\n").slice(0, 14).join("\n").slice(0, 900) || undefined,
+        };
+      case "edit_file":
+      case "multi_edit":
+        return {
+          action: `Edit ${path || "file"}`,
+          detail: body.slice(0, 800) || undefined,
+        };
+      case "delete_file":
+        return { action: `Delete ${path || body || "file"}` };
+      case "move_file":
+        return { action: `Move ${String(parsed.source ?? path)} to ${String(parsed.destination ?? body)}` };
+      case "copy_file":
+        return { action: `Copy ${String(parsed.source ?? path)} to ${String(parsed.destination ?? body)}` };
+      default:
+        return {
+          action: String(parsed.action ?? parsed.title ?? `${n} ${path}`.trim()),
+          detail: String(parsed.detail ?? parsed.reason ?? body).slice(0, 600) || undefined,
+        };
+    }
+  },
+};
+
+export function parseApprovalFromToolCall(toolId: string, toolName: string, argsOrOutput = ""): PendingApproval | null {
+  try {
+    const clean = argsOrOutput.replace(/^\[Approval requested from user\]\s*/i, "").trim();
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(clean);
+      if (typeof parsed.body === "string" && parsed.body.trim().startsWith("{")) {
+        parsed = { ...parsed, ...JSON.parse(parsed.body) };
+      }
+    } catch {
+      parsed = { action: clean };
+    }
+    const desc = AutonomyPolicy.describe(toolName, argsOrOutput);
+    const danger = AutonomyPolicy.dangerReason(toolName, argsOrOutput);
+    return {
+      id: toolId,
+      toolName,
+      action: String(parsed.action ?? parsed.question ?? desc.action),
+      detail: typeof parsed.detail === "string" ? parsed.detail : desc.detail,
+      dangerReason: typeof parsed.dangerReason === "string" ? parsed.dangerReason : danger,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 12. QualityGate (Stormy QualityGate.kt — End-of-Turn Auto Review)   */
+/* ------------------------------------------------------------------ */
+export const QualityGate = {
+  MAX_LISTED: 12,
+
+  touchedPaths(calls: ToolCall[]): string[] {
+    const paths = new Set<string>();
+    for (const c of calls) {
+      if (c.status !== "ok") continue;
+      const canon = ToolAliases.canonicalName(c.name);
+      if (canon === "add_ui_kit") continue;
+      if (MUTATING_TOOLS.has(canon)) {
+        try {
+          const j = JSON.parse(c.args ?? "{}");
+          for (const k of ["path", "destination"]) {
+            const p = typeof j[k] === "string" ? j[k].trim().replace(/^\.\//, "").replace(/^\/+/, "") : "";
+            if (p && !p.startsWith(".zeusdesigns/")) paths.add(p);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return [...paths];
+  },
+
+  async review(root: string | undefined, touched: string[]): Promise<{ blocking: string[]; prompt: string | null }> {
+    if (!root || touched.length === 0) return { blocking: [], prompt: null };
+    try {
+      const findings = await nativeAudit.check(root, touched);
+      const blocking = findings.filter((f) => f.startsWith("ERROR "));
+      if (blocking.length === 0) return { blocking: [], prompt: null };
+      const listed = blocking.slice(0, QualityGate.MAX_LISTED).map((b) => `- ${b}`).join("\n");
+      const more =
+        blocking.length > QualityGate.MAX_LISTED
+          ? `\n- ... and ${blocking.length - QualityGate.MAX_LISTED} more (run check_syntax with no path to see all).`
+          : "";
+      const prompt = [
+        `Automatic quality review (Stormy QualityGate) found ${blocking.length} blocking problem${
+          blocking.length === 1 ? "" : "s"
+        } in the files you changed:`,
+        listed + more,
+        "",
+        "Fix each one now: read the relevant part of the file if needed, make the edit with `edit_file` or `write_file`, then run `check_syntax` to confirm zero errors. When everything is fixed, reply with your final summary for the user.",
+      ].join("\n");
+      return { blocking, prompt };
+    } catch {
+      return { blocking: [], prompt: null };
+    }
+  },
+};

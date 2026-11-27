@@ -84,6 +84,15 @@ export interface PendingUserQuestion {
   answered?: boolean;
 }
 
+export interface PendingApproval {
+  id: string;
+  toolName: string;
+  action: string;
+  detail?: string;
+  dangerReason?: string;
+  resolved?: "approved" | "denied" | "always";
+}
+
 export interface CheckpointManifest {
   id: string;
   label: string;
@@ -102,6 +111,7 @@ export interface Message {
   tools?: ToolCall[];
   plan?: AgentPlan;
   pendingQuestion?: PendingUserQuestion;
+  pendingApproval?: PendingApproval;
   checkpointId?: string;
   reasoning?: string;
   thinkMs?: number;

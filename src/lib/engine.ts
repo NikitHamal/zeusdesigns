@@ -22,14 +22,17 @@ import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./a
 import { getCodingHarnessProfile } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
 import {
+  AutonomyPolicy,
   BriefCheck,
   DiffUtils,
   HistoryPruner,
   ModelProfiles,
+  parseApprovalFromToolCall,
   parseAskUserFromToolCall,
   parsePlanFromToolCall,
   ProjectInstructions,
   ProjectSnapshot,
+  QualityGate,
   StuckDetector,
   ToolAliases,
 } from "./stormyAgent";
@@ -641,6 +644,7 @@ export async function sendMessage(opts: {
       let current = req;
       let msgs: ChatRequest["messages"] = history;
       let nudgeCount = 0;
+      let qualityPassesDone = 0;
       const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
       const stuckDetector = new StuckDetector();
       for (let round = 0; ; round++) {
@@ -722,6 +726,11 @@ export async function sendMessage(opts: {
                 const parsedQ = parseAskUserFromToolCall(t.id, t.args ?? "");
                 if (parsedQ) {
                   useStore.getState().patchMessage(convId, asstId, { pendingQuestion: parsedQ });
+                }
+              } else if (canon === "request_approval" || AutonomyPolicy.dangerReason(e.name, t.args)) {
+                const parsedApp = parseApprovalFromToolCall(t.id, e.name, t.args ?? "");
+                if (parsedApp) {
+                  useStore.getState().patchMessage(convId, asstId, { pendingApproval: parsedApp });
                 }
               } else if (isStudioTool(e.name)) {
                 studioRuns.set(
@@ -1000,6 +1009,48 @@ export async function sendMessage(opts: {
             ];
             current = { ...req, requestId: uid(), effort: "low", messages: msgs };
             continue;
+          }
+
+          // Stormy QualityGate: when the agent declares itself done after mutating files, run automatic quality review
+          const touched = QualityGate.touchedPaths(tools);
+          if (
+            touched.length > 0 &&
+            effectiveWorkspaceRoot &&
+            qualityPassesDone < stormyProfile.qualityPasses &&
+            !signal.aborted
+          ) {
+            qualityPassesDone++;
+            const qg = await QualityGate.review(effectiveWorkspaceRoot, touched);
+            if (qg.prompt) {
+              tools.push({
+                id: uid(),
+                name: "quality_gate",
+                args: `${touched.length} file${touched.length === 1 ? "" : "s"} (${qg.blocking.length} issue${qg.blocking.length === 1 ? "" : "s"})`,
+                status: "error",
+                output: qg.blocking.join("\n"),
+              });
+              sync();
+              msgs = HistoryPruner.prune(
+                [
+                  ...msgs,
+                  { role: "assistant", content: roundText || "Completed initial edits." },
+                  { role: "user", content: qg.prompt },
+                ],
+                stormyProfile.contextBudgetTokens
+              );
+              current = { ...req, requestId: uid(), messages: msgs };
+              full += "\n\n";
+              continue;
+            } else if (qualityPassesDone === 1) {
+              tools.push({
+                id: uid(),
+                name: "quality_gate",
+                args: `${touched.length} file${touched.length === 1 ? "" : "s"} clean`,
+                status: "ok",
+                output: `Audited ${touched.join(", ")}: 0 blocking syntax or asset errors.`,
+              });
+              sync();
+            }
           }
           break;
         }

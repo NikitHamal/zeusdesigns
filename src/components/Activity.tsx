@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../store";
-import type { AgentPlan, Message, PendingUserQuestion, PlanTask, ToolCall } from "../types";
+import type { AgentPlan, Message, PendingApproval, PendingUserQuestion, PlanTask, ToolCall } from "../types";
 import { sendMessage } from "../lib/engine";
 import { DiffUtils, ToolAliases, type ComputedDiff } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
@@ -65,7 +65,26 @@ const PRESENTATIONS: Record<string, ToolPresentation> = {
   memory_delete: { running: "Removing note", done: "Removed note", icon: "psychology", subjectIsPath: false, detail: "Prose" },
   update_plan: { running: "Planning", done: "Updated plan", icon: "checklist", subjectIsPath: false, detail: "Prose" },
   ask_user: { running: "Asking", done: "Asked", icon: "help", subjectIsPath: false, detail: "Prose" },
+  request_approval: { running: "Awaiting approval", done: "Requested approval", icon: "verified_user", subjectIsPath: false, detail: "Prose" },
   spawn_subagent: { running: "Delegating", done: "Delegated", icon: "call_split", subjectIsPath: false, detail: "Prose" },
+  add_ui_kit: { running: "Installing UI kit", done: "Installed UI kit", icon: "style", subjectIsPath: false, detail: "Terminal" },
+  copy_file: { running: "Copying", done: "Copied", icon: "content_copy", subjectIsPath: true, detail: "Terminal" },
+  create_folder: { running: "Creating folder", done: "Created folder", icon: "create_new_folder", subjectIsPath: true, detail: "Terminal" },
+  insert_at_line: { running: "Inserting lines", done: "Inserted lines", icon: "playlist_add", subjectIsPath: true, detail: "Diff" },
+  append_to_file: { running: "Appending to", done: "Appended to", icon: "post_add", subjectIsPath: true, detail: "Diff" },
+  prepend_to_file: { running: "Prepending to", done: "Prepended to", icon: "post_add", subjectIsPath: true, detail: "Diff" },
+  regex_replace: { running: "Replacing in", done: "Replaced in", icon: "find_replace", subjectIsPath: true, detail: "Diff" },
+  get_file_info: { running: "Inspecting", done: "Inspected", icon: "info", subjectIsPath: true, detail: "Code" },
+  diff_files: { running: "Diffing", done: "Diffed", icon: "difference", subjectIsPath: true, detail: "Code" },
+  git_status: { running: "Checking Git status", done: "Checked Git status", icon: "commit", subjectIsPath: false, detail: "Terminal" },
+  git_diff: { running: "Checking Git diff", done: "Checked Git diff", icon: "difference", subjectIsPath: true, detail: "Code" },
+  git_log: { running: "Reading Git log", done: "Read Git log", icon: "history", subjectIsPath: false, detail: "Terminal" },
+  git_branch: { running: "Listing branches", done: "Listed branches", icon: "call_split", subjectIsPath: false, detail: "Terminal" },
+  git_stage: { running: "Staging", done: "Staged", icon: "add_task", subjectIsPath: true, detail: "Terminal" },
+  git_unstage: { running: "Unstaging", done: "Unstaged", icon: "remove_done", subjectIsPath: true, detail: "Terminal" },
+  git_commit: { running: "Committing", done: "Committed", icon: "commit", subjectIsPath: false, detail: "Terminal" },
+  security_scan: { running: "Scanning security", done: "Scanned security", icon: "shield", subjectIsPath: true, detail: "Terminal" },
+  quality_gate: { running: "Auditing quality", done: "QualityGate passed", icon: "fact_check", subjectIsPath: false, detail: "Terminal" },
   lmfingerprint: { running: "Verifying model", done: "Verified model", icon: "verified", subjectIsPath: false, detail: "Terminal" },
   context_compact: { running: "Compacting context", done: "Compacted context", icon: "inventory_2", subjectIsPath: false, detail: "Prose" },
   auto_continue: { running: "Continuing stream", done: "Continued stream", icon: "autorenew", subjectIsPath: false, detail: "Terminal" },
@@ -767,6 +786,95 @@ export function AskUserCard({
           className="state h-8 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
         >
           Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stormy ApprovalCard (ApprovalSheet.kt — Leashed & Danger Approval)  */
+/* ------------------------------------------------------------------ */
+export function ApprovalCard({
+  convId,
+  msgId,
+  approval,
+}: {
+  convId: string;
+  msgId: string;
+  approval: PendingApproval;
+}) {
+  const busy = useStore((s) => s.busy);
+  const patchMessage = useStore((s) => s.patchMessage);
+  const patchSettings = useStore((s) => s.patchSettings);
+
+  if (approval.resolved) return null;
+
+  const respond = (decision: "approved" | "denied" | "always") => {
+    if (busy) return;
+    if (decision === "always") {
+      patchSettings({ autonomy: "unleashed" });
+    }
+    patchMessage(convId, msgId, {
+      pendingApproval: { ...approval, resolved: decision },
+    });
+    if (decision === "denied") {
+      sendMessage({ text: `Denied action: ${approval.action}. Do not perform this step; suggest an alternative or stop.` });
+    } else {
+      sendMessage({ text: `Approved action: ${approval.action}. Proceed now.` });
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-low p-3.5">
+      <div className="flex items-start gap-2.5">
+        <span
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded-xl",
+            approval.dangerReason
+              ? "bg-error-container text-on-error-container"
+              : "bg-primary-container text-on-primary-container"
+          )}
+        >
+          <Icon name={approval.dangerReason ? "warning" : "verified_user"} size={17} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-on-surface">{approval.action}</div>
+          {approval.dangerReason && (
+            <div className="mt-0.5 text-xs font-medium text-error">{approval.dangerReason}</div>
+          )}
+        </div>
+      </div>
+
+      {approval.detail && (
+        <pre className="max-h-40 overflow-auto rounded-xl border border-outline-variant/50 bg-surface-lowest p-2.5 font-mono text-[11.5px] leading-relaxed text-on-surface-variant select-text">
+          {approval.detail}
+        </pre>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button
+          disabled={busy}
+          onClick={() => respond("denied")}
+          className="state h-8 rounded-full bg-surface-high px-3.5 text-xs font-medium text-on-surface"
+        >
+          Deny
+        </button>
+        {!approval.dangerReason && (
+          <button
+            disabled={busy}
+            onClick={() => respond("always")}
+            className="state h-8 rounded-full bg-secondary-container px-3.5 text-xs font-semibold text-on-secondary-container"
+          >
+            Always allow
+          </button>
+        )}
+        <button
+          disabled={busy}
+          onClick={() => respond("approved")}
+          className="state h-8 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
+        >
+          Allow once
         </button>
       </div>
     </div>

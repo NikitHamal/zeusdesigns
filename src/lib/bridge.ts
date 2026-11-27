@@ -226,6 +226,34 @@ export const nativeCheckpoints = {
   },
 };
 
+export interface NativeGitStatus {
+  isRepo: boolean;
+  branch: string;
+  changed: Array<{ path: string; status: string; staged: boolean }>;
+  commits: Array<{ hash: string; author: string; date: string; message: string }>;
+}
+
+export const nativeGit = {
+  status: async (root?: string): Promise<NativeGitStatus> => {
+    if (!root) return { isRepo: false, branch: "", changed: [], commits: [] };
+    return (
+      (await tryInvoke<NativeGitStatus>("workspace_git_status", { root })) ?? {
+        isRepo: false,
+        branch: "",
+        changed: [],
+        commits: [],
+      }
+    );
+  },
+};
+
+export const nativeAudit = {
+  check: async (root?: string, paths?: string[]): Promise<string[]> => {
+    if (!root) return [];
+    return (await tryInvoke<string[]>("workspace_audit", { root, paths })) ?? [];
+  },
+};
+
 /* ---------------- file downloads / clipboard ---------------- */
 export function download(name: string, content: string | Blob, mime = "text/plain") {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });

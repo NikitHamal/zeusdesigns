@@ -16,7 +16,7 @@ import {
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
-import { AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
+import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
 import { FilesPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
@@ -167,6 +167,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
       <WorkLog m={m} />
       {shown.text && <div className={cn(m.streaming && "caret")}><Markdown text={shown.text} /></div>}
       {m.pendingQuestion && <AskUserCard convId={activeConvId} msgId={m.id} pending={m.pendingQuestion} />}
+      {m.pendingApproval && <ApprovalCard convId={activeConvId} msgId={m.id} approval={m.pendingApproval} />}
       {shown.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${i}`} streaming={m.streaming} />)}
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
