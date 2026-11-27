@@ -18,6 +18,12 @@ export type ChatEvent =
       newContent?: string;
       checkpointId?: string;
     }
+  | {
+      type: "provider_notice";
+      provider: string;
+      model: string;
+      message: string;
+    }
   | { type: "done"; usage?: { inputTokens?: number; outputTokens?: number; tokensPerSecond?: number } }
   | { type: "error"; message: string };
 

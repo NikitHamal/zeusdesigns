@@ -11,8 +11,8 @@ import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } 
 import { toolsPrompt } from "./tools";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
-import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
-import { AutonomyPolicy, BriefCheck, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
+import { recordTrajectoryReflection, runPostToolUseHook, runPreToolUseHook } from "./harness2";
+import { AutonomyPolicy, BriefCheck, computeToolBatchWaves, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
 import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
@@ -442,6 +442,7 @@ export async function sendMessage(opts: {
       let qualityPassesDone = 0;
       const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
       const stuckDetector = new StuckDetector();
+      const seenPreToolCalls = new Set<string>();
       for (let round = 0; ; round++) {
         const roundTools: ToolCall[] = [];
         const studioRuns = new Map<string, Promise<void>>();
@@ -449,6 +450,18 @@ export async function sendMessage(opts: {
         let heldBuffer = "";
         await new Promise<void>((resolve, reject) => {
           const onEvent = (e: ChatEvent) => {
+            if (e.type === "provider_notice") {
+              useStore.getState().notify(e.message);
+              tools.push({
+                id: uid(),
+                name: "provider_notice",
+                args: `${e.provider} (${e.model})`,
+                status: "ok",
+                output: e.message,
+              });
+              sync();
+              return;
+            }
             if (e.type === "delta") {
               const outsideThink = (s: string) =>
                 s
@@ -503,11 +516,23 @@ export async function sendMessage(opts: {
                 });
               }
             } else if (e.type === "tool_call") {
+              const rawArgsStr = typeof e.args === "string" ? e.args : JSON.stringify(e.args ?? {});
+              let parsedPath = "";
+              let parsedBody = "";
+              try {
+                const j = JSON.parse(rawArgsStr);
+                parsedPath = j.path ?? "";
+                parsedBody = j.body ?? "";
+              } catch {
+                parsedBody = rawArgsStr;
+              }
+              const preHook = runPreToolUseHook({ name: e.name, path: parsedPath, body: parsedBody }, seenPreToolCalls);
               const t: ToolCall = {
                 id: e.id,
                 name: e.name,
-                args: typeof e.args === "string" ? e.args : JSON.stringify(e.args),
-                status: "running",
+                args: rawArgsStr,
+                status: preHook.allow ? "running" : "error",
+                output: preHook.blockedReason,
               };
               tools.push(t);
               roundTools.push(t);
@@ -527,7 +552,7 @@ export async function sendMessage(opts: {
                 if (parsedApp) {
                   useStore.getState().patchMessage(convId, asstId, { pendingApproval: parsedApp });
                 }
-              } else if (isStudioTool(e.name)) {
+              } else if (isStudioTool(e.name) && preHook.allow) {
                 studioRuns.set(
                   e.id,
                   runStudioTool(e.name, t.args).then((r) => {
@@ -553,7 +578,7 @@ export async function sendMessage(opts: {
                 }
                 const rawOut = /design-tokens|get_design_tokens/.test(t.name) ? designTokensAnswer(t.args) : e.output;
                 const isReadTool = /^(read_file|read|cat|view_file|open_file)$/.test(t.name);
-                const maxOut = isReadTool ? 48_000 : mode === "code" ? codingProfile.maxToolOutputChars : 12_000;
+                const maxOut = isReadTool ? 64_000 : mode === "code" ? codingProfile.maxToolOutputChars : 24_000;
                 const hooked = runPostToolUseHook(
                   { name: t.name, path: parsedPath, body: parsedBody },
                   { ok: e.ok, output: rawOut },
@@ -637,8 +662,17 @@ export async function sendMessage(opts: {
           }
         });
         await Promise.all(studioRuns.values());
+        const batchWaves = computeToolBatchWaves(roundTools);
+        void batchWaves;
         for (const t of roundTools) if (t.status === "running") t.status = "error";
-        if (roundTools.some((t) => ToolAliases.canonicalName(t.name) === "ask_user")) {
+        if (
+          roundTools.some(
+            (t) =>
+              ToolAliases.canonicalName(t.name) === "ask_user" ||
+              ToolAliases.canonicalName(t.name) === "request_approval" ||
+              Boolean(AutonomyPolicy.dangerReason(t.name, t.args))
+          )
+        ) {
           break;
         }
         const stuckVerdict = stuckDetector.record(roundTools);
@@ -725,17 +759,17 @@ export async function sendMessage(opts: {
               cleanVisibleRound
             ) || (lastToolFailed && !hasReadAnyFile && !hasFileOrMemMutation);
           const stoppedAfterReadOnly =
-            asksForMutation && !hasFileOrMemMutation && tools.length > 0;
+            asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
           const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning));
           const dumpedCodeWithoutWrite =
             asksForMutation &&
             !hasFileOrMemMutation &&
+            cleanVisibleRound.length < 400 &&
             (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) ||
               /\bwith\s+open\s*\(/.test(cleanVisibleRound));
-          // Treat visible prose as "statedPlanOnly" when no tools have run yet or when the model defers mid-task
           const visibleAnnouncementOnly =
             tools.length === 0 &&
-            cleanVisibleRound.length < 240 &&
+            cleanVisibleRound.length < 220 &&
             /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|test|create|write|edit|delete|save|update|remove)|we\s+need\s+to\s+(call|pull|list|check|run|read|inspect|update|fix|delete|save|remove)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test|edit|update|write))\b/i.test(
               cleanVisibleRound
             );
@@ -749,22 +783,17 @@ export async function sendMessage(opts: {
           if (
             (mode === "code" || Boolean(st.ui.workspace)) &&
             !produced &&
-            nudgeCount < 3 &&
+            nudgeCount < 2 &&
             (round === 0
               ? tools.length === 0 && (statedPlanOnly || !cleanVisibleRound)
-              : cutOffAfterThink || stoppedAfterReadOnly || deferredToUser || dumpedCodeWithoutWrite) &&
-            (statedPlanOnly ||
-              /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md|pull|push|fetch|clone|git|github|status|diff|check|insepct|inspect|list|read|search|find|grep)\b/i.test(
-                opts.text
-              ))
+              : cutOffAfterThink || deferredToUser || stoppedAfterReadOnly || dumpedCodeWithoutWrite)
           ) {
             nudgeCount++;
-            // Preserve any reasoning emitted during this round before trimming roundText from `full`
             const roundOnlyParsed = parseStream(roundText, "");
             if (roundOnlyParsed.reasoning) {
               extraThink = [extraThink, roundOnlyParsed.reasoning].filter(Boolean).join("\n\n");
             }
-            if (roundText && full.endsWith(roundText)) {
+            if (roundText && full.endsWith(roundText) && cleanVisibleRound.length < 120) {
               full = full.slice(0, full.length - roundText.length);
             }
             const inspectedFiles = tools
@@ -782,27 +811,24 @@ export async function sendMessage(opts: {
               "";
             const specificInstruction =
               cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
-                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete visible answer to the user now (or emit the next \`<zeus_tool>\` block if another workspace action is required).`
+                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete visible answer to the user now (or call the next tool if another workspace action is required).`
                 : deferredToUser
-                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now by emitting \`<zeus_tool name="search_code">query</zeus_tool>\`, \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\`.`
-                : stoppedAfterReadOnly || dumpedCodeWithoutWrite
-                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification on disk yet (writing markdown code blocks in prose does not modify files). Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` right now to apply the change.`
-                : `Your reply stopped without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` now.`;
+                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now using \`search_code\`, \`list_dir\`, or \`read_file\`.`
+                : `You inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"}, now apply the requested modification on disk using \`edit_file\` or \`write_file\`.`;
             msgs = [
               ...msgs,
               {
                 role: "assistant",
                 content:
-                  cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
-                    ? `Thought summary: ${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}`
-                    : "Understood. I will emit the `<zeus_tool>` XML block now to execute the next step directly.",
+                  cleanVisibleRound ||
+                  `Thought summary: ${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}`,
               },
               {
                 role: "user",
                 content: `Original user request: ${opts.text.slice(0, 1000)}\n\n${specificInstruction}`,
               },
             ];
-            current = { ...req, requestId: uid(), effort: "low", messages: msgs };
+            current = { ...req, requestId: uid(), messages: msgs };
             continue;
           }
 
