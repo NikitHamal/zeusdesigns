@@ -13,8 +13,8 @@ import {
 import { SettingsDialog } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { Home } from "./components/Home";
-import { IconBtn } from "./components/ui";
-import { Icon } from "./components/Icon";
+import { Titlebar } from "./components/Titlebar";
+import { CommandPalette } from "./components/CommandPalette";
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -133,14 +133,11 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-full bg-surface text-on-surface">
+    <div className="flex h-full flex-col bg-surface text-on-surface">
+      <Titlebar />
+      <div className="flex min-h-0 flex-1">
       {sidebarOpen && <Sidebar />}
       <main className="relative flex min-w-0 flex-1 bg-surface">
-        {!sidebarOpen && (
-          <div className="absolute left-3 top-3 z-40">
-            <IconBtn label="Show sidebar" size={36} onClick={() => patchUI({ sidebarOpen: true })}><Icon name="left_panel_open" size={20} /></IconBtn>
-          </div>
-        )}
         {odTab === "design-systems" ? (
           <OpenDesignBrandSystemsView />
         ) : odTab === "skills" ? (
@@ -151,7 +148,7 @@ export default function App() {
           <>
             {!collapsed && (
               <>
-                <div style={{ width: w }} className={`min-w-0 shrink-0 ${sidebarOpen ? "" : "pl-12"}`}><ChatPane /></div>
+                <div style={{ width: w }} className={`min-w-0 shrink-0 `}><ChatPane /></div>
                 <div onPointerDown={startDrag} className="group relative z-10 -mx-1 w-2 shrink-0 cursor-col-resize">
                   <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-outline-variant transition-colors group-hover:w-0.5 group-hover:bg-primary" />
                 </div>
@@ -160,12 +157,14 @@ export default function App() {
             <div className="min-w-0 flex-1 p-2 pl-0"><ArtifactWorkbench /></div>
           </>
         ) : hasMessages || leftTab !== "chat" || Boolean(activeRoot) ? (
-          <div className={`flex min-w-0 flex-1 justify-center ${sidebarOpen ? "" : "pl-12"}`}><div className="h-full w-full"><ChatPane /></div></div>
+          <div className={`flex min-w-0 flex-1 justify-center `}><div className="h-full w-full"><ChatPane /></div></div>
         ) : (
           <Home />
         )}
       </main>
+      </div>
       <SettingsDialog />
+      <CommandPalette />
       {toast && <div className="anim-pop fixed bottom-24 left-1/2 z-[600] -translate-x-1/2 rounded-xl bg-inverse-surface px-5 py-3 text-sm font-medium text-inverse-on-surface">{toast}</div>}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { activeConv, activeProject, convArtifactCount, useStore } from "../store";
+import { activeConv, activeProject, useStore } from "../store";
 import type { Attachment, Message, Quote } from "../types";
 import { sendMessage, stopGeneration } from "../lib/engine";
 import { compactConversation, getContextWindowStats } from "../lib/context";
@@ -10,12 +10,12 @@ import {
   nativeCheckpoints,
   nativeMemory,
   openWorkspace,
-  openWorkspaceByPath,
   refreshTree,
 } from "../lib/bridge";
 import { cn } from "../utils/cn";
-import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
+import { Dropdown, IconBtn, Markdown, MenuItem, Thumb } from "./ui";
 import { Icon } from "./Icon";
+import { SessionHeader } from "./SessionHeader";
 import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
 import { FilesPanel, GitPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
@@ -687,15 +687,11 @@ export function Composer({ hero }: { hero?: boolean }) {
 export function ChatPane() {
   const conv = useStore(activeConv);
   const curProject = useStore(activeProject);
-  const projects = useStore((s) => s.projects);
   const ws = useStore((s) => s.ui.workspace);
   const leftTab = useStore((s) => s.ui.leftTab);
   const patchUI = useStore((s) => s.patchUI);
-  const setTitle = useStore((s) => s.setTitle);
   const showCanvas = useStore((s) => s.ui.showCanvas);
   const m3eOpen = useStore((s) => !!s.ui.m3e);
-  const artifacts = useStore((s) => convArtifactCount(s, s.activeConvId));
-  const [editing, setEditing] = useState(false);
   const [dockOpen, setDockOpen] = useState(true);
   const [dockTab, setDockTab] = useState<"files" | "git" | "terminal">("files");
   const scroller = useRef<HTMLDivElement>(null);
@@ -708,30 +704,6 @@ export function ChatPane() {
   useEffect(() => {
     if (stick.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [conv.messages.length, last?.text, last?.artboardIds?.length]);
-
-  const switchProject = (projectId: string) => {
-    const st = useStore.getState();
-    const proj = st.projects.find((p) => p.id === projectId);
-    st.setActiveProject(projectId);
-    if (proj?.root) {
-      openWorkspaceByPath(proj.root, proj.name)
-        .then((w) => w && useStore.getState().patchUI({ workspace: w }))
-        .catch(() => {});
-    }
-  };
-
-  const openNewFolder = () => {
-    openWorkspace()
-      .then((w) => {
-        if (w) {
-          useStore.getState().addOrSelectProject(w);
-          setDockOpen(true);
-          setDockTab("files");
-          useStore.getState().notify(`Opened project ${w.name}`);
-        }
-      })
-      .catch((e) => useStore.getState().notify(e.message));
-  };
 
   const handleOpenDock = (tab: "files" | "git" | "terminal", filePath?: string) => {
     if (!showCanvas && !m3eOpen) {
@@ -750,103 +722,14 @@ export function ChatPane() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-surface">
-      <div className="flex h-14 shrink-0 items-center gap-1.5 border-b border-outline-variant/40 px-3">
-        <Dropdown width={240} trigger={({ toggle, open }) => (
-          <button
-            onClick={toggle}
-            title={curProject?.root ? `${curProject.name} (${curProject.root})` : "Switch or open project folder"}
-            className={cn(
-              "state flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-surface-container px-2.5 text-xs font-semibold text-on-surface",
-              open && "bg-surface-high"
-            )}
-          >
-            <Icon name="folder_open" size={15} className="text-primary" />
-            <span className="max-w-[130px] truncate">{curProject?.name ?? "Workspace"}</span>
-            <Icon name="expand_more" size={14} className="text-on-surface-variant" />
-          </button>
-        )}>
-          {(close) => (
-            <>
-              <MenuLabel>Projects</MenuLabel>
-              {projects.map((p) => (
-                <MenuItem
-                  key={p.id}
-                  icon={<Icon name={p.id === curProject?.id ? "folder_open" : "folder"} size={16} />}
-                  label={p.name}
-                  active={p.id === curProject?.id}
-                  onClick={() => { close(); switchProject(p.id); }}
-                />
-              ))}
-              <div className="my-1 border-t border-outline-variant/60" />
-              <MenuItem
-                icon={<Icon name="create_new_folder" size={16} />}
-                label="Open project folder…"
-                onClick={() => { close(); openNewFolder(); }}
-              />
-            </>
-          )}
-        </Dropdown>
-
-        <span className="text-on-surface-variant/50">/</span>
-
-        {editing ? (
-          <input
-            autoFocus defaultValue={conv.title} spellCheck={false}
-            onBlur={(e) => { if (e.target.value.trim()) setTitle(conv.id, e.target.value.trim()); setEditing(false); }}
-            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
-            className="h-8 min-w-0 flex-1 rounded-lg border border-primary bg-surface-container px-2.5 font-display text-[14.5px] font-medium outline-none"
-          />
-        ) : (
-          <button onClick={() => setEditing(true)} title="Rename chat" className="state flex min-w-0 items-center gap-1 rounded-lg px-2 py-1">
-            <span className="truncate font-display text-[14.5px] font-medium text-on-surface">{conv.title}</span>
-            <Icon name="edit" size={13} className="shrink-0 text-on-surface-variant/70" />
-          </button>
-        )}
-
-        <span className="flex-1" />
-
-        <div className="flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5">
-          {([
-            ["chat", "chat_bubble", "Chat"],
-            ["files", "account_tree", "Files"],
-            ["git", "commit", "Git"],
-            ["terminal", "terminal", "Terminal"],
-          ] as const).map(([id, icon, label]) => {
-            const on = leftTab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => patchUI({ leftTab: id })}
-                title={label}
-                className={cn(
-                  "state flex h-7 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-medium transition-colors",
-                  on ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                )}
-              >
-                <Icon name={icon} size={14} />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {hasProjectFolder && !showCanvas && !m3eOpen && leftTab === "chat" && (
-          <IconBtn
-            label={dockOpen ? "Hide project panel" : "Show project panel"}
-            size={34}
-            active={dockOpen}
-            onClick={() => setDockOpen(!dockOpen)}
-          >
-            <Icon name="account_tree" size={18} />
-          </IconBtn>
-        )}
-
-        <ContextWindowPill />
-        {(artifacts > 0 || showCanvas) && (
-          <IconBtn label={showCanvas ? "Close workbench" : "Open workbench"} size={34} active={showCanvas} onClick={() => patchUI({ showCanvas: !showCanvas })}><Icon name="code_blocks" size={19} /></IconBtn>
-        )}
-        {showCanvas && <IconBtn label="Hide chat" size={34} onClick={() => patchUI({ chatCollapsed: true })}><Icon name="left_panel_close" size={19} /></IconBtn>}
-      </div>
+      <SessionHeader
+        canDock={canSplitIde}
+        dockOpen={dockOpen}
+        dockTab={dockTab}
+        setDockOpen={setDockOpen}
+        setDockTab={setDockTab}
+        trailing={<ContextWindowPill />}
+      />
 
       {leftTab === "files" ? (
         <FilesPanel />

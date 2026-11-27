@@ -44,10 +44,12 @@ export function BottomToolbar({ children }: { children?: React.ReactNode }) {
   useEffect(() => { if (ask) input.current?.focus(); }, [ask]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setAsk(true); }
+      if ((e.key === "k" || e.key === "K") && e.shiftKey && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setAsk(true); }
     };
+    const open = () => setAsk(true);
     window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
+    window.addEventListener("zeus:ask", open);
+    return () => { window.removeEventListener("keydown", k); window.removeEventListener("zeus:ask", open); };
   }, []);
 
   const submit = () => {
@@ -165,7 +167,7 @@ export function BottomToolbar({ children }: { children?: React.ReactNode }) {
             <IconBtn label="Close" size={40} onClick={() => setAsk(false)}><Icon name="close" size={18} /></IconBtn>
           </div>
         ) : (
-          <button onClick={() => setAsk(true)} title="Ask Zeus (Ctrl+K)" className="state morph flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary">
+          <button onClick={() => setAsk(true)} title="Ask Zeus (Ctrl+Shift+K)" className="state morph flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary">
             {busy ? <span className="zshine">Designing…</span> : "Ask Zeus"}
             {target && <span className="max-w-24 truncate rounded-full bg-on-primary/20 px-2 py-0.5 text-[11px]">{target.name}</span>}
           </button>

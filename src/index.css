@@ -62,23 +62,42 @@
   --m-tertiary: hsl(112 32% 72%);
   --m-tertiary-container: hsl(112 20% 26%);
   --m-on-tertiary-container: hsl(112 40% 90%);
-  --m-surface: hsl(17 3% 10%);
-  --m-surface-dim: hsl(17 3% 8%);
-  --m-surface-lowest: hsl(17 3% 6%);
-  --m-surface-low: hsl(17 3% 12%);
-  --m-surface-container: hsl(17 3% 17%);
-  --m-surface-high: hsl(17 3% 20%);
-  --m-surface-highest: hsl(17 3% 24%);
-  --m-on-surface: hsl(17 8% 93%);
-  --m-on-surface-variant: hsl(17 5% 68%);
-  --m-outline: hsl(17 3% 48%);
-  --m-outline-variant: hsl(17 3% 24%);
+  --m-surface: #121212;
+  --m-surface-dim: #101010;
+  --m-surface-lowest: #0c0c0c;
+  --m-surface-low: #151515;
+  --m-surface-container: #1c1c1c;
+  --m-surface-high: #242424;
+  --m-surface-highest: #2c2c2c;
+  --m-on-surface: #ededed;
+  --m-on-surface-variant: #9d9d9d;
+  --m-outline: #7e7e7e;
+  --m-outline-variant: #282828;
   --m-error: hsl(5 90% 74%);
   --m-error-container: hsl(2 55% 25%);
   --m-on-error-container: hsl(5 100% 90%);
   --m-inverse-surface: hsl(17 8% 90%);
   --m-inverse-on-surface: hsl(17 6% 16%);
 }
+
+/* OpenCode semantic tokens (oc-2). Dark is default; light under [data-theme="light"]. */
+:root {
+  --oc-border-weak: #282828; --oc-border-weaker: #202020; --oc-border-base: rgba(255,255,255,.195);
+  --oc-text-strong: rgba(255,255,255,.936); --oc-text-base: rgba(255,255,255,.618); --oc-text-weak: rgba(255,255,255,.422);
+  --oc-surface-raised: rgba(255,255,255,.059); --oc-surface-raised-hover: rgba(255,255,255,.078); --oc-surface-inset: rgba(0,0,0,.5);
+  --oc-success: #7add71; --oc-warning: #ebb76e; --oc-critical: #fc533a;
+  --oc-diff-add-bg: #1a2919; --oc-diff-add-text: #9bcd97; --oc-diff-del-bg: #42120b; --oc-diff-del-text: #ff9b8a;
+  --oc-fw-regular: 440; --oc-fw-medium: 530; --oc-fw-bold: 670;
+}
+:root[data-theme="light"] {
+  --oc-border-weak: #e5e5e5; --oc-border-weaker: #f0f0f0; --oc-border-base: rgba(0,0,0,.162);
+  --oc-text-strong: #171717; --oc-text-base: #6f6f6f; --oc-text-weak: #8f8f8f;
+  --oc-surface-raised: rgba(0,0,0,.031); --oc-surface-raised-hover: rgba(0,0,0,.051); --oc-surface-inset: rgba(0,0,0,.034);
+  --oc-success: #2dba26; --oc-warning: #95671b; --oc-critical: #ed4831;
+  --oc-diff-add-bg: #e3fae1; --oc-diff-add-text: #3a8437; --oc-diff-del-bg: #feefeb; --oc-diff-del-text: #ed4831;
+}
+.oc-titlebar { height: 40px; background: var(--m-surface-dim); border-bottom: 1px solid var(--oc-border-weak); }
+.oc-hairline { border: 1px solid var(--oc-border-weak); }
 
 html, body, #root { height: 100%; }
 body {
@@ -133,8 +152,8 @@ button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 .md li { margin: .15em 0; line-height: 1.55; }
 .md h1, .md h2, .md h3 { font-family: var(--font-display); font-weight: 650; margin: .8em 0 .35em; }
 .md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3 { font-size: 1.02em; }
-.md code { font-family: var(--font-mono); font-size: .86em; background: var(--m-surface-high); padding: .1em .4em; border-radius: 6px; }
-.md pre { background: var(--m-surface-high); border-radius: 16px; padding: 12px 14px; overflow: auto; margin: 0 0 .7em; }
+.md code { font-family: var(--font-mono); font-size: .86em; background: var(--m-surface-container); padding: .1em .35em; border-radius: 4px; }
+.md pre { background: var(--m-surface-low); border: 1px solid var(--oc-border-weak); border-radius: 8px; padding: 10px 12px; overflow: auto; margin: 0 0 .7em; }
 .md pre code { background: none; padding: 0; }
 .md a { color: var(--m-primary); }
 .md blockquote { border-left: 3px solid var(--m-primary); margin: 0 0 .6em; padding: 2px 12px; color: var(--m-on-surface-variant); }
