@@ -86,13 +86,12 @@ export function getProviderSpecialization(providerId: string, modelId: string): 
   const maxOutputTokens = isCustom ? 16384 : model?.maxOutput ?? 8192;
   const isKeylessScraper = !isCustom && SCRAPER_PROVIDERS.has(providerId);
 
-  // Scraped web endpoints perform best when active prompt payload stays under a fast budget
-  // while still carrying the full live canvas HTML of all active screens.
+  // Scale effective budget with verified provider context window while keeping web-scraper endpoints snappy.
   const effectiveBudgetTokens =
     providerId === "chatjimmy" ? 14000 :
     providerId === "longcat" || providerId === "geminiweb" ? 24000 :
     providerId === "deepai" || providerId === "motif" ? 28000 :
-    36000;
+    Math.max(48000, Math.min(Math.floor(contextWindow * 0.75), 128000));
 
   const maxCanvasScreensInPrompt = providerId === "chatjimmy" ? 2 : 4;
   const maxCharsPerScreen = providerId === "chatjimmy" ? 6000 : 12000;
@@ -566,8 +565,20 @@ function buildDeterministicSummary(messagesToCompact: Message[], boards: Artboar
     .map((m) => `- User asked: "${m.text.slice(0, 160).replace(/\n+/g, " ")}"`)
     .slice(-8);
   const touchedIds = new Set<string>();
+  const toolActions: string[] = [];
   for (const m of messagesToCompact) {
     for (const id of m.artboardIds ?? []) touchedIds.add(id);
+    for (const t of m.tools ?? []) {
+      if (["provider_notice", "context_compact", "quality_gate", "auto_continue"].includes(t.name)) continue;
+      let target = "";
+      try {
+        const j = JSON.parse(t.args ?? "{}");
+        target = j.path || j.command || j.query || j.pattern || "";
+      } catch {
+        target = (t.args ?? "").slice(0, 60);
+      }
+      toolActions.push(`- ${t.name}${target ? `(${String(target).slice(0, 80)})` : ""}: ${t.status}`);
+    }
   }
   const activeScreens = boards
     .filter((b) => touchedIds.has(b.id) || boards.length <= 6)
@@ -575,7 +586,8 @@ function buildDeterministicSummary(messagesToCompact: Message[], boards: Artboar
 
   return [
     `**Compacted Context Summary** (${messagesToCompact.length} earlier messages compressed)`,
-    userRequests.length ? `Earlier design requests:\n${userRequests.join("\n")}` : "",
+    userRequests.length ? `Earlier requests:\n${userRequests.join("\n")}` : "",
+    toolActions.length ? `Completed workspace tool actions:\n${toolActions.slice(-12).join("\n")}` : "",
     activeScreens.length ? `Active canvas screens: ${activeScreens.join(" · ")}` : "",
   ]
     .filter(Boolean)

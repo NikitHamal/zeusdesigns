@@ -100,11 +100,46 @@ export function buildPlainContext(opts: {
   quoteToText: (q: Quote, boards: Artboard[]) => string;
   mode?: Intent;
 }) {
-  const all = [...opts.convMessages, opts.userMsg].filter((m) => !m.error && (m.text.trim() || m.attachments?.length));
-  const messages: Mapped[] = all.map((m) => {
+  const all = [...opts.convMessages, opts.userMsg].filter(
+    (m) => !m.error && (m.text.trim() || m.attachments?.length || m.tools?.length)
+  );
+  const lastAsstIdx = (() => {
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (all[i].role === "assistant") return i;
+    }
+    return -1;
+  })();
+
+  const messages: Mapped[] = all.map((m, idx) => {
     let content = m.text;
     if (m.quote) content = opts.quoteToText(m.quote, []) + "\n" + content;
     for (const a of m.attachments ?? []) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 48000)}`;
+    if (m.role === "assistant" && m.tools?.length) {
+      const realTools = m.tools.filter(
+        (t) => !["provider_notice", "context_compact", "quality_gate", "auto_continue"].includes(t.name)
+      );
+      if (realTools.length > 0) {
+        const isLatestAsst = idx === lastAsstIdx;
+        const perToolCap = isLatestAsst ? 3200 : 600;
+        const toolSummaries = realTools
+          .slice(-8)
+          .map((t) => {
+            let argDesc = t.args ?? "";
+            try {
+              const j = JSON.parse(argDesc);
+              argDesc = j.path || j.command || j.query || j.pattern || (typeof j.body === "string" ? j.body.slice(0, 120) : argDesc.slice(0, 120));
+            } catch {
+              argDesc = argDesc.slice(0, 120);
+            }
+            const outSnippet = (t.output ?? "").trim().slice(0, perToolCap);
+            return `[Executed ${t.name}(${String(argDesc).replace(/\s+/g, " ").trim()}) -> ${t.status === "ok" ? "ok" : "error"}]${
+              outSnippet ? `\n${outSnippet}` : ""
+            }`;
+          })
+          .join("\n\n");
+        content = [toolSummaries, content].filter(Boolean).join("\n\n");
+      }
+    }
     if (m.role === "assistant" && m.artboardIds?.length) content += `\n[Opened ${m.artboardIds.length} artifact${m.artboardIds.length > 1 ? "s" : ""} in the preview]`;
     return {
       role: m.role,

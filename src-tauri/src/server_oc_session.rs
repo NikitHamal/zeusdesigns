@@ -589,7 +589,8 @@ fn handle_opencode_session_message(
         "hi" | "hello" | "hey" | "yo" | "sup" | "hola" | "howdy" | "greetings" | "good morning" | "good afternoon" | "good evening"
             | "who are you" | "who r u" | "what model are you" | "which model are you" | "which model r u" | "what model r u" | "what model is this"
     );
-    if !is_greeting && history.len() == 1 {
+    let uses_native_fn_tools = custom_sys.contains("Native Function Calling");
+    if !is_greeting && history.len() == 1 && !uses_native_fn_tools {
         let orig_user = history[0].content.clone();
         history = vec![
             ChatMessage {
@@ -622,6 +623,8 @@ fn handle_opencode_session_message(
     );
     let system_prompt = if custom_sys.trim().is_empty() {
         tool_sys
+    } else if custom_sys.contains("## Agent Tools") || custom_sys.contains("## Agent tools") || custom_sys.contains("## Calling Tools") {
+        custom_sys
     } else {
         format!("{}\n\n{}", custom_sys, tool_sys)
     };
@@ -635,7 +638,7 @@ fn handle_opencode_session_message(
     let mut final_clean_answer = String::new();
     let mut final_reasoning = String::new();
     let mut nudged = false;
-    for round in 0..14usize {
+    for round in 0..32usize {
         if cancel_flag.load(Ordering::Relaxed) {
             break;
         }
