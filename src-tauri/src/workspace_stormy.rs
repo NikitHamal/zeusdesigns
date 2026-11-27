@@ -789,5 +789,3 @@ pub struct CheckpointManifest {
     pub created_at: u64,
     pub files: Vec<CheckpointFileEntry>,
 }
-
-/// Stormy `Checkpoints.Recorder.capture`: copy-on-first-write pre-image capture before a tool mutates `rel_path`.

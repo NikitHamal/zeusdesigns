@@ -768,4 +768,3 @@ pub fn verify_model_fingerprint(
         explanation,
     })
 }
-

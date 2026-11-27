@@ -890,4 +890,3 @@ fn handle_anthropic_response(
     );
     let _ = write_sse_event(stream, "message_stop", &json!({ "type": "message_stop" }));
 }
-

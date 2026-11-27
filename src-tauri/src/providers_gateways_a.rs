@@ -855,5 +855,3 @@ where
         Err("APIsFreeLLM stream ended without output".to_string())
     }
 }
-
-/// Stream from FreeClaude & Gemini 4 Gateway (`calkotter-free-claude-code.hf.space` & `dherain24-claude-proxy.hf.space`, zero-key Anthropic Messages SSE with multimodal vision).

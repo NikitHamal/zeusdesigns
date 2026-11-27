@@ -974,5 +974,3 @@ fn catalog_part_4() -> Vec<ProviderInfo> {
         },
     ]
 }
-    ]
-}

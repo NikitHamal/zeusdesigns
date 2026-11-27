@@ -725,4 +725,3 @@ pub fn clean_python_script(raw: &str) -> String {
 static TERM_APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 static TERM_CWD: std::sync::OnceLock<Mutex<std::collections::HashMap<String, PathBuf>>> = std::sync::OnceLock::new();
 static TERM_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-

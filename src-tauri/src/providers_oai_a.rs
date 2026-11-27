@@ -897,6 +897,3 @@ where
     stream_oai_targets_auth("LiteLLM Frontier Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
         .or_else(|_| stream_nimcloud("nvidia/nemotron-3-ultra-550b-a55b", system, messages, cancel, on_delta))
 }
-
-/// Stream from Vireonix (`vireonix.ai/v1`, anonymous request-aware router, 1M context).
-/// The gateway interleaves non-standard `{"vireonix": ...}` metadata frames, which the shared streamer skips.

@@ -832,6 +832,3 @@ pub fn parse_openai_messages(raw_msgs: &[Value]) -> (String, Vec<ChatMessage>) {
 
     (system_parts.join("\n\n"), chat_msgs)
 }
-
-/// Split `<think>...</think>`, `<thinking>...</thinking>`, `<thought>...</thought>`, `<reasoning>...</reasoning>`,
-/// `<|begin_of_thought|>...<|end_of_thought|>`, and orphan closing `</think>` blocks from raw model output into `(reasoning, answer)`.

@@ -980,4 +980,3 @@ where
 
     stream_oai_targets("Unsloth Qwen 3.5 & Gemma 4 Cloud", targets, system, messages, false, 16, cancel, on_delta)
 }
-

@@ -974,5 +974,3 @@ where
     on_delta(reply);
     Ok(())
 }
-
-/// Stream from Unikey Anonymous (`https://www.getunikey.ai/api/anonymous/chat/completions`, Kimi K3 / K2.7 Code / Grok 4.3).

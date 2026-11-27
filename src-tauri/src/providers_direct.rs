@@ -784,5 +784,3 @@ where
         Ok(())
     }
 }
-
-/// Dispatch a chat request to the selected keyless provider without silent cross-provider model switching.

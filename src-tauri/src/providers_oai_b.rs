@@ -875,5 +875,3 @@ where
     stream_antigravity("claude-sonnet-5-5-high", system, messages, cancel, on_delta)
         .or_else(|_| stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta))
 }
-
-/// Stream from Agnes AI Direct Hub (`https://apihub.agnes-ai.com/v1/chat/completions` with native tools & reasoning + Ptero failover).

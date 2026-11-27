@@ -994,4 +994,3 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         ),
     }
 }
-

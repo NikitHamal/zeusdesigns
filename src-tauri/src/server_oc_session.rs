@@ -900,4 +900,3 @@ fn handle_opencode_session_message(
         }),
     );
 }
-
