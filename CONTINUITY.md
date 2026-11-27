@@ -2,7 +2,17 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 34 (Latest — OpenCode Shell, Titlebar, Palette & Session Header Parity in React 19 + Tailwind 4)
+## Session 35 (Latest — OpenCode Timeline, Streaming & Tool Call UI in React 19 + Tailwind 4)
+Goal: replace the fixed "WorkLog above, answer below" stack with OpenCode's chronological timeline, `BasicTool` rows, grouped exploration, live shell streaming, `follow.ts` scrolling and a turn footer.
+
+Shipped:
+1. **Ordered parts (`src/types.ts`, `src/lib/timeline.ts`, `src/lib/engine.ts`)**: `Message.parts?: MessagePart[]` (`reasoning` / `text` / `tool`). `sync()` records the text and reasoning length at which each tool first appeared (`anchorTools`) and patches `parts` from `buildParts`, so output reads reasoning, tool, text, tool, text. Old messages without `parts` use `partsOf` (reasoning, tools, text); tools added outside the loop trail the parts.
+2. **BasicTool rows (`src/components/Activity.tsx`)**: `WorkLog`/`ToolCard`/`ThinkingBlock` removed. `BasicTool`, `ToolRow`, `ReasoningRow`, `ExploreGroup`, `DiffPill`, `ToolErrorCard`. Running titles use `.zshine`; shell and error bodies open on their own, and a manual toggle always wins. Consecutive `read_file`/`list_files`/`glob`/`grep`/`search_project`/`search_code` collapse to `Explored N files · M searches`.
+3. **Live streaming (`src/lib/timeline.ts`, `src/components/Chat.tsx`)**: `listenLiveShell` appends `zeus://term` agent chunks to the running shell tool's `output` (rAF throttled, 60k tail) and the terminal body pins to the bottom. `useTimelineFollow` (`Timeline.tsx`) follows while streaming via a `ResizeObserver`, detaches on upward wheel, touch, key or scrollbar drag, resumes at the end or on a new user message, and shows `Jump to bottom` while detached.
+4. **Turn footer (`src/components/Timeline.tsx`, `Chat.tsx`)**: `TurnReadout` (model, duration, tokens, tok/s) always visible and muted; copy/retry/restore/continue/remember appear on hover; `TurnDiffs` shows a collapsible `N files changed` summary with per-file inline diffs.
+5. Verification: `tsc --noEmit`, `npm ci && npm run build`, `test-stormy-replica.mjs`, `test-overhaul.mjs` pass; a tsx check confirmed `reasoning > explore(2) > text > tool > text` ordering.
+
+## Session 34 (OpenCode Shell, Titlebar, Palette & Session Header Parity in React 19 + Tailwind 4)
 Goal: Rebuild OpenCode's shell UX natively in `src/` (no SolidJS ports) with Zeus Codes branding, zero shadows/emojis/LIVE badges, keeping the Composer, model/effort selector and Settings UI untouched (owner directive).
 
 Shipped:
