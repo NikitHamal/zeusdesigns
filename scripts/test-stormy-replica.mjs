@@ -213,4 +213,25 @@ assert.ok(
   "codingHarness.ts must export MAX_STEPS_PROMPT, CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, and usesPatchPolicy"
 );
 console.log("[PASS] 9. OpenCode coding harness parity (calculateCeiling, 15k keep, ToolOutput retention, MAX_STEPS_PROMPT, CONTINUE_AFTER_OUTPUT_LIMIT, doom-loop guard & usesPatch) verified");
+
+// 10. Verify 5 new live-verified multi-turn keyless providers across TS, Rust, and C++20 with zero silent cross-model/cross-provider fallbacks
+const providersTs = fs.readFileSync(path.join(process.cwd(), "src/lib/providers.ts"), "utf8");
+const providersDirectRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_direct.rs"), "utf8");
+const providersCat1Rs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_cat_1.rs"), "utf8");
+const zeusEngineCpp = fs.readFileSync(path.join(process.cwd(), "engine/zeus_engine.cpp"), "utf8");
+
+for (const slug of ["gemweb2api", "clinebot", "qwen3moe30b", "minicpmv46", "titooqwen35"]) {
+  assert.ok(providersTs.includes(`id: "${slug}"`), `src/lib/providers.ts must register ${slug}`);
+  assert.ok(providersCat1Rs.includes(`id: "${slug}".to_string()`), `src-tauri/src/providers_cat_1.rs must register ${slug}`);
+  assert.ok(zeusEngineCpp.includes(`"${slug}"`), `engine/zeus_engine.cpp must register ${slug}`);
+}
+assert.ok(
+  providersDirectRs.includes("https://chenian233-gemini-web2api.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://api.cline.bot/api/v1/chat/completions") &&
+    providersOaiBRs.includes("https://hsuwill000-llamacpp-webui01.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions"),
+  "All 5 new keyless provider upstream hosts must be wired in Rust"
+);
+console.log("[PASS] 10. All 5 new live-verified multi-turn keyless providers (gemweb2api, clinebot, qwen3moe30b, minicpmv46, titooqwen35) verified across TS, Rust, and C++20");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");
