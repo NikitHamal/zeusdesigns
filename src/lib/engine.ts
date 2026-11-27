@@ -272,93 +272,68 @@ export async function sendMessage(opts: {
       const now = performance.now();
       const isRevise = !created.includes(id);
       const dsNow = getDS(S.settings.designSystemId);
-      if (b.closed || final) {
-        const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
-        const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
-        if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
-        else S.updateArtboard(id, { html: finalHtml });
-        S.updateArtboard(id, { loading: false });
-        lastPush.set(i, { t: now, len: -1 });
-      } else if (
-        lp.len !== -1 &&
-        !isRevise &&
-        b.html.length > 400 &&
-        now - lp.t > 700 &&
-        b.html.length - lp.len > 300
-      ) {
-        const partialHtml = harden(b.html, dsNow, {
-          partial: true,
-          intent: opts.text,
-          name: b.attrs.name,
-          device: bDevice,
-        }).html;
-        S.updateArtboard(id, {
-          html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml,
+          if (b.closed || final) {
+            const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
+            const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
+            if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
+            else S.updateArtboard(id, { html: finalHtml });
+            S.updateArtboard(id, { loading: false });
+            lastPush.set(i, { t: now, len: -1 });
+          } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
+            const partialHtml = harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html;
+            S.updateArtboard(id, { html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml });
+            lastPush.set(i, { t: now, len: b.html.length });
+          }
         });
-        lastPush.set(i, { t: now, len: b.html.length });
-      }
-    });
 
-    const ms = performance.now() - t0;
-    if (reasoning && !thinkT0) thinkT0 = performance.now();
-    if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) {
-      thinkEnd = performance.now();
-    }
-    const hasUnclosed = final && blocks.some((b) => !b.closed);
-    const allBoardIds = [...new Set([...idMap.values(), ...syncedWorkspaceBoardIds])];
-    const tokEstimate = Math.max(
-      1,
-      Math.round((full.length + extraThink.length + tools.reduce((acc, t) => acc + (t.args?.length ?? 0), 0)) / 4)
-    );
-    S.patchMessage(convId, asstId, {
-      reasoning: reasoning || undefined,
-      thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
-      text,
-      artboardIds: allBoardIds,
-      tools: [...tools],
-      truncated: hasUnclosed || undefined,
-      stats: final ? { ms, tokens: tokEstimate, tps: Math.max(1, Math.round(tokEstimate / (ms / 1000))) } : undefined,
-    });
-  };
+        const ms = performance.now() - t0;
+        if (reasoning && !thinkT0) thinkT0 = performance.now();
+        if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
+        const hasUnclosed = final && blocks.some((b) => !b.closed);
+        const allBoardIds = [...new Set([...idMap.values(), ...syncedWorkspaceBoardIds])];
+        const tokEstimate = Math.max(1, Math.round((full.length + extraThink.length + tools.reduce((acc, t) => acc + (t.args?.length ?? 0), 0)) / 4));
+        S.patchMessage(convId, asstId, {
+          reasoning: reasoning || undefined,
+          thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
+          text,
+          artboardIds: allBoardIds,
+          tools: [...tools],
+          truncated: hasUnclosed || undefined,
+          stats: final ? { ms, tokens: tokEstimate, tps: Math.max(1, Math.round(tokEstimate / (ms / 1000))) } : undefined,
+        });
+      };
 
-  const finish = (err?: string) => {
-    if (mode === "chat" && GREETING_RE.test(opts.text.trim())) {
-      if (full.includes("\n\n")) full = full.split(/\n\s*\n/)[0].trim();
-      if (/RECEIPT:|TIMESTAMP ACCEPTED|†\s*Footnote|<artboard|<!doctype/i.test(full) || full.length > 220) {
-        full = "Hello! What would you like to build, debug, or design?";
-      }
-    }
-    sync(true);
-    for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);
-    const S = useStore.getState();
-    for (const id of idMap.values()) S.updateArtboard(id, { loading: false });
-    S.patchMessage(convId, asstId, { streaming: false, ...(err ? { error: err } : {}) });
-    S.setBusy(false);
-    if (created.length) setTimeout(() => canvasApi.fit(created), 80);
-    controller = null;
-    nativeCancel = null;
-    void nativePerf.trim();
-  };
+      const finish = (err?: string) => {
+        if (mode === "chat" && GREETING_RE.test(opts.text.trim())) {
+          if (full.includes("\n\n")) full = full.split(/\n\s*\n/)[0].trim();
+          if (/RECEIPT:|TIMESTAMP ACCEPTED|†\s*Footnote|<artboard|<!doctype/i.test(full) || full.length > 220) {
+            full = "Hello! What would you like to build, debug, or design?";
+          }
+        }
+        sync(true);
+        for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);
+        const S = useStore.getState();
+        for (const id of idMap.values()) S.updateArtboard(id, { loading: false });
+        S.patchMessage(convId, asstId, { streaming: false, ...(err ? { error: err } : {}) });
+        S.setBusy(false);
+        if (created.length) setTimeout(() => canvasApi.fit(created), 80);
+        controller = null;
+        nativeCancel = null;
+        void nativePerf.trim();
+      };
 
-  const designTokensAnswer = (args?: string) => {
-    let sysId = useStore.getState().settings.designSystemId;
-    try {
-      const a = JSON.parse(args ?? "{}");
-      const v = String(a.system ?? a.body ?? a.path ?? "");
-      if (v) sysId = v;
-    } catch {
-      /* keep active */
-    }
-    const d = getDS(sysId.replace("m3-expressive", "m3e").replace("apple-hig", "hig").replace("fluent2", "fluent"));
-    return `${d.name}\n${tokensCss(d)}`;
-  };
+      const designTokensAnswer = (args?: string) => {
+        let sysId = useStore.getState().settings.designSystemId;
+        try {
+          const a = JSON.parse(args ?? "{}");
+          const v = String(a.system ?? a.body ?? a.path ?? "");
+          if (v) sysId = v;
+        } catch { /* keep active */ }
+        const d = getDS(sysId.replace("m3-expressive", "m3e").replace("apple-hig", "hig").replace("fluent2", "fluent"));
+        return `${d.name}\n${tokensCss(d)}`;
+      };
 
-  const selfCheck = async () => {
-    void auditHtml;
-    void patchFor;
-    void canCallModel;
-    void oneShot;
-  };
+      const selfCheck = async () => { void auditHtml; void patchFor; void canCallModel; void oneShot; };
 
   const nativeOn = isNative && useStore.getState().ui.nativeReady;
   const isGreeting = mode === "chat" && GREETING_RE.test(opts.text.trim());
@@ -884,7 +859,10 @@ export async function sendMessage(opts: {
             try {
               const parsed = JSON.parse(t.args ?? "{}");
               p = parsed.path ?? "";
-              b = parsed.body ?? "";
+              b =
+                typeof parsed.body === "string" && Object.keys(parsed).every((k) => k === "path" || k === "body")
+                  ? parsed.body
+                  : JSON.stringify(parsed);
             } catch {
               b = t.args ?? "";
             }
@@ -893,19 +871,20 @@ export async function sendMessage(opts: {
           .join("\n");
         const said = [strippedRound, canonicalTools].filter(Boolean).join("\n");
         const roundHadError = roundTools.some((t) => t.status === "error");
-        const hasMutatedSoFar = tools.some((t) =>
-          /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(
-            t.name
-          ) && t.status === "ok"
+        const hasMutatedSoFar = tools.some(
+          (t) =>
+            /^(write_file|write|create_file|edit_file|edit|patch_file|multi_edit|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(
+              t.name
+            ) && t.status === "ok"
         );
         const asksMut = /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
           opts.text
         );
         const nextStepDirective = roundHadError
-          ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately emit a fallback <zeus_tool> (such as <zeus_tool name="search_code">...</zeus_tool>, <zeus_tool name="list_dir" path="..."></zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, or <zeus_tool name="python">...</zeus_tool>) to continue.`
+          ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately invoke a fallback tool (such as \`search_code\`, \`list_dir\`, \`read_file\`, or \`python\`) to continue.`
           : asksMut && !hasMutatedSoFar
-          ? `You have only read/searched files so far and have NOT modified any files on disk yet. Emit <zeus_tool name="edit_file" path="..."><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool> or <zeus_tool name="write_file" path="...">...</zeus_tool> (or <zeus_tool name="read_file" path="..."></zeus_tool> if you need to inspect another file first) now. Do NOT output markdown code fences instead of <zeus_tool>.`
-          : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, emit the next <zeus_tool> block to finish the remaining steps (never stop mid-inspection to ask "tell me to proceed" and never repeat an identical call).`;
+          ? `You have only read/searched files so far and have NOT modified any files on disk yet. Invoke \`edit_file\` or \`write_file\` (or \`read_file\` if you need to inspect another file first) now.`
+          : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, invoke the next tool to finish the remaining steps.`;
         msgs = HistoryPruner.prune(
           [
             ...msgs,
@@ -915,7 +894,7 @@ export async function sendMessage(opts: {
               content: `Original user request: ${opts.text.slice(0, 1200)}\n\nTool results:\n${roundTools
                 .map((t) => {
                   const isRead = /^(read_file|read|cat|view_file|open_file)$/.test(t.name);
-                  const cap = isRead ? 48_000 : mode === "code" ? codingProfile.maxToolOutputChars : 12_000;
+                  const cap = isRead ? 64_000 : mode === "code" ? codingProfile.maxToolOutputChars : 24_000;
                   return `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, cap)}\n</tool_result>`;
                 })
                 .join("\n")}${stuckVerdict.note ? `\n\n${stuckVerdict.note}` : ""}\n\n${nextStepDirective}`,
@@ -941,12 +920,7 @@ export async function sendMessage(opts: {
         onDelta,
         (r) => {
           extraThink += r;
-          if (!raf) {
-            raf = requestAnimationFrame(() => {
-              raf = 0;
-              sync();
-            });
-          }
+          if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
         },
         signal
       );
@@ -959,12 +933,7 @@ export async function sendMessage(opts: {
           onDelta,
           (r) => {
             extraThink += r;
-            if (!raf) {
-              raf = requestAnimationFrame(() => {
-                raf = 0;
-                sync();
-              });
-            }
+            if (!raf) raf = requestAnimationFrame(() => { raf = 0; sync(); });
           },
           signal
         );
@@ -973,9 +942,7 @@ export async function sendMessage(opts: {
       }
     } else {
       if (prov && prov.id !== "demo") {
-        onDelta(
-          `> Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`
-        );
+        onDelta(`> Native engine not detected — **${prov.name}** runs inside the desktop app. Using the built-in demo designer here.\n\n`);
       }
       await demoRun({ prompt: opts.text, device, target, onDelta, signal, asVariant: opts.asVariant });
     }
