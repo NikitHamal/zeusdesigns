@@ -102,9 +102,10 @@ fn utf8_byte_boundary(text: &str, max_bytes: usize) -> usize {
 }
 
 /// Matches OpenCode's `ToolOutput.truncate` (`MAX_LINES = 2000`, `MAX_BYTES = 50 * 1024`):
-/// When tool output exceeds either limit, saves the full output to `.zeusdesigns/tool-output/tool_<id>.txt`
-/// inside the workspace (or temp dir fallback) and appends `[showing lines 1-N of M; full output saved to <path>]`.
-pub fn bound_tool_output_with_retention(eff_root: &str, text: String) -> String {
+/// When tool output exceeds either limit, saves the full output to global temp dir
+/// (`<temp>/zeusdesigns/tool-output/tool_<id>.txt`, outside the project git repo)
+/// and appends `[showing lines 1-N of M; full output saved to <path>]`.
+pub fn bound_tool_output_with_retention(_eff_root: &str, text: String) -> String {
     let total_lines = count_output_lines(&text);
     if total_lines <= TOOL_OUTPUT_MAX_LINES && text.len() <= TOOL_OUTPUT_MAX_BYTES {
         return text;
@@ -122,26 +123,10 @@ pub fn bound_tool_output_with_retention(eff_root: &str, text: String) -> String 
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let file_name = format!("tool_{:012x}.txt", ts & 0xffffffffffff);
-    let rel_file = format!("{}/{}", TOOL_OUTPUT_DIR, file_name);
-    let saved_path = match safe_join(eff_root, &rel_file) {
-        Ok(full_path) => {
-            if let Some(parent) = full_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if std::fs::write(&full_path, &text).is_ok() {
-                Ok(rel_file)
-            } else {
-                Err("write failed")
-            }
-        }
-        Err(_) => Err("invalid root"),
-    }
-    .or_else(|_| {
-        let fallback_dir = std::env::temp_dir().join("zeusdesigns").join("tool-output");
-        let _ = std::fs::create_dir_all(&fallback_dir);
-        let fallback_file = fallback_dir.join(&file_name);
-        std::fs::write(&fallback_file, &text).map(|_| fallback_file.to_string_lossy().to_string())
-    });
+    let out_dir = std::env::temp_dir().join("zeusdesigns").join("tool-output");
+    let _ = std::fs::create_dir_all(&out_dir);
+    let out_file = out_dir.join(&file_name);
+    let saved_path = std::fs::write(&out_file, &text).map(|_| out_file.to_string_lossy().to_string());
     let range = if shown_lines == 0 { "0 lines".to_string() } else { format!("lines 1-{}", shown_lines) };
     let cut_note = if last_line_cut { " (last line cut)" } else { "" };
     let save_note = match saved_path {

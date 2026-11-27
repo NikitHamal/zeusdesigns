@@ -85,7 +85,7 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
     "- Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; keep terminal output clean.",
     "- Prefer parallelizing independent tool calls in a single turn.",
     "- Treat unfamiliar files or changes as potential user work and investigate with `read_file` before deleting or overwriting them.",
-    `- Tool outputs exceeding 2,000 lines or 50 KiB are automatically bounded and saved to \`.zeusdesigns/tool-output/tool_<id>.txt\` with \`[showing lines 1-N of M; full output saved to <path>]\` so you can inspect the rest via \`read_file\` (with \`start\`/\`end\`) or \`search_code\`.`,
+    `- Tool outputs exceeding 2,000 lines or 50 KiB are automatically bounded and saved to a temp \`tool-output/tool_<id>.txt\` file outside the workspace with \`[showing lines 1-N of M; full output saved to <path>]\`.`,
   ].join("\n");
 
   const protocolSection = usesNativeTools
