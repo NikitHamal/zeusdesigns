@@ -84,3 +84,10 @@ Keep exactly one finished run: the latest successful one. `scripts/prune-runs.sh
 ## Shared terminal & tool rows
 - `shell_run_as` (`src-tauri/src/workspace.rs`) is the single execution path for the Terminal panel (`user`) and the agent (`agent`). `cd` persists per project root, commands have a 300s hard timeout, git never blocks on a console prompt (`GIT_TERMINAL_PROMPT=0`) while Git Credential Manager and `gh` stay enabled, and common tool dirs (Git, GitHub CLI, nodejs) are appended to `PATH`. Agent runs are mirrored to `TerminalPanel` through the `zeus://term` event (`listenTerminal` in `bridge.ts`, installed in `App.tsx`).
 - Tool rows in chat (`ToolCard` in `Activity.tsx`) expand and collapse in place. There is no tool detail dialog; do not add one.
+
+## Shell and terminal (`src-tauri/src/shell.rs`, `term.rs`, `src/lib/pty.ts`)
+OpenCode-style execution, no Tauri dependency in `shell.rs` (unit-testable on any OS).
+- Shell choice: Git Bash, then PowerShell 7, then cmd.exe, then Windows PowerShell. `ZEUS_SHELL` overrides. Non-Windows uses `$SHELL`.
+- Agent `shell` tool: one real shell process per call, merged output streamed to the Terminal panel's Zeus tab (`zeus://term` `chunk` events), 5 min hard timeout, process-tree kill, cancel via `shell_cancel`, stdin closed. Final cwd is read back (bash `trap EXIT`, PowerShell `finally`) so `cd` persists. cmd.exe keeps the small in-process rg/find/grep/ls layer.
+- Terminal panel: real PTYs (`portable-pty`, ConPTY) rendered by xterm in `TerminalView.tsx`, multiple shell tabs. Rust keeps 192 KB scrollback per session and replays it on re-attach, so xterm is disposed whenever the tab is hidden to keep memory low.
+- Tool output is always an inline expand/collapse row. Do not reintroduce a tool-output dialog.
