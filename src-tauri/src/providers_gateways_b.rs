@@ -492,7 +492,7 @@ where
                         accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
                         if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
                             if text.contains("[proxy error:") {
-                                return fallback(eff_model, system, messages, cancel, on_delta);
+                                return Err(text.trim().to_string());
                             }
                             if !text.is_empty() {
                                 if in_think {
