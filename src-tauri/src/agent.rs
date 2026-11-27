@@ -2,8 +2,8 @@
 pub mod agent_edit;
 #[path = "agent_exec.rs"]
 pub mod agent_exec;
-use crate::agent_edit::{apply_stormy_text_edit_impl, extract_attr};
-pub use crate::agent_exec::{execute_single_workspace_tool, resolve_workspace_root};
+use agent_edit::{apply_stormy_text_edit_impl, extract_attr};
+pub use agent_exec::{execute_single_workspace_tool, resolve_workspace_root};
 use crate::providers::{
     catalog, chatjimmy_complete, dispatch_stream, verify_model_fingerprint, ChatRequest,
     ModelFingerprintReport, ProviderEngine, ProviderInfo,
@@ -18,7 +18,7 @@ use std::sync::{
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 fn strip_read_file_line_prefixes(text: &str) -> String {
-    crate::agent_edit::strip_read_file_line_prefixes(text)
+    agent_edit::strip_read_file_line_prefixes(text)
 }
 pub fn apply_stormy_text_edit(
     content: &str,
@@ -570,7 +570,7 @@ pub fn parse_inline_invocations_segment(
             let mut path_arg = extract_attr(header, "path").unwrap_or_default();
             let mut start_line = extract_attr(header, "start").and_then(|v| v.parse::<usize>().ok());
             let mut end_line = extract_attr(header, "end").and_then(|v| v.parse::<usize>().ok());
-            let body_out = crate::agent_edit::unpack_function_parameters(inner, &mut path_arg, &mut start_line, &mut end_line);
+            let body_out = agent_edit::unpack_function_parameters(inner, &mut path_arg, &mut start_line, &mut end_line);
             covered_spans.push((start, next_from));
             list.push(InlineToolInvocation {
                 name,
@@ -654,7 +654,7 @@ pub fn parse_inline_invocations_segment(
         }
     }
     // 5. Support K2-Horizon <ifm|tool_call>, Kimi <|tool_call_begin|>, DeepSeek <｜tool▁call▁begin｜>, and Mistral [TOOL_CALLS]
-    crate::agent_edit::parse_vendor_tool_calls(clean_text, strict_placeholder_filter, &mut list);
+    agent_edit::parse_vendor_tool_calls(clean_text, strict_placeholder_filter, &mut list);
     list.sort_by_key(|x| x.offset);
     list
 }
@@ -965,7 +965,7 @@ mod tests {
             "new_string": "def compute(a, b):\n    total = a + b"
         })
         .to_string();
-        let res = crate::agent_edit::apply_search_replace(src, &tool_json)
+        let res = agent_edit::apply_search_replace(src, &tool_json)
             .expect("multiline JSON edit_file should apply cleanly");
         assert_eq!(res, "def compute(a, b):\n    total = a + b\n    return total\n");
     }

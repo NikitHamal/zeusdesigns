@@ -1,7 +1,7 @@
 use crate::crypto::{
     decode_data_url, fake_ipv4, generate_deepai_island_key, generate_deepai_tryit_key,
     generate_mychat_encryption_token, hmac_sha256_bytes, hmac_sha256_hex, iso8601_utc_compact,
-    md5_hex, pseudo_random_u64, random_hex, sha256_hex, uuid_v4,
+    pseudo_random_u64, random_hex, sha256_hex, uuid_v4,
 };
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -916,8 +916,8 @@ fn is_upstream_error_text(s: &str) -> bool {
         || t.starts_with("Service error, please try again later")
 }
 
-/// Standard OpenAI function-calling schema for Zeus workspace tools, passed to gateways that natively
-/// execute OpenAI `tools` (`bun008-freellmapi`, `alchoholpad-litellm`, `w902287-ai-bridge`, etc.).
+// Standard OpenAI function-calling schema for Zeus workspace tools, passed to gateways that natively
+// execute OpenAI `tools` (`bun008-freellmapi`, `alchoholpad-litellm`, `w902287-ai-bridge`, etc.).
 
 // Native thinking support ("enable_thinking": true) is wired in providers_oai_a.rs and providers_oai_b.rs
 

@@ -1,5 +1,5 @@
 use crate::agent::InlineToolInvocation;
-use crate::agent_edit::{apply_search_replace, apply_stormy_text_edit_impl, html_to_text};
+use super::agent_edit::{apply_search_replace, apply_stormy_text_edit_impl, html_to_text};
 use crate::providers::{verify_model_fingerprint, ProviderEngine};
 use crate::workspace::{
     audit_workspace_files, bm25_search_project, docs_lookup_reference, fs_delete, fs_move, fs_read,
