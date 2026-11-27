@@ -32,6 +32,7 @@ import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
 import { download, nativePerf, nativeServer, refreshTree, type PerfStats, type ServerStatus } from "../lib/bridge";
+import { verifyModelAuthenticity, type ModelFingerprintReport } from "../lib/lmFingerprint";
 import { Icon } from "./Icon";
 import { MemoryTab } from "./MemoryPanel";
 import { ConnectorsTab } from "./Connectors";
@@ -63,6 +64,21 @@ function ProvidersTab() {
   const { settings, ui } = useStore();
   const patch = useStore((s) => s.patchSettings);
   const [form, setForm] = useState({ name: "", format: "openai" as "openai" | "anthropic", baseUrl: "", apiKey: "", model: "" });
+  const [fpBusy, setFpBusy] = useState(false);
+  const [fpRep, setFpRep] = useState<ModelFingerprintReport | null>(null);
+  const [fpError, setFpError] = useState<string | null>(null);
+  const runFingerprint = async (pId = settings.providerId, mId = settings.modelId) => {
+    setFpBusy(true);
+    setFpError(null);
+    try {
+      const r = await verifyModelAuthenticity(pId, mId);
+      setFpRep(r);
+    } catch (e) {
+      setFpError(e instanceof Error ? e.message : "LMFingerprint probe failed");
+    } finally {
+      setFpBusy(false);
+    }
+  };
   const add = () => {
     if (!form.baseUrl || !form.model) return;
     const id = Math.random().toString(36).slice(2, 8);
@@ -71,10 +87,59 @@ function ProvidersTab() {
   };
   return (
     <div className="space-y-6">
-      <div className={cn("flex items-center gap-3 rounded-3xl px-4 py-3 text-sm", ui.nativeReady ? "bg-tertiary-container text-on-tertiary-container" : "bg-surface-high text-on-surface-variant")}>
-        <Icon name="auto_awesome" size={18} />
-        {ui.nativeReady ? "Native engine connected" : "Browser preview, demo engine"}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-outline-variant/60 bg-surface-container px-4 py-3 text-sm">
+        <div className="flex items-center gap-2.5">
+          <Icon name="verified" size={18} className="text-primary" />
+          <span className="font-semibold text-on-surface">LMFingerprint Authenticity Verifier</span>
+          <span className="font-mono text-xs text-on-surface-variant">{settings.providerId} / {settings.modelId}</span>
+        </div>
+        <button
+          disabled={fpBusy}
+          onClick={() => runFingerprint(settings.providerId, settings.modelId)}
+          className="state morph flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary disabled:opacity-50"
+        >
+          <Icon name="fingerprint" size={15} />
+          {fpBusy ? "Probing Wire & Canary…" : "Verify Active Model"}
+        </button>
       </div>
+      {(fpRep || fpError) && (
+        <div className="space-y-2 rounded-[24px] border border-outline-variant bg-surface-container p-4 text-xs">
+          {fpError ? (
+            <div className="text-error">{fpError}</div>
+          ) : fpRep ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold", fpRep.isGenuine && !fpRep.routedUnderTheHood ? "bg-primary-container text-on-primary-container" : fpRep.isGenuine ? "bg-tertiary-container text-on-tertiary-container" : "bg-error-container text-on-error-container")}>
+                  <Icon name={fpRep.isGenuine ? "verified" : "warning"} size={14} />
+                  {fpRep.verdictLabel}
+                </span>
+                <span className="font-mono text-on-surface-variant">
+                  {fpRep.latencyMs.toLocaleString()} ms · {fpRep.tokensPerSec.toLocaleString()} tok/s · Canary 17×23=391: {fpRep.canaryPassed ? "PASS" : "PARTIAL"} · FP #{fpRep.fingerprintHash}
+                </span>
+              </div>
+              <div className="grid gap-2 pt-1 sm:grid-cols-2">
+                <div className="rounded-xl bg-surface-high px-3 py-2">
+                  <div className="text-[10.5px] font-semibold uppercase text-on-surface-variant">Claimed vs Detected</div>
+                  <div className="mt-0.5 font-mono text-on-surface">{fpRep.claimedFamily} → {fpRep.detectedFamily}</div>
+                </div>
+                <div className="rounded-xl bg-surface-high px-3 py-2">
+                  <div className="text-[10.5px] font-semibold uppercase text-on-surface-variant">Wire Header & Protocol</div>
+                  <div className="mt-0.5 truncate font-mono text-on-surface">{fpRep.upstreamReportedModel} · {fpRep.protocolSignature}</div>
+                </div>
+              </div>
+              <div className="rounded-xl bg-surface-high px-3 py-2 font-mono text-[11px] text-on-surface-variant">
+                Endpoint: {fpRep.upstreamEndpoint}
+              </div>
+              <div className="text-on-surface">{fpRep.explanation}</div>
+              {fpRep.selfReport && (
+                <div className="rounded-xl bg-surface-low px-3 py-2 italic text-on-surface-variant">
+                  “{fpRep.selfReport}”
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
       <div>
         <h3 className="mb-3 font-display text-lg font-semibold">Free · keyless providers ({PROVIDERS.length})</h3>
         <div className="grid gap-3 sm:grid-cols-2">

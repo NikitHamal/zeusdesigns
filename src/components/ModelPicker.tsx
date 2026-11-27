@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "../store";
 import { EFFORTS, PROVIDERS, findProvider, type ModelInfo } from "../lib/providers";
 import { clampEffort, fmtCtx, reasoningTiers } from "../lib/modelMeta";
+import { verifyModelAuthenticity, type ModelFingerprintReport } from "../lib/lmFingerprint";
 import { cn } from "../utils/cn";
 import { Dropdown } from "./ui";
 import { Icon } from "./Icon";
@@ -37,6 +38,9 @@ export function ModelPicker() {
   const nativeReady = useStore((s) => s.ui.nativeReady);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [fpReport, setFpReport] = useState<ModelFingerprintReport | null>(null);
+  const [fpErr, setFpErr] = useState<string | null>(null);
   const custom = settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId);
   const prov = findProvider(settings.providerId);
   const model = prov.models.find((m) => m.id === settings.modelId);
@@ -114,9 +118,53 @@ export function ModelPicker() {
                 </div>
               </div>
             )}
+            {(fpReport || fpErr) && (
+              <div className="shrink-0 border-t border-outline-variant/60 bg-surface-low px-3 py-2 text-xs">
+                {fpErr ? (
+                  <div className="flex items-center justify-between text-error">
+                    <span className="truncate">{fpErr}</span>
+                    <button onClick={() => setFpErr(null)} className="state ml-2 rounded p-0.5 text-on-surface-variant"><Icon name="close" size={13} /></button>
+                  </div>
+                ) : fpReport ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", fpReport.isGenuine && !fpReport.routedUnderTheHood ? "bg-primary-container text-on-primary-container" : fpReport.isGenuine ? "bg-tertiary-container text-on-tertiary-container" : "bg-error-container text-on-error-container")}>
+                        <Icon name={fpReport.isGenuine ? "verified" : "warning"} size={12} />
+                        {fpReport.verdictLabel}
+                      </span>
+                      <span className="font-mono text-[10.5px] text-on-surface-variant">{fpReport.latencyMs}ms · {fpReport.tokensPerSec} tok/s · #{fpReport.fingerprintHash.slice(0, 8)}</span>
+                      <button onClick={() => setFpReport(null)} className="state rounded p-0.5 text-on-surface-variant"><Icon name="close" size={13} /></button>
+                    </div>
+                    <div className="truncate font-mono text-[10.5px] text-on-surface-variant">
+                      Reported: {fpReport.upstreamReportedModel} · {fpReport.upstreamEndpoint}
+                    </div>
+                    <div className="line-clamp-2 text-[11px] text-on-surface">{fpReport.explanation}</div>
+                  </div>
+                ) : null}
+              </div>
+            )}
             <div className="flex h-11 shrink-0 items-center gap-2 border-t border-outline-variant/60 px-2">
               <button onClick={() => { close(); patchUI({ settingsOpen: true, settingsTab: "providers" }); }} className="state flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-on-surface">
                 <Icon name="add" size={16} />Endpoint
+              </button>
+              <button
+                disabled={verifying}
+                onClick={async () => {
+                  setVerifying(true);
+                  setFpErr(null);
+                  try {
+                    const rep = await verifyModelAuthenticity(settings.providerId, settings.modelId);
+                    setFpReport(rep);
+                  } catch (e) {
+                    setFpErr(e instanceof Error ? e.message : "Verification failed");
+                  } finally {
+                    setVerifying(false);
+                  }
+                }}
+                className="state flex h-8 items-center gap-1.5 rounded-lg bg-surface-high px-2.5 text-[12px] font-semibold text-on-surface disabled:opacity-50"
+              >
+                <Icon name="verified" size={14} className="text-primary" />
+                {verifying ? "Probing…" : "LMFingerprint"}
               </button>
               <span className="flex-1" />
               {nativeReady && (

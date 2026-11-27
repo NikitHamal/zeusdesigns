@@ -43,6 +43,7 @@ import {
   synthesizeToolCompletionSummary,
 } from "./streamParser";
 import { demoRun } from "./demoEngine";
+import { formatFingerprintMarkdown, verifyModelAuthenticity } from "./lmFingerprint";
 import {
   BROWSER_FALLBACK_PROVIDER_IDS,
   resolveBrowserGatewayConfig,
@@ -166,6 +167,60 @@ export async function sendMessage(opts: {
   if (st.busy || !opts.text.trim()) return;
   if (opts.text.trim().toLowerCase() === "/compact") {
     await compactConversation({ manual: true });
+    return;
+  }
+  const verifyMatch = /^\/(?:verify|fingerprint|lmfingerprint)(?:\s+([\w./:-]+))?$/i.exec(opts.text.trim());
+  if (verifyMatch) {
+    const arg = verifyMatch[1]?.trim() ?? "";
+    const [targetProv, targetModel] = arg.includes("/")
+      ? arg.split("/", 2)
+      : [st.settings.providerId, arg || st.settings.modelId];
+    const convId = st.activeConvId;
+    const asstId = uid();
+    const toolId = uid();
+    st.addMessage(convId, {
+      id: uid(),
+      role: "user",
+      text: opts.text.trim(),
+      at: Date.now(),
+    });
+    st.addMessage(convId, {
+      id: asstId,
+      role: "assistant",
+      text: "",
+      streaming: true,
+      model: `${targetProv}/${targetModel}`,
+      at: Date.now(),
+      tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "running" }],
+    });
+    st.setBusy(true);
+    try {
+      const rep = await verifyModelAuthenticity(targetProv, targetModel);
+      const md = formatFingerprintMarkdown(rep);
+      useStore.getState().patchMessage(convId, asstId, {
+        text: md,
+        streaming: false,
+        tools: [
+          {
+            id: toolId,
+            name: "lmfingerprint",
+            args: `${rep.provider}/${rep.requestedModel} -> ${rep.verdict}`,
+            status: "ok",
+            output: `${rep.verdictLabel}\nEndpoint: ${rep.upstreamEndpoint}\nReported model: ${rep.upstreamReportedModel}\nFP: ${rep.fingerprintHash}`,
+          },
+        ],
+        stats: { ms: rep.latencyMs, tokens: Math.max(12, Math.round(md.length / 4)), tps: rep.tokensPerSec },
+      });
+    } catch (e) {
+      useStore.getState().patchMessage(convId, asstId, {
+        text: "",
+        streaming: false,
+        error: e instanceof Error ? e.message : "LMFingerprint verification failed",
+        tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "error", output: String(e) }],
+      });
+    } finally {
+      useStore.getState().setBusy(false);
+    }
     return;
   }
 
