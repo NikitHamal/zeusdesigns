@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../store";
-import type { AgentPlan, Message, PendingApproval, PendingUserQuestion, PlanTask, ToolCall } from "../types";
-import { sendMessage } from "../lib/engine";
+import type { Message, ToolCall } from "../types";
 import { DiffUtils, ToolAliases, type ComputedDiff } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";

@@ -6,14 +6,12 @@ import {
   listWorkspaceDir,
   nativeAudit,
   nativeCheckpoints,
-  nativeGit,
   nativeShell,
   openWorkspace,
   readWorkspaceFile,
   refreshTree,
   writeWorkspaceFile,
   type NativeCheckpointManifest,
-  type NativeGitStatus,
 } from "../lib/bridge";
 import { DiffUtils } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
