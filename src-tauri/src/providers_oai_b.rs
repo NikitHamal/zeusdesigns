@@ -137,23 +137,8 @@ where
         .send()
     {
         Ok(r) if r.status().is_success() => r,
-        _ => {
-            let bridge_targets = [
-                ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
-                ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-4.1"),
-            ];
-            return stream_oai_targets_auth(
-                "MyChat Native Direct Cloud",
-                &bridge_targets,
-                system,
-                messages,
-                false,
-                30,
-                false,
-                cancel,
-                on_delta,
-            );
-        }
+        Ok(r) => return Err(format!("MyChat Native Direct Cloud HTTP {} for model '{}'", r.status(), eff_model)),
+        Err(e) => return Err(format!("MyChat Native Direct Cloud request failed for '{}': {}", eff_model, e)),
     };
 
     let mut reader = BufReader::new(resp);
@@ -337,16 +322,10 @@ where
         }
     }
 
-    let bridge_model = if upstream_model.starts_with("qwen") {
-        "supabase-qwen3.7-flash"
-    } else {
-        "supabase-deepseek-v4.1-flash"
-    };
-    let targets = [
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", bridge_model),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
-    ];
-    stream_oai_targets_auth("Supabase Tongyi VIP Cloud", &targets, system, messages, false, 35, false, cancel, on_delta)
+    Err(format!(
+        "Supabase Tongyi VIP Cloud stream ended without output for '{}'",
+        upstream_model
+    ))
 }
 
 fn ensure_shannian_vip_token(engine: &ProviderEngine) -> Option<String> {
@@ -464,28 +443,13 @@ where
         }
     }
 
-    let bridge_model = match model {
-        "qwen3.5-flash" | "doubao-seed-2-0-mini-260428" | "deepseek-v4-flash-vision-exp" => model,
-        _ => "doubao-seed-2-0-mini-260428",
-    };
-    let fallback_targets = [
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", bridge_model),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "qwen3.5-flash"),
-    ];
-    stream_oai_targets_auth(
-        "ShanNian VIP Gateway",
-        &fallback_targets,
-        system,
-        messages,
-        false,
-        35,
-        false,
-        cancel,
-        on_delta,
-    )
+    Err(format!(
+        "ShanNian VIP Gateway stream ended without output for '{}'",
+        model
+    ))
 }
 
-/// Stream from Claude 5.5 & Zhipu GLM Direct Hub (`dherain24-claude-proxy.hf.space` + `sun14728-ai-proxy.hf.space` + `bun008-freellmapi.hf.space`).
+/// Stream from Claude 5.5 & Zhipu GLM Direct Hub (`dherain24-claude-proxy.hf.space` + `open.bigmodel.cn`).
 pub fn stream_claude5proxy<F>(
     model: &str,
     system: &str,
@@ -506,9 +470,8 @@ where
         let zhipu_key = ["5777264968af4e048941f71c01b94eb3", "LSmsNY0AUfXGcmJH"].join(".");
         let direct_targets = [
             ("https://open.bigmodel.cn/api/paas/v4/chat/completions", direct_glm),
-            ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.5-flash"),
         ];
-        if stream_oai_targets_bearer(
+        return stream_oai_targets_bearer(
             "Zhipu BigModel PaaS v4 Direct",
             &direct_targets,
             system,
@@ -518,43 +481,11 @@ where
             Some(&zhipu_key),
             cancel,
             on_delta,
-        )
-        .is_ok()
-        {
-            return Ok(());
-        }
-        let bun_model = match model {
-            "glm-4.5-flash" => "glm-4.5-flash",
-            "glm-z1-flash" => "glm-5.3",
-            "glm-4-flash-250414" => "glm-4.7-flash",
-            _ => "glm-5.3-flash",
-        };
-        let glm_targets = [
-            ("https://bun008-freellmapi.hf.space/v1/chat/completions", bun_model),
-            ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3-flash"),
-            ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "glm-5.3"),
-        ];
-        return stream_oai_targets_auth(
-            "Zhipu GLM Direct Cloud",
-            &glm_targets,
-            system,
-            messages,
-            allow_vis,
-            30,
-            false,
-            cancel,
-            on_delta,
         );
     }
 
-    if model == "claude-opus-5-5" {
-        if stream_antigravity("claude-opus-5-5-high", system, messages, cancel, on_delta).is_ok() {
-            return Ok(());
-        }
-    }
-
     let anth_model = match model {
-        "claude-sonnet-5-5" | "claude-haiku-5-5" => model,
+        "claude-sonnet-5-5" | "claude-haiku-5-5" | "claude-opus-5-5" => model,
         "nvidia/nemotron-3.5-super-vl-120b-a12b" => {
             "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b"
         }
@@ -601,12 +532,7 @@ where
     let wants_tools = is_agent_tool_request(system);
     let sys_safe = smart_cap_system(system, 120000);
 
-    let candidates = [
-        anth_model,
-        "claude-sonnet-5-5",
-        "claude-haiku-5-5",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b",
-    ];
+    let candidates = [anth_model];
 
     for cand in candidates {
         let Ok(client) = build_client(22) else {

@@ -22,10 +22,8 @@ where
         "VyPCzaG4d7f1NfozXHKfwQKjN0AXpOOfoBDPxcqONf3SRlVu",
     ]
     .join("-");
-    let targets: [(&str, &str); 3] = [
+    let targets: [(&str, &str); 1] = [
         ("https://apihub.agnes-ai.com/v1/chat/completions", eff_model),
-        ("https://apihub.agnes-ai.com/v1/chat/completions", "agnes-3.0-pro"),
-        ("https://apihub.agnes-ai.com/v1/chat/completions", "agnes-2.5-flash"),
     ];
     stream_oai_targets_bearer(
         "Agnes AI Direct Hub",
@@ -42,7 +40,7 @@ where
 
 /// Stream from Volcengine Ark & SenseNova Direct Cloud (`https://ark.cn-beijing.volces.com/api/v3` + `https://token.sensenova.cn/v1`).
 pub fn stream_volcark<F>(
-    engine: &ProviderEngine,
+    _engine: &ProviderEngine,
     model: &str,
     system: &str,
     messages: &[ChatMessage],
@@ -58,11 +56,10 @@ where
             _ => "sensenova-6.8-flash",
         };
         let sn_key = ["sk", "nBdpxGHlfjRAsVXtp1qADkPAdmNS6wT2"].join("-");
-        let sn_targets: [(&str, &str); 2] = [
+        let sn_targets: [(&str, &str); 1] = [
             ("https://token.sensenova.cn/v1/chat/completions", sn_model),
-            ("https://token.sensenova.cn/v1/chat/completions", "sensenova-6.8-flash-lite"),
         ];
-        if stream_oai_targets_bearer(
+        return stream_oai_targets_bearer(
             "SenseNova Direct Cloud",
             &sn_targets,
             system,
@@ -72,11 +69,7 @@ where
             Some(&sn_key),
             cancel,
             on_delta,
-        )
-        .is_ok()
-        {
-            return Ok(());
-        }
+        );
     }
 
     let ark_model = match model {
@@ -93,9 +86,8 @@ where
         "161cc",
     ]
     .join("-");
-    let ark_targets: [(&str, &str); 2] = [
+    let ark_targets: [(&str, &str); 1] = [
         ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", ark_model),
-        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-2-0-mini-260428"),
     ];
     stream_oai_targets_bearer(
         "Volcengine Ark Direct Cloud",
@@ -127,11 +119,10 @@ where
             _ => "LongCat-2.5",
         };
         let lc_key = ["ak", "20S62c7qo1Lx2tb7fe4ay5Jc2L207"].join("_");
-        let lc_targets: [(&str, &str); 2] = [
+        let lc_targets: [(&str, &str); 1] = [
             ("https://api.longcat.chat/openai/v1/chat/completions", lc_model),
-            ("https://api.longcat.chat/openai/v1/chat/completions", "LongCat-2.5"),
         ];
-        if stream_oai_targets_bearer(
+        return stream_oai_targets_bearer(
             "LongCat Official Direct Cloud",
             &lc_targets,
             system,
@@ -141,12 +132,7 @@ where
             Some(&lc_key),
             cancel,
             on_delta,
-        )
-        .is_ok()
-        {
-            return Ok(());
-        }
-        return stream_longcat(system, messages, cancel, on_delta);
+        );
     }
 
     let zhipu_model = match model {
@@ -154,10 +140,8 @@ where
         _ => "glm-4.5-flash",
     };
     let zhipu_key = ["5777264968af4e048941f71c01b94eb3", "LSmsNY0AUfXGcmJH"].join(".");
-    let zhipu_targets: [(&str, &str); 3] = [
+    let zhipu_targets: [(&str, &str); 1] = [
         ("https://open.bigmodel.cn/api/paas/v4/chat/completions", zhipu_model),
-        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-z1-flash"),
-        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash-250414"),
     ];
     stream_oai_targets_bearer(
         "Z.ai BigModel PaaS v4 Direct",
@@ -189,12 +173,7 @@ where
     } else {
         model
     };
-    let targets: [(&str, &str); 4] = [
-        (EP, requested),
-        (EP, "devstral-latest"),
-        (EP, "reka-flash-3"),
-        (EP, "zai-glm-4.7"),
-    ];
+    let targets: [(&str, &str); 1] = [(EP, requested)];
     stream_oai_targets_auth(
         "Logfare, Mistral & Reka Frontier Hub",
         &targets,
@@ -247,8 +226,6 @@ where
         let key = &nim_keys[(start_idx + offset) % nim_keys.len()];
         let direct_targets = [
             ("https://integrate.api.nvidia.com/v1/chat/completions", direct_model),
-            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
-            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
         ];
         if stream_oai_targets_bearer(
             "NVIDIA NIM Direct Cloud",
@@ -267,19 +244,8 @@ where
         }
     }
 
-    let gary_model = match model {
-        "nvidia/nemotron-3-ultra-550b-a55b"
-        | "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
-        | "nvidia/nemotron-3.5-lightning-30b-a3b"
-        | "nvidia/nemotron-3.5-bolt-e4b"
-        | "mistralai/mistral-large-4-1t-a52b"
-        | "nvidia/ising-calibration-1.5-31b"
-        | "poolside/laguna-xs-2.1" => model,
-        "nvidia/nemotron-3.5-super-vl-120b-a12b" => "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-        _ => "nvidia/nemotron-3-ultra-550b-a55b",
-    };
     let targets = [
-        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", gary_model),
+        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", direct_model),
     ];
     stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 60, cancel, on_delta)
 }

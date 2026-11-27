@@ -92,66 +92,12 @@ where
         }
     }
 
-    if !has_images && eff_model.contains("/gemini/") {
-        let gem4_id = if eff_model.contains("gemini-4-hydrogen") {
-            "gemini-4-hydrogen"
-        } else if eff_model.contains("gemini-4-carbon") {
-            "gemini-4-carbon"
-        } else if eff_model.contains("gemini-4-neon") {
-            "gemini-4-neon"
-        } else if eff_model.contains("gemini-4-argon") {
-            "gemini-4-argon"
-        } else {
-            "gemini-4-hydrogen"
-        };
-        if stream_gemini4(gem4_id, system, messages, cancel, on_delta).is_ok() {
-            return Ok(());
-        }
-    }
-
     let wants_tools = is_agent_tool_request(system);
     let sys_safe = smart_cap_system(system, 120000);
     let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
     for &h in hosts {
-        let t_secs = if eff_model.contains("/gemini/") || eff_model.contains("kimi-k3.1-pro") || eff_model.contains("step-5") {
-            6
-        } else {
-            16
-        };
-        if !eff_model.contains("/gemini/") {
-            candidate_routes.push((h, eff_model, t_secs));
-        }
+        candidate_routes.push((h, eff_model, 20));
     }
-    candidate_routes.push((
-        "https://dherain24-claude-proxy.hf.space",
-        "claude-sonnet-5-5",
-        16,
-    ));
-    candidate_routes.push((
-        "https://dherain24-claude-proxy.hf.space",
-        "claude-haiku-5-5",
-        14,
-    ));
-    candidate_routes.push((
-        "https://dherain24-claude-proxy.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-super-vl-120b-a12b",
-        16,
-    ));
-    candidate_routes.push((
-        "https://dherain24-claude-proxy.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
-        14,
-    ));
-    candidate_routes.push((
-        "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3.5-bolt-e4b",
-        14,
-    ));
-    candidate_routes.push((
-        "https://calkotter-free-claude-code.hf.space",
-        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b",
-        18,
-    ));
 
     for (host, route_model, timeout_secs) in candidate_routes {
         let Ok(client) = build_client(timeout_secs) else {
