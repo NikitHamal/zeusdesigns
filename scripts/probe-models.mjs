@@ -13,6 +13,9 @@ const GATEWAYS = {
   vireonix: "https://vireonix.ai/v1",
   nimcloud: "https://garystu-openai-nim-proxy.hf.space/v1",
   colibriqwen: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1",
+  acipslongcat: "https://acips-longcat.hf.space/v1",
+  pouluo: "https://pouluo-gemini-web2api.hf.space/v1",
+  peijun1: "https://peijun1-gemini-web2api.hf.space/v1",
   blockrun: { base: "https://blockrun.ai/api/v1", only: /^(nvidia|cohere|poolside)\// },
   kilo: { base: "https://api.kilo.ai/api/gateway", key: "anonymous", only: /free/ },
 };
