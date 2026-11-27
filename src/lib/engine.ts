@@ -10,7 +10,7 @@ import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
-import { getCodingHarnessProfile } from "./codingHarness";
+import { CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, getCodingHarnessProfile, MAX_STEPS_PROMPT } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook, runPreToolUseHook } from "./harness2";
 import { AutonomyPolicy, BriefCheck, computeToolBatchWaves, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
 import { formatRoundToolsForHistory } from "./stormyTools";
@@ -18,7 +18,7 @@ import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { isStudioTool, runStudioTool, studioBrief } from "./studio";
-import { applyThemeOverrideToHtml, buildContinuationPrompt, buildMultiTurnContext, compactConversation, getConversationBoards, getContextWindowStats, getProviderSpecialization, isCanvasRefusal, looksLikeRefusalStart } from "./context";
+import { applyThemeOverrideToHtml, buildContinuationPrompt, buildMultiTurnContext, compactConversation, getConversationBoards, getContextWindowStats, getProviderSpecialization, isCanvasRefusal, isContextOverflowError, looksLikeRefusalStart } from "./context";
 import { extractLeakedPlan, normalizeStream, parseStream, synthesizeToolCompletionSummary } from "./streamParser";
 import { demoRun } from "./demoEngine";
 import { BROWSER_FALLBACK_PROVIDER_IDS, resolveBrowserGatewayConfig, streamCustom } from "./browserProviders";
@@ -215,39 +215,24 @@ export async function sendMessage(opts: {
   let extraThink = "";
   let thinkT0 = 0;
   let thinkEnd = 0;
+  let measuredInputTokens = 0;
+  let measuredOutputTokens = 0;
 
   const sync = (final = false) => {
     const parsed = parseStream(extractRemember(full).clean, extraThink);
     const { blocks, reasoning, thinkOpen } = parsed;
     let { text } = parsed;
-    if (final && !text.trim() && tools.length > 0) {
-      text = synthesizeToolCompletionSummary(tools);
-    }
+    if (final && !text.trim() && tools.length > 0) text = synthesizeToolCompletionSummary(tools);
 
     const S = useStore.getState();
     blocks.forEach((b, i) => {
       let id = idMap.get(i);
-      const bDevice = (
-        ["mobile", "tablet", "web"].includes(b.attrs.device)
-          ? b.attrs.device
-          : target?.device ?? boards[i]?.device ?? "mobile"
-      ) as Device;
+      const bDevice = (["mobile", "tablet", "web"].includes(b.attrs.device) ? b.attrs.device : target?.device ?? boards[i]?.device ?? "mobile") as Device;
       if (!id) {
         const byId = b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
-        const byName =
-          !byId && isCanvasFollowUp && b.attrs.name
-            ? boards.find((a) => a.name.toLowerCase() === b.attrs.name.toLowerCase())
-            : undefined;
+        const byName = !byId && isCanvasFollowUp && b.attrs.name ? boards.find((a) => a.name.toLowerCase() === b.attrs.name.toLowerCase()) : undefined;
         const byTarget = !byId && !byName && target && !opts.asVariant && i === 0 ? target : undefined;
-        const byIndex =
-          !byId &&
-          !byName &&
-          !byTarget &&
-          isCanvasFollowUp &&
-          !opts.asVariant &&
-          (b.attrs.mode === "revise" || Boolean(themeOverride))
-            ? boards[i]
-            : undefined;
+        const byIndex = !byId && !byName && !byTarget && isCanvasFollowUp && !opts.asVariant && (b.attrs.mode === "revise" || Boolean(themeOverride)) ? boards[i] : undefined;
         const existing = byId ?? byName ?? byTarget ?? byIndex;
         if (existing) {
           id = existing.id;
@@ -273,36 +258,44 @@ export async function sendMessage(opts: {
       const now = performance.now();
       const isRevise = !created.includes(id);
       const dsNow = getDS(S.settings.designSystemId);
-          if (b.closed || final) {
-            const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
-            const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
-            if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
-            else S.updateArtboard(id, { html: finalHtml });
-            S.updateArtboard(id, { loading: false });
-            lastPush.set(i, { t: now, len: -1 });
-          } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
-            const partialHtml = harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html;
-            S.updateArtboard(id, { html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml });
-            lastPush.set(i, { t: now, len: b.html.length });
-          }
-        });
+      if (b.closed || final) {
+        const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
+        const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
+        if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
+        else S.updateArtboard(id, { html: finalHtml });
+        S.updateArtboard(id, { loading: false });
+        lastPush.set(i, { t: now, len: -1 });
+      } else if (lp.len !== -1 && !isRevise && b.html.length > 400 && now - lp.t > 700 && b.html.length - lp.len > 300) {
+        const partialHtml = harden(b.html, dsNow, { partial: true, intent: opts.text, name: b.attrs.name, device: bDevice }).html;
+        S.updateArtboard(id, { html: themeOverride ? applyThemeOverrideToHtml(partialHtml, themeOverride) : partialHtml });
+        lastPush.set(i, { t: now, len: b.html.length });
+      }
+    });
 
-        const ms = performance.now() - t0;
-        if (reasoning && !thinkT0) thinkT0 = performance.now();
-        if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
-        const hasUnclosed = final && blocks.some((b) => !b.closed);
-        const allBoardIds = [...new Set([...idMap.values(), ...syncedWorkspaceBoardIds])];
-        const tokEstimate = Math.max(1, Math.round((full.length + extraThink.length + tools.reduce((acc, t) => acc + (t.args?.length ?? 0), 0)) / 4));
-        S.patchMessage(convId, asstId, {
-          reasoning: reasoning || undefined,
-          thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
-          text,
-          artboardIds: allBoardIds,
-          tools: [...tools],
-          truncated: hasUnclosed || undefined,
-          stats: final ? { ms, tokens: tokEstimate, tps: Math.max(1, Math.round(tokEstimate / (ms / 1000))) } : undefined,
-        });
-      };
+    const ms = performance.now() - t0;
+    if (reasoning && !thinkT0) thinkT0 = performance.now();
+    if (reasoning && !thinkEnd && ((!thinkOpen && (text || blocks.length || tools.length)) || final)) thinkEnd = performance.now();
+    const hasUnclosed = final && blocks.some((b) => !b.closed);
+    const allBoardIds = [...new Set([...idMap.values(), ...syncedWorkspaceBoardIds])];
+    const tokEstimate = measuredOutputTokens || Math.max(1, Math.round((full.length + extraThink.length + tools.reduce((acc, t) => acc + (t.args?.length ?? 0), 0)) / 4));
+    S.patchMessage(convId, asstId, {
+      reasoning: reasoning || undefined,
+      thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
+      text,
+      artboardIds: allBoardIds,
+      tools: [...tools],
+      truncated: hasUnclosed || undefined,
+      stats: final
+        ? {
+            ms,
+            tokens: tokEstimate,
+            inputTokens: measuredInputTokens || undefined,
+            outputTokens: measuredOutputTokens || tokEstimate,
+            tps: Math.max(1, Math.round(tokEstimate / (ms / 1000))),
+          }
+        : undefined,
+    });
+  };
 
       const finish = (err?: string) => {
         if (mode === "chat" && GREETING_RE.test(opts.text.trim())) {
@@ -416,7 +409,11 @@ export async function sendMessage(opts: {
       let msgs: ChatRequest["messages"] = history;
       let nudgeCount = 0;
       let qualityPassesDone = 0;
+      let outputLimitContCount = 0;
+      let overflowRetries = 0;
+      let maxStepsHandedOff = false;
       const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
+      const maxRounds = mode === "code" ? codingProfile.maxToolRounds : mode === "chat" ? 8 : 4;
       const stuckDetector = new StuckDetector();
       const seenPreToolCalls = new Set<string>();
       for (let round = 0; ; round++) {
@@ -424,7 +421,8 @@ export async function sendMessage(opts: {
         const studioRuns = new Map<string, Promise<void>>();
         let roundText = "";
         let heldBuffer = "";
-        await new Promise<void>((resolve, reject) => {
+        try {
+          await new Promise<void>((resolve, reject) => {
           const onEvent = (e: ChatEvent) => {
             if (e.type === "provider_notice") {
               useStore.getState().notify(e.message);
@@ -619,7 +617,11 @@ export async function sendMessage(opts: {
               }
               sync();
             } else if (e.type === "error") reject(new Error(e.message));
-            else if (e.type === "done") resolve();
+            else if (e.type === "done") {
+              if (e.usage?.inputTokens) measuredInputTokens = e.usage.inputTokens;
+              if (e.usage?.outputTokens) measuredOutputTokens += e.usage.outputTokens;
+              resolve();
+            }
           };
           signal.addEventListener("abort", () => resolve());
           nativeChat(current, onEvent)
@@ -627,16 +629,31 @@ export async function sendMessage(opts: {
               nativeCancel = c;
             })
             .catch(reject);
-        }).finally(() => {
-          if (!signal.aborted) {
-            try {
-              nativeCancel?.();
-            } catch {
-              /* ignore */
+          }).finally(() => {
+            if (!signal.aborted) {
+              try {
+                nativeCancel?.();
+              } catch { /* ignore */ }
+              nativeCancel = null;
             }
-            nativeCancel = null;
+          });
+        } catch (stepErr) {
+          if (!signal.aborted && overflowRetries < 2 && isContextOverflowError(stepErr)) {
+            overflowRetries++;
+            const compacted = await compactConversation({ convId, manual: false, reason: "overflow" });
+            tools.push({
+              id: uid(),
+              name: "context_compact",
+              args: `overflow recovery #${overflowRetries} · freed ~${compacted.savedTokens.toLocaleString()} tokens`,
+              status: "ok",
+              output: compacted.summary || "Pruned prompt context after provider overflow rejection",
+            });
+            msgs = HistoryPruner.prune(msgs, Math.floor(stormyProfile.contextBudgetTokens * Math.pow(0.7, overflowRetries)));
+            current = { ...req, requestId: uid(), messages: msgs };
+            continue;
           }
-        });
+          throw stepErr;
+        }
         await Promise.all(studioRuns.values());
         const batchWaves = computeToolBatchWaves(roundTools);
         void batchWaves;
@@ -656,7 +673,7 @@ export async function sendMessage(opts: {
           useStore.getState().patchMessage(convId, asstId, { error: stuckVerdict.stop });
           break;
         }
-        if (signal.aborted || round >= (mode === "code" ? codingProfile.maxToolRounds : mode === "chat" ? 8 : 4)) break;
+        if (signal.aborted || maxStepsHandedOff) break;
         if (!roundTools.length) {
           const parsedNow = parseStream(extractRemember(full).clean, extraThink);
           const produced = parsedNow.blocks.length > 0 || syncedWorkspaceBoardIds.size > 0;
@@ -674,6 +691,27 @@ export async function sendMessage(opts: {
               ...msgs,
               { role: "assistant", content: roundText },
               { role: "user", content: buildContinuationPrompt(unclosedBlock.attrs.name || "Screen", unclosedBlock.html) },
+            ];
+            current = { ...req, requestId: uid(), messages: msgs };
+            continue;
+          }
+
+          // Match OpenCode's CONTINUE_AFTER_OUTPUT_LIMIT: auto-continue up to 2 times when a stream ends due to length truncation
+          const hasUnclosedFence = (roundText.match(/```/g)?.length ?? 0) % 2 === 1;
+          const hitOutputTokenCeiling = roundText.length >= spec.maxOutputTokens * 3.2;
+          if ((hasUnclosedFence || hitOutputTokenCeiling) && outputLimitContCount < 2) {
+            outputLimitContCount++;
+            tools.push({
+              id: uid(),
+              name: "auto_continue",
+              args: `output limit (${outputLimitContCount}/2)`,
+              status: "ok",
+              output: CONTINUE_AFTER_OUTPUT_LIMIT,
+            });
+            msgs = [
+              ...msgs,
+              { role: "assistant", content: roundText },
+              { role: "user", content: CONTINUE_AFTER_OUTPUT_LIMIT },
             ];
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
@@ -868,11 +906,17 @@ export async function sendMessage(opts: {
         const asksMut = /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
           opts.text
         );
-        const nextStepDirective = roundHadError
+        const isFinalStep = round >= maxRounds - 1;
+        if (isFinalStep) maxStepsHandedOff = true;
+        const doomVerdict = detectDoomLoop(tools);
+        const nextStepDirective = isFinalStep
+          ? MAX_STEPS_PROMPT
+          : roundHadError
           ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately invoke a fallback tool (such as \`search_code\`, \`list_dir\`, \`read_file\`, or \`python\`) to continue.`
           : asksMut && !hasMutatedSoFar
           ? `You have only read/searched files so far and have NOT modified any files on disk yet. Invoke \`edit_file\` or \`write_file\` (or \`read_file\` if you need to inspect another file first) now.`
           : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, invoke the next tool to finish the remaining steps.`;
+        const extraNotes = [stuckVerdict.note, doomVerdict.hint].filter(Boolean).join("\n\n");
         msgs = HistoryPruner.prune(
           [
             ...msgs,
@@ -885,12 +929,17 @@ export async function sendMessage(opts: {
                   const cap = isRead ? 64_000 : mode === "code" ? codingProfile.maxToolOutputChars : 24_000;
                   return `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, cap)}\n</tool_result>`;
                 })
-                .join("\n")}${stuckVerdict.note ? `\n\n${stuckVerdict.note}` : ""}\n\n${nextStepDirective}`,
+                .join("\n")}${extraNotes ? `\n\n${extraNotes}` : ""}\n\n${nextStepDirective}`,
             },
           ],
           stormyProfile.contextBudgetTokens
         );
-        current = { ...req, requestId: uid(), messages: msgs };
+        current = {
+          ...req,
+          requestId: uid(),
+          system: isFinalStep ? `${req.system}\n\n${MAX_STEPS_PROMPT}` : req.system,
+          messages: msgs,
+        };
         full += "\n\n";
       }
       if (mode === "code") {
