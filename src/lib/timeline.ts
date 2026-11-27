@@ -46,7 +46,12 @@ export function buildParts(
 
 /** Ordered parts for any message. Older messages (no `parts`) keep the reasoning > tools > text layout. */
 export function partsOf(m: Message): MessagePart[] {
-  if (m.parts && m.parts.length) return m.parts;
+  if (m.parts && m.parts.length) {
+    // Tools written outside the streaming loop have no part yet; they trail the ordered parts.
+    const known = new Set(m.parts.flatMap((p) => (p.type === "tool" ? [p.toolId] : [])));
+    const extra = (m.tools ?? []).filter((t) => !known.has(t.id));
+    return extra.length ? [...m.parts, ...extra.map((t): MessagePart => ({ type: "tool", toolId: t.id }))] : m.parts;
+  }
   const out: MessagePart[] = [];
   if (m.reasoning) out.push({ type: "reasoning", text: m.reasoning, ms: m.thinkMs });
   for (const t of m.tools ?? []) out.push({ type: "tool", toolId: t.id });
@@ -93,10 +98,10 @@ export function timelineItems(m: Message): TimelineItem[] {
 /* Follow state (OpenCode `follow.ts`): following <-> detached          */
 /* ------------------------------------------------------------------ */
 export type FollowState = "following" | "detached";
-export type FollowEvent = "wheel.up" | "touch.up" | "key.up" | "at.end" | "return";
+export type FollowEvent = "wheel.up" | "touch.up" | "key.up" | "scroll.away" | "at.end" | "return";
 
 export function transitionFollow(state: FollowState, e: FollowEvent): FollowState {
-  if (e === "wheel.up" || e === "touch.up" || e === "key.up") return "detached";
+  if (e === "wheel.up" || e === "touch.up" || e === "key.up" || e === "scroll.away") return "detached";
   if (e === "return") return "following";
   return state === "detached" && e === "at.end" ? "following" : state;
 }

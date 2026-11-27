@@ -16,7 +16,8 @@ import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, Thumb } from "./ui";
 import { Icon } from "./Icon";
 import { SessionHeader } from "./SessionHeader";
-import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
+import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline } from "./Activity";
+import { JumpToBottom, TurnDiffs, TurnReadout, TurnTimeline, useTimelineFollow } from "./Timeline";
 import { FilesPanel, GitPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
@@ -139,7 +140,6 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   if (m.compacted) {
     return <CompactedCard m={m} />;
   }
-  const shown = m.role === "assistant" ? splitM3e(m.text) : { text: m.text, docs: [] as M3eDoc[] };
   if (m.role === "user") {
     return (
       <div className="anim-pop ml-auto flex max-w-[92%] flex-col items-end gap-1.5">
@@ -164,13 +164,23 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
   return (
     <div className="anim-pop group min-w-0 space-y-2.5">
       {m.plan && <PlanTimeline plan={m.plan} />}
-      <WorkLog m={m} />
-      {shown.text && <div className={cn(m.streaming && "caret")}><Markdown text={shown.text} /></div>}
+      <TurnTimeline
+        m={m}
+        renderText={(text, key, streaming) => {
+          const part = splitM3e(text);
+          return (
+            <>
+              {part.text && <div className={cn(streaming && "caret")}><Markdown text={part.text} /></div>}
+              {part.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${key}:${i}`} streaming={m.streaming} />)}
+            </>
+          );
+        }}
+      />
       {m.pendingQuestion && <AskUserCard convId={activeConvId} msgId={m.id} pending={m.pendingQuestion} />}
       {m.pendingApproval && <ApprovalCard convId={activeConvId} msgId={m.id} approval={m.pendingApproval} />}
-      {shown.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${i}`} streaming={m.streaming} />)}
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
+      <TurnDiffs m={m} />
       {m.error && <div className="flex items-start gap-2 rounded-lg border border-[var(--oc-critical)]/40 bg-error-container/60 px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
       {!m.streaming && m.truncated && (
         <div className="oc-hairline flex items-center justify-between gap-2 rounded-lg bg-surface-low px-3 py-2 text-xs text-on-surface-variant">
@@ -185,7 +195,9 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
         </div>
       )}
       {!m.streaming && (
-        <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex min-w-0 items-center gap-1 text-xs text-on-surface-variant">
+          <TurnReadout m={m} />
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
           <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
           {m.checkpointId && ws?.root && (
@@ -215,8 +227,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
             </IconBtn>
           )}
           <IconBtn label="Remember this" size={28} onClick={async () => { const v = m.text.slice(0, 240); const l = await nativeMemory.add(v); if (l) useStore.getState().patchSettings({ memory: l.reverse() }); else addMemory(v); notify("Saved to Memory"); }}><Icon name="bookmark_add" size={13} /></IconBtn>
-          {m.model && <span className="ml-1">{m.model}</span>}
-          {m.stats?.tps ? <span className="rounded-full bg-surface-high px-2 py-0.5 font-medium text-on-surface-variant">{m.stats.tps.toLocaleString()} tok/s</span> : null}
+          </div>
         </div>
       )}
     </div>
@@ -694,16 +705,24 @@ export function ChatPane() {
   const m3eOpen = useStore((s) => !!s.ui.m3e);
   const [dockOpen, setDockOpen] = useState(true);
   const [dockTab, setDockTab] = useState<"files" | "git" | "terminal">("files");
-  const scroller = useRef<HTMLDivElement>(null);
-  const stick = useRef(true);
-  const [away, setAway] = useState(false);
+  const content = useRef<HTMLDivElement>(null);
+  const { ref: scroller, following, follow, resume } = useTimelineFollow(conv.id);
   const last = conv.messages[conv.messages.length - 1];
   const hasProjectFolder = Boolean(ws?.root || curProject?.root);
   const canSplitIde = hasProjectFolder && !showCanvas && !m3eOpen && leftTab === "chat";
 
+  // A new user message resumes following; every later size change (text, tool rows, expanding output) follows.
   useEffect(() => {
-    if (stick.current && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
-  }, [conv.messages.length, last?.text, last?.artboardIds?.length]);
+    if (last?.role === "user") resume(false);
+  }, [conv.messages.length, last?.role, resume]);
+  useEffect(() => {
+    const el = content.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => follow());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [follow, leftTab, conv.messages.length === 0]);
+  useEffect(() => { follow(); }, [last?.text, last?.parts, last?.tools, last?.artboardIds?.length, follow]);
 
   const handleOpenDock = (tab: "files" | "git" | "terminal", filePath?: string) => {
     if (!showCanvas && !m3eOpen) {
@@ -740,22 +759,16 @@ export function ChatPane() {
       ) : (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div ref={scroller} onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; setAway(!stick.current); }} className="mx-auto flex min-h-0 w-full max-w-[840px] flex-1 flex-col space-y-5 overflow-y-auto px-4 py-3">
-              {conv.messages.length === 0 ? (
-                <ProjectWorkspaceCard onOpenDock={handleOpenDock} />
-              ) : (
-                conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)
-              )}
-            </div>
-            {away && (
-              <div className="pointer-events-none relative h-0">
-                <button
-                  onClick={() => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }}
-                  title="Jump to latest" aria-label="Jump to latest"
-                  className="state pointer-events-auto absolute -top-12 left-1/2 grid size-9 -translate-x-1/2 place-items-center rounded-full border border-outline-variant bg-surface-container text-on-surface"
-                ><Icon name="arrow_downward" size={18} /></button>
+            <div ref={scroller} className="mx-auto min-h-0 w-full max-w-[840px] flex-1 overflow-y-auto px-4 py-3">
+              <div ref={content} className="flex flex-col space-y-5">
+                {conv.messages.length === 0 ? (
+                  <ProjectWorkspaceCard onOpenDock={handleOpenDock} />
+                ) : (
+                  conv.messages.map((m, idx) => <MessageView key={m.id} m={m} isLast={idx === conv.messages.length - 1} />)
+                )}
               </div>
-            )}
+            </div>
+            {!following && conv.messages.length > 0 && <JumpToBottom onClick={() => resume(true)} />}
             <div className="mx-auto w-full max-w-[840px]">
               <Composer />
             </div>

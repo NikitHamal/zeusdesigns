@@ -157,7 +157,7 @@ interface ParsedToolEntry {
   meta: string;
 }
 
-function parseToolEntry(t: ToolCall, pres: ToolPresentation): ParsedToolEntry {
+export function parseToolEntry(t: ToolCall, pres: ToolPresentation): ParsedToolEntry {
   let path = "";
   let body = "";
   try {
@@ -301,7 +301,7 @@ function splitTerminalOutput(out: string): { stdout: string; stderr: string; cod
   return { stdout: text, stderr: "", code };
 }
 
-function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresentation; parsed: ParsedToolEntry }) {
+export function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresentation; parsed: ParsedToolEntry }) {
   const notify = useStore((s) => s.notify);
   const patchUI = useStore((s) => s.patchUI);
   const [tab, setTab] = useState<"diff" | "new" | "old">("diff");
@@ -325,11 +325,18 @@ function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresenta
     notify("Copied to clipboard");
   };
 
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (el && tool.status === "running" && pinned.current) el.scrollTop = el.scrollHeight;
+  }, [tool.output, tool.status]);
+
   const term = pres.detail === "Terminal" && !hasDiff ? splitTerminalOutput(tool.output ?? "") : null;
   const isCode = pres.detail === "Code" || pres.detail === "Terminal";
 
   return (
-    <div className="oc-hairline ml-9 mr-1 mt-1 mb-1.5 overflow-hidden rounded-lg bg-surface-lowest">
+    <div className="oc-hairline ml-6 mr-1 mt-1 mb-1.5 overflow-hidden rounded-lg bg-surface-lowest">
       <div className="flex items-center justify-end gap-1 border-b border-[var(--oc-border-weak)] px-1.5 py-1">
         {hasDiff && (tool.newContent || tool.oldContent) && (
           <div className="mr-auto flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11px] font-medium">
@@ -371,6 +378,8 @@ function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresenta
       </div>
 
       <div
+        ref={bodyRef}
+        onScroll={(e) => { const t = e.currentTarget; pinned.current = t.scrollHeight - t.scrollTop - t.clientHeight < 24; }}
         className={cn(
           "max-h-[320px] overflow-auto p-2.5 text-[12px] leading-relaxed select-text",
           isCode ? "font-mono" : "font-sans"
@@ -445,269 +454,219 @@ function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresenta
   );
 }
 
+
 /* ------------------------------------------------------------------ */
-/* Tool row: one line, expands and collapses in place                  */
+/* BasicTool (OpenCode basic-tool.tsx): one trigger line + collapsible  */
 /* ------------------------------------------------------------------ */
-function ToolCard({ t }: { t: ToolCall }) {
-  const [open, setOpen] = useState(false);
+export function BasicTool({
+  icon,
+  title,
+  subtitle,
+  pill,
+  status,
+  hasContent,
+  open,
+  defaultOpen,
+  onOpenChange,
+  compact,
+  error,
+  children,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  pill?: ReactNode;
+  status?: "running" | "ok" | "error";
+  hasContent?: boolean;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  compact?: boolean;
+  error?: boolean;
+  children?: ReactNode;
+}) {
+  const [inner, setInner] = useState(defaultOpen ?? false);
+  const shown = open ?? inner;
+  const [mounted, setMounted] = useState(shown);
+  useEffect(() => {
+    if (shown) setMounted(true);
+  }, [shown]);
+  const running = status === "running";
+  const toggle = () => {
+    if (!hasContent) return;
+    const next = !shown;
+    setInner(next);
+    onOpenChange?.(next);
+  };
+  return (
+    <div data-component="tool-row" className="min-w-0">
+      <button
+        onClick={toggle}
+        aria-expanded={hasContent ? shown : undefined}
+        className={cn(
+          "group/tool flex w-full min-w-0 items-center gap-2 rounded-md text-left text-[13px] outline-none",
+          compact ? "min-h-6 py-0.5" : "min-h-7 py-1",
+          hasContent ? "cursor-pointer" : "cursor-default"
+        )}
+      >
+        <Icon name={error ? "error" : icon} size={compact ? 14 : 15} className={cn("shrink-0", error ? "text-[var(--oc-critical)]" : "text-on-surface-variant/70")} />
+        <span className={cn("shrink-0 font-medium", running ? "zshine" : error ? "text-[var(--oc-critical)]" : "text-on-surface")}>{title}</span>
+        {subtitle && (
+          <span className="min-w-0 shrink truncate text-[13px] text-on-surface-variant" title={subtitle}>
+            {subtitle}
+          </span>
+        )}
+        {pill}
+        {hasContent && (
+          <Icon
+            name="expand_more"
+            size={15}
+            className={cn("shrink-0 text-on-surface-variant/60 transition-[transform,opacity] group-hover/tool:text-on-surface", shown && "rotate-180")}
+          />
+        )}
+      </button>
+      {hasContent && <Collapse open={shown}>{mounted && children}</Collapse>}
+    </div>
+  );
+}
+
+export function DiffPill({ additions, deletions }: { additions: number; deletions: number }) {
+  if (additions <= 0 && deletions <= 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-high px-1.5 py-px font-mono text-[11px] font-semibold">
+      {additions > 0 && <span className="text-[var(--oc-diff-add-text)]">+{additions}</span>}
+      {deletions > 0 && <span className="text-[var(--oc-diff-del-text)]">-{deletions}</span>}
+    </span>
+  );
+}
+
+/** Error card (OpenCode tool-error-card): first line is the headline, the rest is detail. */
+function ToolErrorCard({ text }: { text: string }) {
+  const clean = text.trim();
+  const [head, ...rest] = clean.split("\n");
+  return (
+    <div className="ml-6 mr-1 mt-1 mb-1.5 rounded-lg border border-[var(--oc-critical)]/40 bg-error-container/40 px-3 py-2 text-[12.5px] text-on-error-container select-text">
+      <div className="font-medium break-words">{head}</div>
+      {rest.length > 0 && <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11.5px] opacity-90">{rest.join("\n")}</pre>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tool row                                                            */
+/* ------------------------------------------------------------------ */
+export function ToolRow({ t, compact }: { t: ToolCall; compact?: boolean }) {
   const running = t.status === "running";
   const isError = t.status === "error";
   const pres = getToolPresentation(t.name);
   const parsed = useMemo(() => parseToolEntry(t, pres), [t, pres]);
   const hasDetail = Boolean(t.output || parsed.computedDiff || parsed.body);
+  const isShell = pres.detail === "Terminal" && Boolean(parsed.body);
+  // Shell output streams open while it runs; any manual toggle wins from then on.
+  const [manual, setManual] = useState<boolean | null>(null);
+  const autoOpen = (isShell && running && Boolean(t.output)) || (isError && Boolean(t.output));
+  const open = manual ?? autoOpen;
 
   return (
-    <>
-      <button
-        onClick={() => hasDetail && setOpen((v) => !v)}
-        aria-expanded={hasDetail ? open : undefined}
-        className={cn(
-          "flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] transition-colors",
-          hasDetail && "hover:bg-surface-high/65"
-        )}
-      >
-        <span
-          className={cn(
-            "grid size-7 shrink-0 place-items-center rounded-lg",
-            isError ? "bg-error-container text-on-error-container" : "bg-surface-high text-on-surface-variant"
-          )}
-        >
-          <Icon name={isError ? "error" : pres.icon} size={15} />
-        </span>
-
-        <span className={cn("shrink-0 text-[13px]", running ? "zshine font-medium" : "text-on-surface-variant")}>
-          {running ? pres.running : pres.done}
-        </span>
-
-        {parsed.subject && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold text-on-surface">
-            {parsed.subject}
-          </span>
-        )}
-        {!parsed.subject && <span className="flex-1" />}
-
-        {parsed.meta && !running && (
-          <span className="shrink-0 font-mono text-[11px] text-on-surface-variant">{parsed.meta}</span>
-        )}
-
-        {(parsed.additions > 0 || parsed.deletions > 0) && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-high px-2 py-0.5 font-mono text-[11px] font-semibold">
-            {parsed.additions > 0 && <span className="text-tertiary">+{parsed.additions}</span>}
-            {parsed.deletions > 0 && <span className="text-error">-{parsed.deletions}</span>}
-          </span>
-        )}
-
-        {hasDetail && (
-          <Icon
-            name="expand_more"
-            size={16}
-            className={cn("shrink-0 text-on-surface-variant/70 transition-transform", open && "rotate-180")}
-          />
-        )}
-      </button>
-
-      {hasDetail && (
-        <Collapse open={open}>{open && <ToolDetail tool={t} pres={pres} parsed={parsed} />}</Collapse>
-      )}
-    </>
+    <BasicTool
+      icon={pres.icon}
+      title={running ? pres.running : pres.done}
+      subtitle={parsed.subject || undefined}
+      status={t.status}
+      error={isError}
+      compact={compact}
+      hasContent={hasDetail}
+      open={open}
+      onOpenChange={setManual}
+      pill={
+        <>
+          {parsed.meta && !running && <span className="shrink-0 font-mono text-[11px] text-on-surface-variant">{parsed.meta}</span>}
+          <DiffPill additions={parsed.additions} deletions={parsed.deletions} />
+        </>
+      }
+    >
+      {isError && t.output ? <ToolErrorCard text={t.output} /> : <ToolDetail tool={t} pres={pres} parsed={parsed} />}
+    </BasicTool>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Reasoning (collapsible thought trace with formatted Markdown)       */
+/* Explored group (OpenCode SessionContextToolGroup)                   */
 /* ------------------------------------------------------------------ */
-function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
-  const [open, setOpen] = useState<boolean | null>(null);
-  const shown = open ?? false;
+function exploreLabel(tools: ToolCall[], live: boolean): { title: string; sub: string } {
+  let files = 0;
+  let searches = 0;
+  let lists = 0;
+  for (const t of tools) {
+    const c = ToolAliases.canonicalName(t.name);
+    if (c === "read_file" || c === "get_file_info") files++;
+    else if (c === "list_files") lists++;
+    else searches++;
+  }
+  const bits = [
+    files && `${files} file${files === 1 ? "" : "s"}`,
+    searches && `${searches} search${searches === 1 ? "" : "es"}`,
+    lists && `${lists} folder${lists === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  return { title: live ? "Exploring" : "Explored", sub: bits.join(" · ") };
+}
+
+export function ExploreGroup({ tools }: { tools: ToolCall[] }) {
+  const live = tools.some((t) => t.status === "running");
+  const [manual, setManual] = useState<boolean | null>(null);
+  const { title, sub } = exploreLabel(tools, live);
+  // A single read stays one plain row, as in OpenCode.
+  if (tools.length === 1) return <ToolRow t={tools[0]} />;
+  return (
+    <BasicTool
+      icon="manage_search"
+      title={title}
+      subtitle={sub}
+      status={live ? "running" : "ok"}
+      hasContent
+      open={manual ?? false}
+      onOpenChange={setManual}
+    >
+      <div className="ml-2 mt-0.5 mb-1 space-y-0 border-l border-[var(--oc-border-weak)] pl-3">
+        {tools.map((t) => (
+          <ToolRow key={t.id} t={t} compact />
+        ))}
+      </div>
+    </BasicTool>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Reasoning row (OpenCode thought.tsx)                                */
+/* ------------------------------------------------------------------ */
+export function ReasoningRow({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
+  const [manual, setManual] = useState<boolean | null>(null);
+  const shown = manual ?? false;
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (live && shown && body.current) body.current.scrollTop = body.current.scrollHeight;
   }, [text, live, shown]);
-  const lines = text.trim().split(/\n+/).filter(Boolean);
-  const firstLineClean = (lines[0] ?? "")
-    .replace(/^[-*•#>\s]+/, "")
-    .replace(/\*\*/g, "")
-    .trim();
-
   return (
-    <div className="rounded-xl">
-      <button
-        onClick={() => setOpen(!shown)}
-        className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-surface-high/60"
+    <BasicTool
+      icon="psychology"
+      title={live ? "Thinking" : "Thought"}
+      subtitle={!live && ms ? secs(ms) : undefined}
+      status={live ? "running" : "ok"}
+      hasContent={Boolean(text.trim())}
+      open={shown}
+      onOpenChange={setManual}
+    >
+      <div
+        ref={body}
+        className="zthink ml-1.5 mt-0.5 mb-1.5 max-h-60 overflow-y-auto border-l border-[var(--oc-border-weak)] pl-3.5 text-[12.5px] leading-relaxed text-on-surface-variant select-text"
       >
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-high text-on-surface-variant">
-          <Icon name="psychology" size={15} className={live ? "text-primary" : "text-on-surface-variant"} />
-        </span>
-        <span className={cn("shrink-0 font-medium", live ? "zshine" : "text-on-surface-variant")}>
-          {live ? "Reasoning" : `Thought${ms ? ` · ${secs(ms)}` : ""}`}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant/75">
-          {!shown ? firstLineClean : `${lines.length} line${lines.length === 1 ? "" : "s"}`}
-        </span>
-        <Icon
-          name="expand_more"
-          size={15}
-          className={cn("shrink-0 text-on-surface-variant/70 transition-transform", shown && "rotate-180")}
-        />
-      </button>
-      <Collapse open={shown}>
-        <div
-          ref={body}
-          className={cn(
-            "zthink ml-4 mt-1 mb-1.5 max-h-60 overflow-y-auto border-l-2 border-outline-variant/60 pl-3.5 text-[12.5px] leading-relaxed text-on-surface-variant select-text",
-            live && "zthink-live"
-          )}
-        >
-          <Markdown text={text} compact />
-        </div>
-      </Collapse>
-    </div>
+        <Markdown text={text} compact />
+      </div>
+    </BasicTool>
   );
 }
 
 export { ApprovalCard, AskUserCard, PlanTimeline } from "./StormyCards";
-
-/* ------------------------------------------------------------------ */
-/* Stormy ToolCallGroup (ToolCallGroup.kt — IconTrail & FileChips)     */
-/* ------------------------------------------------------------------ */
-export function WorkLog({ m }: { m: Message }) {
-  const tools = m.tools ?? [];
-  const boards = useStore((s) => s.artboards);
-  const patchUI = useStore((s) => s.patchUI);
-  const live = !!m.streaming;
-  const [open, setOpen] = useState<boolean | null>(null);
-  const hasBody = !!m.reasoning || tools.length > 0;
-  const shown = open ?? live;
-
-  // Compute changed files with +/- badges for Stormy's always-visible ChangedFileChips
-  const changedFiles = useMemo(() => {
-    const byPath = new Map<string, { path: string; additions: number; deletions: number; tool: ToolCall }>();
-    for (const t of tools) {
-      if (t.status !== "ok") continue;
-      const pres = getToolPresentation(t.name);
-      const parsed = parseToolEntry(t, pres);
-      if (parsed.additions > 0 || parsed.deletions > 0) {
-        let rawPath = parsed.subject;
-        try {
-          const j = JSON.parse(t.args ?? "{}");
-          if (j.path || j.file) rawPath = String(j.path || j.file).trim();
-        } catch {
-          /* keep subject */
-        }
-        if (!rawPath) continue;
-        const prev = byPath.get(rawPath);
-        byPath.set(rawPath, {
-          path: rawPath,
-          additions: (prev?.additions ?? 0) + parsed.additions,
-          deletions: (prev?.deletions ?? 0) + parsed.deletions,
-          tool: t,
-        });
-      }
-    }
-    return [...byPath.values()];
-  }, [tools]);
-
-  const trailIcons = useMemo(() => {
-    const distinct: string[] = [];
-    for (const t of tools) {
-      const ic = getToolPresentation(t.name).icon;
-      if (!distinct.includes(ic)) distinct.push(ic);
-      if (distinct.length >= 6) break;
-    }
-    return distinct;
-  }, [tools]);
-
-  if (!hasBody) return null;
-
-  const failed = tools.filter((t) => t.status === "error").length;
-  const thinkLive = live && !!m.reasoning && !m.thinkMs;
-  const runningTool = tools.find((t) => t.status === "running");
-  const loadingBoard = boards.find((a) => m.artboardIds?.includes(a.id) && a.loading);
-
-  let summaryText = "";
-  if (live) {
-    if (runningTool) {
-      const pres = getToolPresentation(runningTool.name);
-      const parsed = parseToolEntry(runningTool, pres);
-      summaryText = parsed.subject ? `${pres.running} ${parsed.subject}…` : `${pres.running}…`;
-    } else if (loadingBoard) {
-      summaryText = `Designing ${loadingBoard.name}…`;
-    } else if (thinkLive) {
-      summaryText = "Reasoning…";
-    } else {
-      summaryText = "Working…";
-    }
-  } else {
-    const ms = m.stats?.ms || m.thinkMs;
-    summaryText = ms
-      ? `Worked for ${secs(ms)}`
-      : tools.length ? `${tools.length} tool call${tools.length === 1 ? "" : "s"}` : "Thought";
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <div className="oc-hairline rounded-lg bg-surface-low/40">
-        <button
-          onClick={() => setOpen(!shown)}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] outline-none hover:bg-surface-low"
-        >
-          <Icon
-            name="expand_more"
-            size={16}
-            className={cn("shrink-0 text-on-surface-variant transition-transform", shown && "rotate-180")}
-          />
-          <span className={cn("font-medium", live ? "zshine" : "text-on-surface-variant")}>
-            {summaryText}
-          </span>
-          {failed > 0 && (
-            <span className="rounded-full bg-error-container px-2 py-0.5 text-[11px] font-semibold text-on-error-container">
-              {failed} failed
-            </span>
-          )}
-          <span className="flex-1" />
-          {!shown && trailIcons.length > 0 && (
-            <span className="flex items-center gap-1.5 text-on-surface-variant/70">
-              {trailIcons.map((ic) => (
-                <Icon key={ic} name={ic} size={14} />
-              ))}
-            </span>
-          )}
-        </button>
-
-        <Collapse open={shown}>
-          <div className="space-y-0.5 border-t border-[var(--oc-border-weak)] px-2 pb-2 pt-1.5">
-            {m.reasoning && <ThinkingBlock text={m.reasoning} live={thinkLive} ms={m.thinkMs} />}
-            {tools.map((t) => (
-              <ToolCard key={t.id} t={t} />
-            ))}
-          </div>
-        </Collapse>
-      </div>
-
-      {changedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {changedFiles.map((cf) => (
-            <button
-              key={cf.path}
-              onClick={() => {
-                patchUI({ leftTab: "files" });
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: cf.path }));
-                }, 30);
-              }}
-              className="state oc-hairline inline-flex items-center gap-1.5 rounded-md bg-surface-low px-2 py-1 font-mono text-[11.5px] text-on-surface hover:bg-surface-high"
-            >
-              <Icon name="description" size={13} className="text-primary" />
-              <span>{shortenPath(cf.path, 28)}</span>
-              {cf.additions > 0 && <span className="font-semibold text-tertiary">+{cf.additions}</span>}
-              {cf.deletions > 0 && <span className="font-semibold text-error">-{cf.deletions}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Live status line (shimmer text only, no orb)                        */
@@ -715,17 +674,14 @@ export function WorkLog({ m }: { m: Message }) {
 export function LiveStatus({ m }: { m: Message }) {
   const boards = useStore((s) => s.artboards);
   if (!m.streaming) return null;
-  const hasWorkLog = !!m.reasoning || (m.tools && m.tools.length > 0);
+  const items = m.parts ?? [];
+  const lastPart = items[items.length - 1];
   const running = (m.tools ?? []).find((t) => t.status === "running");
   const loading = boards.find((a) => m.artboardIds?.includes(a.id) && a.loading);
-  if (hasWorkLog && !loading && !m.text) return null;
-  let label = "Thinking…";
-  if (running) {
-    const { label: l } = toolTitle(running.name, true);
-    label = l;
-  } else if (loading) label = `Designing ${loading.name}…`;
-  else if (m.reasoning && !m.thinkMs) label = "Reasoning…";
-  else if (m.text) label = "Writing…";
+  const thinkLive = lastPart?.type === "reasoning" && !m.thinkMs;
+  // Rows that already shimmer (running tool, live thought, streaming text) say what is happening.
+  if (!loading && (running || thinkLive || lastPart?.type === "text")) return null;
+  const label = loading ? `Designing ${loading.name}…` : "Thinking…";
   return (
     <div className="flex items-center py-0.5 text-[13px]">
       <span className="zshine font-medium">{label}</span>
