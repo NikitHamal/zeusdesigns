@@ -8,7 +8,6 @@ use crate::providers::{
     catalog, chatjimmy_complete, dispatch_stream, verify_model_fingerprint, ChatRequest,
     ModelFingerprintReport, ProviderEngine, ProviderInfo,
 };
-use crate::workspace::{checkpoint_capture_file, fs_read};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::sync::{
@@ -186,7 +185,7 @@ fn has_structured_tool_keys(j: &Value) -> bool {
         "edits", "old_string", "oldString", "old_str", "old_content", "search", "source", "destination",
         "old_path", "new_path", "from", "to", "path1", "path2", "paths", "questions", "question",
         "tasks", "plan", "todos", "steps", "symbols", "depth", "append", "limit", "line",
-        "replacement", "agent_type",
+        "replacement", "agent_type", "patchText", "agent", "numResults",
     ]
     .iter()
     .any(|k| j.get(k).is_some())
@@ -213,17 +212,18 @@ pub fn is_known_valid_tool(name: &str) -> bool {
             | "get_file_info" | "file_info" | "file_outline" | "stat" | "diff_files" | "compare_files"
             | "git_status" | "git_diff" | "git_log" | "git_branch" | "git_stage" | "git_unstage" | "git_commit"
             | "security_scan" | "find_secrets" | "audit_security" | "request_approval" | "lmfingerprint"
-            | "verify_model" | "model_fingerprint"
+            | "verify_model" | "model_fingerprint" | "apply_patch" | "patch" | "websearch" | "web_search" | "todoread"
+            | "todo_read" | "diagnostics" | "lsp" | "session_search"
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
-fn is_mutating_or_exec_tool(name: &str) -> bool {
+pub fn is_mutating_or_exec_tool(name: &str) -> bool {
     matches!(
         name,
         "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "append_file" | "append_to_file"
             | "prepend_to_file" | "insert_at_line" | "regex_replace" | "edit_file" | "edit" | "patch_file"
             | "replace_in_file" | "str_replace" | "str_replace_editor" | "multi_edit" | "multiedit"
-            | "multi_edit_file" | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink"
+            | "multi_edit_file" | "apply_patch" | "patch" | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink"
             | "move_file" | "rename_file" | "mv" | "copy_file" | "cp" | "shell" | "bash" | "sh" | "cmd"
             | "terminal" | "exec" | "run_command" | "run" | "python" | "python3" | "py" | "python_exec" | "run_python"
     )
@@ -670,7 +670,8 @@ pub fn compute_tool_batch_waves(invocations: &[InlineToolInvocation]) -> Vec<Vec
                 | "search_project" | "docs_lookup" | "check_syntax" | "audit_project" | "review_project"
                 | "lint_project" | "web_fetch" | "fetch" | "get_file_info" | "file_info" | "file_outline"
                 | "diff_files" | "compare_files" | "git_status" | "git_diff" | "git_log"
-                | "security_scan" | "memory_search" | "update_plan"
+                | "security_scan" | "memory_search" | "update_plan" | "websearch" | "web_search" | "todoread" | "todo_read"
+                | "diagnostics" | "lsp"
         )
     };
     let mut waves: Vec<Vec<usize>> = Vec::new();
@@ -693,184 +694,6 @@ pub fn compute_tool_batch_waves(invocations: &[InlineToolInvocation]) -> Vec<Vec
     }
     waves
 }
-/// PreToolUse & AutonomyPolicy in-loop guard executed BEFORE any tool modifies disk or runs shell commands.
-fn pre_tool_and_autonomy_guard(
-    inv: &mut InlineToolInvocation,
-    seen_reads: &mut HashSet<String>,
-) -> Result<(), String> {
-    let n = inv.name.trim().to_ascii_lowercase();
-    let p = inv.path.trim().replace('\\', "/");
-    // 1. AutonomyPolicy: block destructive root deletions or sensitive credential mutations before execution
-    if matches!(n.as_str(), "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink")
-        && (p.is_empty() || p == "." || p == "/" || p == "./")
-    {
-        return Err("[Approval requested from user] Blocked root workspace deletion (`delete_file` on project root).".to_string());
-    }
-    if is_mutating_or_exec_tool(&n)
-        && (p.ends_with(".pem")
-            || p.ends_with(".key")
-            || p.ends_with("id_rsa")
-            || p == ".env"
-            || p.starts_with(".env.")
-            || p.starts_with(".git/"))
-    {
-        return Err(format!(
-            "[Approval requested from user] Modifying sensitive file '{}' requires explicit approval.",
-            p
-        ));
-    }
-    // 2. PreToolUse: deduplicate identical read/list/search calls in the same turn
-    if matches!(
-        n.as_str(),
-        "list_dir" | "ls" | "dir" | "list_files" | "read_file" | "read" | "cat" | "search_code" | "grep" | "glob"
-    ) {
-        let sig = format!(
-            "{}|{}|{}|{:?}|{:?}",
-            n,
-            p,
-            inv.body.trim(),
-            inv.start_line,
-            inv.end_line
-        );
-        if !seen_reads.insert(sig) {
-            return Err(format!(
-                "[Harness² PreToolUse Hook] Duplicate {}({}) in the same turn skipped; use the result above.",
-                n,
-                if p.is_empty() { "." } else { &p }
-            ));
-        }
-    }
-    // 3. PreToolUse: sanitize interactive/window-spawning Windows shell commands
-    if matches!(n.as_str(), "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run") {
-        let mut cmd = if !inv.body.trim().is_empty() {
-            inv.body.trim().to_string()
-        } else {
-            inv.path.trim().to_string()
-        };
-        for prefix in ["start \"\" ", "start cmd /k ", "start cmd /c ", "cmd /k ", "powershell -NoExit "] {
-            if let Some(stripped) = cmd.strip_prefix(prefix) {
-                cmd = stripped.trim().to_string();
-            }
-        }
-        // Strip Markdown auto-links `[https://...](https://...)` injected by web scrapers (e.g. Gemini)
-        while let Some(lb) = cmd.find('[') {
-            let after_lb = &cmd[lb + 1..];
-            let Some(mid) = after_lb.find("](") else { break };
-            let label = &after_lb[..mid];
-            let after_mid = &after_lb[mid + 2..];
-            if (label.starts_with("http://") || label.starts_with("https://"))
-                && (after_mid.starts_with("http://") || after_mid.starts_with("https://"))
-            {
-                if let Some(rb) = after_mid.find(')') {
-                    let href = &after_mid[..rb];
-                    cmd = format!("{}{}{}", &cmd[..lb], href, &after_mid[rb + 1..]);
-                    continue;
-                }
-            }
-            break;
-        }
-        if matches!(cmd.to_ascii_lowercase().as_str(), "pause" | "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "pwsh" | "bash") {
-            return Err("[Harness² PreToolUse Hook] Interactive shell session without a command is blocked.".to_string());
-        }
-        inv.body = cmd;
-    }
-    Ok(())
-}
-/// Execute workspace tools AFTER stream completion in dependency-ordered waves with PreToolUse & AutonomyPolicy guards.
-fn execute_inline_workspace_tools(
-    app: &AppHandle,
-    event_topic: &str,
-    workspace_root: &str,
-    full_text: &str,
-    executed_ids: &mut HashSet<String>,
-) {
-    let clean_text = strip_thinking_blocks(full_text);
-    let mut invocations = parse_inline_invocations_segment(&clean_text, false, true);
-    if invocations.is_empty() && clean_text.trim().len() < 80 {
-        invocations = parse_inline_invocations_segment(full_text, false, true);
-    }
-    if invocations.is_empty() {
-        return;
-    }
-    let eff_root = resolve_workspace_root(workspace_root);
-    let waves = compute_tool_batch_waves(&invocations);
-    let mut seen_reads = HashSet::new();
-    for wave in waves {
-        for idx in wave {
-            let mut inv = invocations[idx].clone();
-            let name = inv.name.trim().to_string();
-            if matches!(name.as_str(), "TOOL" | "tool_name" | "NAME" | "") {
-                continue;
-            }
-            let req_tag = event_topic.rsplit('/').next().unwrap_or("r");
-            let dedup_key = format!("{}|{}|{}|{}", inv.offset, name, inv.path, inv.body.trim());
-            if !executed_ids.insert(dedup_key) {
-                continue;
-            }
-            let tool_id = format!("tool-{}-{}-{}", req_tag, executed_ids.len(), inv.offset);
-            let mut emit_args = json!({
-                "path": inv.path,
-                "body": inv.body.trim()
-            });
-            if let Some(st) = inv.start_line {
-                emit_args["start"] = json!(st);
-            }
-            if let Some(en) = inv.end_line {
-                emit_args["end"] = json!(en);
-            }
-            let _ = app.emit(
-                event_topic,
-                json!({
-                    "type": "tool_call",
-                    "id": tool_id,
-                    "name": name,
-                    "args": emit_args
-                }),
-            );
-            if name.starts_with("studio_") || name.contains("studio_") {
-                continue;
-            }
-            if let Err(blocked_msg) = pre_tool_and_autonomy_guard(&mut inv, &mut seen_reads) {
-                let _ = app.emit(
-                    event_topic,
-                    json!({
-                        "type": "tool_result",
-                        "id": tool_id,
-                        "ok": false,
-                        "output": blocked_msg
-                    }),
-                );
-                continue;
-            }
-            let is_file_mutation = is_mutating_or_exec_tool(name.as_str())
-                && !matches!(name.as_str(), "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" | "python" | "python3" | "py" | "python_exec" | "run_python");
-            let old_content = if is_file_mutation && !inv.path.is_empty() {
-                checkpoint_capture_file(&eff_root, req_tag, &format!("{} {}", name, inv.path), &inv.path);
-                fs_read(eff_root.clone(), inv.path.clone()).ok()
-            } else {
-                None
-            };
-            let (ok, output) = execute_single_workspace_tool(&eff_root, &inv);
-            let new_content = if ok && is_file_mutation && !inv.path.is_empty() {
-                fs_read(eff_root.clone(), inv.path.clone()).ok()
-            } else {
-                None
-            };
-            let _ = app.emit(
-                event_topic,
-                json!({
-                    "type": "tool_result",
-                    "id": tool_id,
-                    "ok": ok,
-                    "output": output,
-                    "oldContent": old_content.as_ref().map(|s| if s.len() <= 80_000 { s.as_str() } else { &s[..80_000] }),
-                    "newContent": new_content.as_ref().map(|s| if s.len() <= 80_000 { s.as_str() } else { &s[..80_000] }),
-                    "checkpointId": if is_file_mutation && ok { Some(req_tag) } else { None }
-                }),
-            );
-        }
-    }
-}
 #[tauri::command]
 pub fn chat_stream(
     req: ChatRequest,
@@ -889,6 +712,13 @@ pub fn chat_stream(
         let mut accumulated = String::new();
         let mut executed_tools = HashSet::new();
         let mut enriched_req = req.clone();
+        let session_key = req.session_id.clone().unwrap_or_else(|| req.request_id.clone());
+        let bg = crate::agent_rt::take_background_results(&session_key);
+        if !bg.is_empty() {
+            if let Some(last) = enriched_req.messages.iter_mut().rev().find(|m| m.role == "user") {
+                last.content = format!("{}\n\n{}", bg, last.content);
+            }
+        }
         if let Some(root) = &req.workspace_root {
             if !root.trim().is_empty() && !enriched_req.system.contains("## Agent") {
                 enriched_req.system.push_str(
@@ -910,8 +740,20 @@ pub fn chat_stream(
         // Execute tools ONLY after stream completion in dependency-ordered waves (disabled on MAX_STEPS_PROMPT final turn).
         let tools_disabled_for_max_steps = enriched_req.system.contains("CRITICAL - MAXIMUM STEPS REACHED");
         if res.is_ok() && !cancel_flag.load(Ordering::Relaxed) && !tools_disabled_for_max_steps {
-            let root = enriched_req.workspace_root.as_deref().unwrap_or("");
-            execute_inline_workspace_tools(&app, &topic, root, &accumulated, &mut executed_tools);
+            let root = resolve_workspace_root(enriched_req.workspace_root.as_deref().unwrap_or(""));
+            let ctx = crate::agent_rt::Ctx {
+                app: app.clone(),
+                engine: engine_arc.clone(),
+                cancel: cancel_flag.clone(),
+                session_id: session_key.clone(),
+                root_session: session_key.clone(),
+                depth: enriched_req.subagent_depth,
+                max_depth: enriched_req.max_subagent_depth.unwrap_or(2),
+                agent_type: "main".to_string(),
+                req: enriched_req.clone(),
+                root,
+            };
+            crate::agent_run::execute_inline_workspace_tools(&ctx, &topic, &accumulated, &mut executed_tools);
         }
         let elapsed_secs = started.elapsed().as_secs_f64().max(0.05);
         let out_tokens = (accumulated.len() / 4).max(1);

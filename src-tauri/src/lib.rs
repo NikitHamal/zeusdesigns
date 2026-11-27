@@ -8,6 +8,12 @@
 #![recursion_limit = "1024"]
 
 pub mod agent;
+pub mod agent_diag;
+pub mod agent_patch;
+pub mod agent_rt;
+pub mod agent_run;
+pub mod agent_sub;
+pub mod agent_web;
 pub mod crypto;
 pub mod mcp;
 pub mod memory;
@@ -92,6 +98,12 @@ pub fn run() {
             agent::provider_verify_model,
             agent::chat_stream,
             agent::chat_cancel,
+            agent_rt::agent_answer_question,
+            agent_rt::agent_answer_permission,
+            agent_rt::agent_todos_get,
+            agent_rt::agent_todos_set,
+            agent_rt::agent_subagent_cancel,
+            agent_rt::agent_subagent_messages,
             agent::title_generate,
             workspace::workspace_pick,
             workspace::workspace_open,

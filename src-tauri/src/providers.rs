@@ -63,7 +63,7 @@ pub struct CustomEndpoint {
     pub format: String, // "openai" | "anthropic"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatRequest {
     #[serde(rename = "requestId")]
     pub request_id: String,
@@ -75,6 +75,14 @@ pub struct ChatRequest {
     #[serde(rename = "workspaceRoot")]
     pub workspace_root: Option<String>,
     pub custom: Option<CustomEndpoint>,
+    #[serde(rename = "sessionId", default)]
+    pub session_id: Option<String>,
+    #[serde(rename = "toolsPrompt", default)]
+    pub tools_prompt: Option<String>,
+    #[serde(rename = "subagentDepth", default)]
+    pub subagent_depth: u32,
+    #[serde(rename = "maxSubagentDepth", default)]
+    pub max_subagent_depth: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

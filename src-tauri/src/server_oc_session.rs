@@ -660,6 +660,7 @@ fn handle_opencode_session_message(
             messages: history.clone(),
             workspace_root: if workdir.is_empty() { None } else { Some(workdir.clone()) },
             custom: None,
+            ..Default::default()
         };
 
         let mut round_raw = String::new();

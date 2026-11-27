@@ -378,6 +378,7 @@ fn handle_http_connection(
             messages: chat_messages,
             workspace_root: None,
             custom: None,
+            ..Default::default()
         };
 
         let cancel = AtomicBool::new(false);

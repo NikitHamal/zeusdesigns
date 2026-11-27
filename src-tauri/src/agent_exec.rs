@@ -1,5 +1,5 @@
 use crate::agent::InlineToolInvocation;
-use super::agent_edit::{apply_search_replace, apply_stormy_text_edit_impl, html_to_text};
+use super::agent_edit::{apply_search_replace, apply_stormy_text_edit_impl};
 use crate::providers::{verify_model_fingerprint, ProviderEngine};
 use crate::workspace::{
     audit_workspace_files, bm25_search_project, docs_lookup_reference, fs_delete, fs_move, fs_read,
@@ -379,10 +379,19 @@ fn execute_single_workspace_tool_inner(eff_root: &str, inv: &InlineToolInvocatio
             }
         }
         "docs_lookup" => (true, docs_lookup_reference(if !body.is_empty() { body } else { path_arg.as_str() })),
-        "check_syntax" | "audit_project" | "review_project" | "lint_project" => {
-            let target = if !path_arg.is_empty() { Some(vec![path_arg.clone()]) } else if !body.is_empty() && !body.starts_with('{') { Some(vec![body.to_string()]) } else { None };
-            let findings = audit_workspace_files(&eff_root, target.as_deref());
-            if findings.is_empty() { (true, "check_syntax: 0 errors or warnings found.".to_string()) } else { (true, findings.join("\n")) }
+        "check_syntax" | "audit_project" | "review_project" | "lint_project" | "diagnostics" | "lsp" => {
+            let target = if !path_arg.is_empty() { Some(path_arg.clone()) } else if !body.is_empty() && !body.starts_with('{') && !body.contains('\n') { Some(body.to_string()) } else { None };
+            crate::agent_diag::diagnostics(&eff_root, target)
+        }
+        "apply_patch" | "patch" => {
+            let text = crate::agent_patch::patch_text_of(path_arg, body);
+            let (ok, out, files) = crate::agent_patch::apply_patch(&eff_root, &text);
+            crate::agent_patch::set_last_files(files);
+            (ok, out)
+        }
+        "websearch" | "web_search" => {
+            let (q, lim) = crate::agent_web::query_of(path_arg, body);
+            crate::agent_web::websearch_tool(&q, lim)
         }
         "update_plan" | "todowrite" | "todo_write" => {
             let plan_payload = if !body.is_empty() { body } else { path_arg.as_str() };
@@ -750,19 +759,8 @@ fn execute_single_workspace_tool_inner(eff_root: &str, inv: &InlineToolInvocatio
             }
         }
         "web_fetch" | "fetch" | "curl" | "webfetch" => {
-            let target_url = if !path_arg.is_empty() { path_arg.as_str() } else { body };
-            match reqwest::blocking::Client::builder()
-                .timeout(std::time::Duration::from_secs(60))
-                .build()
-                .and_then(|c| c.get(target_url).send())
-                .and_then(|r| r.text())
-            {
-                Ok(txt) => {
-                    let readable = if txt.contains('<') { html_to_text(&txt) } else { txt };
-                    (true, readable.chars().take(16000).collect::<String>())
-                }
-                Err(e) => (false, format!("web_fetch failed: {}", e)),
-            }
+            let (url, format, timeout) = crate::agent_web::fetch_args_of(path_arg, body);
+            crate::agent_web::web_fetch(&url, &format, timeout)
         }
         "memory_search" | "memory_list" | "memory_get" | "memory_read" => {
             let store = crate::memory::MemoryStore::default();
@@ -863,51 +861,7 @@ fn execute_single_workspace_tool_inner(eff_root: &str, inv: &InlineToolInvocatio
             let _ = fs_write(eff_root.clone(), "oro-ui/oro.js".to_string(), kit_js.to_string());
             (true, "Installed UI kit:\n- oro-ui/oro.css\n- oro-ui/oro.js".to_string())
         }
-        "subagent" | "spawn_subagent" | "task" => {
-            let mut agent_type = "explore".to_string();
-            let mut target_q = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
-            if body.starts_with('{') && body.ends_with('}') {
-                if let Ok(j) = serde_json::from_str::<Value>(body) {
-                    if let Some(at) = j.get("agent_type").or_else(|| j.get("type")).and_then(|v| v.as_str()) {
-                        agent_type = at.to_string();
-                    }
-                    if let Some(pr) = j.get("prompt").or_else(|| j.get("task")).or_else(|| j.get("query")).and_then(|v| v.as_str()) {
-                        target_q = pr.to_string();
-                    }
-                }
-            }
-            if agent_type.eq_ignore_ascii_case("review") {
-                let issues = audit_workspace_files(&eff_root, None);
-                if issues.is_empty() {
-                    (true, "[Subagent (review) Summary]\nStatic audit passed with 0 errors or warnings.".to_string())
-                } else {
-                    (true, format!("[Subagent (review) Summary]\n{}", issues.join("\n")))
-                }
-            } else {
-                let bm25_hits = bm25_search_project(&eff_root, &target_q, 8);
-                if !bm25_hits.is_empty() {
-                    let formatted = bm25_hits
-                        .iter()
-                        .filter_map(|h| {
-                            Some(format!(
-                                "- {} (lines {}-{}): {}",
-                                h.get("path")?.as_str()?,
-                                h.get("startLine")?.as_u64()?,
-                                h.get("endLine")?.as_u64()?,
-                                h.get("snippet")?.as_str()?.replace('\n', " ")
-                            ))
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    (true, format!("[Subagent ({}) Summary for '{}']\n{}", agent_type, target_q, formatted))
-                } else {
-                    let tree = walk_workspace(Path::new(&eff_root), Path::new(&eff_root), 2);
-                    let mut out = String::new();
-                    format_tree_compact(&tree, 0, &mut out);
-                    (true, format!("[Subagent ({}) Summary]\nWorkspace files:\n{}", agent_type, out.trim_end()))
-                }
-            }
-        }
+        "subagent" | "spawn_subagent" | "task" => (false, "subagent is only available inside a live agent session.".to_string()),
         "lmfingerprint" | "verify_model" | "model_fingerprint" => {
             let target = if !path_arg.is_empty() { path_arg.trim() } else { body.trim() };
             let (prov, mdl) = if let Some((p, m)) = target.split_once('/') {
@@ -937,7 +891,7 @@ fn execute_single_workspace_tool_inner(eff_root: &str, inv: &InlineToolInvocatio
         _ => (
             false,
             format!(
-                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, multi_edit, list_dir, glob, grep, search_code, search_project, check_syntax, web_fetch, memory_search, memory_save, memory_edit, memory_delete, load_skill, subagent, lmfingerprint.",
+                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, multi_edit, apply_patch, list_dir, glob, grep, search_code, search_project, diagnostics, web_fetch, websearch, todowrite, todoread, question, request_approval, subagent, memory_search, memory_save, memory_edit, memory_delete, load_skill, lmfingerprint.",
                 name
             ),
         ),

@@ -18,6 +18,7 @@ where
         messages: norm_msgs,
         workspace_root: req.workspace_root.clone(),
         custom: req.custom.clone(),
+        ..Default::default()
     };
     let req = &norm_req;
 
@@ -710,6 +711,7 @@ pub fn verify_model_fingerprint(
         }],
         workspace_root: None,
         custom: None,
+        ..Default::default()
     };
 
     let mut raw_stream = String::new();
