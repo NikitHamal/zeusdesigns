@@ -121,7 +121,7 @@ export interface Message {
   error?: string;
   compacted?: boolean;
   truncated?: boolean;
-  stats?: { tps?: number; tokens?: number; ms?: number };
+  stats?: { tps?: number; tokens?: number; inputTokens?: number; outputTokens?: number; ms?: number };
   at: number;
 }
 

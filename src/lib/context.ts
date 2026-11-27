@@ -75,20 +75,61 @@ const SCRAPER_PROVIDERS = new Set([
   "chatjimmy",
 ]);
 
+export const RESERVE_MIN = 16_000;
+export const RESERVE_SHARE = 0.15;
+export const COMPACTION_KEEP_TOKENS = 15_000;
+export const SHRINK_STEPS = [0.85, 0.7, 0.5, 0.35] as const;
+
+/**
+ * Matches OpenCode's `calculateCeiling`:
+ * `window - max(floor(window * 0.15), window >= 32000 ? 16000 : 0)` (~85% of the model's real `contextWindow`),
+ * and `Infinity` when unknown (relying on provider overflow recovery).
+ */
+export function calculateCeiling(contextWindow?: number, buffer?: number | string): number {
+  if (contextWindow === undefined || !Number.isFinite(contextWindow) || contextWindow <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const tokens =
+    typeof buffer === "string" ? Math.round((contextWindow * Number.parseFloat(buffer)) / 100) : buffer;
+  if (tokens !== undefined && Number.isFinite(tokens) && tokens > 0 && tokens < contextWindow) {
+    return contextWindow - tokens;
+  }
+  return (
+    contextWindow -
+    Math.max(Math.floor(contextWindow * RESERVE_SHARE), contextWindow >= 2 * RESERVE_MIN ? RESERVE_MIN : 0)
+  );
+}
+
+/** Detects provider context-length / prompt-too-long overflow errors so automatic overflow compaction can recover. */
+export function isContextOverflowError(err: unknown): boolean {
+  const msg = (typeof err === "string" ? err : err instanceof Error ? err.message : String(err ?? "")).toLowerCase();
+  if (!msg) return false;
+  return (
+    /context[_\s-]?length[_\s-]?exceeded|maximum context length|prompt is too long|context window|too many tokens|request too large|input is too long|exceeds the maximum|token limit exceeded|max_tokens_exceeded|payload too large|http 413\b/.test(
+      msg
+    )
+  );
+}
+
 export function getProviderSpecialization(providerId: string, modelId: string): ProviderSpecialization {
   const isCustom = providerId.startsWith("custom:");
   const prov = findProvider(providerId);
   const model = prov.models.find((m) => m.id === modelId) ?? prov.models[0];
-  const contextWindow = isCustom ? 128000 : model?.contextWindow ?? prov.contextWindow ?? 128000;
+  const rawWindow = isCustom ? 0 : model?.contextWindow ?? prov.contextWindow ?? 0;
+  const contextWindow = rawWindow > 0 ? rawWindow : 128000;
   const maxOutputTokens = isCustom ? 16384 : model?.maxOutput ?? 8192;
   const isKeylessScraper = !isCustom && SCRAPER_PROVIDERS.has(providerId);
 
-  // Scale effective budget with verified provider context window while keeping web-scraper endpoints snappy.
+  // Match OpenCode's calculateCeiling (~85% of real contextWindow, Infinity when unknown, no artificial 128k cap).
+  const ceiling = calculateCeiling(rawWindow);
   const effectiveBudgetTokens =
-    providerId === "chatjimmy" ? 14000 :
-    providerId === "longcat" ? 24000 :
-    providerId === "deepai" || providerId === "motif" ? 28000 :
-    Math.max(48000, Math.min(Math.floor(contextWindow * 0.75), 128000));
+    providerId === "chatjimmy"
+      ? Math.min(ceiling, 14000)
+      : providerId === "longcat"
+      ? Math.min(ceiling, 24000)
+      : providerId === "deepai" || providerId === "motif"
+      ? Math.min(ceiling, 28000)
+      : ceiling;
 
   const maxCanvasScreensInPrompt = providerId === "chatjimmy" ? 2 : 4;
   const maxCharsPerScreen = providerId === "chatjimmy" ? 6000 : 12000;
@@ -129,11 +170,18 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.8);
 }
 
+export interface PromptEstimate {
+  measured: number;
+  estimated: number;
+}
+
 export interface ContextWindowStats {
   systemTokens: number;
   canvasTokens: number;
   historyTokens: number;
   memoryTokens: number;
+  measuredTokens: number;
+  estimatedDeltaTokens: number;
   totalTokens: number;
   contextWindow: number;
   effectiveBudget: number;
@@ -143,6 +191,20 @@ export interface ContextWindowStats {
   canvasScreenCount: number;
   compactedCount: number;
   needsCompaction: boolean;
+}
+
+/** Estimates tokens for a single message (including attachments, quotes, and tool outputs). */
+export function estimateMessageTokens(m: Message): number {
+  let chars = (m.text?.length ?? 0) + (m.quote?.text?.length ?? 0);
+  if (m.attachments) {
+    for (const a of m.attachments) chars += a.text?.slice(0, 20000).length ?? 0;
+  }
+  if (m.tools) {
+    for (const t of m.tools) {
+      chars += (t.args?.length ?? 0) + Math.min(t.output?.length ?? 0, 8000);
+    }
+  }
+  return Math.ceil(chars / 3.8) + 4;
 }
 
 /** Resolves all active artboards for the current page or conversation so multi-turn follow-ups never lose canvas sheets. */
@@ -181,6 +243,9 @@ export function getContextWindowStats(): ContextWindowStats {
     if (m.attachments) {
       for (const a of m.attachments) historyChars += (a.text?.slice(0, 20000).length ?? 0);
     }
+    if (m.tools) {
+      for (const t of m.tools) historyChars += (t.args?.length ?? 0) + Math.min(t.output?.length ?? 0, 8000);
+    }
   }
   // Account for reconstructed assistant artboard HTML on the latest assistant design turn
   const lastAsstWithBoards = [...conv.messages].reverse().find((m) => m.role === "assistant" && m.artboardIds && m.artboardIds.length > 0);
@@ -191,22 +256,60 @@ export function getContextWindowStats(): ContextWindowStats {
     }
   }
   const historyTokens = Math.ceil(historyChars / 3.8);
-  const totalTokens = systemTokens + memoryTokens + canvasTokens + historyTokens;
 
+  // Match OpenCode's `estimatePrompt`: anchor on the most recent assistant message with measured provider token usage,
+  // then add estimated delta tokens for any unmeasured messages after the anchor.
+  let anchorIndex = -1;
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i];
+    if (m.role === "assistant" && m.stats && (m.stats.inputTokens ?? 0) > 0) {
+      anchorIndex = i;
+      break;
+    }
+  }
+
+  let measuredTokens = 0;
+  let estimatedDeltaTokens = 0;
+  if (anchorIndex >= 0) {
+    const anchor = conv.messages[anchorIndex];
+    measuredTokens = (anchor.stats?.inputTokens ?? 0) + (anchor.stats?.outputTokens ?? anchor.stats?.tokens ?? 0);
+    for (let i = anchorIndex + 1; i < conv.messages.length; i++) {
+      estimatedDeltaTokens += estimateMessageTokens(conv.messages[i]);
+    }
+  } else {
+    estimatedDeltaTokens = systemTokens + memoryTokens + canvasTokens + historyTokens;
+  }
+
+  const totalTokens = Math.max(
+    systemTokens + memoryTokens + canvasTokens + historyTokens,
+    measuredTokens + estimatedDeltaTokens
+  );
+
+  const finiteBudget = Number.isFinite(spec.effectiveBudgetTokens)
+    ? spec.effectiveBudgetTokens
+    : calculateCeiling(spec.contextWindow);
   const percentOfWindow = Math.min(100, Math.round((totalTokens / spec.contextWindow) * 100));
-  const percentOfBudget = Math.min(100, Math.round((totalTokens / spec.effectiveBudgetTokens) * 100));
+  const percentOfBudget = Number.isFinite(spec.effectiveBudgetTokens)
+    ? Math.min(100, Math.round((totalTokens / spec.effectiveBudgetTokens) * 100))
+    : percentOfWindow;
+
+  // Match OpenCode's `due(context, ceiling)`: never compact based on message count alone; only compact when
+  // total prompt tokens reach the model's ceiling (`effectiveBudgetTokens`).
   const needsCompaction =
-    conv.messages.length >= 6 &&
-    (totalTokens >= spec.effectiveBudgetTokens * 0.78 || conv.messages.length >= 14);
+    Number.isFinite(spec.effectiveBudgetTokens) &&
+    conv.messages.length >= 4 &&
+    totalTokens >= spec.effectiveBudgetTokens;
 
   return {
     systemTokens,
     canvasTokens,
     historyTokens,
     memoryTokens,
+    measuredTokens,
+    estimatedDeltaTokens,
     totalTokens,
     contextWindow: spec.contextWindow,
-    effectiveBudget: spec.effectiveBudgetTokens,
+    effectiveBudget: finiteBudget,
     percentOfWindow,
     percentOfBudget,
     messageCount: conv.messages.length,
@@ -554,15 +657,79 @@ export function buildMultiTurnContext(opts: {
 }
 
 /* ------------------------------------------------------------------ */
-/* Auto-Compaction & Manual Compaction Engine                          */
+/* Auto-Compaction & Manual Compaction Engine (OpenCode Parity)        */
 /* ------------------------------------------------------------------ */
+export const OPENCODE_SUMMARY_TEMPLATE = `You MUST use this format for your response (you may omit sections that aren't applicable). Do not include the <template> tags in your response.
+<template>
+## Objective
+- [one or two brief sentences describing what the user is trying to accomplish]
+
+## Requirements
+- [constraints, preferences, requirements, and scope boundaries stated by the user, or "(none)"]
+
+## Decisions
+- [decisions already made and why, or "(none)"]
+
+## Work State
+### Completed
+- [goals that have been completed; otherwise "(none)"]
+
+### Active
+- [goals currently being worked on; otherwise "(none)"]
+
+### Blocked
+- [anything blocking progress, and why; otherwise "(none)"]
+
+## Next Move
+1. [ordered list of next actions, or "(none)"]
+
+## Relevant Files
+- \`[file or directory path]\`: [brief reason it matters]
+
+## Important Context
+- [facts the next agent cannot continue without and cannot easily find on its own; or "(none)"]
+</template>
+
+Rules:
+- Keep each section concise. Use terse, single-line bullets, not prose paragraphs or nested lists.
+- Preserve exact file paths, symbols, commands, error strings, URLs, and identifiers.
+- Carry forward only user questions or requests that remain unanswered or require further action.
+- Do not call tools or include any preamble.`;
+
+/**
+ * Matches OpenCode's `oldestToDrop` / `recentStart`:
+ * Keeps newest messages within `keepTokens` (`15,000` tokens by default) verbatim beside the summary,
+ * while ensuring at least the older messages are compacted.
+ */
+export function computeCompactionSplitIndex(messages: Message[], keepTokens = COMPACTION_KEEP_TOKENS): number {
+  if (messages.length < 4) return 0;
+  let total = 0;
+  let start = messages.length;
+  while (start > 2) {
+    const next = total + estimateMessageTokens(messages[start - 1]) + 1;
+    if (next > keepTokens && start < messages.length) break;
+    total = next;
+    start--;
+  }
+  // If everything fit inside keepTokens, still keep only the latest exchange when compaction was explicitly requested
+  if (start <= 1) {
+    return Math.max(2, messages.length - 2);
+  }
+  return Math.min(start, messages.length - 2);
+}
+
 function buildDeterministicSummary(messagesToCompact: Message[], boards: Artboard[]): string {
-  const userRequests = messagesToCompact
-    .filter((m) => m.role === "user")
-    .map((m) => `- User asked: "${m.text.slice(0, 160).replace(/\n+/g, " ")}"`)
-    .slice(-8);
+  const userMsgs = messagesToCompact.filter((m) => m.role === "user");
+  const firstUser = userMsgs[0]?.text.slice(0, 220).replace(/\n+/g, " ") ?? "";
+  const recentReqs = userMsgs
+    .slice(-5)
+    .map((m) => `- ${m.text.slice(0, 180).replace(/\n+/g, " ")}`);
+
   const touchedIds = new Set<string>();
-  const toolActions: string[] = [];
+  const relevantFiles = new Map<string, string>();
+  const completedActions: string[] = [];
+  const blockedActions: string[] = [];
+
   for (const m of messagesToCompact) {
     for (const id of m.artboardIds ?? []) touchedIds.add(id);
     for (const t of m.tools ?? []) {
@@ -574,24 +741,59 @@ function buildDeterministicSummary(messagesToCompact: Message[], boards: Artboar
       } catch {
         target = (t.args ?? "").slice(0, 60);
       }
-      toolActions.push(`- ${t.name}${target ? `(${String(target).slice(0, 80)})` : ""}: ${t.status}`);
+      if (target && /[./\\]/.test(String(target)) && !String(target).includes(" ")) {
+        relevantFiles.set(String(target).slice(0, 100), `${t.name} (${t.status})`);
+      }
+      const line = `- \`${t.name}${target ? `(${String(target).slice(0, 80)})` : ""}\`: ${t.status}`;
+      if (t.status === "error") blockedActions.push(line);
+      else completedActions.push(line);
     }
   }
+
   const activeScreens = boards
     .filter((b) => touchedIds.has(b.id) || boards.length <= 6)
     .map((b) => `${b.name} (id=${b.id}, ${b.device}, v${b.version})`);
 
+  const filesSection =
+    relevantFiles.size > 0
+      ? [...relevantFiles.entries()]
+          .slice(0, 15)
+          .map(([p, reason]) => `- \`${p}\`: ${reason}`)
+          .join("\n")
+      : "- (none)";
+
   return [
-    `**Compacted Context Summary** (${messagesToCompact.length} earlier messages compressed)`,
-    userRequests.length ? `Earlier requests:\n${userRequests.join("\n")}` : "",
-    toolActions.length ? `Completed workspace tool actions:\n${toolActions.slice(-12).join("\n")}` : "",
-    activeScreens.length ? `Active canvas screens: ${activeScreens.join(" · ")}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+    "## Objective",
+    firstUser ? `- ${firstUser}` : "- Continue current workspace and design session.",
+    "",
+    "## Requirements",
+    recentReqs.length ? recentReqs.join("\n") : "- (none)",
+    "",
+    "## Decisions",
+    activeScreens.length ? `- Active canvas screens: ${activeScreens.join(" · ")}` : "- (none)",
+    "",
+    "## Work State",
+    "### Completed",
+    completedActions.length ? completedActions.slice(-10).join("\n") : "- (none)",
+    "### Active",
+    recentReqs.length ? recentReqs.slice(-1).join("\n") : "- (none)",
+    "### Blocked",
+    blockedActions.length ? blockedActions.slice(-4).join("\n") : "- (none)",
+    "",
+    "## Next Move",
+    "1. Continue from the retained recent messages and fulfill the latest user request.",
+    "",
+    "## Relevant Files",
+    filesSection,
+    "",
+    "## Important Context",
+    `- Compacted ${messagesToCompact.length} earlier messages.`,
+  ].join("\n");
 }
 
-export async function compactConversation(opts: { convId?: string; manual?: boolean } = {}): Promise<{
+export async function compactConversation(
+  opts: { convId?: string; manual?: boolean; reason?: "auto" | "overflow" | "manual"; keepTokens?: number } = {}
+): Promise<{
   compacted: boolean;
   savedTokens: number;
   summary: string;
@@ -604,33 +806,47 @@ export async function compactConversation(opts: { convId?: string; manual?: bool
     return { compacted: false, savedTokens: 0, summary: "" };
   }
 
-  // Keep the most recent 2 messages (last user + assistant pair) intact and compact everything before them
-  const keepCount = Math.min(2, conv.messages.length - 2);
-  const head = conv.messages.slice(0, conv.messages.length - keepCount);
-  const tail = conv.messages.slice(conv.messages.length - keepCount);
+  const effectiveKeep =
+    opts.reason === "overflow"
+      ? Math.floor((opts.keepTokens ?? COMPACTION_KEEP_TOKENS) * SHRINK_STEPS[1])
+      : opts.keepTokens ?? COMPACTION_KEEP_TOKENS;
+  const splitIdx = computeCompactionSplitIndex(conv.messages, effectiveKeep);
+  if (splitIdx <= 0) {
+    if (opts.manual) st.notify("Conversation is already compact");
+    return { compacted: false, savedTokens: 0, summary: "" };
+  }
+
+  const head = conv.messages.slice(0, splitIdx);
+  const tail = conv.messages.slice(splitIdx);
   const boards = st.artboards.filter((a) => a.pageId === st.activePageId);
 
-  const beforeTokens = estimateTokens(head.map((m) => m.text).join("\n"));
+  const beforeTokens = head.reduce((sum, m) => sum + estimateMessageTokens(m), 0);
   let summary = buildDeterministicSummary(head, boards);
 
   try {
     const transcript = head
-      .map((m) => `${m.role.toUpperCase()}: ${m.text.slice(0, 500)}`)
+      .map((m) => {
+        const toolLines = (m.tools ?? [])
+          .filter((t) => !["provider_notice", "context_compact", "quality_gate", "auto_continue"].includes(t.name))
+          .map((t) => `[Tool ${t.name} (${t.status})]: ${(t.output ?? "").slice(0, 400)}`)
+          .join("\n");
+        return `[${m.role === "user" ? "User" : "Assistant"}]: ${m.text.slice(0, 1200)}${toolLines ? `\n${toolLines}` : ""}`;
+      })
       .join("\n\n")
-      .slice(0, 8000);
+      .slice(0, 12000);
     const llmSummary = await Promise.race([
       oneShot(
-        "Summarize this earlier UI design conversation into 4 concise bullet points: (1) Product domain & target audience, (2) Chosen colors/theme/typography preferences, (3) Screen names & IDs created, (4) Key layout constraints. Output ONLY the bullet points, no intro, no emojis.",
+        `You MUST summarize the conversation above into a structured summary that will be given to another agent to resume the work.\n\n${OPENCODE_SUMMARY_TEMPLATE}`,
         transcript,
         { effort: "low", timeoutMs: 8000 }
       ),
       new Promise<string>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
     ]);
-    if (llmSummary && llmSummary.trim().length > 30) {
-      summary = `**Compacted Context Summary** (${head.length} messages compressed)\n\n${llmSummary.trim()}`;
+    if (llmSummary && llmSummary.trim().length > 40 && /##\s*Objective/i.test(llmSummary)) {
+      summary = llmSummary.replace(/<\/?template>/gi, "").trim();
     }
   } catch {
-    // Deterministic summary is already prepared and instant
+    // Deterministic OpenCode-structured summary is already prepared
   }
 
   const afterTokens = estimateTokens(summary);
