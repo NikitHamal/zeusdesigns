@@ -288,7 +288,7 @@ export function extractReasoningFromRaw(
  */
 export function stripToolMarkupFromText(input: string): string {
   const shorthandTags =
-    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
+    "zeus_tool|tool_call|function_call|function|invoke|antml:invoke|ifm\\|tool_calls|ifm\\|tool_call|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete";
 
   const notBackticked =
     (fn: (m: string) => string) =>
@@ -350,10 +350,15 @@ export function stripToolMarkupFromText(input: string): string {
     .replace(/<(?:antml:)?invoke\s+name=[^>]*>[\s\S]*?(<\/(?:antml:)?invoke>|$)/gi, notBackticked(() => ""))
     .replace(/<ifm\|tool_calls>[\s\S]*?(<\/ifm\|tool_calls>|$)/gi, notBackticked(() => ""))
     .replace(/<ifm\|tool_call>[\s\S]*?(<\/ifm\|tool_call>|$)/gi, notBackticked(() => ""))
+    .replace(/<\|tool_calls_section_begin\|>[\s\S]*?(<\|tool_calls_section_end\|>|$)/gi, "")
+    .replace(/<\|tool_call_begin\|>[\s\S]*?(<\|tool_call_end\|>|$)/gi, "")
+    .replace(/<｜tool▁calls▁begin｜>[\s\S]*?(<｜tool▁calls▁end｜>|$)/gi, "")
+    .replace(/<｜tool▁call▁begin｜>[\s\S]*?(<｜tool▁call▁end｜>|$)/gi, "")
+    .replace(/\[TOOL_CALLS\]\s*\[[\s\S]*?\](?=\s*\n|$)/gi, "")
     .replace(/<\|open\|>tools[\s\S]*?(?:<\|close\|>tools(?:<\|sep\|>)?|$)/gi, "")
     .replace(/<\|open\|>call[\s\S]*?(?:<\|close\|>call(?:<\|sep\|>)?|$)/gi, "")
     .replace(
-      /<(bash|shell|python|read_file|write_file|edit_file|delete_file|search_code|list_dir|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
+      /<(bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file|delete_file|search_code|search_project|docs_lookup|check_syntax|update_plan|ask_user|list_dir|list_files|glob|grep|web_fetch|memory_search|memory_save|memory_edit|memory_delete)(\s+[^>]*)?>[\s\S]*?(<\/\1>|$)/gi,
       (m, _tag: string, attrs: string | undefined, closeTok: string | undefined, offset: number, whole: string) => {
         if (offset > 0 && whole[offset - 1] === "`") return m;
         if (!closeTok && !attrs) {

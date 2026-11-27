@@ -9,7 +9,15 @@ export type ChatEvent =
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
   | { type: "tool_call"; id: string; name: string; args?: unknown }
-  | { type: "tool_result"; id: string; ok: boolean; output: string }
+  | {
+      type: "tool_result";
+      id: string;
+      ok: boolean;
+      output: string;
+      oldContent?: string;
+      newContent?: string;
+      checkpointId?: string;
+    }
   | { type: "done"; usage?: { inputTokens?: number; outputTokens?: number; tokensPerSecond?: number } }
   | { type: "error"; message: string };
 
@@ -194,6 +202,27 @@ export const nativeShell = {
       stdout: `[browser preview] $ ${cmd}\nConnect in the native Windows app for live shell execution in ${root || "."}.`,
       stderr: "",
     };
+  },
+};
+
+export interface NativeCheckpointManifest {
+  id: string;
+  label: string;
+  createdAt: number;
+  files: Array<{ path: string; existed: boolean; blob?: string }>;
+}
+
+export const nativeCheckpoints = {
+  list: async (root?: string): Promise<NativeCheckpointManifest[]> => {
+    if (!root) return [];
+    return (await tryInvoke<NativeCheckpointManifest[]>("workspace_checkpoints", { root })) ?? [];
+  },
+  restore: async (root: string, checkpointId: string): Promise<{ id: string; restoredFiles: string[] } | null> => {
+    if (!root || !checkpointId) return null;
+    return await tryInvoke<{ id: string; restoredFiles: string[] }>("workspace_restore_checkpoint", {
+      root,
+      checkpointId,
+    });
   },
 };
 

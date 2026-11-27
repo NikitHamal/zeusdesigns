@@ -45,7 +45,51 @@ export interface Pin {
 
 export interface Attachment { id: string; name: string; mime: string; size: number; dataUrl?: string; text?: string }
 
-export interface ToolCall { id: string; name: string; args?: string; status: "running" | "ok" | "error"; output?: string }
+export interface ToolCall {
+  id: string;
+  name: string;
+  args?: string;
+  status: "running" | "ok" | "error";
+  output?: string;
+  oldContent?: string;
+  newContent?: string;
+  additions?: number;
+  deletions?: number;
+  checkpointId?: string;
+}
+
+export interface PlanTask {
+  id: string;
+  title: string;
+  state: "pending" | "active" | "done" | "blocked" | "skipped";
+  note?: string;
+  delegatedTo?: string;
+}
+
+export interface AgentPlan {
+  tasks: PlanTask[];
+  updatedAt: number;
+}
+
+export interface UserQuestionItem {
+  id: string;
+  header?: string;
+  question: string;
+  options: Array<{ label: string; description?: string; recommended?: boolean }>;
+}
+
+export interface PendingUserQuestion {
+  id: string;
+  questions: UserQuestionItem[];
+  answered?: boolean;
+}
+
+export interface CheckpointManifest {
+  id: string;
+  label: string;
+  createdAt: number;
+  files: Array<{ path: string; existed: boolean; blob?: string }>;
+}
 
 export interface Quote { kind: "artboard" | "pin" | "element"; label: string; artboardId?: string; pinId?: string; text?: string }
 
@@ -56,6 +100,9 @@ export interface Message {
   quote?: Quote;
   attachments?: Attachment[];
   tools?: ToolCall[];
+  plan?: AgentPlan;
+  pendingQuestion?: PendingUserQuestion;
+  checkpointId?: string;
   reasoning?: string;
   thinkMs?: number;
   artboardIds?: string[];

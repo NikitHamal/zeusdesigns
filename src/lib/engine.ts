@@ -21,6 +21,18 @@ import { toolsPrompt } from "./tools";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
+import {
+  BriefCheck,
+  DiffUtils,
+  HistoryPruner,
+  ModelProfiles,
+  parseAskUserFromToolCall,
+  parsePlanFromToolCall,
+  ProjectInstructions,
+  ProjectSnapshot,
+  StuckDetector,
+  ToolAliases,
+} from "./stormyAgent";
 import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
@@ -552,11 +564,22 @@ export async function sendMessage(opts: {
 
   const nativeOn = isNative && useStore.getState().ui.nativeReady;
   const isGreeting = mode === "chat" && GREETING_RE.test(opts.text.trim());
+  const stormyProfile = ModelProfiles.forIds(settings.providerId, settings.modelId);
   const toolsText = nativeOn && !isGreeting ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
+  const projInstructions = !isGreeting ? await ProjectInstructions.load(st.ui.workspace).catch(() => "") : "";
+  const projSnapshot =
+    !isGreeting && mode === "code" && stormyProfile.inlineProjectChars > 0
+      ? await ProjectSnapshot.inline(st.ui.workspace, stormyProfile.inlineProjectChars).catch(() => "")
+      : "";
+  const isProjectFresh = !st.ui.workspace || st.ui.workspace.tree.length === 0;
+  const briefVerdict = !isGreeting ? BriefCheck.check(opts.text, isProjectFresh) : { vague: false, missing: [], reason: "" };
+  const briefNote = BriefCheck.note(briefVerdict, Boolean((settings as { askBeforeBuilding?: boolean }).askBeforeBuilding));
   const system =
     mode === "design"
-      ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
-      : [agentPrompt(mode, opts.text), toolsText].filter(Boolean).join("\n\n");
+      ? [buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText }), projInstructions, briefNote]
+          .filter(Boolean)
+          .join("\n\n")
+      : [agentPrompt(mode, opts.text), toolsText, projInstructions, projSnapshot, briefNote].filter(Boolean).join("\n\n");
   const activeProjRoot = st.projects.find((p) => p.id === st.activeProjectId)?.root;
   const effectiveWorkspaceRoot = st.ui.workspace?.root || activeProjRoot;
   const req: ChatRequest = {
@@ -619,6 +642,7 @@ export async function sendMessage(opts: {
       let msgs: ChatRequest["messages"] = history;
       let nudgeCount = 0;
       const codingProfile = getCodingHarnessProfile(settings.providerId, settings.modelId);
+      const stuckDetector = new StuckDetector();
       for (let round = 0; ; round++) {
         const roundTools: ToolCall[] = [];
         const studioRuns = new Map<string, Promise<void>>();
@@ -634,7 +658,7 @@ export async function sendMessage(opts: {
                   .replace(/<(?:think|thinking)>[\s\S]*$/gi, (m) => " ".repeat(m.length));
               const findFakeResult = (s: string): number => {
                 const clean = outsideThink(s);
-                if (!roundTools.length && !/<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file)>/i.test(clean)) return -1;
+                if (!roundTools.length && !/<\/(?:zeus_tool|tool_call|function_call|function|invoke|bash|shell|python|read_file|write_file|edit_file|multi_edit|move_file)>/i.test(clean)) return -1;
                 for (const tag of ["<tool_result", "<tool_response"]) {
                   for (let from = 0; ; ) {
                     const i = clean.indexOf(tag, from);
@@ -688,7 +712,18 @@ export async function sendMessage(opts: {
               };
               tools.push(t);
               roundTools.push(t);
-              if (isStudioTool(e.name)) {
+              const canon = ToolAliases.canonicalName(e.name);
+              if (canon === "update_plan") {
+                const parsedPlan = parsePlanFromToolCall(t.args ?? "");
+                if (parsedPlan) {
+                  useStore.getState().patchMessage(convId, asstId, { plan: parsedPlan });
+                }
+              } else if (canon === "ask_user") {
+                const parsedQ = parseAskUserFromToolCall(t.id, t.args ?? "");
+                if (parsedQ) {
+                  useStore.getState().patchMessage(convId, asstId, { pendingQuestion: parsedQ });
+                }
+              } else if (isStudioTool(e.name)) {
                 studioRuns.set(
                   e.id,
                   runStudioTool(e.name, t.args).then((r) => {
@@ -722,14 +757,37 @@ export async function sendMessage(opts: {
                 );
                 t.status = hooked.ok ? "ok" : "error";
                 t.output = hooked.output;
-                if (t.name.startsWith("memory")) {
+                if (e.oldContent !== undefined || e.newContent !== undefined) {
+                  t.oldContent = e.oldContent ?? "";
+                  t.newContent = e.newContent ?? "";
+                  const d = DiffUtils.computeDiff(t.oldContent, t.newContent, 2);
+                  t.additions = d.additions;
+                  t.deletions = d.deletions;
+                }
+                if (e.checkpointId) {
+                  t.checkpointId = e.checkpointId;
+                  useStore.getState().patchMessage(convId, asstId, { checkpointId: e.checkpointId });
+                }
+                const canon = ToolAliases.canonicalName(t.name);
+                if (canon === "update_plan") {
+                  const parsedPlan = parsePlanFromToolCall(t.args || e.output || "");
+                  if (parsedPlan) {
+                    useStore.getState().patchMessage(convId, asstId, { plan: parsedPlan });
+                  }
+                } else if (canon === "ask_user") {
+                  const parsedQ = parseAskUserFromToolCall(t.id, t.args || e.output || "");
+                  if (parsedQ) {
+                    useStore.getState().patchMessage(convId, asstId, { pendingQuestion: parsedQ });
+                  }
+                }
+                if (t.name.startsWith("memory") || canon.startsWith("memory")) {
                   import("./bridge")
                     .then(({ nativeMemory }) =>
                       nativeMemory.list().then((l) => l && useStore.getState().patchSettings({ memory: [...l].reverse() }))
                     )
                     .catch(() => {});
                 } else if (
-                  /^(write_file|write|create_file|delete_file|remove_file|rm|del|unlink|edit_file|edit|patch_file|shell|bash|python|python3)$/.test(
+                  /^(write_file|write|create_file|append_file|delete_file|remove_file|rm|del|unlink|move_file|rename_file|mv|edit_file|edit|patch_file|multi_edit|multiedit|shell|bash|python|python3)$/.test(
                     t.name
                   )
                 ) {
@@ -776,6 +834,14 @@ export async function sendMessage(opts: {
         });
         await Promise.all(studioRuns.values());
         for (const t of roundTools) if (t.status === "running") t.status = "error";
+        if (roundTools.some((t) => ToolAliases.canonicalName(t.name) === "ask_user")) {
+          break;
+        }
+        const stuckVerdict = stuckDetector.record(roundTools);
+        if (stuckVerdict.stop) {
+          useStore.getState().patchMessage(convId, asstId, { error: stuckVerdict.stop });
+          break;
+        }
         if (signal.aborted || round >= (mode === "code" ? codingProfile.maxToolRounds : mode === "chat" ? 8 : 4)) break;
         if (!roundTools.length) {
           const parsedNow = parseStream(extractRemember(full).clean, extraThink);
@@ -968,20 +1034,23 @@ export async function sendMessage(opts: {
           : asksMut && !hasMutatedSoFar
           ? `You have only read/searched files so far and have NOT modified any files on disk yet. Emit <zeus_tool name="edit_file" path="..."><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool> or <zeus_tool name="write_file" path="...">...</zeus_tool> (or <zeus_tool name="read_file" path="..."></zeus_tool> if you need to inspect another file first) now. Do NOT output markdown code fences instead of <zeus_tool>.`
           : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, emit the next <zeus_tool> block to finish the remaining steps (never stop mid-inspection to ask "tell me to proceed" and never repeat an identical call).`;
-        msgs = [
-          ...msgs,
-          { role: "assistant", content: said },
-          {
-            role: "user",
-            content: `Original user request: ${opts.text.slice(0, 1200)}\n\nTool results:\n${roundTools
-              .map((t) => {
-                const isRead = /^(read_file|read|cat|view_file|open_file)$/.test(t.name);
-                const cap = isRead ? 48_000 : mode === "code" ? codingProfile.maxToolOutputChars : 12_000;
-                return `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, cap)}\n</tool_result>`;
-              })
-              .join("\n")}\n\n${nextStepDirective}`,
-          },
-        ];
+        msgs = HistoryPruner.prune(
+          [
+            ...msgs,
+            { role: "assistant", content: said },
+            {
+              role: "user",
+              content: `Original user request: ${opts.text.slice(0, 1200)}\n\nTool results:\n${roundTools
+                .map((t) => {
+                  const isRead = /^(read_file|read|cat|view_file|open_file)$/.test(t.name);
+                  const cap = isRead ? 48_000 : mode === "code" ? codingProfile.maxToolOutputChars : 12_000;
+                  return `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, cap)}\n</tool_result>`;
+                })
+                .join("\n")}${stuckVerdict.note ? `\n\n${stuckVerdict.note}` : ""}\n\n${nextStepDirective}`,
+            },
+          ],
+          stormyProfile.contextBudgetTokens
+        );
         current = { ...req, requestId: uid(), messages: msgs };
         full += "\n\n";
       }

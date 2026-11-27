@@ -46,10 +46,13 @@ function sig(schema: unknown): string {
   return "{" + keys.map((k) => `${k}${s?.required?.includes(k) ? "" : "?"}: ${props[k]?.type ?? "any"}`).join(", ") + "}";
 }
 
+import { ModelProfiles, TextToolProtocol } from "./stormyAgent";
+
 export async function toolsPrompt(opts: { design?: boolean } = { design: true }): Promise<string> {
   const st = useStore.getState();
   const ws = st.ui.workspace;
   const profile = getCodingHarnessProfile(st.settings.providerId, st.settings.modelId);
+  const stormyProfile = ModelProfiles.forIds(st.settings.providerId, st.settings.modelId);
   let mcp: McpToolInfo[] = [];
   const maxMcp = profile.style === "guided_compact" ? 8 : 40;
   try { mcp = (await enabledMcpTools()).slice(0, maxMcp); } catch { /* none */ }
@@ -57,9 +60,11 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
     "## Agent tools",
     "Emit tool blocks in your final response (never inside internal reasoning) and stop your turn after the closing tag so the harness can execute and return `<tool_result>`. Never emit a placeholder tool name.",
     ws || !opts.design ? profile.toolExamples : "",
+    ws || !opts.design ? TextToolProtocol.render(stormyProfile.wholeFiles) : "",
+    stormyProfile.promptSection,
     "- `<zeus_tool name=\"web_fetch\" path=\"https://example.com\"></zeus_tool>` | `<zeus_tool name=\"lmfingerprint\" path=\"provider/model\"></zeus_tool>` (verify if a model is genuine direct or routed under the hood) | `<zeus_tool name=\"memory_search\">query</zeus_tool>` | `<zeus_tool name=\"memory_save\" path=\"preferences\">durable fact</zeus_tool>` | `<zeus_tool name=\"memory_edit\" path=\"mem-id\">updated fact</zeus_tool>` | `<zeus_tool name=\"memory_delete\" path=\"mem-id\"></zeus_tool>`",
     opts.design ? studioToolsPrompt() : "",
     ...(mcp.length ? ["MCP tools, BODY is a JSON object of arguments:", ...mcp.map((t) => `- name="mcp:${t.server_id}:${t.name}" ${sig(t.input_schema)} ${t.description.replace(/\s+/g, " ").slice(0, 110)}`)] : []),
   ];
-  return lines.filter(Boolean).join("\n");
+  return lines.filter(Boolean).join("\n\n");
 }
