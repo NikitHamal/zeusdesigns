@@ -90,8 +90,6 @@ pub fn run() {
             server::server_status,
             server::server_start,
             server::server_stop,
-            server::server_opencode_config,
-            server::server_install_opencode,
             updater::update_check,
             updater::update_install,
             agent::providers_list,

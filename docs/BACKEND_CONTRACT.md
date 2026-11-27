@@ -23,8 +23,7 @@ browser fallback** so the UI is fully usable without the engine (demo engine + l
 | `memory_list` / `memory_search` / `memory_add` / `memory_update` / `memory_delete` | `{query?, category?, project?}` / `{text, category?, project?}` / `{id, text, category?}` / `{id}` | `MemoryItem[]` |
 | `mcp_list` / `mcp_add` / `mcp_remove` / `mcp_tools` / `mcp_call` | server config / `{tool, args}` | status / tools / result |
 | `perf_stats` / `perf_trim` / `perf_set_auto` | – / – / `{enabled}` | `PerfStats` / `TrimReport` / `PerfStats` |
-| `server_status` / `server_start` / `server_stop` | – / `{port?}` / – | `ServerStatus` (`running`, `port`, `baseUrl`, `openaiBaseUrl`, `chatCompletionsUrl`, `modelsUrl`, `messagesUrl`, `opencodeConfigUrl`, `apiKey`, `requestCount`, `modelCount`, `lastModel`) |
-| `server_opencode_config` / `server_install_opencode` | – / `{workspaceRoot?}` | `opencode.json` object / `{ok, paths, baseUrl, defaultModel}` |
+| `server_status` / `server_start` / `server_stop` | – / `{port?}` / – | `ServerStatus` (`running`, `port`, `baseUrl`, `openaiBaseUrl`, `chatCompletionsUrl`, `modelsUrl`, `messagesUrl`, `apiKey`, `requestCount`, `modelCount`, `lastModel`) |
 
 ### `ChatRequest`
 ```ts
@@ -86,7 +85,7 @@ Multimodal image/file attachments (`messages[*].attachments`) are supported nati
 
 
 ## Session 19 additions
-- `opencode_start(root, port, config)` / `opencode_stop()` (`workspace.rs`): spawn or kill `opencode serve` (config JSON goes in `OPENCODE_CONFIG_CONTENT`). The UI talks to it over HTTP with `@opencode-ai/sdk` on `127.0.0.1:4096`.
+- (Removed in session 37) The `opencode serve` / `@opencode-ai/sdk` runtime. All coding turns run on the unified Zeus Harness² loop (native Rust agent loop for native tool-calling and `<zeus_tool>` XML models alike).
 - Inline tool `edit_file`: `<zeus_tool name="edit_file" path="f">` with `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE` blocks. `read_file` accepts `start` and `end`; `list_dir` accepts `path`.
 - Provider `opencodezen`: OpenAI-compatible `https://opencode.ai/zen/v1/chat/completions`, `Authorization: Bearer public`, free models only.
 

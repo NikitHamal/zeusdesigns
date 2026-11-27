@@ -3,7 +3,7 @@
 // Exposes all 34 verified keyless providers (including Mercury 3, Gemini Web, LongCat, DeepAI, Qwen, Ptero,
 // Unikey, K2Horizon, Motif, YQCloud, ChatJimmy, and Anthropic proxies like FreeCC Gemini 4 Hydrogen)
 // as a standard OpenAI `/v1/chat/completions`, `/v1/models`, `/v1/responses` and Anthropic `/v1/messages`
-// local HTTP server with a Universal OpenCode Tool-Calling Bridge (`tools` -> `<tool_call>` -> `delta.tool_calls`).
+// local HTTP server with a universal tool-calling bridge (`tools` -> `<tool_call>` -> `delta.tool_calls`).
 
 use crate::crypto::{random_hex, uuid_v4};
 use crate::providers::{
@@ -38,8 +38,6 @@ pub struct ServerStatus {
     pub models_url: String,
     #[serde(rename = "messagesUrl")]
     pub messages_url: String,
-    #[serde(rename = "opencodeConfigUrl")]
-    pub opencode_config_url: String,
     #[serde(rename = "apiKey")]
     pub api_key: String,
     #[serde(rename = "requestCount")]
@@ -50,24 +48,12 @@ pub struct ServerStatus {
     pub last_model: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OcSession {
-    pub id: String,
-    pub title: String,
-    pub directory: String,
-    pub messages: Vec<ChatMessage>,
-    pub created: u64,
-}
-
 pub struct LocalServerState {
     pub running: AtomicBool,
     pub stop_signal: Mutex<Option<Arc<AtomicBool>>>,
     pub port: AtomicU16,
     pub request_count: AtomicU64,
     pub last_model: Mutex<String>,
-    pub oc_sessions: Mutex<std::collections::HashMap<String, OcSession>>,
-    pub oc_cancels: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
-    pub oc_subscribers: Mutex<Vec<std::sync::mpsc::Sender<Value>>>,
 }
 
 impl Default for LocalServerState {
@@ -78,17 +64,6 @@ impl Default for LocalServerState {
             port: AtomicU16::new(DEFAULT_SERVER_PORT),
             request_count: AtomicU64::new(0),
             last_model: Mutex::new("gemini-4-hydrogen".to_string()),
-            oc_sessions: Mutex::new(std::collections::HashMap::new()),
-            oc_cancels: Mutex::new(std::collections::HashMap::new()),
-            oc_subscribers: Mutex::new(Vec::new()),
-        }
-    }
-}
-
-impl LocalServerState {
-    pub fn broadcast_oc_event(&self, ev: Value) {
-        if let Ok(mut subs) = self.oc_subscribers.lock() {
-            subs.retain(|tx| tx.send(ev.clone()).is_ok());
         }
     }
 }
@@ -188,7 +163,6 @@ pub fn build_status(state: &LocalServerState) -> ServerStatus {
         chat_completions_url: format!("{}/v1/chat/completions", base),
         models_url: format!("{}/v1/models", base),
         messages_url: format!("{}/v1/messages", base),
-        opencode_config_url: format!("{}/v1/opencode.json", base),
         api_key: "zeus-local".to_string(),
         request_count: state.request_count.load(Ordering::Relaxed),
         model_count: build_openai_models_list().len(),
@@ -303,88 +277,6 @@ pub fn server_stop(state: tauri::State<'_, Arc<LocalServerState>>) -> Result<Ser
     stop_local_server(&state)
 }
 
-#[tauri::command(async)]
-pub fn server_opencode_config(state: tauri::State<'_, Arc<LocalServerState>>) -> Value {
-    let port = state.port.load(Ordering::Relaxed);
-    generate_opencode_config_json(port)
-}
-
-#[tauri::command(async)]
-pub fn server_install_opencode(
-    workspace_root: Option<String>,
-    state: tauri::State<'_, Arc<LocalServerState>>,
-) -> Result<Value, String> {
-    let port = state.port.load(Ordering::Relaxed);
-    let generated = generate_opencode_config_json(port);
-    let mut written_paths = Vec::new();
-
-    // 1. Write/merge into global `~/.config/opencode/opencode.json`
-    let home = std::env::var("USERPROFILE")
-        .or_else(|_| std::env::var("HOME"))
-        .unwrap_or_default();
-    if !home.is_empty() {
-        let global_dir = PathBuf::from(&home).join(".config").join("opencode");
-        if fs::create_dir_all(&global_dir).is_ok() {
-            let global_file = global_dir.join("opencode.json");
-            let merged = merge_opencode_json(&global_file, &generated);
-            if let Ok(pretty) = serde_json::to_string_pretty(&merged) {
-                if fs::write(&global_file, pretty).is_ok() {
-                    written_paths.push(global_file.to_string_lossy().to_string());
-                }
-            }
-        }
-    }
-
-    // 2. If a workspace folder is open in ZeusDesigns, also write/merge `opencode.json` in the workspace root
-    if let Some(ws) = workspace_root {
-        let ws_trimmed = ws.trim();
-        if !ws_trimmed.is_empty() {
-            let ws_file = PathBuf::from(ws_trimmed).join("opencode.json");
-            let merged = merge_opencode_json(&ws_file, &generated);
-            if let Ok(pretty) = serde_json::to_string_pretty(&merged) {
-                if fs::write(&ws_file, pretty).is_ok() {
-                    written_paths.push(ws_file.to_string_lossy().to_string());
-                }
-            }
-        }
-    }
-
-    if written_paths.is_empty() {
-        return Err("Could not write opencode.json to ~/.config/opencode/opencode.json".to_string());
-    }
-
-    Ok(json!({
-        "ok": true,
-        "paths": written_paths,
-        "baseUrl": format!("http://127.0.0.1:{}/v1", port),
-        "defaultModel": "zeusdesigns/gemini-4-hydrogen"
-    }))
-}
-
-fn merge_opencode_json(path: &PathBuf, generated: &Value) -> Value {
-    let mut base = fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .unwrap_or_else(|| json!({}));
-    if !base.is_object() {
-        base = json!({});
-    }
-    base["$schema"] = json!("https://opencode.ai/config.json");
-    if base.get("model").is_none() {
-        base["model"] = json!("zeusdesigns/gemini-4-hydrogen");
-    }
-    if base.get("small_model").is_none() {
-        base["small_model"] = json!("zeusdesigns/claude-haiku-5-5");
-    }
-    if !base.get("provider").map(|p| p.is_object()).unwrap_or(false) {
-        base["provider"] = json!({});
-    }
-    if let Some(zeus_prov) = generated.get("provider").and_then(|p| p.get("zeusdesigns")) {
-        base["provider"]["zeusdesigns"] = zeus_prov.clone();
-    }
-    base
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436,5 +328,5 @@ mod tests {
 
 
 include!("server_models.rs");
-include!("server_oc_session.rs");
+include!("server_util.rs");
 include!("server_http.rs");

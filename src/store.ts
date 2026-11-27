@@ -41,7 +41,6 @@ export interface Settings {
   learnOn: boolean;
   askBeforeBuilding?: boolean;
   autonomy?: "unleashed" | "leashed";
-  agentRuntime?: "zeus" | "opencode";
   maxSubagentDepth?: number;
 }
 export interface Viewport { x: number; y: number; z: number }

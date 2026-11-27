@@ -63,175 +63,14 @@ fn handle_http_connection(
                 "healthy": true,
                 "version": "1.0.0",
                 "status": "ok",
-                "server": "ZeusDesigns Local OpenAI & Native OpenCode Server",
+                "server": "ZeusDesigns Local OpenAI-compatible Server",
                 "port": port,
                 "base_url": format!("http://127.0.0.1:{}/v1", port),
                 "models_count": models.len(),
-                "requests_served": server_state.request_count.load(Ordering::Relaxed),
-                "opencode_ready": true
+                "requests_served": server_state.request_count.load(Ordering::Relaxed)
             }),
         );
         return;
-    }
-
-    // Native OpenCode SDK Server Protocol (`/event`, `/session`, `/session/{id}/message`, `/session/{id}/abort`)
-    if method == "GET" && (path == "/event" || path == "/global/event" || path == "/api/event") {
-        if write_sse_headers(&mut stream).is_err() {
-            return;
-        }
-        let _ = write_sse_data(&mut stream, &json!({ "type": "server.connected", "properties": {} }));
-        let (tx, rx) = std::sync::mpsc::channel::<Value>();
-        if let Ok(mut subs) = server_state.oc_subscribers.lock() {
-            subs.push(tx);
-        }
-        loop {
-            match rx.recv_timeout(Duration::from_secs(15)) {
-                Ok(ev) => {
-                    if write_sse_data(&mut stream, &ev).is_err() {
-                        break;
-                    }
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    if stream.write_all(b": keepalive\n\n").is_err() || stream.flush().is_err() {
-                        break;
-                    }
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        }
-        return;
-    }
-
-    if (path == "/session" || path == "/api/session") && method == "GET" {
-        let list: Vec<Value> = server_state
-            .oc_sessions
-            .lock()
-            .map(|m| {
-                m.values()
-                    .map(|s| {
-                        json!({
-                            "id": s.id,
-                            "title": s.title,
-                            "directory": s.directory,
-                            "version": "1.0.0",
-                            "time": { "created": s.created, "updated": now_secs() }
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        write_json_response(&mut stream, "200 OK", &json!(list));
-        return;
-    }
-
-    if (path == "/session" || path == "/api/session") && method == "POST" {
-        let req_json: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| json!({}));
-        let sid = format!("ses_{}", random_hex(12));
-        let title = req_json
-            .get("title")
-            .and_then(|t| t.as_str())
-            .unwrap_or("New Session")
-            .to_string();
-        let dir_q = raw_path
-            .split('?')
-            .nth(1)
-            .and_then(|q| {
-                q.split('&').find_map(|kv| {
-                    let (k, v) = kv.split_once('=')?;
-                    if k == "directory" {
-                        Some(percent_decode(v))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .unwrap_or_default();
-        let created = now_secs();
-        let sess = OcSession {
-            id: sid.clone(),
-            title: title.clone(),
-            directory: dir_q.clone(),
-            messages: Vec::new(),
-            created,
-        };
-        if let Ok(mut guard) = server_state.oc_sessions.lock() {
-            guard.insert(sid.clone(), sess);
-        }
-        write_json_response(
-            &mut stream,
-            "200 OK",
-            &json!({
-                "id": sid,
-                "title": title,
-                "directory": dir_q,
-                "version": "1.0.0",
-                "time": { "created": created, "updated": created }
-            }),
-        );
-        return;
-    }
-
-    if path.starts_with("/session/") || path.starts_with("/api/session/") {
-        let clean_p = path.trim_start_matches("/api");
-        let segs: Vec<&str> = clean_p.split('/').filter(|s| !s.is_empty()).collect();
-        if segs.len() >= 2 && segs[0] == "session" {
-            let sid = segs[1].to_string();
-            let action = segs.get(2).copied().unwrap_or("");
-            if method == "GET" && action.is_empty() {
-                let info = server_state
-                    .oc_sessions
-                    .lock()
-                    .ok()
-                    .and_then(|g| g.get(&sid).cloned());
-                if let Some(s) = info {
-                    write_json_response(
-                        &mut stream,
-                        "200 OK",
-                        &json!({
-                            "id": s.id,
-                            "title": s.title,
-                            "directory": s.directory,
-                            "version": "1.0.0",
-                            "time": { "created": s.created, "updated": now_secs() }
-                        }),
-                    );
-                } else {
-                    write_json_response(&mut stream, "404 Not Found", &json!({ "error": "Session not found" }));
-                }
-                return;
-            }
-            if method == "DELETE" && action.is_empty() {
-                if let Ok(mut guard) = server_state.oc_sessions.lock() {
-                    guard.remove(&sid);
-                }
-                write_json_response(&mut stream, "200 OK", &json!(true));
-                return;
-            }
-            if method == "POST" && (action == "abort" || action == "interrupt") {
-                if let Ok(guard) = server_state.oc_cancels.lock() {
-                    if let Some(flag) = guard.get(&sid) {
-                        flag.store(true, Ordering::Relaxed);
-                    }
-                }
-                server_state.broadcast_oc_event(json!({
-                    "type": "session.idle",
-                    "properties": { "sessionID": sid }
-                }));
-                write_json_response(&mut stream, "200 OK", &json!(true));
-                return;
-            }
-            if method == "POST" && (action == "message" || action == "prompt" || action == "prompt_async") {
-                handle_opencode_session_message(
-                    &mut stream,
-                    raw_path,
-                    &sid,
-                    &body_bytes,
-                    engine,
-                    server_state,
-                );
-                return;
-            }
-        }
     }
 
     if method == "GET" && (path == "/v1/models" || path == "/models") {
@@ -244,12 +83,6 @@ fn handle_http_connection(
                 "data": models
             }),
         );
-        return;
-    }
-
-    if method == "GET" && (path == "/v1/opencode.json" || path == "/opencode.json") {
-        let cfg = generate_opencode_config_json(port);
-        write_json_response(&mut stream, "200 OK", &cfg);
         return;
     }
 

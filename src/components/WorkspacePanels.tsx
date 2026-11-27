@@ -813,10 +813,6 @@ export function ProjectWorkspaceCard({
 }) {
   const ws = useStore((s) => s.ui.workspace);
   const curProject = useStore(activeProject);
-  const providerId = useStore((s) => s.settings.providerId);
-  const modelId = useStore((s) => s.settings.modelId);
-  const agentRuntime = useStore((s) => s.settings.agentRuntime ?? "zeus");
-  const patchSettings = useStore((s) => s.patchSettings);
   const topNodes = (ws?.tree ?? []).slice(0, 12);
 
   return (
@@ -839,31 +835,6 @@ export function ProjectWorkspaceCard({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <div
-              title={`Active coding runtime for ${providerId}/${modelId}`}
-              className="inline-flex h-8 items-center rounded-full border border-outline-variant/60 bg-surface p-0.5 text-[11.5px] font-semibold"
-            >
-              <button
-                onClick={() => patchSettings({ agentRuntime: "zeus" })}
-                className={cn(
-                  "inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition-colors",
-                  agentRuntime === "zeus" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
-                )}
-              >
-                <Icon name="bolt" size={13} />
-                Harness²
-              </button>
-              <button
-                onClick={() => patchSettings({ agentRuntime: "opencode" })}
-                className={cn(
-                  "inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition-colors",
-                  agentRuntime === "opencode" ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface"
-                )}
-              >
-                <Icon name="terminal" size={13} />
-                OpenCode SDK
-              </button>
-            </div>
             <button
               onClick={() => onOpenDock("files")}
               className="state inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-high px-3 text-xs font-medium text-on-surface"

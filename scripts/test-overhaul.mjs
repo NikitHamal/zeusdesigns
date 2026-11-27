@@ -121,23 +121,26 @@ assert.ok(
 );
 console.log("[PASS] 5. Qwen/ShanNian/Supavip native thinking, multi-turn prompt protection, and Gemini snapshot recovery verified");
 
-// Verify OpenCode SDK zero-dependency client & engine wiring
-const opencodeSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/opencode.ts"), "utf8");
+// Verify unified Zeus Harness² engine: no OpenCode SDK runtime, one loop for native + XML tool models
 const engineSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/engine.ts"), "utf8");
+assert.ok(!fs.existsSync(path.join(process.cwd(), "src/lib/opencode.ts")), "src/lib/opencode.ts (OpenCode SDK client) must be removed");
 assert.ok(
-  opencodeSrc.includes("export function createOpencodeClient") &&
-    opencodeSrc.includes("export async function runOpenCode"),
-  "src/lib/opencode.ts must export createOpencodeClient and runOpenCode"
+  !engineSrc.includes("runOpenCode") && !engineSrc.includes("agentRuntime"),
+  "src/lib/engine.ts must not reference the OpenCode SDK runtime"
 );
 assert.ok(
-  engineSrc.includes("useOpenCodeRuntime") && engineSrc.includes("runOpenCode("),
-  "src/lib/engine.ts must wire settings.agentRuntime === 'opencode' to runOpenCode"
+  !fs.existsSync(path.join(process.cwd(), "src-tauri/src/server_oc_session.rs")),
+  "server_oc_session.rs (OpenCode SDK session bridge) must be removed"
+);
+assert.ok(
+  engineSrc.includes("agent_run") || engineSrc.includes("nativeAgent") || engineSrc.includes("toolsPrompt"),
+  "src/lib/engine.ts must drive the unified Zeus Harness² loop"
 );
 assert.ok(
   engineSrc.includes("isInspectionPrompt") && engineSrc.includes("visibleAnnouncementOnly"),
   "src/lib/engine.ts must preserve final answers after tool execution without false-positive nudges"
 );
-console.log("[PASS] 6. Zero-dependency OpenCode SDK client and post-tool answer preservation verified");
+console.log("[PASS] 6. Unified Zeus Harness² engine (no OpenCode SDK) and post-tool answer preservation verified");
 
 // Verify backtick-quoted tags ("The `<bash>`...", "The `<think>`...", "The `<html>`...") never truncate at "The `"
 assert.ok(
@@ -151,7 +154,6 @@ console.log("[PASS] 7. Inline backtick-quoted tags ('The `<bash>`...') are prote
 const moduleFiles = [
   "src/lib/engine.ts",
   "src/lib/streamParser.ts",
-  "src/lib/opencode.ts",
   "src/lib/demoEngine.ts",
   "src/lib/browserProviders.ts",
   "src/lib/openDesign.ts",

@@ -96,7 +96,7 @@ export function renderOpenCodeSystemGuidance(
       );
     }
   }
-  return `## OpenCode Harness & Tool Discipline\n${instructions.join("\n")}`;
+  return `## Zeus Harness² Tool Discipline\n${instructions.join("\n")}`;
 }
 
 function countOutputLines(text: string): number {

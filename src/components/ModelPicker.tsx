@@ -35,7 +35,6 @@ export function ModelPicker() {
   const settings = useStore((s) => s.settings);
   const patch = useStore((s) => s.patchSettings);
   const patchUI = useStore((s) => s.patchUI);
-  const nativeReady = useStore((s) => s.ui.nativeReady);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -167,15 +166,6 @@ export function ModelPicker() {
                 {verifying ? "Probing…" : "LMFingerprint"}
               </button>
               <span className="flex-1" />
-              {nativeReady && (
-                <div className="flex gap-0.5 rounded-full bg-surface-low p-0.5" title="Agent runtime">
-                  {(["zeus", "opencode"] as const).map((r) => (
-                    <button key={r} onClick={() => patch({ agentRuntime: r })} className={cn("h-7 rounded-full px-3 text-[12px] font-semibold", (settings.agentRuntime ?? "zeus") === r ? "bg-primary text-on-primary" : "text-on-surface-variant")}>
-                      {r === "zeus" ? "Zeus" : "OpenCode"}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
