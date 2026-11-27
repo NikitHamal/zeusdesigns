@@ -2,7 +2,23 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 30 (Latest — 5 New Multi-Turn Flagship Keyless Providers: Claude Fable/Opus/Sonnet, GPT-6.2/6.1, Gemini 4 Ultra 7-Node, Cline/NIM 550B & DeepSeek V4.1/Qwen 4 Max)
+## Session 31 (Latest — OpenCode Coding Harness Parity: `calculateCeiling`, 15k Keep Tail, `ToolOutput` Retention, `MAX_STEPS_PROMPT` Handoff, `CONTINUE_AFTER_OUTPUT_LIMIT`, Doom-Loop Guard & `usesPatch`)
+Goal: Study OpenCode's core harness (`/tmp/opencode/packages/core/src/`) and upgrade `zeusdesigns` (`src/lib/context.ts`, `src/lib/codingHarness.ts`, `src/lib/engine.ts`, `src/lib/tools.ts`, `src/lib/agent.ts`, `src/lib/harness2.ts`, `src-tauri/src/agent.rs`, `src-tauri/src/agent_exec.rs`, `src-tauri/src/providers.rs`) to match OpenCode's coding harness while preserving full compatibility with keyless non-native tool-calling models (`SCRAPER_PROVIDERS` via `<zeus_tool>` XML DSL) and keeping all `.ts`, `.tsx`, and `.rs` files `<= 1,000` lines.
+
+Shipped:
+1. **Fixed Premature Auto-Compaction & Matched OpenCode `SessionCompaction` (`src/lib/context.ts`, `src/lib/engine.ts`, `src/types.ts`)**:
+   - Removed the hardcoded `conv.messages.length >= 14` auto-compaction trigger and the artificial `128,000` token cap on `effectiveBudgetTokens`.
+   - Implemented `calculateCeiling(contextWindow, buffer)` matching OpenCode (`window - max(floor(window * 0.15), window >= 32000 ? 16000 : 0)`, ~85% of the model's real `contextWindow`, and `Infinity` when unknown).
+   - Updated `getContextWindowStats` to anchor on measured provider token usage (`stats.inputTokens` + `stats.outputTokens`) + delta estimation for unmeasured turns, updated `compactConversation` to keep a `15,000`-token recent tail (`COMPACTION_KEEP_TOKENS = 15_000`) instead of a hardcoded 2-message tail, adopted OpenCode's structured summary sections (`Objective`, `Requirements`, `Decisions`, `Work State`, `Next Move`, `Relevant Files`, `Important Context`), and added `isContextOverflowError` overflow recovery in `src/lib/engine.ts`.
+2. **Tool Output Bounding & Retained Full-Output Files (`src-tauri/src/agent_exec.rs`, `src/lib/codingHarness.ts`, `src/lib/harness2.ts`)**:
+   - Matched OpenCode's `ToolOutput` (`TOOL_OUTPUT_MAX_LINES = 2000`, `TOOL_OUTPUT_MAX_BYTES = 50 * 1024`): when any native or `<zeus_tool>` XML tool output exceeds 2,000 lines or 50 KiB, `bound_tool_output_with_retention` writes the full output to `.zeusdesigns/tool-output/tool_<id>.txt` and appends `[showing lines 1-N of M; full output saved to <path>]` so the agent can `read_file` / `search_code` the remainder without losing lines silently.
+3. **Runner Resilience: `MAX_STEPS_PROMPT` Handoff, `CONTINUE_AFTER_OUTPUT_LIMIT` & Doom-Loop Guard (`src/lib/engine.ts`, `src/lib/codingHarness.ts`, `src-tauri/src/agent.rs`, `src-tauri/src/providers.rs`)**:
+   - Injected OpenCode's `MAX_STEPS_PROMPT` on the final tool round (`round >= maxRounds - 1`) and disabled tool execution in both `src-tauri/src/agent.rs` (`tools_disabled_for_max_steps`) and `src-tauri/src/providers.rs` (`!system.contains("CRITICAL - MAXIMUM STEPS REACHED")`) so both native and XML `<zeus_tool>` models produce a structured final summary turn instead of stopping abruptly.
+   - Added `CONTINUE_AFTER_OUTPUT_LIMIT` auto-continuation (up to 2 times) when a stream ends due to output length / unclosed code fences, plus `detectDoomLoop` recovery hints when identical tool calls fail repeatedly.
+4. **OpenCode `system.txt` Guidance & `usesPatch` Model Policy (`src/lib/codingHarness.ts`, `src/lib/tools.ts`, `src/lib/agent.ts`, `src-tauri/src/providers.rs`)**:
+   - Adopted OpenCode's dynamic tool guidance (prefer dedicated `read_file`/`edit_file`/`write_file`/`search_code` over `shell`, never chain noisy `echo "===="` separators, parallelize independent tool calls, investigate unfamiliar files before overwriting) and `usesPatchPolicy` for GPT-5+ models vs `edit_file`/`write_file` for other models.
+
+## Session 30 (5 New Multi-Turn Flagship Keyless Providers: Claude Fable/Opus/Sonnet, GPT-6.2/6.1, Gemini 4 Ultra 7-Node, Cline/NIM 550B & DeepSeek V4.1/Qwen 4 Max)
 Goal: Add 5 fresh, highly reliable, multi-turn keyless flagship providers covering the Gemini 4 family, GPT-6+ families, Claude Fable/Opus/Sonnet flagships, NVIDIA NIM 550B / Cline Bot, and DeepSeek V4.1 / Qwen 4 Max / GLM 5.3 while keeping memory strictly `< 20 MB` and all `.ts`/`.tsx`/`.rs` files `<= 1,000` lines.
 
 Shipped:

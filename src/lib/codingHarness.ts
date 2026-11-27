@@ -299,7 +299,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
 
   const preferBashPython = style === "bash_python_first" || family === "mercury" || family === "gemini" || family === "nemotron";
   const maxToolRounds = style === "guided_compact" ? 20 : 40;
-  const maxToolOutputChars = style === "guided_compact" ? 32000 : 64000;
+  const maxToolOutputChars = style === "guided_compact" ? 32000 : TOOL_OUTPUT_MAX_BYTES;
   const allowMultiToolPerTurn = style !== "guided_compact";
   const defaultEffort: Effort =
     family === "mercury" || family === "deepseek" || family === "kimi" || family === "claude" || family === "gpt"
@@ -307,7 +307,6 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
       : "medium";
 
   const usesPatch = usesPatchPolicy(modelId, providerId);
-  const maxToolOutputChars = style === "guided_compact" ? 32000 : TOOL_OUTPUT_MAX_BYTES;
   const familyDirective = buildFamilyDirective(family, modelLabel, nativeToolProtocol);
   const workflowDirective = [
     buildWorkflowDirective(style, family, nativeToolProtocol),
