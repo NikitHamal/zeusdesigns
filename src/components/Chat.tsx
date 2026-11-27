@@ -7,14 +7,16 @@ import { supportsAttachments } from "../lib/providers";
 import { ModelPicker } from "./ModelPicker";
 import { focusArtboard } from "../lib/actions";
 import {
+  nativeCheckpoints,
   nativeMemory,
   openWorkspace,
   openWorkspaceByPath,
+  refreshTree,
 } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
-import { Collapse, LiveStatus, WorkLog } from "./Activity";
+import { AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
 import { FilesPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
@@ -155,10 +157,16 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
       </div>
     );
   }
+  const activeConvId = useStore((s) => s.activeConvId);
+  const ws = useStore((s) => s.ui.workspace);
+  const patchUI = useStore((s) => s.patchUI);
+
   return (
     <div className="anim-pop group min-w-0 space-y-2.5">
+      {m.plan && <PlanTimeline plan={m.plan} />}
       <WorkLog m={m} />
       {shown.text && <div className={cn(m.streaming && "caret")}><Markdown text={shown.text} /></div>}
+      {m.pendingQuestion && <AskUserCard convId={activeConvId} msgId={m.id} pending={m.pendingQuestion} />}
       {shown.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${i}`} streaming={m.streaming} />)}
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
@@ -179,6 +187,23 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
         <div className="flex items-center gap-1 text-xs text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100">
           <IconBtn label="Copy" size={28} onClick={() => { navigator.clipboard.writeText(m.text); notify("Copied"); }}><Icon name="content_copy" size={13} /></IconBtn>
           <IconBtn label="Retry" size={28} onClick={() => retry(m)}><Icon name="refresh" size={13} /></IconBtn>
+          {m.checkpointId && ws?.root && (
+            <IconBtn
+              label="Restore file checkpoint before this turn"
+              size={28}
+              onClick={async () => {
+                if (!ws?.root || !m.checkpointId) return;
+                const res = await nativeCheckpoints.restore(ws.root, m.checkpointId);
+                if (res) {
+                  const tree = await refreshTree(ws);
+                  patchUI({ workspace: { ...ws, tree } });
+                  notify(`Restored ${res.restoredFiles.length} file${res.restoredFiles.length === 1 ? "" : "s"}`);
+                }
+              }}
+            >
+              <Icon name="history" size={13} />
+            </IconBtn>
+          )}
           {isLast && (
             <IconBtn
               label="Continue generation"

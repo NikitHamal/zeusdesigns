@@ -4,11 +4,13 @@ import type { FileNode } from "../types";
 import { focusArtboard } from "../lib/actions";
 import {
   listWorkspaceDir,
+  nativeCheckpoints,
   nativeShell,
   openWorkspace,
   readWorkspaceFile,
   refreshTree,
   writeWorkspaceFile,
+  type NativeCheckpointManifest,
 } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { IconBtn } from "./ui";
@@ -106,6 +108,14 @@ export function FilesPanel() {
   const [creatingFile, setCreatingFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showCheckpoints, setShowCheckpoints] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<NativeCheckpointManifest[]>([]);
+
+  const loadCheckpoints = async () => {
+    if (!ws?.root) return;
+    const list = await nativeCheckpoints.list(ws.root);
+    setCheckpoints(list);
+  };
 
   const openFolder = () =>
     openWorkspace()
@@ -206,6 +216,18 @@ export function FilesPanel() {
           <div className="truncate text-[13px] font-semibold text-on-surface">{ws.name}</div>
           {ws.root && <div className="truncate font-mono text-[10.5px] text-on-surface-variant">{ws.root}</div>}
         </div>
+        <IconBtn
+          label="Checkpoints"
+          size={28}
+          active={showCheckpoints}
+          onClick={() => {
+            const next = !showCheckpoints;
+            setShowCheckpoints(next);
+            if (next) void loadCheckpoints();
+          }}
+        >
+          <Icon name="history" size={15} />
+        </IconBtn>
         <IconBtn label="New file" size={28} onClick={() => setCreatingFile(!creatingFile)}>
           <Icon name="add" size={16} />
         </IconBtn>
@@ -216,6 +238,52 @@ export function FilesPanel() {
           <Icon name="create_new_folder" size={15} />
         </IconBtn>
       </div>
+
+      {showCheckpoints && (
+        <div className="max-h-52 space-y-1.5 overflow-y-auto border-b border-outline-variant/60 bg-surface-low px-3 py-2">
+          <div className="flex items-center justify-between text-[11.5px] font-semibold text-on-surface">
+            <span>Checkpoints ({checkpoints.length})</span>
+            <button
+              onClick={() => void loadCheckpoints()}
+              className="state text-[11px] font-medium text-primary"
+            >
+              Refresh
+            </button>
+          </div>
+          {checkpoints.length === 0 ? (
+            <div className="py-2 text-xs text-on-surface-variant">No file checkpoints recorded yet</div>
+          ) : (
+            checkpoints.map((cp) => (
+              <div
+                key={cp.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant/50 bg-surface px-2.5 py-1.5 text-xs"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-[11.5px] font-medium text-on-surface">{cp.label}</div>
+                  <div className="truncate text-[10.5px] text-on-surface-variant">
+                    {cp.files.map((f) => f.path).join(", ")}
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!ws?.root) return;
+                    const res = await nativeCheckpoints.restore(ws.root, cp.id);
+                    if (res) {
+                      const tree = await refreshTree(ws);
+                      patchUI({ workspace: { ...ws, tree } });
+                      notify(`Restored ${res.restoredFiles.length} file${res.restoredFiles.length === 1 ? "" : "s"}`);
+                      void loadCheckpoints();
+                    }
+                  }}
+                  className="state shrink-0 rounded-lg bg-surface-high px-2.5 py-1 text-[11px] font-semibold text-on-surface"
+                >
+                  Restore
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {creatingFile && (
         <div className="flex items-center gap-1.5 border-b border-outline-variant/60 bg-surface-low px-3 py-2">

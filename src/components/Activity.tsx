@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../store";
-import type { Message, ToolCall } from "../types";
+import type { AgentPlan, Message, PendingUserQuestion, PlanTask, ToolCall } from "../types";
+import { sendMessage } from "../lib/engine";
+import { DiffUtils, ToolAliases, type ComputedDiff } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
 import { Markdown } from "./MarkdownView";
@@ -28,136 +30,92 @@ function secs(ms?: number) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tools Metadata, Icons & Diff Formatting                             */
+/* Stormy ToolPresentation (ToolPresentation.kt)                       */
 /* ------------------------------------------------------------------ */
-const TOOL_LABEL: Record<string, string> = {
-  design_lint: "Enforced design system & tokens",
-  design_audit: "Audited layout geometry",
-  design_repair: "Refined screen layout",
-  context_compact: "Compacted conversation context",
-  auto_continue: "Continued truncated stream",
-  read_file: "Read file",
-  read: "Read file",
-  cat: "Read file",
-  write_file: "Created file",
-  write: "Created file",
-  create_file: "Created file",
-  delete_file: "Deleted file",
-  remove_file: "Deleted file",
-  rm: "Deleted file",
-  del: "Deleted file",
-  unlink: "Deleted file",
-  edit_file: "Edited file",
-  edit: "Edited file",
-  patch_file: "Edited file",
-  list_dir: "Listed folder",
-  ls: "Listed folder",
-  load_skill: "Loaded skill",
-  skill: "Loaded skill",
-  subagent: "Ran subagent",
-  task: "Ran subagent",
-  studio_brief: "Prepared design brief",
-  studio_palette: "Built tonal palette",
-  studio_contrast: "Verified WCAG contrast",
-  studio_fonts: "Selected font pairing",
-  studio_icons: "Resolved Material Symbols",
-  studio_components: "Loaded component kit",
-  studio_tokens: "Loaded design tokens",
-  studio_systems: "Listed design systems",
-  studio_screens: "Inspected canvas screens",
-  studio_read_screen: "Read screen markup",
-  studio_lint: "Linted screen markup",
-  studio_svg_chart: "Generated SVG chart",
-  studio_blueprint: "Loaded screen blueprint",
-  studio_export_react: "Exported React TSX",
-  studio_insert_block: "Inserted UI component block",
-  studio_patch_screen: "Patched screen element",
-  studio_batch_patch: "Patched elements across all screens",
-  studio_create_frame: "Created screen frame",
-  studio_clone_screen: "Cloned screen variant",
-  studio_inspect_dom: "Inspected DOM layer hierarchy",
-  studio_arrange_canvas: "Arranged canvas screens",
-  studio_retheme_page: "Applied design system theme",
-  search_code: "Searched codebase",
-  grep: "Searched codebase",
-  rg: "Searched codebase",
-  shell: "Executed command",
-  bash: "Executed bash command",
-  python: "Executed Python script",
-  python3: "Executed Python script",
-  web_fetch: "Fetched reference page",
-  memory: "Saved to memory",
-  memory_search: "Fetched memory",
-  memory_list: "Listed memory",
-  memory_get: "Read memory",
-  memory_save: "Saved to memory",
-  memory_add: "Saved to memory",
-  memory_edit: "Updated memory",
-  memory_update: "Updated memory",
-  memory_delete: "Deleted memory",
-  memory_remove: "Deleted memory",
+export type ToolDetailKind = "Diff" | "Code" | "Listing" | "Terminal" | "Prose";
+
+export interface ToolPresentation {
+  running: string;
+  done: string;
+  icon: string;
+  subjectIsPath: boolean;
+  detail: ToolDetailKind;
+}
+
+const PRESENTATIONS: Record<string, ToolPresentation> = {
+  read_file: { running: "Reading", done: "Read", icon: "description", subjectIsPath: true, detail: "Code" },
+  list_files: { running: "Listing", done: "Listed", icon: "folder_open", subjectIsPath: true, detail: "Listing" },
+  glob: { running: "Matching", done: "Matched", icon: "manage_search", subjectIsPath: false, detail: "Listing" },
+  grep: { running: "Grepping for", done: "Found", icon: "find_in_page", subjectIsPath: false, detail: "Listing" },
+  search_project: { running: "Searching project", done: "Searched project", icon: "travel_explore", subjectIsPath: false, detail: "Listing" },
+  write_file: { running: "Writing", done: "Wrote", icon: "edit_note", subjectIsPath: true, detail: "Diff" },
+  edit_file: { running: "Editing", done: "Edited", icon: "difference", subjectIsPath: true, detail: "Diff" },
+  multi_edit: { running: "Editing", done: "Edited", icon: "difference", subjectIsPath: true, detail: "Diff" },
+  delete_file: { running: "Deleting", done: "Deleted", icon: "delete", subjectIsPath: true, detail: "Terminal" },
+  move_file: { running: "Moving", done: "Moved", icon: "drive_file_move", subjectIsPath: true, detail: "Terminal" },
+  check_syntax: { running: "Auditing", done: "Audited", icon: "bug_report", subjectIsPath: true, detail: "Terminal" },
+  docs_lookup: { running: "Checking docs", done: "Checked docs", icon: "menu_book", subjectIsPath: false, detail: "Prose" },
+  use_skill: { running: "Loading skill", done: "Loaded skill", icon: "auto_awesome_motion", subjectIsPath: false, detail: "Prose" },
+  web_fetch: { running: "Fetching", done: "Fetched", icon: "link", subjectIsPath: false, detail: "Prose" },
+  run_command: { running: "Running", done: "Ran", icon: "terminal", subjectIsPath: false, detail: "Terminal" },
+  python: { running: "Running Python", done: "Ran Python", icon: "code", subjectIsPath: false, detail: "Terminal" },
+  memory_save: { running: "Saving note", done: "Noted", icon: "psychology", subjectIsPath: false, detail: "Prose" },
+  memory_search: { running: "Recalling", done: "Recalled", icon: "psychology", subjectIsPath: false, detail: "Prose" },
+  memory_edit: { running: "Updating note", done: "Updated note", icon: "psychology", subjectIsPath: false, detail: "Prose" },
+  memory_delete: { running: "Removing note", done: "Removed note", icon: "psychology", subjectIsPath: false, detail: "Prose" },
+  update_plan: { running: "Planning", done: "Updated plan", icon: "checklist", subjectIsPath: false, detail: "Prose" },
+  ask_user: { running: "Asking", done: "Asked", icon: "help", subjectIsPath: false, detail: "Prose" },
+  spawn_subagent: { running: "Delegating", done: "Delegated", icon: "call_split", subjectIsPath: false, detail: "Prose" },
+  lmfingerprint: { running: "Verifying model", done: "Verified model", icon: "verified", subjectIsPath: false, detail: "Terminal" },
+  context_compact: { running: "Compacting context", done: "Compacted context", icon: "inventory_2", subjectIsPath: false, detail: "Prose" },
+  auto_continue: { running: "Continuing stream", done: "Continued stream", icon: "autorenew", subjectIsPath: false, detail: "Terminal" },
+  design_audit: { running: "Auditing layout", done: "Audited layout", icon: "straighten", subjectIsPath: true, detail: "Terminal" },
+  design_repair: { running: "Repairing layout", done: "Repaired layout", icon: "build", subjectIsPath: true, detail: "Terminal" },
+  studio_retheme_page: { running: "Applying theme", done: "Applied theme", icon: "palette", subjectIsPath: false, detail: "Terminal" },
 };
 
-const TOOL_RUNNING: Record<string, string> = {
-  design_lint: "Enforcing design system & tokens…",
-  design_audit: "Auditing layout geometry…",
-  design_repair: "Refining screen layout…",
-  context_compact: "Compacting conversation context…",
-  auto_continue: "Continuing truncated stream…",
-  read_file: "Reading file…",
-  read: "Reading file…",
-  write_file: "Writing file…",
-  write: "Writing file…",
-  edit_file: "Editing file…",
-  edit: "Editing file…",
-  delete_file: "Deleting file…",
-  list_dir: "Listing folder…",
-  ls: "Listing folder…",
-  studio_brief: "Preparing design brief…",
-  studio_palette: "Building tonal palette…",
-  studio_contrast: "Checking contrast…",
-  studio_fonts: "Selecting font pairing…",
-  studio_icons: "Resolving Material Symbols…",
-  studio_components: "Loading component kit…",
-  studio_tokens: "Loading design tokens…",
-  studio_lint: "Linting screen…",
-  studio_blueprint: "Loading blueprint…",
-  studio_insert_block: "Inserting UI component…",
-  studio_patch_screen: "Patching screen element…",
-  studio_arrange_canvas: "Arranging canvas…",
-  studio_retheme_page: "Applying design system…",
-  search_code: "Searching codebase…",
-  grep: "Searching codebase…",
-  rg: "Searching codebase…",
-  shell: "Running command…",
-  bash: "Running bash command…",
-  python: "Running Python script…",
-  python3: "Running Python script…",
-  web_fetch: "Fetching page…",
-  memory: "Saving memory…",
-  memory_search: "Fetching memory…",
-  memory_list: "Listing memory…",
-  memory_get: "Reading memory…",
-  memory_save: "Saving memory…",
-  memory_add: "Saving memory…",
-  memory_edit: "Updating memory…",
-  memory_update: "Updating memory…",
-  memory_delete: "Deleting memory…",
-  memory_remove: "Deleting memory…",
-};
+export function getToolPresentation(rawName: string): ToolPresentation {
+  if (rawName.startsWith("mcp:")) {
+    return {
+      running: "Calling MCP",
+      done: "Called MCP",
+      icon: "extension",
+      subjectIsPath: false,
+      detail: "Code",
+    };
+  }
+  if (rawName.startsWith("studio_")) {
+    const clean = rawName.replace(/^studio_/, "").replace(/_/g, " ");
+    return {
+      running: `Studio ${clean}`,
+      done: `Studio ${clean}`,
+      icon: "design_services",
+      subjectIsPath: false,
+      detail: "Terminal",
+    };
+  }
+  const canon = ToolAliases.canonicalName(rawName);
+  return (
+    PRESENTATIONS[canon] ??
+    PRESENTATIONS[rawName] ?? {
+      running: `Running ${rawName.replace(/_/g, " ")}`,
+      done: `Ran ${rawName.replace(/_/g, " ")}`,
+      icon: "build",
+      subjectIsPath: false,
+      detail: "Terminal",
+    }
+  );
+}
 
-function toolIconName(name: string): string {
-  if (/^(read_file|read|cat|view_file|open_file)$/.test(name)) return "description";
-  if (/^(write_file|write|create_file|save_file)$/.test(name)) return "note_add";
-  if (/^(edit_file|edit|patch_file|replace_in_file)$/.test(name)) return "edit_note";
-  if (/^(delete_file|remove_file|rm|del|unlink)$/.test(name)) return "delete";
-  if (/^(search_code|grep|rg|search|ripgrep)$/.test(name)) return "search";
-  if (/^(list_dir|ls|dir|glob|find_files)$/.test(name)) return "folder_open";
-  if (/^(shell|bash|sh|cmd|terminal|exec|run)$/.test(name)) return "terminal";
-  if (/^(python|python3|py)$/.test(name)) return "code";
-  if (name.startsWith("memory")) return "psychology";
-  if (name.startsWith("studio_")) return "design_services";
-  return "build";
+export function shortenPath(raw: string, maxLen = 42): string {
+  const clean = raw.trim().replace(/\\/g, "/");
+  if (clean.length <= maxLen) return clean;
+  const parts = clean.split("/").filter(Boolean);
+  if (parts.length <= 2) return `...${clean.slice(-(maxLen - 3))}`;
+  const file = parts[parts.length - 1];
+  const parent = parts[parts.length - 2];
+  const tail = `${parent}/${file}`;
+  return tail.length <= maxLen ? `.../${tail}` : `.../${file.slice(-(maxLen - 4))}`;
 }
 
 export function toolTitle(name: string, running = false): { label: string; sub?: string; icon: string } {
@@ -165,164 +123,413 @@ export function toolTitle(name: string, running = false): { label: string; sub?:
     const [, server, ...tool] = name.split(":");
     return { label: tool.join(":") || name, sub: server.replace(/^mcp-/, ""), icon: "extension" };
   }
+  const pres = getToolPresentation(name);
   return {
-    label: (running && TOOL_RUNNING[name]) || TOOL_LABEL[name] || name.replace(/_/g, " "),
-    icon: toolIconName(name),
+    label: running ? `${pres.running}…` : pres.done,
+    icon: pres.icon,
   };
 }
 
-function parseToolPayload(t: ToolCall): {
-  primaryArg: string;
+interface ParsedToolEntry {
+  subject: string;
   body: string;
-  diffStats?: { added: number; removed: number };
-  diffLines?: { kind: "add" | "del" | "ctx" | "hdr"; text: string }[];
-} {
+  additions: number;
+  deletions: number;
+  computedDiff: ComputedDiff | null;
+  meta: string;
+}
+
+function parseToolEntry(t: ToolCall, pres: ToolPresentation): ParsedToolEntry {
   let path = "";
   let body = "";
   try {
     const j = JSON.parse(t.args ?? "{}");
-    path = String(j.path || j.file || j.name || j.query || "").trim();
+    path = String(
+      j.path || j.file || j.source || j.pattern || j.query || j.url || j.name || ""
+    ).trim();
     body = String(j.body || j.content || j.command || j.script || "").trim();
   } catch {
     body = (t.args ?? "").trim();
   }
 
-  const primaryArg =
+  const canon = ToolAliases.canonicalName(t.name);
+  const rawSubject =
     path ||
-    (/^(shell|bash|python|python3|search_code|grep|rg)$/.test(t.name)
-      ? body.split("\n")[0]?.slice(0, 80) ?? ""
-      : body.slice(0, 60));
+    (["run_command", "python", "grep", "glob", "search_project"].includes(canon)
+      ? body.split("\n")[0]?.slice(0, 72) ?? ""
+      : body.slice(0, 56));
+  const subject = pres.subjectIsPath && rawSubject ? shortenPath(rawSubject) : rawSubject;
 
-  // Parse SEARCH/REPLACE hunks for edit_file so the user can inspect exact +/- line changes
-  if (/^(edit_file|edit|patch_file|replace_in_file)$/.test(t.name) && body.includes("=======")) {
-    const diffLines: { kind: "add" | "del" | "ctx" | "hdr"; text: string }[] = [];
-    let added = 0;
-    let removed = 0;
-    const lines = body.replace(/\r\n/g, "\n").split("\n");
-    let state: "outside" | "search" | "replace" = "outside";
-    for (const line of lines) {
-      if (/^<{4,}/.test(line.trim())) {
-        state = "search";
-        continue;
+  // 1. Exact before/after diff from native checkpoint capture
+  if (t.oldContent !== undefined || t.newContent !== undefined) {
+    const computedDiff = DiffUtils.computeDiff(t.oldContent ?? "", t.newContent ?? "", 3);
+    return {
+      subject,
+      body,
+      additions: t.additions ?? computedDiff.additions,
+      deletions: t.deletions ?? computedDiff.deletions,
+      computedDiff,
+      meta: "",
+    };
+  }
+
+  // 2. Fallback diff for SEARCH/REPLACE blocks or JSON old_string/new_string
+  if ((canon === "edit_file" || canon === "multi_edit") && body) {
+    if (body.includes("=======")) {
+      const diffLines: ComputedDiff["lines"] = [];
+      let additions = 0;
+      let deletions = 0;
+      let state: "outside" | "search" | "replace" = "outside";
+      for (const line of body.replace(/\r\n/g, "\n").split("\n")) {
+        if (/^<{4,}/.test(line.trim())) {
+          state = "search";
+          continue;
+        }
+        if (/^={4,}/.test(line.trim())) {
+          state = "replace";
+          continue;
+        }
+        if (/^>{4,}/.test(line.trim())) {
+          state = "outside";
+          continue;
+        }
+        if (state === "search") {
+          deletions++;
+          diffLines.push({ kind: "del", text: `-${line}` });
+        } else if (state === "replace") {
+          additions++;
+          diffLines.push({ kind: "add", text: `+${line}` });
+        }
       }
-      if (/^={4,}/.test(line.trim())) {
-        state = "replace";
-        continue;
+      if (additions > 0 || deletions > 0) {
+        return {
+          subject,
+          body,
+          additions,
+          deletions,
+          computedDiff: { additions, deletions, lines: diffLines },
+          meta: "",
+        };
       }
-      if (/^>{4,}/.test(line.trim())) {
-        state = "outside";
-        continue;
+    } else if (body.startsWith("{") && body.endsWith("}")) {
+      try {
+        const j = JSON.parse(body);
+        const oldS = String(j.old_string ?? j.oldString ?? "");
+        const newS = String(j.new_string ?? j.newString ?? "");
+        if (oldS || newS) {
+          const computedDiff = DiffUtils.computeDiff(oldS, newS, 3);
+          return {
+            subject,
+            body,
+            additions: computedDiff.additions,
+            deletions: computedDiff.deletions,
+            computedDiff,
+            meta: "",
+          };
+        }
+      } catch {
+        /* ignore */
       }
-      if (state === "search") {
-        removed++;
-        diffLines.push({ kind: "del", text: `- ${line}` });
-      } else if (state === "replace") {
-        added++;
-        diffLines.push({ kind: "add", text: `+ ${line}` });
-      }
-    }
-    if (added > 0 || removed > 0) {
-      return { primaryArg, body, diffStats: { added, removed }, diffLines };
     }
   }
 
-  if (/^(write_file|write|create_file)$/.test(t.name) && body) {
-    const lineCount = body.split("\n").length;
-    return { primaryArg, body, diffStats: { added: lineCount, removed: 0 } };
+  if (canon === "write_file" && body) {
+    const computedDiff = DiffUtils.computeDiff("", body, 3);
+    return {
+      subject,
+      body,
+      additions: computedDiff.additions,
+      deletions: 0,
+      computedDiff,
+      meta: "",
+    };
   }
 
-  return { primaryArg, body };
+  let meta = "";
+  if (t.status === "ok" && t.output) {
+    const outLines = t.output.trim().split("\n").filter(Boolean);
+    if (pres.detail === "Code") {
+      meta = `${outLines.length} lines`;
+    } else if (pres.detail === "Listing") {
+      meta = t.output.includes("(0 ") || t.output.includes("No matches") ? "0 hits" : `${outLines.length} items`;
+    }
+  }
+
+  return {
+    subject,
+    body,
+    additions: t.additions ?? 0,
+    deletions: t.deletions ?? 0,
+    computedDiff: null,
+    meta,
+  };
 }
 
-function ToolRow({ t }: { t: ToolCall }) {
-  const [open, setOpen] = useState(false);
-  const running = t.status === "running";
-  const { label, sub, icon } = toolTitle(t.name, running);
-  const { primaryArg, body, diffStats, diffLines } = parseToolPayload(t);
-  const hasExpandable = Boolean(t.output || diffLines?.length || body);
+/* ------------------------------------------------------------------ */
+/* Stormy ToolDetailSheet / Inspector Modal (ToolCard.kt)              */
+/* ------------------------------------------------------------------ */
+function ToolDetailModal({
+  tool,
+  pres,
+  parsed,
+  onClose,
+}: {
+  tool: ToolCall;
+  pres: ToolPresentation;
+  parsed: ParsedToolEntry;
+  onClose: () => void;
+}) {
+  const notify = useStore((s) => s.notify);
+  const patchUI = useStore((s) => s.patchUI);
+  const [tab, setTab] = useState<"diff" | "new" | "old">("diff");
+
+  const hasDiff = Boolean(parsed.computedDiff && parsed.computedDiff.lines.length > 0);
+  const rawPath = useMemo(() => {
+    try {
+      const j = JSON.parse(tool.args ?? "{}");
+      return String(j.path || j.file || "").trim();
+    } catch {
+      return "";
+    }
+  }, [tool.args]);
+
+  const copyText = (txt: string) => {
+    navigator.clipboard.writeText(txt);
+    notify("Copied to clipboard");
+  };
 
   return (
-    <div className="rounded-xl transition-colors">
-      <button
-        onClick={() => hasExpandable && setOpen(!open)}
-        className={cn(
-          "flex w-full items-center gap-2 rounded-xl px-2 py-1 text-left text-[12.5px]",
-          hasExpandable && "hover:bg-surface-high/60 hover:text-on-surface"
-        )}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[82vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[24px] border border-outline-variant bg-surface text-on-surface"
       >
-        {!running ? (
-          <span className="grid size-4 shrink-0 place-items-center">
-            {t.status === "ok" ? (
-              <Icon name="check" size={13} className="text-tertiary" />
-            ) : (
-              <Icon name="error" size={13} className="text-error" />
+        <div className="flex items-center justify-between gap-3 border-b border-outline-variant/60 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={cn(
+                "grid size-8 shrink-0 place-items-center rounded-xl",
+                tool.status === "error"
+                  ? "bg-error-container text-on-error-container"
+                  : "bg-surface-high text-on-surface-variant"
+              )}
+            >
+              <Icon name={tool.status === "error" ? "error" : pres.icon} size={17} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-on-surface-variant">
+                  {tool.status === "running" ? pres.running : pres.done}
+                </span>
+                {parsed.subject && (
+                  <span className="truncate font-mono text-[13px] font-semibold text-on-surface">
+                    {parsed.subject}
+                  </span>
+                )}
+                {(parsed.additions > 0 || parsed.deletions > 0) && (
+                  <span className="flex items-center gap-1 rounded-full bg-surface-high px-2 py-0.5 font-mono text-[11px] font-semibold">
+                    {parsed.additions > 0 && <span className="text-tertiary">+{parsed.additions}</span>}
+                    {parsed.deletions > 0 && <span className="text-error">-{parsed.deletions}</span>}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            {hasDiff && (tool.newContent || tool.oldContent) && (
+              <div className="flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11.5px] font-medium">
+                {(["diff", "new", "old"] as const).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setTab(k)}
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 capitalize transition-colors",
+                      tab === k ? "bg-surface-high font-semibold text-on-surface" : "text-on-surface-variant"
+                    )}
+                  >
+                    {k}
+                  </button>
+                ))}
+              </div>
             )}
-          </span>
-        ) : (
-          <span className="grid size-4 shrink-0 place-items-center">
-            <Icon name={icon} size={13} className="text-primary" />
-          </span>
-        )}
-        <Icon name={icon} size={13} className="shrink-0 text-on-surface-variant/80" />
-        <span className={cn("shrink-0 font-medium", running ? "zshine" : "text-on-surface-variant")}>
-          {label}
-        </span>
-        {sub && (
-          <span className="shrink-0 rounded-md bg-surface-high px-1.5 py-0.5 text-[11px] text-on-surface-variant/80">
-            {sub}
-          </span>
-        )}
-        {primaryArg && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-on-surface">
-            {primaryArg}
-          </span>
-        )}
-        {!primaryArg && <span className="flex-1" />}
-        {diffStats && (
-          <span className="flex shrink-0 items-center gap-1 font-mono text-[11px]">
-            {diffStats.added > 0 && <span className="text-tertiary">+{diffStats.added}</span>}
-            {diffStats.removed > 0 && <span className="text-error">-{diffStats.removed}</span>}
-          </span>
-        )}
-        {hasExpandable && (
-          <Icon
-            name="expand_more"
-            size={14}
-            className={cn("shrink-0 text-on-surface-variant/70 transition-transform", open && "rotate-180")}
-          />
-        )}
-      </button>
-      <Collapse open={open}>
-        <div className="ml-5 mb-1.5 mt-1 space-y-1.5">
-          {diffLines && diffLines.length > 0 && (
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-outline-variant/45 bg-surface-lowest px-3 py-2 font-mono text-[11.5px] leading-relaxed select-text">
-              {diffLines.map((dl, idx) => (
+            {rawPath && (
+              <button
+                onClick={() => {
+                  patchUI({ leftTab: "files" });
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: rawPath }));
+                  }, 30);
+                  onClose();
+                }}
+                className="state flex h-7 items-center gap-1 rounded-lg bg-surface-high px-2.5 text-xs font-medium text-on-surface"
+              >
+                <Icon name="open_in_new" size={13} />
+                Open file
+              </button>
+            )}
+            <button
+              onClick={() => copyText(tool.newContent || tool.output || parsed.body)}
+              className="state grid size-7 place-items-center rounded-lg bg-surface-high text-on-surface-variant hover:text-on-surface"
+              title="Copy"
+            >
+              <Icon name="content_copy" size={14} />
+            </button>
+            <button
+              onClick={onClose}
+              className="state grid size-7 place-items-center rounded-lg bg-surface-high text-on-surface-variant hover:text-on-surface"
+              title="Close"
+            >
+              <Icon name="close" size={15} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-surface-lowest p-4 font-mono text-[12px] leading-relaxed select-text">
+          {hasDiff && tab === "diff" && parsed.computedDiff ? (
+            <div className="space-y-0.5">
+              {parsed.computedDiff.lines.map((dl, idx) => (
                 <div
                   key={idx}
                   className={cn(
-                    "px-1 -mx-1 rounded-sm",
-                    dl.kind === "add" && "bg-tertiary-container/35 text-tertiary",
-                    dl.kind === "del" && "bg-error-container/35 text-error"
+                    "flex items-baseline gap-2 rounded-sm px-2 py-0.5",
+                    dl.kind === "add" && "bg-tertiary-container/30 text-tertiary",
+                    dl.kind === "del" && "bg-error-container/30 text-error",
+                    dl.kind === "ctx" && "text-on-surface-variant"
                   )}
                 >
-                  {dl.text}
+                  <span className="w-8 shrink-0 select-none text-right text-[10.5px] opacity-55">
+                    {dl.newLine ?? dl.oldLine ?? ""}
+                  </span>
+                  <span className="whitespace-pre-wrap break-all">{dl.text}</span>
                 </div>
               ))}
+            </div>
+          ) : hasDiff && tab === "new" ? (
+            <pre className="whitespace-pre-wrap break-words text-on-surface">
+              {tool.newContent || parsed.body}
             </pre>
-          )}
-          {!diffLines && /^(write_file|write|create_file|python|python3|shell|bash)$/.test(t.name) && body && (
-            <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-outline-variant/45 bg-surface-lowest px-3 py-2 font-mono text-[11.5px] leading-relaxed text-on-surface select-text">
-              {body.slice(0, 4000)}
+          ) : hasDiff && tab === "old" ? (
+            <pre className="whitespace-pre-wrap break-words text-on-surface-variant">
+              {tool.oldContent || "(new file)"}
             </pre>
-          )}
-          {t.output && (
-            <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-outline-variant/40 bg-surface-low px-3 py-2 font-mono text-[11.5px] leading-relaxed text-on-surface-variant select-text">
-              {t.output}
-            </pre>
+          ) : pres.detail === "Listing" && tool.output ? (
+            <div className="space-y-1">
+              {tool.output.split("\n").map((line, i) => {
+                const fileMatch = /^([\w./\\-]+\.[a-z0-9]+)(?::(\d+))?/i.exec(line.trim());
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (fileMatch?.[1]) {
+                        patchUI({ leftTab: "files" });
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: fileMatch[1] }));
+                        }, 30);
+                        onClose();
+                      }
+                    }}
+                    className={cn(
+                      "rounded-lg px-2 py-1",
+                      fileMatch ? "cursor-pointer hover:bg-surface-high text-on-surface" : "text-on-surface-variant"
+                    )}
+                  >
+                    {line}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {parsed.body && pres.detail === "Terminal" && (
+                <div className="rounded-xl border border-outline-variant/50 bg-surface px-3 py-2 text-on-surface">
+                  <span className="mr-2 text-primary">$</span>
+                  {parsed.body}
+                </div>
+              )}
+              {tool.output ? (
+                <pre className="whitespace-pre-wrap break-words text-on-surface-variant">{tool.output}</pre>
+              ) : (
+                <pre className="whitespace-pre-wrap break-words text-on-surface-variant">
+                  {parsed.body || "(no output)"}
+                </pre>
+              )}
+            </div>
           )}
         </div>
-      </Collapse>
+      </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stormy ToolCard (One line: tile, verb, subject, +/- badge)          */
+/* ------------------------------------------------------------------ */
+function ToolCard({ t }: { t: ToolCall }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const running = t.status === "running";
+  const isError = t.status === "error";
+  const pres = getToolPresentation(t.name);
+  const parsed = useMemo(() => parseToolEntry(t, pres), [t, pres]);
+  const hasDetail = Boolean(t.output || parsed.computedDiff || parsed.body);
+
+  return (
+    <>
+      <button
+        onClick={() => hasDetail && setSheetOpen(true)}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] transition-colors",
+          hasDetail && "hover:bg-surface-high/65"
+        )}
+      >
+        <span
+          className={cn(
+            "grid size-7 shrink-0 place-items-center rounded-lg",
+            isError ? "bg-error-container text-on-error-container" : "bg-surface-high text-on-surface-variant"
+          )}
+        >
+          <Icon name={isError ? "error" : pres.icon} size={15} />
+        </span>
+
+        <span className={cn("shrink-0 text-[13px]", running ? "zshine font-medium" : "text-on-surface-variant")}>
+          {running ? pres.running : pres.done}
+        </span>
+
+        {parsed.subject && (
+          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold text-on-surface">
+            {parsed.subject}
+          </span>
+        )}
+        {!parsed.subject && <span className="flex-1" />}
+
+        {parsed.meta && !running && (
+          <span className="shrink-0 font-mono text-[11px] text-on-surface-variant">{parsed.meta}</span>
+        )}
+
+        {(parsed.additions > 0 || parsed.deletions > 0) && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-high px-2 py-0.5 font-mono text-[11px] font-semibold">
+            {parsed.additions > 0 && <span className="text-tertiary">+{parsed.additions}</span>}
+            {parsed.deletions > 0 && <span className="text-error">-{parsed.deletions}</span>}
+          </span>
+        )}
+
+        {hasDetail && (
+          <Icon name="chevron_right" size={15} className="shrink-0 text-on-surface-variant/70" />
+        )}
+      </button>
+
+      {sheetOpen && (
+        <ToolDetailModal
+          tool={t}
+          pres={pres}
+          parsed={parsed}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -331,7 +538,7 @@ function ToolRow({ t }: { t: ToolCall }) {
 /* ------------------------------------------------------------------ */
 function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
   const [open, setOpen] = useState<boolean | null>(null);
-  const shown = open ?? live;
+  const shown = open ?? false;
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (live && shown && body.current) body.current.scrollTop = body.current.scrollHeight;
@@ -346,23 +553,20 @@ function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: n
     <div className="rounded-xl">
       <button
         onClick={() => setOpen(!shown)}
-        className="flex w-full items-center gap-2 rounded-xl px-2 py-1 text-left text-[12.5px] hover:bg-surface-high/60"
+        className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-surface-high/60"
       >
-        {!live ? (
-          <Icon name="check" size={13} className="shrink-0 text-tertiary" />
-        ) : (
-          <Icon name="psychology" size={13} className="shrink-0 text-primary" />
-        )}
-        <Icon name="psychology" size={13} className="shrink-0 text-on-surface-variant/80" />
-        <span className={cn("shrink-0 font-medium", live ? "zshine" : "text-on-surface-variant")}>
-          {live ? "Reasoning…" : `Thought process${ms ? ` · ${secs(ms)}` : ""}`}
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-high text-on-surface-variant">
+          <Icon name="psychology" size={15} className={live ? "text-primary" : "text-on-surface-variant"} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[11.5px] text-on-surface-variant/65">
+        <span className={cn("shrink-0 font-medium", live ? "zshine" : "text-on-surface-variant")}>
+          {live ? "Reasoning" : `Thought${ms ? ` · ${secs(ms)}` : ""}`}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant/75">
           {!shown ? firstLineClean : `${lines.length} line${lines.length === 1 ? "" : "s"}`}
         </span>
         <Icon
           name="expand_more"
-          size={14}
+          size={15}
           className={cn("shrink-0 text-on-surface-variant/70 transition-transform", shown && "rotate-180")}
         />
       </button>
@@ -370,7 +574,7 @@ function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: n
         <div
           ref={body}
           className={cn(
-            "zthink ml-3 mt-1 mb-1.5 max-h-60 overflow-y-auto border-l-2 border-outline-variant/60 pl-3.5 text-[12.5px] leading-relaxed text-on-surface-variant select-text",
+            "zthink ml-4 mt-1 mb-1.5 max-h-60 overflow-y-auto border-l-2 border-outline-variant/60 pl-3.5 text-[12.5px] leading-relaxed text-on-surface-variant select-text",
             live && "zthink-live"
           )}
         >
@@ -382,66 +586,330 @@ function ThinkingBlock({ text, live, ms }: { text: string; live: boolean; ms?: n
 }
 
 /* ------------------------------------------------------------------ */
-/* Work log: reasoning + tool steps, one collapsible group             */
+/* Stormy PlanTimeline (PlanTimeline.kt — Collapsible Checklist)       */
+/* ------------------------------------------------------------------ */
+export function PlanTimeline({ plan }: { plan: AgentPlan }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!plan.tasks.length) return null;
+
+  const doneCount = plan.tasks.filter((t) => t.state === "done").length;
+  const isComplete = doneCount === plan.tasks.length;
+  const activeTask = plan.tasks.find((t) => t.state === "active") ?? plan.tasks.find((t) => t.state === "pending");
+  const fraction = Math.round((doneCount / Math.max(1, plan.tasks.length)) * 100);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="state flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-semibold text-on-surface">
+            {isComplete ? "Plan complete" : activeTask?.title ?? "Planning"}
+          </div>
+          <div className="text-[11.5px] text-on-surface-variant">
+            {doneCount} of {plan.tasks.length} done
+          </div>
+        </div>
+        <Icon
+          name="expand_more"
+          size={16}
+          className={cn("shrink-0 text-on-surface-variant transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+      <div className="h-0.5 w-full bg-surface-highest">
+        <div
+          style={{ width: `${fraction}%` }}
+          className="h-full bg-primary transition-all duration-300"
+        />
+      </div>
+      <Collapse open={expanded}>
+        <div className="space-y-1.5 px-3.5 py-2.5">
+          {plan.tasks.map((task: PlanTask) => (
+            <div key={task.id} className="flex items-start gap-2.5 text-[12.5px]">
+              <span className="mt-0.5 grid size-4 shrink-0 place-items-center">
+                {task.state === "done" ? (
+                  <Icon name="check" size={14} className="text-tertiary" />
+                ) : task.state === "active" ? (
+                  <span className="size-2 rounded-full bg-primary" />
+                ) : task.state === "blocked" ? (
+                  <Icon name="error" size={14} className="text-error" />
+                ) : (
+                  <span className="size-2 rounded-full bg-surface-highest" />
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    task.state === "active" && "font-semibold text-on-surface",
+                    task.state === "done" && "text-on-surface-variant",
+                    task.state === "pending" && "text-on-surface-variant/80",
+                    task.state === "skipped" && "line-through text-on-surface-variant/60",
+                    task.state === "blocked" && "text-error"
+                  )}
+                >
+                  {task.title}
+                </span>
+                {task.note && (
+                  <div className="text-[11px] text-on-surface-variant">{task.note}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stormy AskUserCard (AskUserCard.kt — Interactive Intake Card)       */
+/* ------------------------------------------------------------------ */
+export function AskUserCard({
+  convId,
+  msgId,
+  pending,
+}: {
+  convId: string;
+  msgId: string;
+  pending: PendingUserQuestion;
+}) {
+  const busy = useStore((s) => s.busy);
+  const patchMessage = useStore((s) => s.patchMessage);
+  const [selected, setSelected] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const q of pending.questions) {
+      const rec = q.options.find((o) => o.recommended) ?? q.options[0];
+      if (rec) init[q.id] = rec.label;
+    }
+    return init;
+  });
+  const [customText, setCustomText] = useState("");
+
+  if (pending.answered) return null;
+
+  const submitAnswers = (youDecide = false) => {
+    if (busy) return;
+    patchMessage(convId, msgId, {
+      pendingQuestion: { ...pending, answered: true },
+    });
+    if (youDecide) {
+      sendMessage({ text: "You decide the best options and build it now." });
+      return;
+    }
+    const lines = pending.questions.map((q) => {
+      const ans = selected[q.id] || "You decide";
+      return `- ${q.header ? `${q.header}: ` : ""}${q.question} -> ${ans}`;
+    });
+    if (customText.trim()) {
+      lines.push(`- Additional notes: ${customText.trim()}`);
+    }
+    sendMessage({ text: lines.join("\n") });
+  };
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-low p-3.5">
+      {pending.questions.map((q) => (
+        <div key={q.id} className="space-y-1.5">
+          <div className="text-[13px] font-semibold text-on-surface">
+            {q.header ? `${q.header}: ` : ""}
+            {q.question}
+          </div>
+          {q.options.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {q.options.map((opt) => {
+                const active = selected[q.id] === opt.label;
+                return (
+                  <button
+                    key={opt.label}
+                    onClick={() => setSelected((s) => ({ ...s, [q.id]: opt.label }))}
+                    className={cn(
+                      "state flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      active
+                        ? "border-primary bg-primary-container text-on-primary-container font-semibold"
+                        : "border-outline-variant/60 bg-surface text-on-surface hover:bg-surface-high"
+                    )}
+                  >
+                    {active && <Icon name="check" size={13} />}
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <input
+        value={customText}
+        onChange={(e) => setCustomText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submitAnswers(false);
+          }
+        }}
+        placeholder="Other details…"
+        className="h-8 w-full rounded-xl border border-outline-variant/60 bg-surface px-3 text-xs text-on-surface outline-none focus:border-primary"
+      />
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          disabled={busy}
+          onClick={() => submitAnswers(true)}
+          className="state h-8 rounded-full bg-surface-high px-3.5 text-xs font-medium text-on-surface"
+        >
+          You decide
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => submitAnswers(false)}
+          className="state h-8 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stormy ToolCallGroup (ToolCallGroup.kt — IconTrail & FileChips)     */
 /* ------------------------------------------------------------------ */
 export function WorkLog({ m }: { m: Message }) {
   const tools = m.tools ?? [];
   const boards = useStore((s) => s.artboards);
+  const patchUI = useStore((s) => s.patchUI);
   const live = !!m.streaming;
   const [open, setOpen] = useState<boolean | null>(null);
   const hasBody = !!m.reasoning || tools.length > 0;
   const shown = open ?? live;
+
+  // Compute changed files with +/- badges for Stormy's always-visible ChangedFileChips
+  const changedFiles = useMemo(() => {
+    const byPath = new Map<string, { path: string; additions: number; deletions: number; tool: ToolCall }>();
+    for (const t of tools) {
+      if (t.status !== "ok") continue;
+      const pres = getToolPresentation(t.name);
+      const parsed = parseToolEntry(t, pres);
+      if (parsed.additions > 0 || parsed.deletions > 0) {
+        let rawPath = parsed.subject;
+        try {
+          const j = JSON.parse(t.args ?? "{}");
+          if (j.path || j.file) rawPath = String(j.path || j.file).trim();
+        } catch {
+          /* keep subject */
+        }
+        if (!rawPath) continue;
+        const prev = byPath.get(rawPath);
+        byPath.set(rawPath, {
+          path: rawPath,
+          additions: (prev?.additions ?? 0) + parsed.additions,
+          deletions: (prev?.deletions ?? 0) + parsed.deletions,
+          tool: t,
+        });
+      }
+    }
+    return [...byPath.values()];
+  }, [tools]);
+
+  const trailIcons = useMemo(() => {
+    const distinct: string[] = [];
+    for (const t of tools) {
+      const ic = getToolPresentation(t.name).icon;
+      if (!distinct.includes(ic)) distinct.push(ic);
+      if (distinct.length >= 6) break;
+    }
+    return distinct;
+  }, [tools]);
+
   if (!hasBody) return null;
+
   const failed = tools.filter((t) => t.status === "error").length;
   const thinkLive = live && !!m.reasoning && !m.thinkMs;
   const runningTool = tools.find((t) => t.status === "running");
   const loadingBoard = boards.find((a) => m.artboardIds?.includes(a.id) && a.loading);
 
-  let liveHeader = "Thinking…";
-  if (runningTool) liveHeader = toolTitle(runningTool.name, true).label;
-  else if (loadingBoard) liveHeader = `Designing ${loadingBoard.name}…`;
-  else if (thinkLive) liveHeader = "Reasoning…";
-  else if (live) liveHeader = "Working…";
-
-  const parts = [
-    m.reasoning ? "Reasoning" : "",
-    tools.length ? `${tools.length} step${tools.length > 1 ? "s" : ""}` : "",
-    failed ? `${failed} failed` : "",
-  ].filter(Boolean);
+  let summaryText = "";
+  if (live) {
+    if (runningTool) {
+      const pres = getToolPresentation(runningTool.name);
+      const parsed = parseToolEntry(runningTool, pres);
+      summaryText = parsed.subject ? `${pres.running} ${parsed.subject}…` : `${pres.running}…`;
+    } else if (loadingBoard) {
+      summaryText = `Designing ${loadingBoard.name}…`;
+    } else if (thinkLive) {
+      summaryText = "Reasoning…";
+    } else {
+      summaryText = "Working…";
+    }
+  } else {
+    summaryText = tools.length
+      ? `${tools.length} tool call${tools.length === 1 ? "" : "s"}${m.stats?.ms ? ` · ${secs(m.stats.ms)}` : ""}`
+      : `Thought${m.thinkMs ? ` · ${secs(m.thinkMs)}` : ""}`;
+  }
 
   return (
-    <div className="rounded-2xl border border-outline-variant/55 bg-surface-low/50">
-      <button
-        onClick={() => setOpen(!shown)}
-        className="state flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2 text-left text-[13px]"
-      >
-        {!live && (
+    <div className="space-y-1.5">
+      <div className="rounded-2xl border border-outline-variant/55 bg-surface-low/50">
+        <button
+          onClick={() => setOpen(!shown)}
+          className="state flex w-full items-center gap-2 rounded-2xl px-3.5 py-2 text-left text-[13px]"
+        >
           <Icon
-            name={failed ? "error" : "check"}
-            size={15}
-            className={cn("shrink-0", failed ? "text-error" : "text-tertiary")}
+            name="expand_more"
+            size={16}
+            className={cn("shrink-0 text-on-surface-variant transition-transform", shown && "rotate-180")}
           />
-        )}
-        <span className={cn("font-medium", live ? "zshine" : "text-on-surface")}>
-          {live ? liveHeader : m.stats?.ms ? `Worked for ${secs(m.stats.ms)}` : "Worked"}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] text-on-surface-variant/80">
-          {parts.join(" · ")}
-        </span>
-        <Icon
-          name="expand_more"
-          size={16}
-          className={cn("shrink-0 text-on-surface-variant transition-transform", shown && "rotate-180")}
-        />
-      </button>
-      <Collapse open={shown}>
-        <div className="space-y-1 border-t border-outline-variant/35 px-2.5 pb-2.5 pt-1.5">
-          {m.reasoning && <ThinkingBlock text={m.reasoning} live={thinkLive} ms={m.thinkMs} />}
-          {tools.map((t) => (
-            <ToolRow key={t.id} t={t} />
+          <span className={cn("font-medium", live ? "zshine" : "text-on-surface-variant")}>
+            {summaryText}
+          </span>
+          {failed > 0 && (
+            <span className="rounded-full bg-error-container px-2 py-0.5 text-[11px] font-semibold text-on-error-container">
+              {failed} failed
+            </span>
+          )}
+          <span className="flex-1" />
+          {!shown && trailIcons.length > 0 && (
+            <span className="flex items-center gap-1.5 text-on-surface-variant/70">
+              {trailIcons.map((ic) => (
+                <Icon key={ic} name={ic} size={14} />
+              ))}
+            </span>
+          )}
+        </button>
+
+        <Collapse open={shown}>
+          <div className="space-y-0.5 border-t border-outline-variant/35 px-2 pb-2 pt-1.5">
+            {m.reasoning && <ThinkingBlock text={m.reasoning} live={thinkLive} ms={m.thinkMs} />}
+            {tools.map((t) => (
+              <ToolCard key={t.id} t={t} />
+            ))}
+          </div>
+        </Collapse>
+      </div>
+
+      {changedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {changedFiles.map((cf) => (
+            <button
+              key={cf.path}
+              onClick={() => {
+                patchUI({ leftTab: "files" });
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: cf.path }));
+                }, 30);
+              }}
+              className="state inline-flex items-center gap-1.5 rounded-full border border-outline-variant/60 bg-surface-low px-2.5 py-1 font-mono text-[11.5px] text-on-surface hover:bg-surface-high"
+            >
+              <Icon name="description" size={13} className="text-primary" />
+              <span>{shortenPath(cf.path, 28)}</span>
+              {cf.additions > 0 && <span className="font-semibold text-tertiary">+{cf.additions}</span>}
+              {cf.deletions > 0 && <span className="font-semibold text-error">-{cf.deletions}</span>}
+            </button>
           ))}
         </div>
-      </Collapse>
+      )}
     </div>
   );
 }
