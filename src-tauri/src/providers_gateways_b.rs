@@ -195,19 +195,11 @@ where
                 "https://amirkazim-qwen-7b-chat.hf.space/v1/chat/completions",
                 "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
             ),
-            (
-                "https://agrawal-prateek-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
-                "gemma4-e4b",
-            ),
         ],
         "gemma-4-e2b-q8" => &[
             (
                 "https://rabu1234-gemma-4-e2b-it-gguf.hf.space/v1/chat/completions",
                 "gemma-4-e2b-it-Q8_0.gguf",
-            ),
-            (
-                "https://agrawal-prateek-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
-                "gemma4-e4b",
             ),
         ],
         _ => &[
@@ -218,10 +210,6 @@ where
             (
                 "https://wanyamaelis-qwen3-8-27b.hf.space/v1/chat/completions",
                 "/home/user/.cache/huggingface/hub/models--unsloth--Qwen3.8-27B-GGUF/snapshots/4af51b3542f775b0a8e4b310bfb3f17e01c306c9/Qwen3.8-27B-UD-Q8_K_XL.gguf",
-            ),
-            (
-                "https://amirkazim-qwen-7b-chat.hf.space/v1/chat/completions",
-                "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q5_K_P.gguf",
             ),
         ],
     };
@@ -687,10 +675,6 @@ where
                 "https://usermma-lfm2-5-8b-a1b-abliterated-q3.hf.space/v1/chat/completions",
                 "Huihui-LFM2.5-8B-A1B-abliterated.Q4_K_M.gguf",
             ),
-            (
-                "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf",
-            ),
         ],
         "lfm3-1.7b" => &[
             (
@@ -707,19 +691,11 @@ where
                 "https://apathy-exe-lfm2-5-2-6b.hf.space/v1/chat/completions",
                 "/LFM2.5-2.6B-Q4_K_M.gguf",
             ),
-            (
-                "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf",
-            ),
         ],
         _ => &[
             (
                 "https://apathy-exe-lfm2-5-24b-a2b.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--unsloth--LFM2.5-24B-A2B-GGUF/snapshots/aacc77834f6aa568c93b4dbd6d295059736be98c/LFM2.5-24B-A2B-Q8_0.gguf",
-            ),
-            (
-                "https://apathy-exe-lfm3-1-7b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--LiquidAI--LFM3-1.7B-GGUF/snapshots/cd0c74c575b5c416f3011b5b4c298077f26ca8c2/LFM3-1.7B-QAD-Q4_0.gguf",
             ),
         ],
     };
@@ -741,27 +717,17 @@ where
     let targets: &[(&str, &str)] = match model {
         "koboldcpp/gemma-2-9b-it-Q5_K_M" => &[
             (
-                "https://nxdev-org-koboldcpp-tiefighter.hf.space/v1/chat/completions",
-                "koboldcpp/gemma-3n-E2B-it",
-            ),
-            (
                 "https://nanoph-koboldcpp-tiefighter.hf.space/v1/chat/completions",
                 "koboldcpp/gemma-2-9b-it-Q5_K_M",
             ),
-            (
-                "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
-                "/models/gemma-4-E4B-it-Q4_K_M.gguf",
-            ),
         ],
-        _ => &[
+        "koboldcpp/gemma-3n-E2B-it" => &[
             (
                 "https://nxdev-org-koboldcpp-tiefighter.hf.space/v1/chat/completions",
                 "koboldcpp/gemma-3n-E2B-it",
             ),
-            (
-                "https://will-resolute-gemma4-vision-ui.hf.space/v1/chat/completions",
-                "/models/gemma-4-E4B-it-Q4_K_M.gguf",
-            ),
+        ],
+        _ => &[
             (
                 "https://koboldai-koboldcpp-tiefighter.hf.space/v1/chat/completions",
                 "koboldcpp/Gemma4-E2B",
@@ -786,22 +752,15 @@ where
     let targets: &[(&str, &str)] = match model {
         "bonsai-8b" => &[
             ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
-            (
-                "https://bananamort-ternary-bonsai-2-27b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--prism-ml--Ternary-Bonsai-2-27B-gguf/snapshots/839bd57023c1558945afea70a74fa83c054f35f9/Ternary-Bonsai-2-27B-PTQ1_0.gguf",
-            ),
         ],
         "vibethinker-3b-q4" => &[
             ("https://mikeee-llama-cpp-server.hf.space/v1/chat/completions", "vibethinker-3b-q4"),
-            ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
         ],
         _ => &[
             (
                 "https://bananamort-ternary-bonsai-2-27b.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--prism-ml--Ternary-Bonsai-2-27B-gguf/snapshots/839bd57023c1558945afea70a74fa83c054f35f9/Ternary-Bonsai-2-27B-PTQ1_0.gguf",
             ),
-            ("https://mikeee-bonsai-8b.hf.space/v1/chat/completions", "bonsai-8b"),
-            ("https://mikeee-llama-cpp-server.hf.space/v1/chat/completions", "vibethinker-3b-q4"),
         ],
     };
 
@@ -825,19 +784,11 @@ where
                 "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
                 "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
             ),
-            (
-                "https://bleak-openai-compatible-server.hf.space/v1/chat/completions",
-                "unsloth/Qwen3.5-4B-GGUF:Q6_K",
-            ),
         ],
         "gemma-4-e2b-qat-ud" => &[
             (
                 "https://elseodelasgalletas-gemma4-e2b-qat.hf.space/v1/chat/completions",
                 "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
-            ),
-            (
-                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
-                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
             ),
         ],
         "gemma-4-e2b-q4ks" => &[
@@ -845,23 +796,11 @@ where
                 "https://bleak-openai-compatible-server-gemma4.hf.space/v1/chat/completions",
                 "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S",
             ),
-            (
-                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
-                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
-            ),
         ],
         _ => &[
             (
-                "https://elseodelasgalletas-gemma4-e2b.hf.space/v1/chat/completions",
-                "unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_XL",
-            ),
-            (
-                "https://bleak-openai-compatible-server-gemma4.hf.space/v1/chat/completions",
-                "unsloth/gemma-4-E2B-it-GGUF:Q4_K_S",
-            ),
-            (
-                "https://elseodelasgalletas-gemma4-e2b-qat.hf.space/v1/chat/completions",
-                "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
+                "https://bleak-openai-compatible-server.hf.space/v1/chat/completions",
+                "unsloth/Qwen3.5-4B-GGUF:Q6_K",
             ),
         ],
     };
