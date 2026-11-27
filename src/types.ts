@@ -102,6 +102,11 @@ export interface CheckpointManifest {
 
 export interface Quote { kind: "artboard" | "pin" | "element"; label: string; artboardId?: string; pinId?: string; text?: string }
 
+export type MessagePart =
+  | { type: "reasoning"; text: string; ms?: number }
+  | { type: "text"; text: string }
+  | { type: "tool"; toolId: string };
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -109,6 +114,7 @@ export interface Message {
   quote?: Quote;
   attachments?: Attachment[];
   tools?: ToolCall[];
+  parts?: MessagePart[];
   plan?: AgentPlan;
   pendingQuestion?: PendingUserQuestion;
   pendingApproval?: PendingApproval;

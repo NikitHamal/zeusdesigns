@@ -9,6 +9,7 @@ import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
+import { anchorTools, buildParts, listenLiveShell, type PartAnchors } from "./timeline";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, getCodingHarnessProfile, MAX_STEPS_PROMPT } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook, runPreToolUseHook } from "./harness2";
@@ -217,6 +218,8 @@ export async function sendMessage(opts: {
   let thinkEnd = 0;
   let measuredInputTokens = 0;
   let measuredOutputTokens = 0;
+  const anchors: PartAnchors = new Map();
+  const termSub = listenLiveShell(() => tools, () => sync());
 
   const sync = (final = false) => {
     const parsed = parseStream(extractRemember(full).clean, extraThink);
@@ -278,9 +281,12 @@ export async function sendMessage(opts: {
     const hasUnclosed = final && blocks.some((b) => !b.closed);
     const allBoardIds = [...new Set([...idMap.values(), ...syncedWorkspaceBoardIds])];
     const tokEstimate = measuredOutputTokens || Math.max(1, Math.round((full.length + extraThink.length + tools.reduce((acc, t) => acc + (t.args?.length ?? 0), 0)) / 4));
+    const thinkTotal = thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined;
+    anchorTools(anchors, tools, text.length, reasoning.length);
     S.patchMessage(convId, asstId, {
       reasoning: reasoning || undefined,
-      thinkMs: thinkEnd ? Math.max(1, thinkEnd - thinkT0) : undefined,
+      thinkMs: thinkTotal,
+      parts: buildParts(text, reasoning, thinkTotal, tools, anchors),
       text,
       artboardIds: allBoardIds,
       tools: [...tools],
@@ -305,6 +311,7 @@ export async function sendMessage(opts: {
           }
         }
         sync(true);
+        void termSub.then((off) => off());
         for (const f of extractRemember(full).found) void saveMemory(f.text, f.category);
         const S = useStore.getState();
         for (const id of idMap.values()) S.updateArtboard(id, { loading: false });
