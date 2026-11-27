@@ -137,8 +137,8 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
     : "hybrid_fast";
 
   const preferBashPython = style === "bash_python_first" || family === "mercury" || family === "gemini" || family === "nemotron";
-  const maxToolRounds = style === "guided_compact" ? 16 : 35;
-  const maxToolOutputChars = style === "guided_compact" ? 14000 : 32000;
+  const maxToolRounds = style === "guided_compact" ? 20 : 40;
+  const maxToolOutputChars = style === "guided_compact" ? 32000 : 64000;
   const allowMultiToolPerTurn = style !== "guided_compact";
   const defaultEffort: Effort =
     family === "mercury" || family === "deepseek" || family === "kimi" || family === "claude" || family === "gpt"

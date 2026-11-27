@@ -23,8 +23,6 @@ export function classifyIntent(text: string, ctx: { boards: number; quote?: bool
   if (GREETING_RE.test(t) || CASUAL_CHAT.test(t)) return "chat";
   if (ctx.asVariant || ctx.quote) return "design";
   if (M3E_TRIGGER.test(t)) return "chat";
-  // If the prompt asks for any file, shell, git, code, or deletion action (even alongside a UI/page request), route to `code`
-  // so Zeus Harness² executes all workspace tools first without forcing a design template.
   if (CODE_ASK.test(t) || /\b(delete|remove|rm|unlink|erase)\b/i.test(t) || ctx.workspace) return "code";
   if (DESIGN_ASK.test(t)) return "code";
   if (ctx.boards > 0 && EDIT_CANVAS.test(t) && !NEW_SUBJECT.test(t)) return "design";
@@ -58,7 +56,7 @@ export function agentPrompt(mode: Intent, userText = ""): string {
     mode === "code"
       ? composeHarness2Surface({ profile, workspace: ws, userPrompt: userText })
       : `## Tools
-Use tools when the task needs workspace files, shell/python execution, web pages, or user memory (\`memory_search\`, \`memory_save\`, \`memory_edit\`, \`memory_delete\`). User memory is never preloaded into the prompt—always emit \`<zeus_tool name="memory_search">...</zeus_tool>\` when asked what you remember or know about the user's preferences/projects, and emit \`memory_save\`, \`memory_edit\`, or \`memory_delete\` when asked to record, update, or forget durable facts.`,
+Use tools when the task needs workspace files, shell/python execution, web pages, or user memory (\`memory_search\`, \`memory_save\`, \`memory_edit\`, \`memory_delete\`). User memory is never preloaded into the prompt—always invoke \`memory_search\` when asked what you remember or know about the user's preferences/projects, and invoke \`memory_save\`, \`memory_edit\`, or \`memory_delete\` when asked to record, update, or forget durable facts.`,
     `## Artifacts & OpenDesign Deliverables
 When the user asks for a visual deliverable (an interactive prototype, a HyperFrames code-to-video composition, an Open-Slide 1920x1080 deck, a kinetic motion poster, or a Brand/DESIGN.md specimen), emit it as one complete self-contained HTML document inside <artboard name="Short name" device="web" mode="new"><!doctype html>...</html></artboard> (or write it to an .html file in the workspace). It opens next to the chat in the Zeus Workbench with live preview, Direct DOM Inspector, HyperFrames timeline scrubber, WebM/MP4 video export, and slide deck presenter.`,
     (() => {
@@ -80,8 +78,8 @@ When the user asks for a visual deliverable (an interactive prototype, a HyperFr
         aspect: s.settings.openDesignAspect ?? "16:9",
       });
     })(),
-    spec.isKeylessScraper
-      ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. \`shell\` runs in the user's real shell (Git Bash when installed, else PowerShell 7 or cmd.exe); the working directory persists between calls, commands never get stdin and stop after 5 minutes, so background servers and avoid watch modes. Never claim you lack file, terminal, or python access.`
+    spec.isKeylessScraper && profile.nativeToolProtocol === "scraper_xml_dsl"
+      ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`multi_edit\`, \`search_code\`, \`list_dir\`, \`glob\`, \`grep\`, \`web_fetch\`) are connected and execute after your stream completes via \`<zeus_tool>\` blocks. \`shell\` runs in the user's real shell (Git Bash when installed, else PowerShell 7 or cmd.exe); the working directory persists between calls, commands never get stdin and stop after 5 minutes, so background servers and avoid watch modes. Never claim you lack file, terminal, or python access.`
       : "",
     ws
       ? `## Project\nOpen folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top-level entries: ${topFiles}.`
@@ -95,20 +93,18 @@ When the user asks for a visual deliverable (an interactive prototype, a HyperFr
 
 type Mapped = { role: "user" | "assistant"; content: string; attachments: { name: string; mime: string; dataUrl: string }[] };
 
-/** History without any canvas state, so non-design turns never see artboards. */
+/** History without any canvas state or fake prefill turns, so non-design turns see clean conversation history. */
 export function buildPlainContext(opts: {
   convMessages: Message[];
   userMsg: Message;
   quoteToText: (q: Quote, boards: Artboard[]) => string;
   mode?: Intent;
 }) {
-  const s = useStore.getState();
-  const ws = s.ui.workspace;
   const all = [...opts.convMessages, opts.userMsg].filter((m) => !m.error && (m.text.trim() || m.attachments?.length));
   const messages: Mapped[] = all.map((m) => {
     let content = m.text;
     if (m.quote) content = opts.quoteToText(m.quote, []) + "\n" + content;
-    for (const a of m.attachments ?? []) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 20000)}`;
+    for (const a of m.attachments ?? []) if (a.text) content += `\n\n[Attached file: ${a.name}]\n${a.text.slice(0, 48000)}`;
     if (m.role === "assistant" && m.artboardIds?.length) content += `\n[Opened ${m.artboardIds.length} artifact${m.artboardIds.length > 1 ? "s" : ""} in the preview]`;
     return {
       role: m.role,
@@ -118,40 +114,6 @@ export function buildPlainContext(opts: {
         .map((a) => ({ name: a.name, mime: a.mime, dataUrl: a.dataUrl! })),
     };
   });
-
-  // In `code` mode, prefill a completed `list_dir` tool round BEFORE the final user request
-  // so every model (including web scrapers that ignore `role: "system"`) immediately sees `<zeus_tool>`
-  // active in its own prior assistant turn while keeping the user's request as the final focus.
-  if (opts.mode === "code" && messages.length > 0) {
-    const lastIdx = messages.length - 1;
-    const last = messages[lastIdx];
-    if (last.role === "user") {
-      const dirListing = ws
-        ? ws.tree.length
-          ? ws.tree.slice(0, 60).map((n) => (n.dir ? `${n.name}/` : n.name)).join("\n")
-          : "(workspace connected — use shell/read_file/write_file directly)"
-        : "(current directory connected — use shell/read_file/write_file directly)";
-      messages.splice(
-        lastIdx,
-        1,
-        {
-          role: "user",
-          content: `[XML DSL Output Mode — Required by Client Parser]\nWorkspace${ws?.name ? ` "${ws.name}"` : ""}${ws?.root ? ` (${ws.root})` : ""} is connected. List top-level entries to verify the <zeus_tool> bridge.`,
-          attachments: [],
-        },
-        {
-          role: "assistant",
-          content: `Workspace is connected. I will check the top-level directory listing first.\n<zeus_tool name="list_dir" path=""></zeus_tool>`,
-          attachments: [],
-        },
-        {
-          role: "user",
-          content: `Tool results:\n<tool_result name="list_dir" ok="true">\n${dirListing}\n</tool_result>\n\nUser request: ${last.content}\n(If this request needs a workspace command, file read/write/edit, python script, or memory lookup, emit the required <zeus_tool> XML block in your response; if no workspace tool is needed, answer the user directly.)`,
-          attachments: last.attachments,
-        }
-      );
-    }
-  }
 
   return { messages, themeOverride: null, isCanvasFollowUp: false };
 }
