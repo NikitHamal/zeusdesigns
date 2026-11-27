@@ -2,7 +2,15 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 36 (Latest — OpenCode UI Parity, Real Subagents, Interactive Docks & Patch/Search Tools)
+## Session 37 (Latest — OpenCode SDK Removal, Unified Zeus Harness²)
+Goal: run 100% on the native Rust + TS engine; no OpenCode SDK or `opencode serve`.
+
+Shipped:
+1. Removed `src/lib/opencode.ts`, `server_oc_session.rs` (SDK session bridge, `/event`, `/session*`, `/v1/opencode.json`), `server_opencode_config` / `server_install_opencode` commands, `OcSession` state, `agentRuntime` setting, the Zeus/OpenCode runtime toggles (Model picker footer, Workspace panel) and the Settings "OpenCode Integration" card (replaced by a curl test request). Helpers that were in the bridge file moved to `server_util.rs`. The local `/v1/chat/completions`, `/v1/models`, `/v1/responses`, `/v1/messages` server and the `opencodezen` provider are kept.
+2. `engine.ts` has one loop for native tool-calling and `<zeus_tool>` XML models. `test-overhaul.mjs` check #6 now asserts the SDK runtime is gone.
+3. Session 36 parity work (docks, subagents, review, todo, apply_patch, websearch, diagnostics) audited and unchanged. No local `cargo`: Rust is verified by the Windows CI run.
+
+## Session 36 ( — OpenCode UI Parity, Real Subagents, Interactive Docks & Patch/Search Tools)
 Goal: finish OpenCode parity on top of the Rust agent runtime (`agent_rt.rs`, `agent_sub.rs`, `agent_run.rs`, `agent_patch.rs`, `agent_web.rs`, `agent_diag.rs`) without touching `Composer` or `ModelPicker`.
 
 Shipped:
