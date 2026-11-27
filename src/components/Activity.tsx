@@ -559,7 +559,10 @@ export function ToolRow({ t, compact }: { t: ToolCall; compact?: boolean }) {
   const running = t.status === "running";
   const isError = t.status === "error";
   const pres = getToolPresentation(t.name);
-  const parsed = useMemo(() => parseToolEntry(t, pres), [t, pres]);
+  const parsed = useMemo(
+    () => parseToolEntry(t, pres),
+    [t, t.args, t.status, t.output, t.oldContent, t.newContent, t.additions, t.deletions, pres]
+  );
   const hasDetail = Boolean(t.output || parsed.computedDiff || parsed.body);
   const isShell = pres.detail === "Terminal" && Boolean(parsed.body);
   // Shell output streams open while it runs; any manual toggle wins from then on.

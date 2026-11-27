@@ -289,7 +289,7 @@ export async function sendMessage(opts: {
       parts: buildParts(text, reasoning, thinkTotal, tools, anchors),
       text,
       artboardIds: allBoardIds,
-      tools: [...tools],
+      tools: tools.map((t) => ({ ...t })),
       truncated: hasUnclosed || undefined,
       stats: final
         ? {
