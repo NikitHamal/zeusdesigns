@@ -31,7 +31,7 @@ export function classifyClaimedFamily(provider: string, model: string): string {
   }
   if (s.includes("gemini")) return "Google Gemini Family";
   if (s.includes("gemma")) return "Google Gemma Open-Weights";
-  if (s.includes("claude") || s.includes("sonnet") || s.includes("opus") || s.includes("haiku")) return "Anthropic Claude";
+  if (s.includes("claude") || s.includes("fable") || s.includes("sonnet") || s.includes("opus") || s.includes("haiku")) return "Anthropic Claude";
   if (s.includes("gpt-oss")) return "OpenAI GPT-OSS Open-Weights";
   if (s.includes("gpt-") || s.includes("o3") || s.includes("o4") || s.includes("openai")) return "OpenAI GPT / o-Series";
   if (s.includes("deepseek")) return "DeepSeek";

@@ -10,6 +10,11 @@ namespace zeus {
 
 enum class ProviderFormat {
     SCRAPER_INCEPTION,   // Mercury 3 (chat.inceptionlabs.ai) 1,000-2,000+ tok/s diffusion LLM
+    SCRAPER_CLAUDEFABLE, // Claude Fable 5.2, Opus 5.5 & Sonnet 5.5 Flagship Mesh
+    SCRAPER_GPT6FLAGSHIP,// OpenAI GPT-6.2 Sol, GPT-6.2 Astra & GPT-6.1 Frontier Mesh
+    SCRAPER_GEMINI4ULTRA,// Google Gemini 4 Argon, Carbon, Neon & Hydrogen 7-Node Mesh
+    SCRAPER_CLINEFRONTIER,// Cline Bot & NVIDIA NIM 550B Direct Coding Mesh
+    SCRAPER_DEEPSEEKV4ULTRA,// DeepSeek V4.1 Pro, Qwen 4 Max & GLM 5.3 Flagship Mesh
     SCRAPER_CHATJIMMY,   // ChatJimmy (chatjimmy.ai) 20,000+ tok/s Llama 3.1 8B instant title & micro-task engine
     SCRAPER_MOTIF,       // Motif (chat.motiftech.io) Motif 3 102B / 12.7B Reasoning
     SCRAPER_K2HORIZON,   // K2Horizon (chat.ifm.ai) IFM/K2-Horizon-375B-A23B

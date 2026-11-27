@@ -84,8 +84,10 @@ where
         _ => "gemini-4-hydrogen",
     };
 
-    let targets: [(&str, &str); 2] = [
+    let targets: [(&str, &str); 4] = [
         ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
+        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash"),
+        ("https://peijun1-gemini-web2api1.hf.space/v1/chat/completions", "gemini-3.5-flash"),
         ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
     ];
 
@@ -95,7 +97,7 @@ where
         system,
         messages,
         false,
-        14,
+        11,
         false,
         cancel,
         on_delta,
@@ -126,14 +128,15 @@ where
         system,
         messages,
         true,
-        15,
+        8,
         Some("sk-antigravity"),
         cancel,
         on_delta,
     )
     .or_else(|_| {
         if requested.starts_with("claude-") {
-            stream_claude5proxy("claude-sonnet-5-5", system, messages, cancel, on_delta)
+            stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta)
+                .or_else(|_| stream_claude5proxy("claude-sonnet-5-5", system, messages, cancel, on_delta))
         } else if requested.starts_with("gpt-oss") {
             stream_litellmhub("groq/gpt-oss-120b", system, messages, cancel, on_delta)
         } else {
@@ -263,8 +266,9 @@ where
     F: FnMut(&str),
 {
     let eff_model = match model {
-        "gpt-6-luna" | "gpt-5" | "gpt-5-mini" | "gpt-5-nano" | "gpt-4.1" | "gpt-4.1-mini"
-        | "gpt-4o" | "gpt-4o-mini" | "o3" | "o3-mini" | "o4-mini" => model,
+        "gpt-6.2-sol" | "gpt-6.1-sol" | "gpt-6-astra" | "gpt-6-luna" | "gpt-5" | "gpt-5-mini"
+        | "gpt-5-nano" | "gpt-4.1" | "gpt-4.1-mini" | "gpt-4o" | "gpt-4o-mini" | "o3"
+        | "o3-mini" | "o4-mini" => model,
         _ => "gpt-6-luna",
     };
     let norm_messages = normalize_multi_turn_messages(messages, 64, 36000, 140000);

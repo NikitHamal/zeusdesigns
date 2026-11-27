@@ -403,6 +403,7 @@ where
             || endpoint.contains("api.llm7.io")
             || endpoint.contains("lolmaobruhhh-test")
             || endpoint.contains("mychat-ai.cloud")
+            || endpoint.contains("api.cline.bot")
             || endpoint.contains("vdspcxotxhxfjowqndix.supabase.co")
             || (endpoint.contains("w902287-ai-bridge")
                 && !upstream_model.contains("claude")

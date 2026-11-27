@@ -4,6 +4,11 @@
 import type { ChatRequest } from "./bridge";
 
 export const BROWSER_FALLBACK_PROVIDER_IDS = new Set([
+  "claudefable",
+  "gpt6flagship",
+  "gemini4ultra",
+  "clinefrontier",
+  "deepseekv4ultra",
   "kilo",
   "gemini4hydrogen",
   "antigravity",
@@ -184,6 +189,11 @@ export function resolveBrowserGatewayConfig(
   modelId: string
 ): { baseUrl: string; apiKey: string; format: "openai" | "anthropic"; model: string } {
   const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
+    claudefable: { baseUrl: "https://dherain24-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
+    gpt6flagship: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
+    gemini4ultra: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
+    clinefrontier: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
+    deepseekv4ultra: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "" },
     kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
     nimcloud: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
     colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free" },

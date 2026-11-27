@@ -36,6 +36,11 @@ where
     let primary = req.provider.as_str();
     let res = match primary {
         "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
+        "claudefable" => stream_claudefable(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gpt6flagship" => stream_gpt6flagship(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemini4ultra" => stream_gemini4ultra(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "clinefrontier" => stream_clinefrontier(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "deepseekv4ultra" => stream_deepseekv4ultra(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
         "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),
         "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -355,7 +360,7 @@ pub fn classify_claimed_family(provider: &str, model: &str) -> &'static str {
         "Google Gemini Family"
     } else if s.contains("gemma-4") || s.contains("gemma4") || s.contains("diffusiongemma") || s.contains("gemma") {
         "Google Gemma Open-Weights"
-    } else if s.contains("claude") || s.contains("sonnet") || s.contains("opus") || s.contains("haiku") {
+    } else if s.contains("claude") || s.contains("fable") || s.contains("sonnet") || s.contains("opus") || s.contains("haiku") {
         "Anthropic Claude"
     } else if s.contains("gpt-oss") {
         "OpenAI GPT-OSS Open-Weights"

@@ -289,7 +289,7 @@ pub fn normalize_multi_turn_messages(
 
 
 pub fn catalog() -> Vec<ProviderInfo> {
-    let mut list = Vec::with_capacity(51);
+    let mut list = Vec::with_capacity(56);
     list.extend(catalog_part_1());
     list.extend(catalog_part_2());
     list.extend(catalog_part_3());
@@ -965,4 +965,5 @@ include!("providers_gateways_b.rs");
 include!("providers_oai_a.rs");
 include!("providers_oai_b.rs");
 include!("providers_direct.rs");
+include!("providers_flagships.rs");
 include!("providers_fingerprint.rs");

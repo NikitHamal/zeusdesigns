@@ -50,6 +50,9 @@ export interface CodingHarnessProfile {
 }
 
 const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
+  "gpt6flagship",
+  "clinefrontier",
+  "deepseekv4ultra",
   "mychatcloud",
   "supavip",
   "agnescloud",
@@ -72,6 +75,8 @@ const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
 export function detectNativeToolProtocol(providerId: string, modelId: string): NativeToolProtocol {
   const m = modelId.toLowerCase();
   if (providerId === "freecc") return "anthropic_tool_use";
+  if (providerId === "claudefable") return m === "claude-haiku-5-5" ? "anthropic_tool_use" : "scraper_xml_dsl";
+  if (providerId === "clinefrontier" && (m.includes("grok") || m.includes("kimi"))) return "scraper_xml_dsl";
   if (providerId === "claude5proxy") return m.startsWith("glm-") ? "scraper_xml_dsl" : "anthropic_tool_use";
   if (providerId.startsWith("custom:")) return "openai_tools";
   if (providerId === "aibridge") {
