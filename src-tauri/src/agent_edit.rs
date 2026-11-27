@@ -247,7 +247,75 @@ fn find_marker_line(text: &str, ch: char) -> Option<(usize, usize)> {
 /// Applies one or more `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` blocks (or flexible 4..9 marker variants or JSON `oldString`/`newString` edits),
 /// with automatic line-trimmed fuzzy fallback when exact whitespace differs.
 pub fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
-    let mut unescaped_body = if find_marker_line(body, '<').is_none() && body.contains("\\n") {
+    let raw_trimmed = body.trim();
+    if raw_trimmed.starts_with('{') && raw_trimmed.ends_with('}') {
+        if let Ok(j) = serde_json::from_str::<Value>(raw_trimmed) {
+            let old_s = j
+                .get("old_string")
+                .or_else(|| j.get("oldString"))
+                .or_else(|| j.get("old_str"))
+                .or_else(|| j.get("old_content"))
+                .or_else(|| j.get("old"))
+                .or_else(|| j.get("search"))
+                .or_else(|| j.get("find"))
+                .and_then(|v| v.as_str());
+            let new_s = j
+                .get("new_string")
+                .or_else(|| j.get("newString"))
+                .or_else(|| j.get("new_str"))
+                .or_else(|| j.get("new_content"))
+                .or_else(|| j.get("new"))
+                .or_else(|| j.get("replace"))
+                .or_else(|| j.get("replacement"))
+                .and_then(|v| v.as_str());
+            if let (Some(o), Some(r)) = (old_s, new_s) {
+                let rep_all = j
+                    .get("replace_all")
+                    .or_else(|| j.get("replaceAll"))
+                    .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s.eq_ignore_ascii_case("true"))))
+                    .unwrap_or(false);
+                return apply_stormy_text_edit_impl(content, o, r, rep_all, 1);
+            }
+            if let Some(edits_arr) = j.get("edits").and_then(|v| v.as_array()) {
+                if !edits_arr.is_empty() {
+                    let mut current = content.to_string();
+                    for (idx, ed) in edits_arr.iter().enumerate() {
+                        let eo = ed
+                            .get("old_string")
+                            .or_else(|| ed.get("oldString"))
+                            .or_else(|| ed.get("old_str"))
+                            .or_else(|| ed.get("search"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let er = ed
+                            .get("new_string")
+                            .or_else(|| ed.get("newString"))
+                            .or_else(|| ed.get("new_str"))
+                            .or_else(|| ed.get("replace"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let rep_all = ed.get("replace_all").and_then(|v| v.as_bool()).unwrap_or(false);
+                        current = apply_stormy_text_edit_impl(&current, eo, er, rep_all, idx + 1)?;
+                    }
+                    return Ok(current);
+                }
+            }
+            if let Some(inner_content) = j
+                .get("content")
+                .or_else(|| j.get("body"))
+                .or_else(|| j.get("diff"))
+                .or_else(|| j.get("patch"))
+                .and_then(|v| v.as_str())
+            {
+                if !inner_content.trim().is_empty() {
+                    return apply_search_replace(content, inner_content);
+                }
+            }
+            return Err("edit_file: JSON arguments must include `old_string` and `new_string` (or `content` with a SEARCH/REPLACE block).".to_string());
+        }
+    }
+
+    let mut unescaped_body = if find_marker_line(body, '<').is_none() && body.contains("\\n") && !raw_trimmed.starts_with('{') {
         body.replace("\\r\\n", "\n").replace("\\n", "\n")
     } else {
         body.to_string()
@@ -292,32 +360,8 @@ pub fn apply_search_replace(content: &str, body: &str) -> Result<String, String>
     }
 
     let trimmed = unescaped_body.trim();
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        if let Ok(j) = serde_json::from_str::<Value>(trimmed) {
-            let old_s = j
-                .get("oldString")
-                .or_else(|| j.get("old_str"))
-                .or_else(|| j.get("old_string"))
-                .or_else(|| j.get("search"))
-                .and_then(|v| v.as_str());
-            let new_s = j
-                .get("newString")
-                .or_else(|| j.get("new_str"))
-                .or_else(|| j.get("new_string"))
-                .or_else(|| j.get("replace"))
-                .and_then(|v| v.as_str());
-            if let (Some(o), Some(r)) = (old_s, new_s) {
-                let rep_all = j
-                    .get("replace_all")
-                    .or_else(|| j.get("replaceAll"))
-                    .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s == "true")))
-                    .unwrap_or(false);
-                return apply_stormy_text_edit_impl(&out, o, r, rep_all, 1);
-            }
-        }
-    }
-
     if !trimmed.is_empty()
+        && !trimmed.starts_with('{')
         && !trimmed.contains("<<<<")
         && !trimmed.contains(">>>>")
         && (trimmed.lines().count() >= 2 || content.lines().count() <= 3)

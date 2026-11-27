@@ -155,9 +155,9 @@ export interface StormyToolSpec {
 
 export const STORMY_TOOLS_LIST: StormyToolSpec[] = [
   { name: "read_file", signature: "read_file(path: string, paths?: [string, ...], offset?: int, limit?: int)", summary: "Read a text file from the project (numbered \"<line>|<text>\", up to 8 files via paths).", readOnly: true },
-  { name: "list_files", signature: "list_files(path?: string, depth?: int, symbols?: boolean)", summary: "List files and folders as a tree; with symbols=true adds a one-line symbol outline of each file.", readOnly: true },
+  { name: "list_dir", signature: "list_dir(path?: string, depth?: int, symbols?: boolean)", summary: "List files and folders as a tree (alias: list_files); with symbols=true adds a one-line symbol outline of each file.", readOnly: true },
   { name: "glob", signature: "glob(pattern: string, path?: string)", summary: "Find files by glob pattern (e.g. \"**/*.ts\", \"src/**/*.{js,tsx}\"), most recently modified first.", readOnly: true },
-  { name: "grep", signature: "grep(pattern: string, path?: string, include?: string, ignore_case?: boolean, literal?: boolean)", summary: "Search file contents with a regular expression or literal string across the project.", readOnly: true },
+  { name: "grep", signature: "grep(pattern: string, path?: string, include?: string, ignore_case?: boolean, literal?: boolean)", summary: "Search file contents with a regular expression or literal string across the project (alias: search_code).", readOnly: true },
   { name: "search_project", signature: "search_project(query: string, limit?: int)", summary: "On-device BM25 search over 40-line code chunks with camelCase splitting and synonyms.", readOnly: true },
   { name: "edit_file", signature: "edit_file(path: string, old_string: string, new_string: string, replace_all?: boolean)", summary: "Replace an exact string in a file (or <<<<<<< SEARCH / ======= / >>>>>>> REPLACE block).", readOnly: false },
   { name: "multi_edit", signature: "multi_edit(path: string, edits: [{old_string: string, new_string: string, replace_all?: boolean}, ...])", summary: "Apply several edit_file replacements to one file atomically in order.", readOnly: false },
@@ -166,7 +166,7 @@ export const STORMY_TOOLS_LIST: StormyToolSpec[] = [
   { name: "delete_file", signature: "delete_file(path: string)", summary: "Delete a file or folder from the project.", readOnly: false },
   { name: "check_syntax", signature: "check_syntax(path?: string)", summary: "Static syntax and asset audit of a file or the whole project (HTML, CSS, JS/TS, JSON).", readOnly: true },
   { name: "shell", signature: "shell(command: string)", summary: "Execute a non-interactive bash/cmd command, ripgrep, git, or test suite in the project root.", readOnly: false },
-  { name: "python", signature: "python(script: string)", summary: "Execute a Python 3 script via stdin in the project root for data processing or multi-file refactoring.", readOnly: false },
+  { name: "python", signature: "python(code: string)", summary: "Execute a Python 3 script via stdin in the project root for data processing or multi-file refactoring.", readOnly: false },
   { name: "update_plan", signature: "update_plan(tasks: [{title: string, state: \"pending\"|\"active\"|\"done\"|\"blocked\"|\"skipped\"}])", summary: "Publish or update the live step-by-step plan checklist pinned above the conversation.", readOnly: true },
   { name: "ask_user", signature: "ask_user(questions: [{question: string, header?: string, options?: [{label: string, recommended?: boolean}]}])", summary: "Ask the user 1-4 clarifying questions in an interactive card and wait for answers.", readOnly: true },
   { name: "docs_lookup", signature: "docs_lookup(query: string)", summary: "Look up HTML, CSS, JavaScript, or TypeScript usage patterns in the built-in offline reference.", readOnly: true },

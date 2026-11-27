@@ -403,12 +403,31 @@ pub fn parse_inline_invocations_segment(
                 let has_structured_fields = j.get("edits").is_some()
                     || j.get("old_string").is_some()
                     || j.get("oldString").is_some()
+                    || j.get("old_str").is_some()
+                    || j.get("old_content").is_some()
+                    || j.get("search").is_some()
                     || j.get("source").is_some()
                     || j.get("destination").is_some()
+                    || j.get("old_path").is_some()
+                    || j.get("new_path").is_some()
+                    || j.get("from").is_some()
+                    || j.get("to").is_some()
+                    || j.get("path1").is_some()
+                    || j.get("path2").is_some()
                     || j.get("paths").is_some()
                     || j.get("questions").is_some()
+                    || j.get("question").is_some()
                     || j.get("tasks").is_some()
-                    || j.get("symbols").is_some();
+                    || j.get("plan").is_some()
+                    || j.get("todos").is_some()
+                    || j.get("steps").is_some()
+                    || j.get("symbols").is_some()
+                    || j.get("depth").is_some()
+                    || j.get("append").is_some()
+                    || j.get("limit").is_some()
+                    || j.get("line").is_some()
+                    || j.get("replacement").is_some()
+                    || j.get("agent_type").is_some();
                 if !has_structured_fields {
                     if let Some(c) = j
                         .get("content")
@@ -491,25 +510,69 @@ pub fn parse_inline_invocations_segment(
                     .get("path")
                     .or_else(|| args_obj.get("file"))
                     .or_else(|| args_obj.get("filePath"))
+                    .or_else(|| args_obj.get("file_path"))
+                    .or_else(|| args_obj.get("filepath"))
+                    .or_else(|| args_obj.get("filename"))
+                    .or_else(|| args_obj.get("directory"))
+                    .or_else(|| args_obj.get("dir"))
+                    .or_else(|| args_obj.get("id"))
+                    .or_else(|| args_obj.get("category"))
+                    .or_else(|| args_obj.get("key"))
                     .or_else(|| args_obj.get("url"))
+                    .or_else(|| args_obj.get("uri"))
+                    .or_else(|| args_obj.get("link"))
+                    .or_else(|| args_obj.get("skill"))
+                    .or_else(|| args_obj.get("skill_name"))
                     .and_then(|p| p.as_str())
                     .unwrap_or("")
                     .to_string();
-                let start_line = args_obj.get("start").or_else(|| args_obj.get("offset")).and_then(|x| x.as_u64()).map(|x| x as usize);
-                let end_line = args_obj.get("end").and_then(|x| x.as_u64()).map(|x| x as usize).or_else(|| {
-                    let off = start_line?;
-                    let lim = args_obj.get("limit").and_then(|x| x.as_u64())? as usize;
-                    Some(off + lim.saturating_sub(1))
-                });
+                let start_line = args_obj
+                    .get("start")
+                    .or_else(|| args_obj.get("offset"))
+                    .or_else(|| args_obj.get("start_line"))
+                    .or_else(|| args_obj.get("line_start"))
+                    .or_else(|| args_obj.get("line"))
+                    .and_then(|x| x.as_u64())
+                    .map(|x| x as usize);
+                let end_line = args_obj
+                    .get("end")
+                    .or_else(|| args_obj.get("end_line"))
+                    .or_else(|| args_obj.get("line_end"))
+                    .and_then(|x| x.as_u64())
+                    .map(|x| x as usize)
+                    .or_else(|| {
+                        let off = start_line.unwrap_or(1);
+                        let lim = args_obj.get("limit").and_then(|x| x.as_u64())? as usize;
+                        Some(off + lim.saturating_sub(1))
+                    });
                 let has_structured = args_obj.get("edits").is_some()
                     || args_obj.get("old_string").is_some()
                     || args_obj.get("oldString").is_some()
+                    || args_obj.get("old_str").is_some()
+                    || args_obj.get("old_content").is_some()
+                    || args_obj.get("search").is_some()
                     || args_obj.get("source").is_some()
                     || args_obj.get("destination").is_some()
+                    || args_obj.get("old_path").is_some()
+                    || args_obj.get("new_path").is_some()
+                    || args_obj.get("from").is_some()
+                    || args_obj.get("to").is_some()
+                    || args_obj.get("path1").is_some()
+                    || args_obj.get("path2").is_some()
                     || args_obj.get("paths").is_some()
                     || args_obj.get("questions").is_some()
+                    || args_obj.get("question").is_some()
                     || args_obj.get("tasks").is_some()
-                    || args_obj.get("symbols").is_some();
+                    || args_obj.get("plan").is_some()
+                    || args_obj.get("todos").is_some()
+                    || args_obj.get("steps").is_some()
+                    || args_obj.get("symbols").is_some()
+                    || args_obj.get("depth").is_some()
+                    || args_obj.get("append").is_some()
+                    || args_obj.get("limit").is_some()
+                    || args_obj.get("line").is_some()
+                    || args_obj.get("replacement").is_some()
+                    || args_obj.get("agent_type").is_some();
                 let body = if !has_structured {
                     if let Some(b) = args_obj
                         .get("command")
@@ -954,5 +1017,18 @@ mod tests {
         assert_eq!(parsed[1].path, "index.html");
         assert_eq!(parsed[2].name, "edit_file");
         assert_eq!(parsed[2].path, "b.ts");
+    }
+    #[test]
+    fn test_multiline_json_edit_file_does_not_corrupt_json() {
+        let src = "def compute(a, b):\n    total = a - b\n    return total\n";
+        let tool_json = serde_json::json!({
+            "path": "math.py",
+            "old_string": "def compute(a, b):\n    total = a - b",
+            "new_string": "def compute(a, b):\n    total = a + b"
+        })
+        .to_string();
+        let res = crate::agent_edit::apply_search_replace(src, &tool_json)
+            .expect("multiline JSON edit_file should apply cleanly");
+        assert_eq!(res, "def compute(a, b):\n    total = a + b\n    return total\n");
     }
 }

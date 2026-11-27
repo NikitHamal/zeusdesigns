@@ -332,8 +332,16 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
             }
         }
         "glob" | "find_files" => {
-            let mut pattern = if !path_arg.is_empty() { path_arg.clone() } else { body.to_string() };
-            let mut subpath: Option<String> = None;
+            let mut pattern = if !body.is_empty() && !body.starts_with('{') {
+                body.to_string()
+            } else {
+                path_arg.clone()
+            };
+            let mut subpath: Option<String> = if !body.is_empty() && !body.starts_with('{') && !path_arg.is_empty() {
+                Some(path_arg.clone())
+            } else {
+                None
+            };
             if body.starts_with('{') && body.ends_with('}') {
                 if let Ok(j) = serde_json::from_str::<Value>(body) {
                     if let Some(pat) = j.get("pattern").or_else(|| j.get("glob")).and_then(|v| v.as_str()) {
@@ -659,6 +667,11 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         }
         "search_code" | "grep" | "rg" | "search" | "search_files" | "ripgrep" | "find_in_files" => {
             let mut query = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
+            let mut sub_dir = if !body.is_empty() && !path_arg.is_empty() {
+                path_arg.clone()
+            } else {
+                String::new()
+            };
             if body.starts_with('{') && body.ends_with('}') {
                 if let Ok(j) = serde_json::from_str::<Value>(body) {
                     if let Some(p) = j
@@ -669,17 +682,33 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     {
                         query = p.to_string();
                     }
+                    if let Some(sp) = j.get("path").or_else(|| j.get("directory")).and_then(|v| v.as_str()) {
+                        sub_dir = sp.to_string();
+                    }
                 }
             }
-            let results = search_workspace_code(&eff_root, &query, 30);
+            let search_root = if !sub_dir.trim().is_empty() && sub_dir.trim() != "." {
+                safe_join(&eff_root, sub_dir.trim())
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| eff_root.clone())
+            } else {
+                eff_root.clone()
+            };
+            let results = search_workspace_code(&search_root, &query, 30);
             if results.is_empty() {
                 (true, format!("No matches found for '{}'", query))
             } else {
+                let prefix = if !sub_dir.trim().is_empty() && sub_dir.trim() != "." && search_root != eff_root {
+                    format!("{}/", sub_dir.trim().trim_end_matches('/'))
+                } else {
+                    String::new()
+                };
                 let formatted = results
                     .iter()
                     .filter_map(|r| {
                         Some(format!(
-                            "{}:{}: {}",
+                            "{}{}:{}: {}",
+                            prefix,
                             r.get("path")?.as_str()?,
                             r.get("line")?.as_u64()?,
                             r.get("snippet")?.as_str()?

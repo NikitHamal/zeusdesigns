@@ -22,9 +22,9 @@ fn build_native_oai_agent_tools() -> Value {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "code": { "type": "string", "description": "Python 3 script code to execute" }
-                    },
-                    "required": ["code"]
+                        "code": { "type": "string", "description": "Python 3 script code to execute" },
+                        "script": { "type": "string", "description": "Alias for code: Python 3 script to execute" }
+                    }
                 }
             }
         },
@@ -32,13 +32,16 @@ fn build_native_oai_agent_tools() -> Value {
             "type": "function",
             "function": {
                 "name": "read_file",
-                "description": "Read a file in the project workspace with optional 1-indexed start and end line bounds.",
+                "description": "Read a file in the project workspace with optional 1-indexed start/end or offset/limit line bounds.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "path": { "type": "string", "description": "Relative file path" },
+                        "paths": { "type": "array", "items": { "type": "string" }, "description": "Optional list of up to 8 file paths to read" },
                         "start": { "type": "integer", "description": "Start line (1-indexed)" },
-                        "end": { "type": "integer", "description": "End line" }
+                        "end": { "type": "integer", "description": "End line" },
+                        "offset": { "type": "integer", "description": "Alias for start line (1-indexed)" },
+                        "limit": { "type": "integer", "description": "Max number of lines to read" }
                     },
                     "required": ["path"]
                 }
@@ -53,7 +56,8 @@ fn build_native_oai_agent_tools() -> Value {
                     "type": "object",
                     "properties": {
                         "path": { "type": "string", "description": "Relative file path" },
-                        "content": { "type": "string", "description": "Complete file content" }
+                        "content": { "type": "string", "description": "Complete file content" },
+                        "append": { "type": "boolean", "description": "Append to existing file instead of overwriting" }
                     },
                     "required": ["path", "content"]
                 }
@@ -157,7 +161,10 @@ fn build_native_oai_agent_tools() -> Value {
                     "type": "object",
                     "properties": {
                         "pattern": { "type": "string", "description": "Search pattern or regex" },
-                        "path": { "type": "string", "description": "Optional subdirectory" }
+                        "path": { "type": "string", "description": "Optional subdirectory" },
+                        "include": { "type": "string", "description": "Optional file glob filter" },
+                        "ignore_case": { "type": "boolean", "description": "Case-insensitive search" },
+                        "literal": { "type": "boolean", "description": "Match literal substring instead of regex" }
                     },
                     "required": ["pattern"]
                 }
@@ -171,7 +178,8 @@ fn build_native_oai_agent_tools() -> Value {
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": { "type": "string", "description": "Substring or symbol to search for" }
+                        "query": { "type": "string", "description": "Substring or symbol to search for" },
+                        "path": { "type": "string", "description": "Optional subdirectory" }
                     },
                     "required": ["query"]
                 }
@@ -197,6 +205,21 @@ fn build_native_oai_agent_tools() -> Value {
             "function": {
                 "name": "list_dir",
                 "description": "List files and subdirectories in a workspace path.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Relative subdirectory path (empty for root)" },
+                        "depth": { "type": "integer", "description": "Directory traversal depth" },
+                        "symbols": { "type": "boolean", "description": "Include symbol outline per file" }
+                    }
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_files",
+                "description": "List files and folders as a tree; with symbols=true adds a one-line symbol outline of each file.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -352,6 +375,150 @@ fn build_native_oai_agent_tools() -> Value {
                         "path": { "type": "string", "description": "Memory ID or matching substring to remove" }
                     },
                     "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "copy_file",
+                "description": "Copy a file inside the project workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "source": { "type": "string", "description": "Source relative path" },
+                        "destination": { "type": "string", "description": "Destination relative path" },
+                        "overwrite": { "type": "boolean", "description": "Overwrite destination if it exists" }
+                    },
+                    "required": ["source", "destination"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_folder",
+                "description": "Create a directory (and any parent directories) inside the project.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Relative directory path" }
+                    },
+                    "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "insert_at_line",
+                "description": "Insert lines at a 1-indexed line number in a file.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Relative file path" },
+                        "line": { "type": "integer", "description": "1-indexed line number" },
+                        "content": { "type": "string", "description": "Text to insert" }
+                    },
+                    "required": ["path", "line", "content"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_file_info",
+                "description": "Return file size and a one-line symbol outline of a file.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Relative file path" }
+                    },
+                    "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "diff_files",
+                "description": "Compute a unified line diff between two files in the workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path1": { "type": "string", "description": "First relative file path" },
+                        "path2": { "type": "string", "description": "Second relative file path" }
+                    },
+                    "required": ["path1", "path2"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "docs_lookup",
+                "description": "Look up HTML, CSS, JavaScript, or TypeScript usage patterns in the built-in offline reference.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": { "type": "string", "description": "Topic or API to look up" }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "use_skill",
+                "description": "Load a domain craft or engineering skill playbook on demand.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string", "description": "Skill name" }
+                    },
+                    "required": ["name"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "spawn_subagent",
+                "description": "Delegate bounded codebase exploration or static review to an isolated subagent.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "agent_type": { "type": "string", "enum": ["explore", "review", "verify"] },
+                        "prompt": { "type": "string", "description": "Subagent task prompt" }
+                    },
+                    "required": ["agent_type", "prompt"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "security_scan",
+                "description": "Scan project files for hardcoded secrets, unsafe eval(), or unsanitized innerHTML.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Optional relative file path" }
+                    }
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lmfingerprint",
+                "description": "Verify whether a provider/model is genuine direct or routed under the hood.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string", "description": "Provider/model target (e.g. 'gemini4hydrogen/gemini-4-hydrogen')" }
+                    }
                 }
             }
         }
