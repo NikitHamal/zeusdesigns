@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { activeProject, uid, useStore } from "../store";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { activeProject, useStore } from "../store";
 import type { FileNode } from "../types";
 import { focusArtboard } from "../lib/actions";
 import {
   listWorkspaceDir,
   nativeAudit,
   nativeCheckpoints,
-  nativeShell,
+  isNative,
   openWorkspace,
   readWorkspaceFile,
   refreshTree,
@@ -15,7 +15,8 @@ import {
 } from "../lib/bridge";
 import { DiffUtils } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
-import { IconBtn } from "./ui";
+import { Dropdown, IconBtn, MenuItem } from "./ui";
+import { closePty, ensurePty, openPty, ptyApi, ptyShells, setActivePty, usePtyTabs, type ShellInfo } from "../lib/pty";
 import { Icon } from "./Icon";
 
 /* ------------------------------------------------------------------ */
@@ -588,215 +589,213 @@ export function FilesPanel() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Interactive Project Terminal Panel                                  */
+/* Terminal: real PTY shells (xterm) + live stream of the agent's runs  */
 /* ------------------------------------------------------------------ */
-const QUICK_COMMANDS = ["git status -sb", "npm test", "npm run build", "python3 --version"];
+const TerminalView = lazy(() => import("./TerminalView"));
 
-export function TerminalPanel() {
-  const curProject = useStore(activeProject);
-  const ws = useStore((s) => s.ui.workspace);
+function AgentRuns({ projId }: { projId: string }) {
   const allRuns = useStore((s) => s.terminalHistory);
-  const { addTerminalRun, patchTerminalRun, clearTerminal, patchUI, notify } = useStore.getState();
-  const [cmd, setCmd] = useState("");
-  const [histIdx, setHistIdx] = useState(-1);
-  const [running, setRunning] = useState(false);
-  const outRef = useRef<HTMLDivElement>(null);
-
-  const projId = curProject?.id ?? "proj-default";
-  const cwd = ws?.root ?? curProject?.root ?? "";
-  const runs = useMemo(() => allRuns.filter((r) => r.projectId === projId), [allRuns, projId]);
+  const { clearTerminal, patchUI, notify } = useStore.getState();
+  const runs = useMemo(() => allRuns.filter((r) => r.projectId === projId && r.source === "agent"), [allRuns, projId]);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const endRef = useRef<HTMLDivElement>(null);
+  const last = runs[runs.length - 1];
 
   useEffect(() => {
-    if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight;
-  }, [runs.length, running]);
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [runs.length, last?.stdout.length, last?.running]);
 
-  const execCommand = async (commandToRun?: string) => {
-    const line = (commandToRun ?? cmd).trim();
-    if (!line || running) return;
-    if (!commandToRun) setCmd("");
-    setHistIdx(-1);
-    const id = uid();
-    setRunning(true);
-    addTerminalRun({
-      id,
-      projectId: projId,
-      cmd: line,
-      cwd: cwd || ".",
-      stdout: "",
-      stderr: "",
-      code: 0,
-      at: Date.now(),
-      running: true,
-      source: "user",
-    });
-    try {
-      const res = await nativeShell.run(cwd, line);
-      patchTerminalRun(id, {
-        stdout: res.stdout,
-        stderr: res.stderr,
-        code: res.code,
-        cwd: res.cwd || undefined,
-        running: false,
-      });
-      if (ws) {
-        refreshTree(ws)
-          .then((tree) => patchUI({ workspace: { ...ws, tree } }))
-          .catch(() => {});
-      }
-    } catch (e) {
-      patchTerminalRun(id, {
-        stderr: e instanceof Error ? e.message : String(e),
-        code: 1,
-        running: false,
-      });
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const sendOutputToChat = (r: { cmd: string; stdout: string; stderr: string; code: number }) => {
+  const askZeus = (r: { cmd: string; stdout: string; stderr: string; code: number }) => {
     const out = [r.stdout.trim(), r.stderr.trim()].filter(Boolean).join("\n").slice(0, 8000);
     const snippet = `Terminal command \`${r.cmd}\` (exit ${r.code}):\n\`\`\`\n${out || "(no output)"}\n\`\`\`\n`;
     patchUI({ leftTab: "chat" });
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: snippet }));
-    }, 30);
+    setTimeout(() => window.dispatchEvent(new CustomEvent("zeus:prefill", { detail: snippet })), 30);
     notify("Sent terminal output to chat composer");
   };
 
+  if (runs.length === 0) {
+    return (
+      <div className="grid min-h-0 flex-1 place-items-center bg-surface-dim p-6 text-center text-xs text-on-surface-variant">
+        Commands Zeus runs show up here as they stream.
+      </div>
+    );
+  }
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-surface-dim">
-      <div className="flex items-center justify-between gap-2 border-b border-outline-variant/60 px-3 py-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Icon name="terminal" size={16} className="shrink-0 text-primary" />
-          <span className="truncate font-mono text-xs font-medium text-on-surface">
-            {curProject?.name ?? "Workspace"}
-          </span>
-          {(runs[runs.length - 1]?.cwd || cwd) && (
-            <span className="truncate font-mono text-[10.5px] text-on-surface-variant">
-              {runs[runs.length - 1]?.cwd || cwd}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {runs.length > 0 && (
-            <IconBtn label="Clear terminal" size={28} onClick={() => clearTerminal(projId)}>
-              <Icon name="delete_sweep" size={15} />
-            </IconBtn>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1 border-b border-outline-variant/40 px-3 py-1.5">
-        {QUICK_COMMANDS.map((qCmd) => (
-          <button
-            key={qCmd}
-            disabled={running}
-            onClick={() => void execCommand(qCmd)}
-            className="state rounded-md bg-surface-container px-2 py-0.5 font-mono text-[11px] text-on-surface-variant hover:text-on-surface disabled:opacity-50"
-          >
-            $ {qCmd}
-          </button>
-        ))}
-      </div>
-
-      <div ref={outRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3 font-mono text-[12px]">
-        {runs.length === 0 && (
-          <div className="py-8 text-center font-sans text-xs text-on-surface-variant">
-            Run bash, git, test, or python commands in <span className="font-mono text-on-surface">{cwd || "."}</span>
-          </div>
-        )}
-        {runs.map((r) => (
-          <div key={r.id} className="rounded-xl border border-outline-variant/50 bg-surface-container p-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="text-primary">$</span>
-                <span className="truncate font-semibold text-on-surface">{r.cmd}</span>
-                {r.source === "agent" && (
-                  <span className="shrink-0 rounded bg-surface-high px-1.5 py-0.5 font-sans text-[10px] font-medium text-on-surface-variant">
-                    Zeus
-                  </span>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {r.running ? (
-                  <span className="zshine text-[11px]">Running…</span>
-                ) : (
-                  <>
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                        r.code === 0
-                          ? "bg-surface-high text-on-surface-variant"
-                          : "bg-error-container text-on-error-container"
-                      )}
-                    >
+    <div className="min-h-0 flex-1 overflow-y-auto bg-surface-dim py-1 font-mono text-[12px]">
+      {runs.map((r) => {
+        const isOpen = open[r.id] ?? Boolean(r.running);
+        const body = [r.stdout, r.stderr && r.stdout && !r.stdout.includes(r.stderr) ? r.stderr : r.stdout ? "" : r.stderr]
+          .filter(Boolean)
+          .join("\n");
+        return (
+          <div key={r.id} className="border-b border-outline-variant/30">
+            <div className="flex items-center gap-1 px-2 py-1.5">
+              <button
+                onClick={() => setOpen((o) => ({ ...o, [r.id]: !isOpen }))}
+                className="state flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left"
+              >
+                <Icon name={isOpen ? "expand_more" : "chevron_right"} size={15} className="shrink-0 text-on-surface-variant" />
+                <span className="shrink-0 text-primary">$</span>
+                <span className={cn("truncate", r.running ? "zshine" : "text-on-surface")}>{r.cmd}</span>
+              </button>
+              {r.running ? (
+                <IconBtn label="Stop" size={26} onClick={() => ptyApi.cancelRun(r.id)}>
+                  <Icon name="stop" size={15} />
+                </IconBtn>
+              ) : (
+                <>
+                  {r.code !== 0 && (
+                    <span className="shrink-0 rounded bg-error-container px-1.5 py-0.5 text-[10px] font-semibold text-on-error-container">
                       exit {r.code}
                     </span>
-                    <button
-                      onClick={() => sendOutputToChat(r)}
-                      title="Send output to chat"
-                      className="state rounded bg-surface-high px-1.5 py-0.5 font-sans text-[10.5px] font-medium text-on-surface"
-                    >
-                      Ask Zeus
-                    </button>
-                  </>
-                )}
-              </div>
+                  )}
+                  <IconBtn label="Send output to chat" size={26} onClick={() => askZeus(r)}>
+                    <Icon name="forum" size={14} />
+                  </IconBtn>
+                </>
+              )}
             </div>
-            {(r.stdout || r.stderr) && (
-              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words border-t border-outline-variant/40 pt-2 text-[11.5px] leading-relaxed text-on-surface-variant select-text">
-                {r.stdout}
-                {r.stderr ? (r.stdout ? `\n${r.stderr}` : r.stderr) : ""}
+            {isOpen && (
+              <pre className="mx-2 mb-2 max-h-72 select-text overflow-auto whitespace-pre-wrap break-words rounded-lg bg-surface-lowest p-2 text-[11.5px] leading-relaxed text-on-surface-variant">
+                {body || (r.running ? "" : "(no output)")}
               </pre>
             )}
           </div>
-        ))}
-      </div>
-
-      <div className="border-t border-outline-variant/60 bg-surface p-2">
-        <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3 py-1.5 focus-within:border-primary">
-          <span className="font-mono text-xs font-bold text-primary">$</span>
-          <input
-            value={cmd}
-            onChange={(e) => setCmd(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void execCommand();
-              } else if (e.key === "ArrowUp" && runs.length > 0) {
-                e.preventDefault();
-                const nextIdx = histIdx < 0 ? runs.length - 1 : Math.max(0, histIdx - 1);
-                setHistIdx(nextIdx);
-                setCmd(runs[nextIdx].cmd);
-              } else if (e.key === "ArrowDown" && histIdx >= 0) {
-                e.preventDefault();
-                const nextIdx = histIdx + 1;
-                if (nextIdx >= runs.length) {
-                  setHistIdx(-1);
-                  setCmd("");
-                } else {
-                  setHistIdx(nextIdx);
-                  setCmd(runs[nextIdx].cmd);
-                }
-              }
-            }}
-            placeholder={`Run command in ${curProject?.name ?? "project"}…`}
-            className="h-7 flex-1 bg-transparent font-mono text-xs text-on-surface outline-none placeholder:text-on-surface-variant/60"
-          />
-          <button
-            disabled={!cmd.trim() || running}
-            onClick={() => void execCommand()}
-            className="state grid size-7 place-items-center rounded-lg bg-primary text-on-primary disabled:opacity-40"
-          >
-            <Icon name="play_arrow" size={15} fill />
-          </button>
-        </div>
+        );
+      })}
+      <div ref={endRef} />
+      <div className="flex justify-end px-2 py-1">
+        <button onClick={() => clearTerminal(projId)} className="state rounded-md px-2 py-0.5 font-sans text-[11px] text-on-surface-variant">
+          Clear
+        </button>
       </div>
     </div>
   );
 }
 
+export function TerminalPanel() {
+  const curProject = useStore(activeProject);
+  const ws = useStore((s) => s.ui.workspace);
+  const allRuns = useStore((s) => s.terminalHistory);
+  const projId = curProject?.id ?? "proj-default";
+  const cwd = ws?.root ?? curProject?.root ?? "";
+  const { tabs, active } = usePtyTabs(projId);
+  const [mode, setMode] = useState<"shell" | "agent">("shell");
+  const [shells, setShells] = useState<{ default: ShellInfo; available: ShellInfo[] } | null>(null);
+  const [focusKey, setFocusKey] = useState(0);
+  const agentRunning = useMemo(
+    () => allRuns.filter((r) => r.projectId === projId && r.source === "agent" && r.running).length,
+    [allRuns, projId]
+  );
+
+  useEffect(() => {
+    if (!isNative) return;
+    void ptyShells().then(setShells);
+  }, []);
+  useEffect(() => {
+    if (isNative && tabs.length === 0) void ensurePty(projId, cwd).catch(() => {});
+  }, [projId, cwd, tabs.length]);
+
+  const current = tabs.find((t) => t.id === active) ?? tabs[tabs.length - 1];
+  const add = (shell?: string) => {
+    setMode("shell");
+    void openPty(projId, cwd, shell).catch(() => {});
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-surface-dim">
+      <div className="flex items-center gap-1 border-b border-outline-variant/60 px-2 py-1">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+          {tabs.map((t) => {
+            const on = mode === "shell" && current?.id === t.id;
+            return (
+              <div
+                key={t.id}
+                className={cn(
+                  "group flex h-7 shrink-0 items-center gap-1 rounded-lg pl-2 pr-1 text-[11.5px] font-medium",
+                  on ? "bg-surface-high text-on-surface" : "text-on-surface-variant hover:bg-surface-container"
+                )}
+              >
+                <button
+                  className="flex items-center gap-1.5"
+                  onClick={() => {
+                    setMode("shell");
+                    setActivePty(projId, t.id);
+                    setFocusKey((k) => k + 1);
+                  }}
+                >
+                  <Icon name="terminal" size={13} />
+                  <span className={cn("max-w-[110px] truncate", t.exited !== undefined && "line-through opacity-60")}>{t.title}</span>
+                </button>
+                <button
+                  onClick={() => closePty(t.id)}
+                  aria-label="Close terminal"
+                  className="state grid size-5 place-items-center rounded-md opacity-60 hover:opacity-100"
+                >
+                  <Icon name="close" size={12} />
+                </button>
+              </div>
+            );
+          })}
+          {shells && shells.available.length > 1 ? (
+            <Dropdown
+              width={220}
+              trigger={({ toggle }) => (
+                <IconBtn label="New terminal" size={26} onClick={toggle}>
+                  <Icon name="add" size={15} />
+                </IconBtn>
+              )}
+            >
+              {(close) => (
+                <>
+                  {shells.available.map((s) => (
+                    <MenuItem
+                      key={s.id}
+                      label={s.label}
+                      icon={<Icon name="terminal" size={16} />}
+                      onClick={() => {
+                        close();
+                        add(s.id);
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          ) : (
+            <IconBtn label="New terminal" size={26} onClick={() => add()}>
+              <Icon name="add" size={15} />
+            </IconBtn>
+          )}
+        </div>
+        <button
+          onClick={() => setMode(mode === "agent" ? "shell" : "agent")}
+          className={cn(
+            "state flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-medium",
+            mode === "agent" ? "bg-secondary-container text-on-secondary-container" : "text-on-surface-variant"
+          )}
+        >
+          Zeus
+          {agentRunning > 0 && <span className="size-1.5 rounded-full bg-primary" />}
+        </button>
+      </div>
+
+      {mode === "agent" ? (
+        <AgentRuns projId={projId} />
+      ) : !isNative ? (
+        <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-xs text-on-surface-variant">
+          The terminal runs in the Windows app.
+        </div>
+      ) : current ? (
+        <Suspense fallback={<div className="min-h-0 flex-1 bg-surface-dim" />}>
+          <TerminalView key={current.id} id={current.id} focusKey={focusKey} />
+        </Suspense>
+      ) : (
+        <div className="min-h-0 flex-1 bg-surface-dim" />
+      )}
+    </div>
+  );
+}
 /* ------------------------------------------------------------------ */
 /* Project Workspace Overview (shown on new chat inside a project)     */
 /* ------------------------------------------------------------------ */

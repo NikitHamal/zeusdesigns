@@ -204,6 +204,8 @@ export interface TermEvent {
   stdout?: string;
   stderr?: string;
   cwd?: string;
+  chunk?: string;
+  shell?: string;
 }
 
 /** Every command the agent runs is mirrored here so the Terminal panel is the one shared terminal. */

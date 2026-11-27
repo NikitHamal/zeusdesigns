@@ -48,9 +48,18 @@ export default function App() {
       const st = useStore.getState();
       const proj = st.projects.find((p) => p.root && p.root === e.root) ?? st.projects.find((p) => p.id === st.activeProjectId) ?? st.projects[0];
       const projectId = proj?.id ?? "proj-default";
-      if (st.terminalHistory.some((r) => r.id === e.id)) {
+      const prev = st.terminalHistory.find((r) => r.id === e.id);
+      if (e.chunk !== undefined) {
+        // Live output: append while the command runs (capped so a noisy build can't grow the heap).
+        const next = ((prev?.stdout ?? "") + e.chunk).slice(-200_000);
+        if (prev) st.patchTerminalRun(e.id, { stdout: next, running: true });
+        else
+          st.addTerminalRun({ id: e.id, projectId, cmd: e.cmd, cwd: e.root || ".", stdout: next, stderr: "", code: 0, at: Date.now(), running: true, source: "agent" });
+        return;
+      }
+      if (prev) {
         st.patchTerminalRun(e.id, {
-          stdout: e.stdout ?? "",
+          stdout: e.stdout ?? prev.stdout,
           stderr: e.stderr ?? "",
           code: e.code ?? 0,
           cwd: e.cwd || undefined,

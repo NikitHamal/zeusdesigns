@@ -81,7 +81,7 @@ When the user asks for a visual deliverable (an interactive prototype, a HyperFr
       });
     })(),
     spec.isKeylessScraper
-      ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. `shell` runs in the user's real shell (Git Bash when installed, else PowerShell 7 or cmd.exe); the working directory persists between calls, commands never get stdin and stop after 5 minutes, so background servers and avoid watch modes. Never claim you lack file, terminal, or python access.`
+      ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. \`shell\` runs in the user's real shell (Git Bash when installed, else PowerShell 7 or cmd.exe); the working directory persists between calls, commands never get stdin and stop after 5 minutes, so background servers and avoid watch modes. Never claim you lack file, terminal, or python access.`
       : "",
     ws
       ? `## Project\nOpen folder: ${ws.name}${ws.root ? ` (${ws.root})` : ""}. Top-level entries: ${topFiles}.`
