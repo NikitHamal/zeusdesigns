@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
-import { nativeAvailable, nativeMcp, nativeMemory, openWorkspaceByPath } from "./lib/bridge";
+import { listenTerminal, nativeAvailable, nativeMcp, nativeMemory, openWorkspaceByPath } from "./lib/bridge";
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { ArtifactWorkbench } from "./components/ArtifactWorkbench";
@@ -40,6 +40,45 @@ export default function App() {
     mq.addEventListener("change", h);
     return () => mq.removeEventListener("change", h);
   }, [theme, hue]);
+
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    let dead = false;
+    void listenTerminal((e) => {
+      const st = useStore.getState();
+      const proj = st.projects.find((p) => p.root && p.root === e.root) ?? st.projects.find((p) => p.id === st.activeProjectId) ?? st.projects[0];
+      const projectId = proj?.id ?? "proj-default";
+      if (st.terminalHistory.some((r) => r.id === e.id)) {
+        st.patchTerminalRun(e.id, {
+          stdout: e.stdout ?? "",
+          stderr: e.stderr ?? "",
+          code: e.code ?? 0,
+          cwd: e.cwd || undefined,
+          running: e.running,
+        });
+      } else {
+        st.addTerminalRun({
+          id: e.id,
+          projectId,
+          cmd: e.cmd,
+          cwd: e.cwd || e.root || ".",
+          stdout: e.stdout ?? "",
+          stderr: e.stderr ?? "",
+          code: e.code ?? 0,
+          at: Date.now(),
+          running: e.running,
+          source: "agent",
+        });
+      }
+    }).then((fn) => {
+      if (dead) fn();
+      else off = fn;
+    });
+    return () => {
+      dead = true;
+      off?.();
+    };
+  }, []);
 
   useEffect(() => {
     nativeAvailable().then((ok) => patchUI({ nativeReady: ok }));

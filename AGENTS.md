@@ -80,3 +80,7 @@ Keep exactly one finished run: the latest successful one. `scripts/prune-runs.sh
 ## Session hygiene
 - Update `CONTINUITY.md` at the end of each milestone: what shipped, what is in flight, what is next, known issues.
 - Keep `docs/BACKEND_CONTRACT.md` and this file accurate. Delete stale notes instead of appending.
+
+## Shared terminal & tool rows
+- `shell_run_as` (`src-tauri/src/workspace.rs`) is the single execution path for the Terminal panel (`user`) and the agent (`agent`). `cd` persists per project root, commands have a 300s hard timeout, git never blocks on a console prompt (`GIT_TERMINAL_PROMPT=0`) while Git Credential Manager and `gh` stay enabled, and common tool dirs (Git, GitHub CLI, nodejs) are appended to `PATH`. Agent runs are mirrored to `TerminalPanel` through the `zeus://term` event (`listenTerminal` in `bridge.ts`, installed in `App.tsx`).
+- Tool rows in chat (`ToolCard` in `Activity.tsx`) expand and collapse in place. There is no tool detail dialog; do not add one.

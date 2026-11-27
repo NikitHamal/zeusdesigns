@@ -144,6 +144,7 @@ export interface TerminalRun {
   code: number;
   at: number;
   running?: boolean;
+  source?: "user" | "agent";
 }
 
 export interface Conversation {

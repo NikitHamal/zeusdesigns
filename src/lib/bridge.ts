@@ -191,6 +191,29 @@ export interface ShellResult {
   code: number;
   stdout: string;
   stderr: string;
+  cwd?: string;
+}
+
+export interface TermEvent {
+  id: string;
+  root: string;
+  cmd: string;
+  source: "user" | "agent";
+  running: boolean;
+  code?: number;
+  stdout?: string;
+  stderr?: string;
+  cwd?: string;
+}
+
+/** Every command the agent runs is mirrored here so the Terminal panel is the one shared terminal. */
+export async function listenTerminal(onEvent: (e: TermEvent) => void): Promise<() => void> {
+  if (!isNative) return () => {};
+  try {
+    return await listen<TermEvent>("zeus://term", (ev) => onEvent(ev.payload));
+  } catch {
+    return () => {};
+  }
 }
 
 export const nativeShell = {

@@ -627,6 +627,7 @@ export function TerminalPanel() {
       code: 0,
       at: Date.now(),
       running: true,
+      source: "user",
     });
     try {
       const res = await nativeShell.run(cwd, line);
@@ -634,6 +635,7 @@ export function TerminalPanel() {
         stdout: res.stdout,
         stderr: res.stderr,
         code: res.code,
+        cwd: res.cwd || undefined,
         running: false,
       });
       if (ws) {
@@ -670,7 +672,11 @@ export function TerminalPanel() {
           <span className="truncate font-mono text-xs font-medium text-on-surface">
             {curProject?.name ?? "Workspace"}
           </span>
-          {cwd && <span className="truncate font-mono text-[10.5px] text-on-surface-variant">· {cwd}</span>}
+          {(runs[runs.length - 1]?.cwd || cwd) && (
+            <span className="truncate font-mono text-[10.5px] text-on-surface-variant">
+              {runs[runs.length - 1]?.cwd || cwd}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {runs.length > 0 && (
@@ -706,6 +712,11 @@ export function TerminalPanel() {
               <div className="flex min-w-0 items-center gap-1.5">
                 <span className="text-primary">$</span>
                 <span className="truncate font-semibold text-on-surface">{r.cmd}</span>
+                {r.source === "agent" && (
+                  <span className="shrink-0 rounded bg-surface-high px-1.5 py-0.5 font-sans text-[10px] font-medium text-on-surface-variant">
+                    Zeus
+                  </span>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {r.running ? (

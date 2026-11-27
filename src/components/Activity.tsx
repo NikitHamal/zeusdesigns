@@ -284,19 +284,24 @@ function parseToolEntry(t: ToolCall, pres: ToolPresentation): ParsedToolEntry {
 }
 
 /* ------------------------------------------------------------------ */
-/* Stormy ToolDetailSheet / Inspector Modal (ToolCard.kt)              */
+/* Inline tool detail (expands in place, no dialog)                    */
 /* ------------------------------------------------------------------ */
-function ToolDetailModal({
-  tool,
-  pres,
-  parsed,
-  onClose,
-}: {
-  tool: ToolCall;
-  pres: ToolPresentation;
-  parsed: ParsedToolEntry;
-  onClose: () => void;
-}) {
+function splitTerminalOutput(out: string): { stdout: string; stderr: string; code: number | null } {
+  let text = out.replace(/\r\n/g, "\n");
+  let code: number | null = null;
+  const m = /\n?\[exit code: (-?\d+)\]\s*$/.exec(text);
+  if (m) {
+    code = Number(m[1]);
+    text = text.slice(0, m.index);
+  }
+  const exitOnly = /^\[exit (-?\d+)\] \(no output\)$/.exec(text.trim());
+  if (exitOnly) return { stdout: "", stderr: "", code: Number(exitOnly[1]) };
+  const i = text.indexOf("[stderr]\n");
+  if (i >= 0) return { stdout: text.slice(0, i).trimEnd(), stderr: text.slice(i + 9), code };
+  return { stdout: text, stderr: "", code };
+}
+
+function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresentation; parsed: ParsedToolEntry }) {
   const notify = useStore((s) => s.notify);
   const patchUI = useStore((s) => s.patchUI);
   const [tab, setTab] = useState<"diff" | "new" | "old">("diff");
@@ -311,183 +316,140 @@ function ToolDetailModal({
     }
   }, [tool.args]);
 
+  const openFile = (p: string) => {
+    patchUI({ leftTab: "files" });
+    setTimeout(() => window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: p })), 30);
+  };
   const copyText = (txt: string) => {
-    navigator.clipboard.writeText(txt);
+    void navigator.clipboard.writeText(txt);
     notify("Copied to clipboard");
   };
 
+  const term = pres.detail === "Terminal" && !hasDiff ? splitTerminalOutput(tool.output ?? "") : null;
+  const isCode = pres.detail === "Code" || pres.detail === "Terminal";
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[82vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[24px] border border-outline-variant bg-surface text-on-surface"
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-outline-variant/60 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-xl",
-                tool.status === "error"
-                  ? "bg-error-container text-on-error-container"
-                  : "bg-surface-high text-on-surface-variant"
-              )}
-            >
-              <Icon name={tool.status === "error" ? "error" : pres.icon} size={17} />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-on-surface-variant">
-                  {tool.status === "running" ? pres.running : pres.done}
-                </span>
-                {parsed.subject && (
-                  <span className="truncate font-mono text-[13px] font-semibold text-on-surface">
-                    {parsed.subject}
-                  </span>
-                )}
-                {(parsed.additions > 0 || parsed.deletions > 0) && (
-                  <span className="flex items-center gap-1 rounded-full bg-surface-high px-2 py-0.5 font-mono text-[11px] font-semibold">
-                    {parsed.additions > 0 && <span className="text-tertiary">+{parsed.additions}</span>}
-                    {parsed.deletions > 0 && <span className="text-error">-{parsed.deletions}</span>}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1.5">
-            {hasDiff && (tool.newContent || tool.oldContent) && (
-              <div className="flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11.5px] font-medium">
-                {(["diff", "new", "old"] as const).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => setTab(k)}
-                    className={cn(
-                      "rounded-full px-2.5 py-0.5 capitalize transition-colors",
-                      tab === k ? "bg-surface-high font-semibold text-on-surface" : "text-on-surface-variant"
-                    )}
-                  >
-                    {k}
-                  </button>
-                ))}
-              </div>
-            )}
-            {rawPath && (
+    <div className="ml-9 mr-1 mt-1 mb-1.5 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-lowest">
+      <div className="flex items-center justify-end gap-1 border-b border-outline-variant/40 px-1.5 py-1">
+        {hasDiff && (tool.newContent || tool.oldContent) && (
+          <div className="mr-auto flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11px] font-medium">
+            {(["diff", "new", "old"] as const).map((k) => (
               <button
-                onClick={() => {
-                  patchUI({ leftTab: "files" });
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: rawPath }));
-                  }, 30);
-                  onClose();
-                }}
-                className="state flex h-7 items-center gap-1 rounded-lg bg-surface-high px-2.5 text-xs font-medium text-on-surface"
+                key={k}
+                onClick={() => setTab(k)}
+                className={cn(
+                  "rounded-full px-2 py-0.5 capitalize transition-colors",
+                  tab === k ? "bg-surface-high font-semibold text-on-surface" : "text-on-surface-variant"
+                )}
               >
-                <Icon name="open_in_new" size={13} />
-                Open file
+                {k}
               </button>
-            )}
-            <button
-              onClick={() => copyText(tool.newContent || tool.output || parsed.body)}
-              className="state grid size-7 place-items-center rounded-lg bg-surface-high text-on-surface-variant hover:text-on-surface"
-              title="Copy"
-            >
-              <Icon name="content_copy" size={14} />
-            </button>
-            <button
-              onClick={onClose}
-              className="state grid size-7 place-items-center rounded-lg bg-surface-high text-on-surface-variant hover:text-on-surface"
-              title="Close"
-            >
-              <Icon name="close" size={15} />
-            </button>
+            ))}
           </div>
-        </div>
+        )}
+        {term && term.code !== null && term.code !== 0 && (
+          <span className="mr-auto rounded bg-error-container px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-on-error-container">
+            exit {term.code}
+          </span>
+        )}
+        {rawPath && (
+          <button
+            onClick={() => openFile(rawPath)}
+            className="state flex h-6 items-center gap-1 rounded-md px-2 text-[11.5px] font-medium text-on-surface-variant hover:text-on-surface"
+          >
+            <Icon name="open_in_new" size={12} />
+            Open
+          </button>
+        )}
+        <button
+          onClick={() => copyText(tool.newContent || tool.output || parsed.body)}
+          className="state grid size-6 place-items-center rounded-md text-on-surface-variant hover:text-on-surface"
+          title="Copy"
+        >
+          <Icon name="content_copy" size={13} />
+        </button>
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-auto bg-surface-lowest p-4 font-mono text-[12px] leading-relaxed select-text">
-          {hasDiff && tab === "diff" && parsed.computedDiff ? (
-            <div className="space-y-0.5">
-              {parsed.computedDiff.lines.map((dl, idx) => (
+      <div
+        className={cn(
+          "max-h-[320px] overflow-auto p-2.5 text-[12px] leading-relaxed select-text",
+          isCode ? "font-mono" : "font-sans"
+        )}
+      >
+        {hasDiff && tab === "diff" && parsed.computedDiff ? (
+          <div className="font-mono">
+            {parsed.computedDiff.lines.map((dl, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "flex items-baseline gap-2 rounded-sm px-1.5",
+                  dl.kind === "add" && "bg-tertiary-container/30 text-tertiary",
+                  dl.kind === "del" && "bg-error-container/30 text-error",
+                  dl.kind === "ctx" && "text-on-surface-variant"
+                )}
+              >
+                <span className="w-7 shrink-0 select-none text-right text-[10.5px] opacity-55">
+                  {dl.newLine ?? dl.oldLine ?? ""}
+                </span>
+                <span className="whitespace-pre-wrap break-all">{dl.text}</span>
+              </div>
+            ))}
+          </div>
+        ) : hasDiff && tab === "new" ? (
+          <pre className="whitespace-pre-wrap break-words font-mono text-on-surface">{tool.newContent || parsed.body}</pre>
+        ) : hasDiff && tab === "old" ? (
+          <pre className="whitespace-pre-wrap break-words font-mono text-on-surface-variant">{tool.oldContent || "(new file)"}</pre>
+        ) : pres.detail === "Listing" && tool.output ? (
+          <div className="space-y-0.5 font-mono">
+            {tool.output.split("\n").map((line, i) => {
+              const fileMatch = /^([\w./\\-]+\.[a-z0-9]+)(?::(\d+))?/i.exec(line.trim());
+              return (
                 <div
-                  key={idx}
+                  key={i}
+                  onClick={() => fileMatch?.[1] && openFile(fileMatch[1])}
                   className={cn(
-                    "flex items-baseline gap-2 rounded-sm px-2 py-0.5",
-                    dl.kind === "add" && "bg-tertiary-container/30 text-tertiary",
-                    dl.kind === "del" && "bg-error-container/30 text-error",
-                    dl.kind === "ctx" && "text-on-surface-variant"
+                    "rounded-md px-1.5 py-0.5",
+                    fileMatch ? "cursor-pointer text-on-surface hover:bg-surface-high" : "text-on-surface-variant"
                   )}
                 >
-                  <span className="w-8 shrink-0 select-none text-right text-[10.5px] opacity-55">
-                    {dl.newLine ?? dl.oldLine ?? ""}
-                  </span>
-                  <span className="whitespace-pre-wrap break-all">{dl.text}</span>
+                  {line}
                 </div>
-              ))}
-            </div>
-          ) : hasDiff && tab === "new" ? (
-            <pre className="whitespace-pre-wrap break-words text-on-surface">
-              {tool.newContent || parsed.body}
-            </pre>
-          ) : hasDiff && tab === "old" ? (
-            <pre className="whitespace-pre-wrap break-words text-on-surface-variant">
-              {tool.oldContent || "(new file)"}
-            </pre>
-          ) : pres.detail === "Listing" && tool.output ? (
-            <div className="space-y-1">
-              {tool.output.split("\n").map((line, i) => {
-                const fileMatch = /^([\w./\\-]+\.[a-z0-9]+)(?::(\d+))?/i.exec(line.trim());
-                return (
-                  <div
-                    key={i}
-                    onClick={() => {
-                      if (fileMatch?.[1]) {
-                        patchUI({ leftTab: "files" });
-                        setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: fileMatch[1] }));
-                        }, 30);
-                        onClose();
-                      }
-                    }}
-                    className={cn(
-                      "rounded-lg px-2 py-1",
-                      fileMatch ? "cursor-pointer hover:bg-surface-high text-on-surface" : "text-on-surface-variant"
-                    )}
-                  >
-                    {line}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {parsed.body && pres.detail === "Terminal" && (
-                <div className="rounded-xl border border-outline-variant/50 bg-surface px-3 py-2 text-on-surface">
-                  <span className="mr-2 text-primary">$</span>
-                  {parsed.body}
-                </div>
-              )}
-              {tool.output ? (
-                <pre className="whitespace-pre-wrap break-words text-on-surface-variant">{tool.output}</pre>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words text-on-surface-variant">
-                  {parsed.body || "(no output)"}
-                </pre>
-              )}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        ) : term ? (
+          <div className="space-y-1.5">
+            {parsed.body && (
+              <div className="whitespace-pre-wrap break-words text-on-surface">
+                <span className="mr-2 text-primary">$</span>
+                {parsed.body}
+              </div>
+            )}
+            {term.stdout && <pre className="whitespace-pre-wrap break-words text-on-surface-variant">{term.stdout}</pre>}
+            {term.stderr && (
+              <pre className={cn("whitespace-pre-wrap break-words", term.code ? "text-error" : "text-on-surface-variant")}>
+                {term.stderr}
+              </pre>
+            )}
+            {!term.stdout && !term.stderr && tool.status !== "running" && (
+              <span className="text-on-surface-variant">(no output)</span>
+            )}
+          </div>
+        ) : (
+          <pre className="whitespace-pre-wrap break-words text-on-surface-variant">
+            {tool.output || parsed.body || "(no output)"}
+          </pre>
+        )}
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Stormy ToolCard (One line: tile, verb, subject, +/- badge)          */
+/* Tool row: one line, expands and collapses in place                  */
 /* ------------------------------------------------------------------ */
 function ToolCard({ t }: { t: ToolCall }) {
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const running = t.status === "running";
   const isError = t.status === "error";
   const pres = getToolPresentation(t.name);
@@ -497,7 +459,8 @@ function ToolCard({ t }: { t: ToolCall }) {
   return (
     <>
       <button
-        onClick={() => hasDetail && setSheetOpen(true)}
+        onClick={() => hasDetail && setOpen((v) => !v)}
+        aria-expanded={hasDetail ? open : undefined}
         className={cn(
           "flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] transition-colors",
           hasDetail && "hover:bg-surface-high/65"
@@ -535,17 +498,16 @@ function ToolCard({ t }: { t: ToolCall }) {
         )}
 
         {hasDetail && (
-          <Icon name="chevron_right" size={15} className="shrink-0 text-on-surface-variant/70" />
+          <Icon
+            name="expand_more"
+            size={16}
+            className={cn("shrink-0 text-on-surface-variant/70 transition-transform", open && "rotate-180")}
+          />
         )}
       </button>
 
-      {sheetOpen && (
-        <ToolDetailModal
-          tool={t}
-          pres={pres}
-          parsed={parsed}
-          onClose={() => setSheetOpen(false)}
-        />
+      {hasDetail && (
+        <Collapse open={open}>{open && <ToolDetail tool={t} pres={pres} parsed={parsed} />}</Collapse>
       )}
     </>
   );
