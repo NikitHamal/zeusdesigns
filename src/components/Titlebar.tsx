@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { activeProject, useStore } from "../store";
-import { isNative } from "../lib/bridge";
+import { isNative, nativeGit } from "../lib/bridge";
 import { cn } from "../utils/cn";
 import { Icon } from "./Icon";
 
-/* icons: left_panel_open, left_panel_close, search, settings, remove, crop_square, filter_none, close */
+/* icons: call_split, left_panel_open, left_panel_close, search, settings, remove, crop_square, filter_none, close */
 
 type Win = Awaited<ReturnType<typeof loadWindow>>;
 const loadWindow = async () => (await import("@tauri-apps/api/window")).getCurrentWindow();
@@ -54,6 +54,14 @@ export function Titlebar() {
   const patchUI = useStore((s) => s.patchUI);
   const proj = useStore(activeProject);
   const label = proj?.root ? proj.root : proj?.name ?? "Workspace";
+  const busy = useStore((s) => s.busy);
+  const [branch, setBranch] = useState("");
+  useEffect(() => {
+    let dead = false;
+    if (!proj?.root) { setBranch(""); return; }
+    void nativeGit.status(proj.root).then((g) => !dead && setBranch(g.isRepo ? g.branch : ""));
+    return () => { dead = true; };
+  }, [proj?.root, busy]);
   return (
     <header data-tauri-drag-region className="oc-titlebar relative flex shrink-0 items-center gap-1 pl-2 pr-1 select-none">
       <TbBtn label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} onClick={() => patchUI({ sidebarOpen: !sidebarOpen })}>
@@ -67,7 +75,9 @@ export function Titlebar() {
           className="oc-hairline pointer-events-auto flex h-7 w-[min(440px,36vw)] items-center gap-2 rounded-md bg-surface-low px-2.5 text-left text-[12.5px] text-on-surface-variant outline-none transition-colors hover:bg-surface-container"
         >
           <Icon name="search" size={15} />
+          {busy && <span className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-on-surface-variant/40 border-t-on-surface" />}
           <span className="min-w-0 flex-1 truncate">{label}</span>
+          {branch && <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-on-surface-variant/80"><Icon name="call_split" size={12} />{branch}</span>}
           <kbd className="font-mono text-[10.5px] text-on-surface-variant/70">Ctrl K</kbd>
         </button>
       </div>

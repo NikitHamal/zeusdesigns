@@ -58,6 +58,7 @@ const agentRs = [
   fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent.rs"), "utf8"),
   fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_edit.rs"), "utf8"),
   fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_exec.rs"), "utf8"),
+  ...["agent_run", "agent_rt", "agent_sub", "agent_patch", "agent_web", "agent_diag"].map((f) => fs.readFileSync(path.join(process.cwd(), `src-tauri/src/${f}.rs`), "utf8")),
 ].join("\n");
 for (const feature of [
   "pub fn apply_stormy_text_edit",

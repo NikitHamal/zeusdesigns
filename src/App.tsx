@@ -1,4 +1,5 @@
 import { startAgentBridge } from "./lib/agentState";
+import { wireConvStatus } from "./lib/convStatus";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeConv, useStore } from "./store";
 import { applyTheme } from "./lib/theme";
@@ -42,7 +43,7 @@ export default function App() {
     return () => mq.removeEventListener("change", h);
   }, [theme, hue]);
 
-  useEffect(() => { startAgentBridge(); }, []);
+  useEffect(() => { startAgentBridge(); wireConvStatus(); }, []);
 
   useEffect(() => {
     let off: (() => void) | undefined;

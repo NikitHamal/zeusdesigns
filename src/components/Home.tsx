@@ -3,6 +3,8 @@ import { Composer } from "./Chat";
 import { Icon } from "./Icon";
 import { Dropdown, MenuItem, MenuLabel } from "./ui";
 import { openWorkspace, openWorkspaceByPath } from "../lib/bridge";
+import { StatusMark } from "./StatusMark";
+import { useConvStatus } from "../lib/convStatus";
 import { OpenDesignCreationBar } from "./OpenDesignViews";
 import { STARTER_HYPERFRAMES_VIDEO_HTML, STARTER_OPEN_SLIDE_DECK_HTML } from "../lib/openDesign";
 
@@ -13,6 +15,28 @@ const STARTERS = [
   { i: "code", t: "Refactor module", p: "Refactor and optimize this module while keeping all tests passing: " },
   { i: "description", t: "Generate AGENTS.md", p: "Inspect this project and write a comprehensive AGENTS.md file." },
 ];
+
+function ago(t: number) {
+  const m = Math.max(1, Math.round((Date.now() - t) / 60000));
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `${h}h` : `${Math.round(h / 24)}d`;
+}
+
+function SessionRow({ id, title, project, at }: { id: string; title: string; project: string; at: number }) {
+  const status = useConvStatus(id);
+  return (
+    <button
+      onClick={() => { const st = useStore.getState(); st.setActiveConv(id); st.patchUI({ leftTab: "chat" }); }}
+      className="flex h-10 w-full items-center gap-3 border-b border-[var(--oc-border-weak)] px-3 text-left outline-none last:border-b-0 hover:bg-surface-low"
+    >
+      <StatusMark status={status} />
+      <span className="min-w-0 flex-1 truncate text-[13px] text-on-surface">{title}</span>
+      <span className="shrink-0 text-[11.5px] text-on-surface-variant">{project}</span>
+      <span className="w-8 shrink-0 text-right font-mono text-[11px] text-on-surface-variant">{ago(at)}</span>
+    </button>
+  );
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -26,6 +50,8 @@ export function Home() {
   const projects = useStore((s) => s.projects);
   const curProject = useStore(activeProject);
   const notify = useStore((s) => s.notify);
+  const convs = useStore((s) => s.conversations);
+  const recentSessions = convs.filter((c) => c.messages.length > 0).sort((a, b) => b.at - a.at).slice(0, 6);
   const recentProjects = [...projects].filter((p) => p.root).sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, 5);
 
   const pickFolder = () => {
@@ -127,8 +153,18 @@ export function Home() {
             </button>
           ))}
         </div>
-        {recentProjects.length > 0 && (
+        {recentSessions.length > 0 && (
           <div className="mt-10">
+            <div className="mb-1.5 px-1 text-[12px] font-medium text-on-surface-variant">Recent sessions</div>
+            <div className="oc-hairline overflow-hidden rounded-lg">
+              {recentSessions.map((c) => (
+                <SessionRow key={c.id} id={c.id} title={c.title} at={c.at} project={projects.find((p) => p.id === c.projectId)?.name ?? "Workspace"} />
+              ))}
+            </div>
+          </div>
+        )}
+        {recentProjects.length > 0 && (
+          <div className="mt-6">
             <div className="mb-1.5 px-1 text-[12px] font-medium text-on-surface-variant">Recent projects</div>
             <div className="oc-hairline overflow-hidden rounded-lg">
               {recentProjects.map((p) => (

@@ -5,6 +5,8 @@ import { nativePerf, nativeServer, openWorkspace, openWorkspaceByPath } from "..
 import { cn } from "../utils/cn";
 import { Dialog, Dropdown, IconBtn, MenuItem } from "./ui";
 import { Icon } from "./Icon";
+import { StatusMark } from "./StatusMark";
+import { useConvStatus } from "../lib/convStatus";
 
 /* icons: folder, folder_open, create_new_folder, terminal, code, save, play_arrow, delete_sweep */
 
@@ -86,6 +88,7 @@ function ChatRow({ id, title, active, screenCount }: { id: string; title: string
   const [rename, setRename] = useState(false);
   const { setActiveConv, deleteConv, setTitle } = useStore.getState();
   const patchUI = useStore((s) => s.patchUI);
+  const status = useConvStatus(id);
   if (rename) {
     return (
       <input
@@ -107,6 +110,7 @@ function ChatRow({ id, title, active, screenCount }: { id: string; title: string
         onDoubleClick={() => setRename(true)}
         className={cn("flex h-7 w-full items-center gap-2 rounded-md pl-2 pr-8 text-left text-[13px] outline-none", active ? "text-on-surface" : "text-on-surface-variant")}
       >
+        <StatusMark status={status} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {screenCount > 0 && <span className="shrink-0 rounded-full bg-surface-container px-1.5 py-0.5 text-[10.5px] font-medium text-on-surface-variant group-hover:opacity-0">{screenCount}</span>}
       </button>

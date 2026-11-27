@@ -9,6 +9,7 @@ import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
 import { memoryBlock, extractRemember, addMemory as saveMemory, learnFromText } from "./memory";
 import { toolsPrompt } from "./tools";
+import { runSessionSearch } from "./sessionSearch";
 import { anchorTools, buildParts, listenLiveShell, type PartAnchors } from "./timeline";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, getCodingHarnessProfile, MAX_STEPS_PROMPT } from "./codingHarness";
@@ -524,6 +525,9 @@ export async function sendMessage(opts: {
               const canon = ToolAliases.canonicalName(e.name);
               if (canon === "update_plan" || canon === "ask_user" || canon === "request_approval") {
                 // Interactive tools run natively: docks come from zeus://question|permission|todo events.
+              } else if (canon === "session_search" && preHook.allow) {
+                t.output = runSessionSearch(t.args);
+                t.status = "ok";
               } else if (isStudioTool(e.name) && preHook.allow) {
                 studioRuns.set(
                   e.id,

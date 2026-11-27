@@ -18,6 +18,7 @@ import { Icon } from "./Icon";
 import { SessionHeader } from "./SessionHeader";
 import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline } from "./Activity";
 import { DockStack } from "./Docks";
+import { SessionTabs } from "./SessionTabs";
 import { ReviewPanel } from "./ReviewPanel";
 import { SubagentDrawer } from "./SubagentRow";
 import { TokenRing } from "./TokenRing";
@@ -757,6 +758,7 @@ export function ChatPane() {
         setDockTab={setDockTab}
         trailing={<ContextWindowPill />}
       />
+      <SessionTabs />
 
       {leftTab === "files" ? (
         <FilesPanel />
