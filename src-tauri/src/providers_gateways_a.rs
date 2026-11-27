@@ -163,7 +163,7 @@ where
     }
 
     let client = build_client(16)?;
-    let candidates = vec![eff_model, "codestral-latest", "default"];
+    let candidates = vec![eff_model];
     let mut active_resp = None;
     for cand in candidates {
         let mut payload = json!({
@@ -192,7 +192,7 @@ where
         }
     }
     let Some(resp) = active_resp else {
-        return stream_unikey("gpt-6-luna", system, messages, cancel, on_delta);
+        return Err(format!("LLM7 request failed for model '{}'", eff_model));
     };
 
     let mut reader = BufReader::new(resp);
@@ -440,21 +440,7 @@ where
         }
     }
 
-    let candidates = if has_images {
-        vec![
-            eff_model,
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-            "nvidia/nemotron-nano-12b-v2-vl",
-        ]
-    } else {
-        vec![
-            eff_model,
-            "nvidia/nemotron-3.5-lightning",
-            "poolside/laguna-xs-2.1",
-            "nvidia/nemotron-3.5-bolt",
-            "nvidia/nemotron-3-ultra-550b",
-        ]
-    };
+    let candidates = vec![eff_model];
 
     let wants_tools = is_agent_tool_request(system);
     let client = build_client(12)?;
@@ -621,25 +607,7 @@ where
     }
 
     let client = build_client(18)?;
-    let candidates = if has_images {
-        vec![
-            eff_model,
-            "qwen3-vl-30b-a3b",
-            "nemotron3-omni-30b",
-            "Qwen3.8-27B",
-            "Qwen2.5-VL-72B-Instruct",
-        ]
-    } else {
-        vec![
-            eff_model,
-            "qwen3.6-35b-a3b",
-            "Qwen3.6-27B",
-            "gemma-4-26b-a4b",
-            "laguna-xs-2.1",
-            "nemotron3-nano-30b",
-            "gpt-oss-20b",
-        ]
-    };
+    let candidates = vec![eff_model];
     let wants_tools = is_agent_tool_request(system);
     let mut active_resp = None;
     for cand in candidates {

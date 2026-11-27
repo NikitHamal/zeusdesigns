@@ -632,28 +632,7 @@ where
         }
     }
 
-    let candidates: Vec<&str> = if has_images {
-        vec![
-            eff_model,
-            "particle-ai/particle-1:free",
-            "dots-studio/dots-3-note-preview:free",
-            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-        ]
-    } else if eff_model == "kilo-auto/free" || eff_model == "cohere/north-mini-code:free" {
-        vec![
-            "nvidia/nemotron-3.5-lightning:free",
-            "reflection/beam-free",
-            "stealth/glyph-cluster",
-            "particle-ai/particle-1:free",
-        ]
-    } else {
-        vec![
-            eff_model,
-            "nvidia/nemotron-3.5-lightning:free",
-            "reflection/beam-free",
-            "stealth/glyph-cluster",
-        ]
-    };
+    let candidates: Vec<&str> = vec![eff_model];
 
     let client = build_client(14)?;
     let mut active_resp = None;
@@ -685,7 +664,7 @@ where
         }
     }
     let Some(resp) = active_resp else {
-        return stream_blockrun("nvidia/nemotron-3.5-lightning", system, messages, cancel, on_delta);
+        return Err(format!("Kilo Gateway request failed for model '{}'", eff_model));
     };
 
     let mut reader = BufReader::new(resp);
