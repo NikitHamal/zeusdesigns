@@ -2,7 +2,21 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 35 (Latest — OpenCode Timeline, Streaming & Tool Call UI in React 19 + Tailwind 4)
+## Session 36 (Latest — OpenCode UI Parity, Real Subagents, Interactive Docks & Patch/Search Tools)
+Goal: finish OpenCode parity on top of the Rust agent runtime (`agent_rt.rs`, `agent_sub.rs`, `agent_run.rs`, `agent_patch.rs`, `agent_web.rs`, `agent_diag.rs`) without touching `Composer` or `ModelPicker`.
+
+Shipped:
+1. **Native tool registration**: `providers_oai_a.rs` now exposes `todowrite`, `todoread`, `question`, `request_approval`, `subagent`, `apply_patch`, `websearch`, `session_search`, `diagnostics` (replacing the old `update_plan`/`ask_user`/`spawn_subagent` stubs). `stormyTools.ts` (aliases `todo_read`, `web_search`, `patch`, `lsp`), `tools.ts`, `codingHarness.ts` and `streamParser.ts` carry the same tools for XML `<zeus_tool>` models.
+2. **Request wiring (`engine.ts`)**: `sessionId`, `toolsPrompt`, `subagentDepth`, `maxSubagentDepth` (Settings button) sent on every request. The passive `pendingQuestion`/`pendingApproval`/`plan` echoes and the "break after ask_user/approval" are gone: Rust pauses on a channel and returns the real answer as the tool result. `session_search` runs in the webview (`sessionSearch.ts`).
+3. **Live state (`lib/agentState.ts`)**: `useAgent` mirrors `zeus://question|permission|todo|subagent|dock-clear`; `answerQuestion`/`answerPermission` call the new commands.
+4. **Docks (`Docks.tsx`)**: `QuestionDock` (tabs, single/multi select, custom answer, Up/Down/Left/Right/Enter/Space/Esc, Submit/Dismiss), `PermissionDock` (Allow once, Always allow, Deny), `TodoBar`; `DockStack` mounts directly above `Composer` in `ChatPane`.
+5. **Subagent rows (`SubagentRow.tsx`)**: `BasicTool` row with live child tool list, model/token/duration readout, background tag; `SubagentDrawer` shows prompt, child tools, transcript, Stop.
+6. **Review (`ReviewPanel.tsx`)**: `Review` dock/full tab with `Session changes` (`changedFilesOf`, now apply_patch aware) and `Git diff` (`git diff HEAD` parsed per file). Header `difference` toggle with change-count badge.
+7. **Session actions (`lib/session.ts`, `TurnActions.tsx`)**: fork from a turn, revert to before a turn (restores that turn's checkpoints, then drops the messages; two-click confirm), copy as Markdown, file-path pills in Markdown open the file.
+8. **Shell parity**: `SessionHeader` (branch, Working indicator, session menu, TokenRing context meter), `SessionTabs`, working/needs-input/unread `StatusMark` in the sidebar, tabs and Home recent sessions, branch and spinner in the titlebar pill.
+9. Verification: `tsc --noEmit`, `npm run build`, `test-stormy-replica.mjs` (module list now includes the new agent modules), `test-overhaul.mjs`; no source file over 1,000 lines.
+
+## Session 35 (OpenCode Timeline, Streaming & Tool Call UI in React 19 + Tailwind 4)
 Goal: replace the fixed "WorkLog above, answer below" stack with OpenCode's chronological timeline, `BasicTool` rows, grouped exploration, live shell streaming, `follow.ts` scrolling and a turn footer.
 
 Shipped:

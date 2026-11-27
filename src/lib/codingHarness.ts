@@ -450,6 +450,8 @@ function buildToolExamples(style: ToolExecutionStyle): string {
     `- \`<zeus_tool name="read_file" path="src/app.ts" start="1" end="200"></zeus_tool>\` — read a file (optional 1-indexed line range)`,
     `- \`<zeus_tool name="search_code">functionName</zeus_tool>\` — fast substring/symbol search across workspace files`,
     `- \`<zeus_tool name="list_dir" path="src"></zeus_tool>\` — list files in a specific subdirectory (never re-list root \`""\` if already shown in \`## Project\`)`,
+    `- \`<zeus_tool name="subagent">{"agent":"explore","prompt":"Find where auth tokens are refreshed","description":"Find token refresh"}</zeus_tool>\` — run a real read-only child session (agents: explore, plan, review, verify, general); reuse its \`session_id\` to continue it`,
+    `- \`<zeus_tool name="todowrite">{"todos":[{"content":"Fix parser","status":"in_progress"},{"content":"Run tests","status":"pending"}]}</zeus_tool>\` — keep the session checklist current; \`<zeus_tool name="apply_patch">*** Begin Patch\n*** Update File: a.ts\n@@\n-old\n+new\n*** End Patch</zeus_tool>\` edits several files at once`,
   ];
   if (style === "guided_compact") {
     return base.slice(0, 5).join("\n");

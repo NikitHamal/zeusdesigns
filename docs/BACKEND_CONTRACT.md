@@ -89,3 +89,28 @@ Multimodal image/file attachments (`messages[*].attachments`) are supported nati
 - `opencode_start(root, port, config)` / `opencode_stop()` (`workspace.rs`): spawn or kill `opencode serve` (config JSON goes in `OPENCODE_CONFIG_CONTENT`). The UI talks to it over HTTP with `@opencode-ai/sdk` on `127.0.0.1:4096`.
 - Inline tool `edit_file`: `<zeus_tool name="edit_file" path="f">` with `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE` blocks. `read_file` accepts `start` and `end`; `list_dir` accepts `path`.
 - Provider `opencodezen`: OpenAI-compatible `https://opencode.ai/zen/v1/chat/completions`, `Authorization: Bearer public`, free models only.
+
+## Session 36: subagents, interactive docks, todos and patch tools
+
+`ChatRequest` also carries `sessionId` (the conversation id; scopes todos, permissions and the child registry), `toolsPrompt` (the XML tool docs reused by child sessions), `subagentDepth` (0 for the main agent) and `maxSubagentDepth` (default 2, Settings > Subagent depth).
+
+| Command | Args | Returns |
+|---|---|---|
+| `agent_answer_question` | `{id, answers: string[][], dismissed?}` | resumes the paused `question`/`ask_user` tool |
+| `agent_answer_permission` | `{id, decision: "once" \| "always" \| "deny"}` | resumes a paused permission gate or `request_approval` |
+| `agent_todos_get` / `agent_todos_set` | `{sessionId}` / `{sessionId, todos}` | `Todo[]` (`id`, `content`, `status: pending\|in_progress\|completed\|cancelled`, `priority`) |
+| `agent_subagent_cancel` | `{sessionId}` | stops a running child session |
+| `agent_subagent_messages` | `{sessionId}` | child transcript `{role, content}[]` |
+
+| Event | Payload |
+|---|---|
+| `zeus://question` | `{id, sessionId, questions: [{header, question, options: [{label, description}], multiple, custom}]}`; the agent thread blocks until `agent_answer_question` |
+| `zeus://permission` | `{id, sessionId, tool, title, detail, reason, explicit}`; blocks until `agent_answer_permission` |
+| `zeus://dock-clear` | `{id}` when a pending dock was cancelled |
+| `zeus://todo` | `{sessionId, todos}` after every `todowrite` |
+| `zeus://subagent` | `{type: start\|tool_call\|tool_result\|usage\|text\|done\|background_result, sessionId, parentToolId, ...}` streaming a child run into the parent `subagent` row |
+
+Tools (native JSON schemas in `providers_oai_a.rs`, XML `<zeus_tool>` docs in `tools.ts`/`stormyTools.ts`/`codingHarness.ts`, both reaching the same inline executor): `subagent` (aliases `task`, `spawn_subagent`; args `agent`, `prompt`, `description`, `model`, `sessionID`, `background`), `question`, `request_approval`, `todowrite`, `todoread`, `apply_patch` (`patchText`; result carries per-file `files[{path, from, kind, oldContent, newContent}]` for diffs), `websearch`, `web_fetch` (Markdown), `diagnostics`. `session_search` is answered in the webview (`src/lib/sessionSearch.ts`) like `studio_*` tools.
+
+UI state mirrors these events in `src/lib/agentState.ts` (`useAgent`): `questions`, `permissions`, `todos[sessionId]`, `subagents[parentToolId]`. `DockStack` (`Docks.tsx`) mounts above the unchanged Composer; `SubagentRow`/`SubagentDrawer` render child activity.
+
