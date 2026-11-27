@@ -228,6 +228,10 @@ fn format_exec_result(v: &Value) -> (bool, String) {
     }
     if code != 0 {
         parts.push(format!("[exit code: {}]", code));
+        if let Some(sh) = v.get("shell").and_then(|s| s.as_str()) {
+            let cwd = v.get("cwd").and_then(|s| s.as_str()).unwrap_or("");
+            parts.push(format!("[shell: {}{}]", sh, if cwd.is_empty() { String::new() } else { format!(", cwd: {}", cwd) }));
+        }
     }
     let text = if parts.is_empty() {
         format!("[exit {}] (no output)", code)

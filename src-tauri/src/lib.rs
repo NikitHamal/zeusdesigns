@@ -11,6 +11,8 @@ pub mod memory;
 pub mod perf;
 pub mod providers;
 pub mod server;
+pub mod shell;
+pub mod term;
 pub mod updater;
 pub mod workspace;
 
@@ -53,11 +55,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             workspace::set_term_app(app.handle().clone());
+            term::init(app.handle().clone());
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.maximize();
                 let _ = win.set_focus();
             }
             Ok(())
+        })
+        .on_window_event(|_w, ev| {
+            if let tauri::WindowEvent::Destroyed = ev {
+                term::shutdown();
+            }
         })
         .manage(provider_engine)
         .manage(local_server_state)
@@ -96,6 +104,13 @@ pub fn run() {
             workspace::fs_delete,
             workspace::fs_move,
             workspace::shell_run,
+            term::term_shells,
+            term::pty_open,
+            term::pty_write,
+            term::pty_resize,
+            term::pty_close,
+            term::pty_attach,
+            term::shell_cancel,
             memory::memory_list,
             memory::memory_search,
             memory::memory_add,
