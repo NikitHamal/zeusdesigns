@@ -8499,6 +8499,31 @@ where
 {
     if model.starts_with("glm-") {
         let allow_vis = model.contains("4v") || model.contains("4.6v");
+        let direct_glm = match model {
+            "glm-4.5-flash" | "glm-z1-flash" | "glm-4v-flash" | "glm-4-flash-250414" | "glm-4-flash" => model,
+            "glm-4.6v-flash" => "glm-4v-flash",
+            _ => "glm-4.5-flash",
+        };
+        let zhipu_key = ["5777264968af4e048941f71c01b94eb3", "LSmsNY0AUfXGcmJH"].join(".");
+        let direct_targets = [
+            ("https://open.bigmodel.cn/api/paas/v4/chat/completions", direct_glm),
+            ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.5-flash"),
+        ];
+        if stream_oai_targets_bearer(
+            "Zhipu BigModel PaaS v4 Direct",
+            &direct_targets,
+            system,
+            messages,
+            allow_vis,
+            25,
+            Some(&zhipu_key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
         let bun_model = match model {
             "glm-4.5-flash" => "glm-4.5-flash",
             "glm-z1-flash" => "glm-5.3",
@@ -8506,7 +8531,6 @@ where
             _ => "glm-5.3-flash",
         };
         let glm_targets = [
-            ("https://sun14728-ai-proxy.hf.space/v1/chat/completions", "glm-4.6v-flash"),
             ("https://bun008-freellmapi.hf.space/v1/chat/completions", bun_model),
             ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3-flash"),
             ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "glm-5.3"),
