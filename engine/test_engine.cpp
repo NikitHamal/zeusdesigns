@@ -39,12 +39,17 @@ int main() {
     assert(rc == 0);
     assert(std::string(title_buf) == "Design a Material 3 Expressive");
 
-    char cat_buf[65536]{};
+    char cat_buf[131072]{};
     int count = zeus_providers_catalog_json(cat_buf, sizeof(cat_buf));
-    assert(count == 47);
+    assert(count == 52);
     std::string cat(cat_buf);
+    assert(cat.find("gemini4hydrogen") != std::string::npos);
     assert(cat.find("antigravity") != std::string::npos);
     assert(cat.find("gemini4") != std::string::npos);
+    assert(cat.find("agnescloud") != std::string::npos);
+    assert(cat.find("volcark") != std::string::npos);
+    assert(cat.find("zhipudirect") != std::string::npos);
+    assert(cat.find("logfarehub") != std::string::npos);
     assert(cat.find("mychatcloud") != std::string::npos);
     assert(cat.find("supavip") != std::string::npos);
     assert(cat.find("shannian") != std::string::npos);
