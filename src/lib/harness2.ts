@@ -15,7 +15,13 @@
 import { uid, useStore } from "../store";
 import type { ToolCall } from "../types";
 import { readWorkspaceFile, writeWorkspaceFile, type Workspace } from "./bridge";
-import { getCodingHarnessProfile, type CodingHarnessProfile } from "./codingHarness";
+import {
+  boundToolOutputWithMarker,
+  getCodingHarnessProfile,
+  TOOL_OUTPUT_MAX_BYTES,
+  TOOL_OUTPUT_MAX_LINES,
+  type CodingHarnessProfile,
+} from "./codingHarness";
 
 export const HARNESS2_VERSION = "zeus-harness2-1.0";
 export const ALWAYS_ON_MAX_CHARS = 24_000;
@@ -226,12 +232,14 @@ export function runPostToolUseHook(
     }
   }
 
-  // Trim oversized tool output (keeping head + tail so stack traces at the end are never lost)
-  if (output.length > maxChars) {
-    const headLen = Math.floor(maxChars * 0.65);
-    const tailLen = Math.floor(maxChars * 0.3);
-    output = `${output.slice(0, headLen)}\n\n... [Harness² PostToolUse Hook trimmed ${output.length - headLen - tailLen} middle chars] ...\n\n${output.slice(-tailLen)}`;
-  }
+  // Match OpenCode's ToolOutput (`MAX_LINES = 2000`, `MAX_BYTES = 50 * 1024`):
+  // If Rust already bounded and saved the output with `[showing lines 1-N of M; full output saved to <path>]`,
+  // preserve it verbatim; otherwise bound to OpenCode limits with the retained file marker.
+  const bounded = boundToolOutputWithMarker(output, {
+    maxLines: TOOL_OUTPUT_MAX_LINES,
+    maxBytes: Math.min(Math.max(maxChars, TOOL_OUTPUT_MAX_BYTES), TOOL_OUTPUT_MAX_BYTES),
+  });
+  output = bounded.text;
 
   if (injectedHint) {
     output = `${output}\n\n${injectedHint}`;
