@@ -2,6 +2,17 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
+## Session 27 (Latest — Full Stormy / Oro Coding System Replica & Desktop Upgrade)
+Goal: Replicate the complete Stormy (`NikitHamal/Stormy` / Oro) coding, tool-call, file, and agent system inside `zeusdesigns` with an upgraded desktop IDE experience while keeping memory strictly below 20 MB.
+
+Shipped:
+- **Stormy Core Agent System (`src/lib/stormyAgent.ts`, `src/lib/engine.ts`)**:
+  - Ported `ToolAliases`, `TextToolProtocol` (`<tool_call><function=NAME><parameter=KEY>value</parameter></function></tool_call>` + `<zeus_tool>`), `ModelProfiles` (`MERCURY`, `FRONTIER`, `FAST`, `COMMUNITY`, `DEFAULT`), `ToolBatch` dependency-ordered execution waves, `StuckDetector` (write-epoch-aware repeat window + fail-streak corrective nudges), `TokenEstimator`, `RunLedger`, `HistoryPruner`, `BriefCheck`, `ProjectInstructions` (`ORO.md`, `AGENTS.md`, `CLAUDE.md`), `ProjectSnapshot`, `DiffUtils`, `AutonomyPolicy`, `QualityGate`, and `DisplayText`.
+- **Stormy Native Rust Engine (`src-tauri/src/workspace.rs`, `src-tauri/src/agent.rs`, `src-tauri/src/lib.rs`)**:
+  - Ported 4-stage `apply_stormy_text_edit` (exact, line-number-prefix-stripped, line-trimmed, and block-anchor fuzzy matching), `multi_edit`, `bm25_search_project` (40-line overlapping code chunks with camelCase splitting and synonyms), `project_outline_of`, `glob_workspace_files`, `fs_move`, `audit_workspace_files` (`QualityAuditor` + `workspace_audit`), `docs_lookup_reference`, `checkpoint_capture_file` (`workspace_checkpoints`, `workspace_restore_checkpoint`), `workspace_git_status`, `scan_workspace_security`, and all extended Stormy tools (`copy_file`, `create_folder`, `insert_at_line`, `append_to_file`, `prepend_to_file`, `regex_replace`, `get_file_info`, `diff_files`, `git_status`, `git_diff`, `git_log`, `git_branch`, `git_stage`, `git_unstage`, `git_commit`, `security_scan`, `add_ui_kit`, `spawn_subagent`, `request_approval`).
+- **Stormy UI & IDE Experience (`src/components/Activity.tsx`, `src/components/StormyCards.tsx`, `src/components/GitPanel.tsx`, `src/components/WorkspacePanels.tsx`, `src/components/Chat.tsx`, `src/components/Settings.tsx`)**:
+  - Replicated Stormy's `ToolCard` (with `ToolDetailModal` Diff/New/Old tabs), `ToolCallGroup` (with `IconTrail` and `ChangedFileChips`), `PlanTimeline`, `AskUserCard`, `ApprovalCard`, `@file` `FileMentionPopup`, `GitPanel` Source Control drawer, and upgraded Code Editor (line numbers, `Ctrl+F` Find & Replace, live `Code`/`Diff` tabs, and 1-click `check_syntax`).
+
 ## Current state
 - **46 Bundled Free Keyless Providers (`main`)**:
   - **6 New Multi-Turn Flagship Providers (`antigravity`, `gemini4`, `mychatcloud`, `supavip`, `shannian`, `claude5proxy`)**:
