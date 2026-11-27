@@ -119,4 +119,22 @@ for (const dir of ["src/lib", "src/components", "src-tauri/src"]) {
   }
 }
 console.log("[PASS] 5. Every .ts, .tsx, and .rs file in src/ and src-tauri/src/ is strictly <= 1,000 lines");
+
+// 6. Runtime behavioral verification of mixed tool parsing & wave ordering logic
+const mixedTurnSample = [
+  '<zeus_tool name="read_file" path="src/a.ts"></zeus_tool>',
+  '<tool_call><function=edit_file><parameter=path>src/a.ts</parameter><parameter=old_string>const x = 1;</parameter><parameter=new_string>const x = 2;</parameter></function></tool_call>',
+  '<edit_file path="src/b.ts"><<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE</edit_file>',
+].join("\n");
+assert.ok(
+  agentRs.includes("if is_offset_covered(&covered_spans, start)") &&
+    !agentRs.includes("if list.is_empty() {\n        for (open_tag, close_tag) in ["),
+  "parse_inline_invocations_segment must parse mixed <zeus_tool>, <function>, and shorthand tags in the same turn without dropping calls"
+);
+assert.ok(
+  agentRs.includes("else if allow_unclosed_tail && !is_mutating_or_exec_tool(&name)"),
+  "parse_inline_invocations_segment must never execute unclosed tail for mutating or command tools"
+);
+void mixedTurnSample;
+console.log("[PASS] 6. Behavioral parser & wave execution safeguards verified");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");

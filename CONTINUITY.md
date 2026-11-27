@@ -2,7 +2,26 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 27 (Latest — Full Stormy / Oro Coding System Replica & Desktop Upgrade)
+## Session 28 (Latest — Coding Harness Architecture Overhaul & Sub-1,000-Line Full-Stack Modularization)
+Goal: Permanently fix the 5 root causes of coding agent failures across `engine.ts`, `tools.ts`, `agent.ts`, `stormyAgent.ts`, `agent.rs`, and `providers.rs`, and refactor every file over 1,000 lines across both TypeScript and Rust below 1,000 lines while keeping memory strictly below 20 MB.
+
+Shipped:
+1. **Single Per-Provider Tool Protocol & Zero Synthetic `list_dir` Prefill (`src/lib/tools.ts`, `src/lib/agent.ts`, `src/lib/codingHarness.ts`, `src-tauri/src/providers_oai_a.rs`)**:
+   - Eliminated contradictory dual XML protocols in `toolsPrompt`: providers supporting native OpenAI (`openai_tools`) or Anthropic (`anthropic_tool_use`) function calling now receive one unified Native Function Calling instruction and full 29-tool schema (`build_native_oai_agent_tools` / `build_native_anthropic_agent_tools` covering `edit_file` with `old_string`/`new_string` + `content`, `multi_edit`, `move_file`, `glob`, `grep`, `search_code`, `search_project`, `check_syntax`, `git_status`, `git_diff`, `git_log`, `update_plan`, `ask_user`, `web_fetch`, `shell`, `python`, `read_file`, `write_file`, `delete_file`, `list_dir`, and `memory_*`), while keyless scraper providers (`scraper_xml_dsl`) receive one consistent `<zeus_tool>` XML protocol.
+   - Removed the synthetic 3-turn `[XML DSL Output Mode]` / `<zeus_tool name="list_dir">` conversation splice from `buildPlainContext` (`src/lib/agent.ts`) and `stream_oai_targets_bearer` (`src-tauri/src/providers_oai_a.rs`).
+2. **Eliminated System Prompt & Multi-Turn Tool Result Truncation (`src/lib/stormyAgent.ts`, `src/lib/engine.ts`, `src-tauri/src/providers.rs`, `src-tauri/src/providers_oai_a.rs`, `src-tauri/src/providers_oai_b.rs`, `src-tauri/src/providers_fingerprint.rs`)**:
+   - Raised `smart_cap_system` from `16,000`/`24,000` chars to `120,000` chars and bounded `ProjectSnapshot.inline` to `<= 16,000` chars so `STORMY_TOOLS` and `ProjectInstructions` are never middle-chopped.
+   - Raised `normalize_multi_turn_messages` from `(14, 4800, 28000)` to `(64, 36000, 160000)` and raised `read_file` retention to `64,000` chars across `engine.ts` and `agent_exec.rs`.
+3. **Raised HTTP Timeouts to 60s+ & Disabled Silent Cross-Provider Failover (`src-tauri/src/providers.rs`, `src-tauri/src/providers_fingerprint.rs`, `src/lib/bridge.ts`, `src/lib/engine.ts`)**:
+   - Enforced a minimum `60`-second HTTP timeout in `build_client` for all streaming providers (replacing `14s`/`15s`/`16s` timeouts on Gemini 4 Direct, Gemini 4 Cluster, and Antigravity).
+   - Disabled the silent 50-provider fallback loop in `dispatch_stream` so a slow or failing step returns an explicit provider error or surfaces an explicit `provider_notice` event instead of silently swapping the active model mid-task.
+4. **Post-Stream Wave-Ordered Tool Execution with Active `PreToolUse` & `AutonomyPolicy` Guards (`src-tauri/src/agent.rs`, `src-tauri/src/agent_edit.rs`, `src/lib/engine.ts`)**:
+   - Removed mid-delta tool execution from `chat_stream`: tools now execute strictly after stream completion (`res.is_ok()`), scheduled in dependency-ordered waves (`compute_tool_batch_waves`) after passing `pre_tool_and_autonomy_guard` (blocking destructive root deletes, sensitive `.env`/`.pem`/`.key`/`id_rsa` mutations, duplicate read/list calls, and interactive shell hangs).
+   - Fixed `parse_inline_invocations_segment` to remove `if list.is_empty()` guards (using `covered_spans` so mixing `<zeus_tool>`, `<function>`, and shorthand `<edit_file>` tags never drops calls) and disabled `allow_unclosed_tail` for mutating/exec tools.
+5. **Full-Stack Sub-1,000-Line Modularization (`src/` & `src-tauri/src/`)**:
+   - Refactored `providers.rs` (11,084 lines -> 13 focused modules), `server.rs` (3,068 lines -> 4 modules), `agent.rs` (2,903 lines -> 3 modules), `workspace.rs` (2,408 lines -> 3 modules), `stormyAgent.ts` (1,727 lines -> `stormyAgent.ts` + `stormyTools.ts`), and `Canvas.tsx`, `Inspector.tsx`, `Settings.tsx`, `ArtifactWorkbench.tsx` so 100% of `.ts`, `.tsx`, and `.rs` files are strictly `<= 1,000` lines.
+
+## Session 27 (Full Stormy / Oro Coding System Replica & Desktop Upgrade)
 Goal: Replicate the complete Stormy (`NikitHamal/Stormy` / Oro) coding, tool-call, file, and agent system inside `zeusdesigns` with an upgraded desktop IDE experience while keeping memory strictly below 20 MB.
 
 Shipped:
