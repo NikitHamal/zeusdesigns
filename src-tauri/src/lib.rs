@@ -4,6 +4,9 @@
 // (keyless providers, workspace indexer, persistent memory, agent loop, MCP client,
 // and Local OpenAI/OpenCode Server) lives in sibling modules and is registered below.
 
+// The native tool schema tables are large `json!` literals; raise the macro expansion ceiling.
+#![recursion_limit = "1024"]
+
 pub mod agent;
 pub mod crypto;
 pub mod mcp;
