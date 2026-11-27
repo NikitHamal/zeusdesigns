@@ -10,8 +10,10 @@
 //   - ProjectInstructions & ProjectSnapshot (ORO.md / AGENTS.md / CLAUDE.md + small project file inlining)
 //   - DiffUtils (unified diff computation with +/- counts and context hunks)
 
-import type { AgentPlan, PendingApproval, PendingUserQuestion, PlanTask, ToolCall } from "../types";
+import { activeConv, uid, useStore } from "../store";
+import { DEVICE_SIZE, type AgentPlan, type PendingApproval, type PendingUserQuestion, type PlanTask, type ToolCall } from "../types";
 import { nativeAudit, readWorkspaceFile, type Workspace } from "./bridge";
+import { formatFingerprintMarkdown, verifyModelAuthenticity } from "./lmFingerprint";
 
 /* ------------------------------------------------------------------ */
 /* 1. ToolAliases (Stormy ToolAliases.kt)                              */
@@ -1619,3 +1621,107 @@ export const DisplayText = {
       .join("`");
   },
 };
+
+/* ------------------------------------------------------------------ */
+/* 14. Workbench HTML Sync & /verify Slash Command Helper              */
+/* ------------------------------------------------------------------ */
+export async function syncHtmlFileToWorkbench(
+  relPath: string,
+  convId: string,
+  asstId: string,
+  syncedBoardIds: Set<string>
+) {
+  const cleanRel = relPath.replace(/\\/g, "/").replace(/^\.\//, "").trim();
+  if (!/\.html?$/i.test(cleanRel)) return;
+  const st = useStore.getState();
+  const ws = st.ui.workspace;
+  if (!ws) return;
+  try {
+    const htmlContent = await readWorkspaceFile(ws, cleanRel);
+    if (!htmlContent || htmlContent.trim().length < 20) return;
+    const fileName = cleanRel.split("/").pop() || cleanRel;
+    const S = useStore.getState();
+    const existing = S.artboards.find(
+      (a) =>
+        (a.source && a.source.replace(/\\/g, "/").toLowerCase() === cleanRel.toLowerCase()) ||
+        a.name.toLowerCase() === fileName.toLowerCase() ||
+        a.name.toLowerCase() === cleanRel.toLowerCase()
+    );
+    let boardId: string;
+    if (existing) {
+      boardId = existing.id;
+      S.reviseArtboard(boardId, htmlContent);
+      S.updateArtboard(boardId, { source: cleanRel, loading: false });
+    } else {
+      const created = S.addArtboard({
+        name: fileName,
+        device: "web",
+        html: htmlContent,
+        source: cleanRel,
+        w: DEVICE_SIZE.web.w,
+        h: DEVICE_SIZE.web.h,
+      });
+      boardId = created.id;
+    }
+    syncedBoardIds.add(boardId);
+    S.setSel([boardId]);
+    S.patchUI({ showCanvas: true });
+    const msg = activeConv(useStore.getState()).messages.find((m) => m.id === asstId);
+    const mergedIds = [...new Set([...(msg?.artboardIds ?? []), ...syncedBoardIds])];
+    useStore.getState().patchMessage(convId, asstId, { artboardIds: mergedIds });
+  } catch {
+    /* ignore if file not readable */
+  }
+}
+
+export async function runVerifySlashCommand(rawText: string): Promise<boolean> {
+  const verifyMatch = /^\/(?:verify|fingerprint|lmfingerprint)(?:\s+([\w./:-]+))?$/i.exec(rawText.trim());
+  if (!verifyMatch) return false;
+  const st = useStore.getState();
+  const arg = verifyMatch[1]?.trim() ?? "";
+  const [targetProv, targetModel] = arg.includes("/")
+    ? arg.split("/", 2)
+    : [st.settings.providerId, arg || st.settings.modelId];
+  const convId = st.activeConvId;
+  const asstId = uid();
+  const toolId = uid();
+  st.addMessage(convId, { id: uid(), role: "user", text: rawText.trim(), at: Date.now() });
+  st.addMessage(convId, {
+    id: asstId,
+    role: "assistant",
+    text: "",
+    streaming: true,
+    model: `${targetProv}/${targetModel}`,
+    at: Date.now(),
+    tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "running" }],
+  });
+  st.setBusy(true);
+  try {
+    const rep = await verifyModelAuthenticity(targetProv, targetModel);
+    const md = formatFingerprintMarkdown(rep);
+    useStore.getState().patchMessage(convId, asstId, {
+      text: md,
+      streaming: false,
+      tools: [
+        {
+          id: toolId,
+          name: "lmfingerprint",
+          args: `${rep.provider}/${rep.requestedModel} -> ${rep.verdict}`,
+          status: "ok",
+          output: `${rep.verdictLabel}\nEndpoint: ${rep.upstreamEndpoint}\nReported model: ${rep.upstreamReportedModel}\nFP: ${rep.fingerprintHash}`,
+        },
+      ],
+      stats: { ms: rep.latencyMs, tokens: Math.max(12, Math.round(md.length / 4)), tps: rep.tokensPerSec },
+    });
+  } catch (e) {
+    useStore.getState().patchMessage(convId, asstId, {
+      text: "",
+      streaming: false,
+      error: e instanceof Error ? e.message : "LMFingerprint verification failed",
+      tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "error", output: String(e) }],
+    });
+  } finally {
+    useStore.getState().setBusy(false);
+  }
+  return true;
+}

@@ -3,16 +3,7 @@ import type { Artboard, Attachment, Device, Message, Quote, ToolCall } from "../
 import { DEVICE_SIZE } from "../types";
 import { getDS, tokensCss } from "./designSystems";
 import { SKILLS } from "./skills";
-import {
-  generateTitle,
-  isNative,
-  nativeChat,
-  nativePerf,
-  readWorkspaceFile,
-  refreshTree,
-  type ChatEvent,
-  type ChatRequest,
-} from "./bridge";
+import { generateTitle, isNative, nativeChat, nativePerf, refreshTree, type ChatEvent, type ChatRequest } from "./bridge";
 import { findProvider } from "./providers";
 import { canvasApi } from "./canvasApi";
 import { harden, harnessPrompt } from "./harness";
@@ -21,49 +12,15 @@ import { toolsPrompt } from "./tools";
 import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./agent";
 import { getCodingHarnessProfile } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook } from "./harness2";
-import {
-  AutonomyPolicy,
-  BriefCheck,
-  DiffUtils,
-  HistoryPruner,
-  ModelProfiles,
-  parseApprovalFromToolCall,
-  parseAskUserFromToolCall,
-  parsePlanFromToolCall,
-  ProjectInstructions,
-  ProjectSnapshot,
-  QualityGate,
-  StuckDetector,
-  ToolAliases,
-} from "./stormyAgent";
+import { AutonomyPolicy, BriefCheck, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
 import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
 import { isStudioTool, runStudioTool, studioBrief } from "./studio";
-import {
-  applyThemeOverrideToHtml,
-  buildContinuationPrompt,
-  buildMultiTurnContext,
-  compactConversation,
-  getConversationBoards,
-  getContextWindowStats,
-  getProviderSpecialization,
-  isCanvasRefusal,
-  looksLikeRefusalStart,
-} from "./context";
-import {
-  extractLeakedPlan,
-  normalizeStream,
-  parseStream,
-  synthesizeToolCompletionSummary,
-} from "./streamParser";
+import { applyThemeOverrideToHtml, buildContinuationPrompt, buildMultiTurnContext, compactConversation, getConversationBoards, getContextWindowStats, getProviderSpecialization, isCanvasRefusal, looksLikeRefusalStart } from "./context";
+import { extractLeakedPlan, normalizeStream, parseStream, synthesizeToolCompletionSummary } from "./streamParser";
 import { demoRun } from "./demoEngine";
-import { formatFingerprintMarkdown, verifyModelAuthenticity } from "./lmFingerprint";
-import {
-  BROWSER_FALLBACK_PROVIDER_IDS,
-  resolveBrowserGatewayConfig,
-  streamCustom,
-} from "./browserProviders";
+import { BROWSER_FALLBACK_PROVIDER_IDS, resolveBrowserGatewayConfig, streamCustom } from "./browserProviders";
 
 export { extractLeakedPlan, normalizeStream, parseStream };
 
@@ -119,59 +76,6 @@ const quoteToText = (q: Quote, boards: Artboard[]) => {
   return `[Context: ${q.kind === "pin" ? "pinned comment on" : "selected"} screen "${a?.name ?? q.label}"${a ? ` (id=${a.id})` : ""}${q.text ? ` — "${q.text}"` : ""}]`;
 };
 
-/**
- * Synchronizes an `.html` / `.htm` file in the workspace directly with `s.artboards` and `ArtifactWorkbench`
- * whenever the agent creates or modifies it on disk via `write_file`, `edit_file`, `python`, or `shell`.
- */
-async function syncHtmlFileToWorkbench(
-  relPath: string,
-  convId: string,
-  asstId: string,
-  syncedBoardIds: Set<string>
-) {
-  const cleanRel = relPath.replace(/\\/g, "/").replace(/^\.\//, "").trim();
-  if (!/\.html?$/i.test(cleanRel)) return;
-  const st = useStore.getState();
-  const ws = st.ui.workspace;
-  if (!ws) return;
-  try {
-    const htmlContent = await readWorkspaceFile(ws, cleanRel);
-    if (!htmlContent || htmlContent.trim().length < 20) return;
-    const fileName = cleanRel.split("/").pop() || cleanRel;
-    const S = useStore.getState();
-    const existing = S.artboards.find(
-      (a) =>
-        (a.source && a.source.replace(/\\/g, "/").toLowerCase() === cleanRel.toLowerCase()) ||
-        a.name.toLowerCase() === fileName.toLowerCase() ||
-        a.name.toLowerCase() === cleanRel.toLowerCase()
-    );
-    let boardId: string;
-    if (existing) {
-      boardId = existing.id;
-      S.reviseArtboard(boardId, htmlContent);
-      S.updateArtboard(boardId, { source: cleanRel, loading: false });
-    } else {
-      const created = S.addArtboard({
-        name: fileName,
-        device: "web",
-        html: htmlContent,
-        source: cleanRel,
-        w: DEVICE_SIZE.web.w,
-        h: DEVICE_SIZE.web.h,
-      });
-      boardId = created.id;
-    }
-    syncedBoardIds.add(boardId);
-    S.setSel([boardId]);
-    S.patchUI({ showCanvas: true });
-    const msg = activeConv(useStore.getState()).messages.find((m) => m.id === asstId);
-    const mergedIds = [...new Set([...(msg?.artboardIds ?? []), ...syncedBoardIds])];
-    useStore.getState().patchMessage(convId, asstId, { artboardIds: mergedIds });
-  } catch {
-    /* ignore if file not readable */
-  }
-}
-
 export async function sendMessage(opts: {
   text: string;
   attachments?: Attachment[];
@@ -184,60 +88,7 @@ export async function sendMessage(opts: {
     await compactConversation({ manual: true });
     return;
   }
-  const verifyMatch = /^\/(?:verify|fingerprint|lmfingerprint)(?:\s+([\w./:-]+))?$/i.exec(opts.text.trim());
-  if (verifyMatch) {
-    const arg = verifyMatch[1]?.trim() ?? "";
-    const [targetProv, targetModel] = arg.includes("/")
-      ? arg.split("/", 2)
-      : [st.settings.providerId, arg || st.settings.modelId];
-    const convId = st.activeConvId;
-    const asstId = uid();
-    const toolId = uid();
-    st.addMessage(convId, {
-      id: uid(),
-      role: "user",
-      text: opts.text.trim(),
-      at: Date.now(),
-    });
-    st.addMessage(convId, {
-      id: asstId,
-      role: "assistant",
-      text: "",
-      streaming: true,
-      model: `${targetProv}/${targetModel}`,
-      at: Date.now(),
-      tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "running" }],
-    });
-    st.setBusy(true);
-    try {
-      const rep = await verifyModelAuthenticity(targetProv, targetModel);
-      const md = formatFingerprintMarkdown(rep);
-      useStore.getState().patchMessage(convId, asstId, {
-        text: md,
-        streaming: false,
-        tools: [
-          {
-            id: toolId,
-            name: "lmfingerprint",
-            args: `${rep.provider}/${rep.requestedModel} -> ${rep.verdict}`,
-            status: "ok",
-            output: `${rep.verdictLabel}\nEndpoint: ${rep.upstreamEndpoint}\nReported model: ${rep.upstreamReportedModel}\nFP: ${rep.fingerprintHash}`,
-          },
-        ],
-        stats: { ms: rep.latencyMs, tokens: Math.max(12, Math.round(md.length / 4)), tps: rep.tokensPerSec },
-      });
-    } catch (e) {
-      useStore.getState().patchMessage(convId, asstId, {
-        text: "",
-        streaming: false,
-        error: e instanceof Error ? e.message : "LMFingerprint verification failed",
-        tools: [{ id: toolId, name: "lmfingerprint", args: `${targetProv}/${targetModel}`, status: "error", output: String(e) }],
-      });
-    } finally {
-      useStore.getState().setBusy(false);
-    }
-    return;
-  }
+  if (await runVerifySlashCommand(opts.text)) return;
 
   const convId = st.activeConvId;
   const { settings } = st;
@@ -503,66 +354,10 @@ export async function sendMessage(opts: {
   };
 
   const selfCheck = async () => {
-    if (signal.aborted || !signal.aborted) return;
-    if (!useStore.getState().settings.selfCheck || signal.aborted) return;
-    for (const id of [...new Set(idMap.values())].slice(0, 4)) {
-      if (signal.aborted) return;
-      const a = useStore.getState().artboards.find((x) => x.id === id);
-      if (!a || a.html.length < 300 || a.html.includes("Empty frame")) continue;
-      const chip: ToolCall = { id: uid(), name: "design_audit", args: a.name, status: "running" };
-      tools.push(chip);
-      sync();
-      try {
-        let issues = await auditHtml(a.html, a.w, a.h);
-        const patched = patchFor(a.html, issues);
-        if (patched !== a.html) useStore.getState().updateArtboard(id, { html: patched });
-        const log = issues.map((i) => i.msg);
-        const severe = issues.filter((i) => i.severe);
-        if (severe.length && canCallModel() && !signal.aborted) {
-          chip.name = "design_repair";
-          sync();
-          try {
-            const cur = useStore.getState().artboards.find((x) => x.id === id)!;
-            const bare = cur.html
-              .replace(/<style data-zeus-kit>[\s\S]*?<\/style>/, "")
-              .replace(/<script data-zeus-kit-js>[\s\S]*?<\/script>/, "");
-            const raw = await Promise.race([
-              oneShot(
-                'You repair layout defects in one HTML screen. Fix ONLY the listed defects with the smallest possible edits. Keep content, structure, classes and CSS variables. Do not add shadows, emoji, gradients or external resources. Reply with the complete fixed document inside <artboard name="fix" mode="revise">...</artboard> and nothing else.',
-                `Screen ${a.w}x${a.h}px. Defects:\n${severe.map((i) => `- ${i.msg}`).join("\n")}\n\n<artboard name="${a.name}" mode="revise">\n${bare.slice(0, 30000)}\n</artboard>`,
-                { effort: "low", timeoutMs: 90000 }
-              ),
-              new Promise<string>((_, rej) => signal.addEventListener("abort", () => rej(new Error("stopped")))),
-            ]);
-            const b = parseStream(raw).blocks[0];
-            if (b && b.html.length > Math.max(600, bare.length * 0.75) && !signal.aborted) {
-              const fixed = harden(b.html, getDS(useStore.getState().settings.designSystemId), {
-                intent: opts.text,
-                name: a.name,
-                device: a.device,
-              }).html;
-              const again = await auditHtml(fixed, a.w, a.h);
-              const notSparse = !again.some((i) => i.kind === "sparse" || i.kind === "gap");
-              if (notSparse && again.filter((i) => i.severe).length < severe.length) {
-                useStore.getState().updateArtboard(id, { html: patchFor(fixed, again) });
-                log.push(
-                  `repaired: ${severe.length} defect${severe.length > 1 ? "s" : ""} fixed, ${again.filter((i) => i.severe).length} left`
-                );
-                issues = again;
-              } else log.push("repair did not improve the screen, kept the original");
-            }
-          } catch (e) {
-            log.push(`repair skipped: ${(e as Error).message}`);
-          }
-        }
-        chip.status = "ok";
-        chip.output = log.length ? log.join("\n") : "No layout issues";
-      } catch (e) {
-        chip.status = "error";
-        chip.output = (e as Error).message;
-      }
-      sync();
-    }
+    void auditHtml;
+    void patchFor;
+    void canCallModel;
+    void oneShot;
   };
 
   const nativeOn = isNative && useStore.getState().ui.nativeReady;
