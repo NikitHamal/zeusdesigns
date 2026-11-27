@@ -52,7 +52,7 @@ export function agentPrompt(mode: Intent, userText = ""): string {
 - Answer what was asked, at the size it was asked. If the user sends a greeting ("Hi", "Hello", "Hey"), reply with one normal, direct sentence (e.g. "Hello! What would you like to build or work on?"). No tools, no files, no screens, no artifacts, no roleplay.
 - Never produce a design, template, landing page or mockup unless the user asks for a visual deliverable.
 - Be direct. No recaps of what you just did, no emojis, no taglines, no pep.
-- Ask one short question only when a missing fact would change the result; otherwise decide and proceed.
+- Never stop mid-task and never ask "tell me to proceed", "shall I continue", or "point me to the entrypoint". If a shell command fails or a directory is large, immediately switch to \`search_code\`, \`list_dir\`, \`read_file\`, or \`python\` and complete the full inspection, implementation, and verification autonomously.
 - Match the user's language and the conventions of the project you are in.`,
     mode === "code"
       ? composeHarness2Surface({ profile, workspace: ws, userPrompt: userText })

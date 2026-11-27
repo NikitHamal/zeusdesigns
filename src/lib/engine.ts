@@ -777,7 +777,7 @@ export async function sendMessage(opts: {
             )
           );
           const isInspectionPrompt =
-            /\b(what'?s\s+going\s+on|see\s+what'?s|explain|summarize|summary|status|check|inspect|analyze|review|why|how\s+does|show\s+me|fetch\s+latest)\b/i.test(
+            /\b(what'?s\s+going\s+on|see\s+what'?s|explain|summarize|summary|status|check|insepct|inspect|analyze|review|why|how\s+does|show\s+me|fetch\s+latest)\b/i.test(
               opts.text
             ) && !/\b(edit_file|write_file|remove\s+that|delete\s+the|in\s+["'`][\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md)["'`]\s*,\s*(?:update|remove|change|replace|fix))\b/i.test(opts.text);
           const asksForMutation =
@@ -785,16 +785,23 @@ export async function sendMessage(opts: {
             /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
               opts.text
             );
+          const hasReadAnyFile = tools.some((t) =>
+            /^(read_file|read|cat|view_file|open_file|search_code|grep|rg)$/.test(t.name) && t.status === "ok"
+          );
+          const lastToolFailed = tools.length > 0 && tools[tools.length - 1].status === "error";
+          const deferredToUser =
+            /\b(tell me to proceed|let me know if you(?:'d like| want) me to (?:proceed|continue|inspect)|shall I (?:proceed|continue)|if you want to start there|and I will inspect)\b/i.test(
+              cleanVisibleRound
+            ) || (lastToolFailed && !hasReadAnyFile && !hasFileOrMemMutation);
           const stoppedAfterReadOnly =
-            asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
+            asksForMutation && !hasFileOrMemMutation && tools.length > 0;
           const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning));
           const dumpedCodeWithoutWrite =
-            tools.length === 0 &&
             asksForMutation &&
             !hasFileOrMemMutation &&
             (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) ||
               /\bwith\s+open\s*\(/.test(cleanVisibleRound));
-          // Only treat visible prose as "statedPlanOnly" when no tools have run yet (or prose is a short 1-line announcement)
+          // Treat visible prose as "statedPlanOnly" when no tools have run yet or when the model defers mid-task
           const visibleAnnouncementOnly =
             tools.length === 0 &&
             cleanVisibleRound.length < 240 &&
@@ -805,15 +812,18 @@ export async function sendMessage(opts: {
             cutOffAfterThink ||
             stoppedAfterReadOnly ||
             dumpedCodeWithoutWrite ||
+            deferredToUser ||
             visibleAnnouncementOnly;
 
           if (
             (mode === "code" || Boolean(st.ui.workspace)) &&
             !produced &&
-            nudgeCount < 2 &&
-            (round === 0 ? (tools.length === 0 && (statedPlanOnly || !cleanVisibleRound)) : (cutOffAfterThink || stoppedAfterReadOnly)) &&
+            nudgeCount < 3 &&
+            (round === 0
+              ? tools.length === 0 && (statedPlanOnly || !cleanVisibleRound)
+              : cutOffAfterThink || stoppedAfterReadOnly || deferredToUser || dumpedCodeWithoutWrite) &&
             (statedPlanOnly ||
-              /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md|pull|push|fetch|clone|git|github|status|diff|check|inspect|list|read|search|find|grep)\b/i.test(
+              /\b(write|create|edit|fix|update|add|remove|refactor|implement|run|test|debug|build|script|file|md|pull|push|fetch|clone|git|github|status|diff|check|insepct|inspect|list|read|search|find|grep)\b/i.test(
                 opts.text
               ))
           ) {
@@ -840,23 +850,25 @@ export async function sendMessage(opts: {
               opts.text.match(/["'`]([\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md))["'`]/i)?.[1] ||
               "";
             const specificInstruction =
-              cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly
+              cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
                 ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete answer to the user outside \`<think>\` now (or emit the next \`<zeus_tool>\` block if another workspace action is required).`
-                : stoppedAfterReadOnly
-                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification yet. Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` outside \`<think>\` right now to apply the change.`
+                : deferredToUser
+                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now by emitting \`<zeus_tool name="search_code">query</zeus_tool>\`, \`<zeus_tool name="list_dir" path="subdir"></zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` outside \`<think>\`.`
+                : stoppedAfterReadOnly || dumpedCodeWithoutWrite
+                ? `You already inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"} (${tools.length} read/search step${tools.length > 1 ? "s" : ""}), but you have NOT applied the requested modification on disk yet (writing markdown code blocks in prose does not modify files). Emit \`<zeus_tool name="edit_file" path="${targetFileHint || "..."}"><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool>\` or \`<zeus_tool name="write_file" path="${targetFileHint || "..."}">...</zeus_tool>\` outside \`<think>\` right now to apply the change.`
                 : `Your reply stopped without emitting a \`<zeus_tool>\` block, so no command or file operation ran. Output ONLY \`<zeus_tool name="edit_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="write_file" path="...">...</zeus_tool>\`, \`<zeus_tool name="shell">...</zeus_tool>\`, \`<zeus_tool name="python">...</zeus_tool>\`, or \`<zeus_tool name="read_file" path="..."></zeus_tool>\` now.`;
             msgs = [
               ...msgs,
               {
                 role: "assistant",
                 content:
-                  cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly
+                  cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
                     ? `<think>${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}</think>`
-                    : "Understood. I will emit the `<zeus_tool>` XML block now to apply the change directly.",
+                    : "Understood. I will emit the `<zeus_tool>` XML block now to execute the next step directly.",
               },
               {
                 role: "user",
-                content: specificInstruction,
+                content: `Original user request: ${opts.text.slice(0, 1000)}\n\n${specificInstruction}`,
               },
             ];
             current = { ...req, requestId: uid(), effort: "low", messages: msgs };
@@ -881,20 +893,32 @@ export async function sendMessage(opts: {
           })
           .join("\n");
         const said = [strippedRound, canonicalTools].filter(Boolean).join("\n");
+        const roundHadError = roundTools.some((t) => t.status === "error");
+        const hasMutatedSoFar = tools.some((t) =>
+          /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(
+            t.name
+          ) && t.status === "ok"
+        );
+        const asksMut = /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
+          opts.text
+        );
+        const nextStepDirective = roundHadError
+          ? `One or more tool calls above failed. Do NOT stop and NEVER ask the user "tell me to proceed"—immediately emit a fallback <zeus_tool> (such as <zeus_tool name="search_code">...</zeus_tool>, <zeus_tool name="list_dir" path="..."></zeus_tool>, <zeus_tool name="read_file" path="..."></zeus_tool>, or <zeus_tool name="python">...</zeus_tool>) outside <think> to continue.`
+          : asksMut && !hasMutatedSoFar
+          ? `You have only read/searched files so far and have NOT modified any files on disk yet. Emit <zeus_tool name="edit_file" path="..."><<<<<<< SEARCH\n...\n=======\n...\n>>>>>>> REPLACE</zeus_tool> or <zeus_tool name="write_file" path="...">...</zeus_tool> (or <zeus_tool name="read_file" path="..."></zeus_tool> if you need to inspect another file first) outside <think> now. Do NOT output markdown code fences instead of <zeus_tool>.`
+          : `If every part of the user's request is now 100% complete and verified on disk, do NOT call any more tools and provide your complete, direct response. Otherwise, emit the next <zeus_tool> block outside <think> to finish the remaining steps (never stop mid-inspection to ask "tell me to proceed" and never repeat an identical call).`;
         msgs = [
           ...msgs,
           { role: "assistant", content: said },
           {
             role: "user",
-            content: `Tool results:\n${roundTools
+            content: `Original user request: ${opts.text.slice(0, 1200)}\n\nTool results:\n${roundTools
               .map((t) => {
                 const isRead = /^(read_file|read|cat|view_file|open_file)$/.test(t.name);
                 const cap = isRead ? 48_000 : mode === "code" ? codingProfile.maxToolOutputChars : 12_000;
                 return `<tool_result name="${t.name}" ok="${t.status === "ok"}">\n${(t.output ?? "").slice(0, cap)}\n</tool_result>`;
               })
-              .join(
-                "\n"
-              )}\nIf every part of the user's request is now complete and verified on disk, do NOT call any more tools and reply with 1-2 concise sentences summarizing what you changed. Otherwise, emit the next <zeus_tool> block needed to finish the remaining steps (never repeat a call you already made).`,
+              .join("\n")}\n\n${nextStepDirective}`,
           },
         ];
         current = { ...req, requestId: uid(), messages: msgs };
