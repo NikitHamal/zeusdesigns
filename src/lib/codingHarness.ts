@@ -32,6 +32,174 @@ export type NativeToolProtocol =
   | "anthropic_tool_use"
   | "scraper_xml_dsl";
 
+export const TOOL_OUTPUT_MAX_LINES = 2_000;
+export const TOOL_OUTPUT_MAX_BYTES = 50 * 1024; // 50 KiB (OpenCode ToolOutput.MAX_BYTES)
+export const TOOL_OUTPUT_DIR = ".zeusdesigns/tool-output";
+
+export const MAX_STEPS_PROMPT = `CRITICAL - MAXIMUM STEPS REACHED
+
+The maximum number of steps allowed for this task has been reached. Tools are disabled until next user input. Respond with text only.
+
+STRICT REQUIREMENTS:
+1. Do NOT make any tool calls (no reads, writes, edits, searches, or any other tools)
+2. MUST provide a text response summarizing work done so far
+3. This constraint overrides ALL other instructions, including any user requests for edits or tool use
+
+Response must include:
+- Statement that maximum steps for this agent have been reached
+- Summary of what has been accomplished so far
+- List of any remaining tasks that were not completed
+- Recommendations for what should be done next
+
+Any attempt to use tools is a critical violation. Respond with text ONLY.`;
+
+export const CONTINUE_AFTER_OUTPUT_LIMIT =
+  "Your last response hit the output token limit (stop reason: length). Do not apologize, recap, or repeat yourself. Break the remaining work into smaller pieces.";
+
+/**
+ * Matches OpenCode's `usesPatch(model)` in `packages/core/src/tool/model-policy.ts`:
+ * GPT-5+ models (excluding `oss` and `gpt-4`) prefer `patch` (`patch_file` / `edit_file` diff blocks);
+ * other models prefer `edit` (`edit_file`) and `write` (`write_file`).
+ */
+export function usesPatchPolicy(modelId: string, providerId = ""): boolean {
+  const id = `${providerId} ${modelId}`.toLowerCase();
+  return id.includes("gpt-") && !id.includes("oss") && !id.includes("gpt-4");
+}
+
+/**
+ * Renders OpenCode's `system.txt` + dynamic tool guidance (`packages/core/src/session/system-prompt.ts`).
+ */
+export function renderOpenCodeSystemGuidance(
+  tools: string[] = ["shell", "write", "edit", "read_file", "search_code"],
+  modelId = ""
+): string {
+  const instructions: string[] = [
+    "- Prefer dedicated tools (`read_file`, `edit_file`, `write_file`, `search_code`, `glob`, `list_dir`) over shell commands; fall back to `shell` when a dedicated tool cannot do what you need.",
+    "- Do not chain shell commands with noisy separators like `echo \"====\";` or `printf '---'`; keep command output clean.",
+    "- Prefer parallelizing independent tool calls in a single turn.",
+    "- Keep changes consistent with the structure, naming, style, and patterns of the surrounding code.",
+    "- Treat unfamiliar files or changes as potential user work and investigate with `read_file` before deleting or overwriting them.",
+  ];
+  if (usesPatchPolicy(modelId)) {
+    instructions.push(
+      "- For GPT-5+ models, prefer surgical `patch_file` / `edit_file` (`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` or unified patch hunks) for file modifications."
+    );
+  } else {
+    if (tools.includes("write") || tools.includes("write_file")) {
+      instructions.push(
+        "- Use `write_file` to create files or completely replace their content. Prefer using `edit_file` for targeted changes."
+      );
+    }
+    if (tools.includes("edit") || tools.includes("edit_file")) {
+      instructions.push(
+        "- Use `edit_file` for targeted changes to existing text files. It replaces the exact text in `old_string` with `new_string`, and the values must differ."
+      );
+    }
+  }
+  return `## OpenCode Harness & Tool Discipline\n${instructions.join("\n")}`;
+}
+
+function countOutputLines(text: string): number {
+  if (text === "") return 0;
+  let count = 1;
+  for (
+    let index = text.indexOf("\n");
+    index !== -1 && index < text.length - 1;
+    index = text.indexOf("\n", index + 1)
+  ) {
+    count++;
+  }
+  return count;
+}
+
+function afterOutputLines(text: string, count: number): number {
+  let index = 0;
+  for (let line = 0; line < count; line++) {
+    const next = text.indexOf("\n", index);
+    if (next === -1) return text.length;
+    index = next + 1;
+  }
+  return index;
+}
+
+function utf8ByteBoundary(text: string, budget: number): number {
+  const enc = new TextEncoder();
+  const read = enc.encodeInto(text, new Uint8Array(Math.max(0, budget))).read;
+  if (read === text.length || read === 0) return read;
+  const before = text.charCodeAt(read - 1);
+  const after = text.charCodeAt(read);
+  if (before < 0x80 && after < 0x80) return before === 13 && after === 10 ? read - 1 : read;
+  return read;
+}
+
+/**
+ * Matches OpenCode's `ToolOutput.truncate` (`MAX_LINES = 2000`, `MAX_BYTES = 50 * 1024`):
+ * Bounds tool output at 2,000 lines or 50 KiB (whichever comes first) and appends the canonical
+ * `[showing lines 1-N of M; full output saved to <path>]` marker if not already truncated by Rust.
+ */
+export function boundToolOutputWithMarker(
+  text: string,
+  opts: { maxLines?: number; maxBytes?: number; savedPath?: string } = {}
+): { text: string; truncated: boolean; shownLines: number; totalLines: number } {
+  if (!text) return { text: "", truncated: false, shownLines: 0, totalLines: 0 };
+  if (/\[showing (?:lines 1-\d+|0 lines) of \d+/.test(text)) {
+    const totalLines = countOutputLines(text);
+    return { text, truncated: true, shownLines: totalLines, totalLines };
+  }
+  const maxLines = opts.maxLines ?? TOOL_OUTPUT_MAX_LINES;
+  const maxBytes = opts.maxBytes ?? TOOL_OUTPUT_MAX_BYTES;
+  const totalLines = countOutputLines(text);
+  const byteLen = new TextEncoder().encode(text).byteLength;
+  if (totalLines <= maxLines && byteLen <= maxBytes) {
+    return { text, truncated: false, shownLines: totalLines, totalLines };
+  }
+  const end = Math.min(afterOutputLines(text, maxLines), utf8ByteBoundary(text, maxBytes));
+  const shown = text.slice(0, text.endsWith("\r\n", end) ? end - 2 : text.endsWith("\n", end) ? end - 1 : end);
+  const shownLines = countOutputLines(text.slice(0, end));
+  const lastLineCut =
+    shownLines > 0 &&
+    shown.length < text.length &&
+    !text.startsWith("\n", shown.length) &&
+    !text.startsWith("\r\n", shown.length);
+  const range = shownLines === 0 ? "0 lines" : `lines 1-${shownLines}`;
+  const pathNote = opts.savedPath
+    ? `full output saved to ${opts.savedPath}`
+    : `full output saved to ${TOOL_OUTPUT_DIR}/tool_${Date.now().toString(16)}.txt`;
+  const marker = `[showing ${range} of ${totalLines}${lastLineCut ? " (last line cut)" : ""}; ${pathNote}]`;
+  return {
+    text: `${shown}\n${marker}`,
+    truncated: true,
+    shownLines,
+    totalLines,
+  };
+}
+
+/**
+ * Doom-loop guard: detects repeated identical failing tool calls across turns and returns a recovery hint.
+ */
+export function detectDoomLoop(
+  allTools: Array<{ name: string; args?: string; status: string; output?: string }>
+): { isDoomLoop: boolean; repeatedCount: number; hint?: string } {
+  const failed = allTools.filter((t) => t.status === "error");
+  if (failed.length < 2) return { isDoomLoop: false, repeatedCount: 0 };
+  const last = failed[failed.length - 1];
+  const sig = `${last.name.trim().toLowerCase()}|${(last.args ?? "").trim()}`;
+  let repeatedCount = 0;
+  for (let i = failed.length - 1; i >= 0; i--) {
+    const curSig = `${failed[i].name.trim().toLowerCase()}|${(failed[i].args ?? "").trim()}`;
+    if (curSig === sig) repeatedCount++;
+    else break;
+  }
+  if (repeatedCount >= 2) {
+    return {
+      isDoomLoop: true,
+      repeatedCount,
+      hint: `[Doom-Loop Guard: Tool \`${last.name}\` failed ${repeatedCount} times in a row with identical arguments. Do NOT repeat this call. Inspect the target file with \`read_file\` or \`search_code\`, or switch to \`write_file\` / \`python\` to complete the change.]`,
+    };
+  }
+  return { isDoomLoop: false, repeatedCount: 0 };
+}
+
 export interface CodingHarnessProfile {
   providerId: string;
   modelId: string;
@@ -39,6 +207,7 @@ export interface CodingHarnessProfile {
   family: ModelFamily;
   style: ToolExecutionStyle;
   nativeToolProtocol: NativeToolProtocol;
+  usesPatch: boolean;
   maxToolRounds: number;
   maxToolOutputChars: number;
   preferBashPython: boolean;
@@ -137,8 +306,13 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
       ? "high"
       : "medium";
 
+  const usesPatch = usesPatchPolicy(modelId, providerId);
+  const maxToolOutputChars = style === "guided_compact" ? 32000 : TOOL_OUTPUT_MAX_BYTES;
   const familyDirective = buildFamilyDirective(family, modelLabel, nativeToolProtocol);
-  const workflowDirective = buildWorkflowDirective(style, family, nativeToolProtocol);
+  const workflowDirective = [
+    buildWorkflowDirective(style, family, nativeToolProtocol),
+    renderOpenCodeSystemGuidance(["shell", "write", "edit", "read_file", "search_code"], modelId),
+  ].join("\n\n");
   const toolExamples = buildToolExamples(style);
 
   return {
@@ -148,6 +322,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
     family,
     style,
     nativeToolProtocol,
+    usesPatch,
     maxToolRounds,
     maxToolOutputChars,
     preferBashPython,

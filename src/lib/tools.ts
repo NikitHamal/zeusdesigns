@@ -73,27 +73,45 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
   const usesNativeTools =
     profile.nativeToolProtocol === "openai_tools" || profile.nativeToolProtocol === "anthropic_tool_use";
 
+  // Match OpenCode's `modelTools` (`packages/core/src/tool/model-policy.ts`):
+  // GPT-5+ models prefer `patch_file` / `edit_file` unified/search-replace patching, while all other models highlight `edit_file` + `write_file`.
+  const filteredTools = STORMY_TOOLS.filter((t) => {
+    if (profile.usesPatch) return true;
+    return t.name !== "patch";
+  });
+
+  const openCodeDiscipline = [
+    "- Prefer dedicated tools (`read_file`, `edit_file`, `write_file`, `search_code`, `glob`, `list_dir`) over `shell` commands; fall back to `shell` when a dedicated tool cannot do what you need.",
+    "- Do not chain shell commands with separators like `echo \"====\";` or `printf '---'`; keep terminal output clean.",
+    "- Prefer parallelizing independent tool calls in a single turn.",
+    "- Treat unfamiliar files or changes as potential user work and investigate with `read_file` before deleting or overwriting them.",
+    `- Tool outputs exceeding 2,000 lines or 50 KiB are automatically bounded and saved to \`.zeusdesigns/tool-output/tool_<id>.txt\` with \`[showing lines 1-N of M; full output saved to <path>]\` so you can inspect the rest via \`read_file\` (with \`start\`/\`end\`) or \`search_code\`.`,
+  ].join("\n");
+
   const protocolSection = usesNativeTools
     ? [
         "## Agent Tools (Native Function Calling)",
         "Invoke workspace, shell, python, git, search, plan, and memory tools using the native tool/function-calling API provided in this request (or if the upstream gateway strips native tool definitions, emit `<zeus_tool name=\"TOOL_NAME\" path=\"...\">...</zeus_tool>` XML blocks outside `<think>`).",
-        "- Pass complete, un-truncated file contents or exact search/replace blocks in your tool arguments.",
-        "- You may batch independent read/search calls in a single turn; they execute in dependency-ordered waves after your response stream finishes.",
+        openCodeDiscipline,
+        profile.usesPatch
+          ? "- Model Policy (GPT-5+ Patch Mode): Prefer `patch_file` / `edit_file` (`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE` or unified patch hunks) for modifying existing files."
+          : "- Model Policy: Use `write_file` to create new files or completely replace their content, and prefer `edit_file` for targeted changes to existing files.",
         "- Never fabricate tool output or write `<tool_result>` yourself.",
         "",
         "Available Workspace & Engineering Tools (`?` = optional):",
-        ...STORMY_TOOLS.map((t) => `- \`${t.signature}\` — ${t.summary}`),
+        ...filteredTools.map((t) => `- \`${t.signature}\` — ${t.summary}`),
         `- \`memory_search(query: string, path?: string)\` | \`memory_save(content: string, path?: string)\` | \`memory_edit(path: string, content: string)\` | \`memory_delete(path: string)\``,
         `- \`lmfingerprint(path: string)\` — verify whether a provider/model is genuine direct or routed under the hood.`,
       ].join("\n")
     : [
         "## Agent Tools (Zeus XML Protocol)",
         "Emit `<zeus_tool>` blocks in your final response (never inside internal reasoning) and stop your turn after the closing tag so the harness can execute them after stream completion and return `<tool_result>`.",
+        openCodeDiscipline,
         ws || !opts.design ? profile.toolExamples : "",
         "- `<zeus_tool name=\"web_fetch\" path=\"https://example.com\"></zeus_tool>` | `<zeus_tool name=\"lmfingerprint\" path=\"provider/model\"></zeus_tool>` | `<zeus_tool name=\"memory_search\">query</zeus_tool>` | `<zeus_tool name=\"memory_save\" path=\"preferences\">durable fact</zeus_tool>` | `<zeus_tool name=\"memory_edit\" path=\"mem-id\">updated fact</zeus_tool>` | `<zeus_tool name=\"memory_delete\" path=\"mem-id\"></zeus_tool>`",
         "",
         "Additional Workspace Tools (pass JSON arguments in body when multiple parameters are needed):",
-        ...STORMY_TOOLS.map((t) => `- \`${t.signature}\` — ${t.summary}`),
+        ...filteredTools.map((t) => `- \`${t.signature}\` — ${t.summary}`),
       ]
         .filter(Boolean)
         .join("\n");
