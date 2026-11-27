@@ -17,10 +17,10 @@ import { cn } from "../utils/cn";
 import { Dropdown, IconBtn, Markdown, MenuItem, MenuLabel, Thumb } from "./ui";
 import { Icon } from "./Icon";
 import { ApprovalCard, AskUserCard, Collapse, LiveStatus, PlanTimeline, WorkLog } from "./Activity";
-import { FilesPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
+import { FilesPanel, GitPanel, ProjectWorkspaceCard, TerminalPanel } from "./WorkspacePanels";
 import { splitM3e, m3eLink, type M3eDoc } from "../lib/m3e";
 
-export { FilesPanel, TerminalPanel };
+export { FilesPanel, GitPanel, TerminalPanel };
 
 /* ------------------------------------------------------------------ */
 /* Message bits                                                        */
@@ -697,7 +697,7 @@ export function ChatPane() {
   const artifacts = useStore((s) => convArtifactCount(s, s.activeConvId));
   const [editing, setEditing] = useState(false);
   const [dockOpen, setDockOpen] = useState(true);
-  const [dockTab, setDockTab] = useState<"files" | "terminal">("files");
+  const [dockTab, setDockTab] = useState<"files" | "git" | "terminal">("files");
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [away, setAway] = useState(false);
@@ -733,7 +733,7 @@ export function ChatPane() {
       .catch((e) => useStore.getState().notify(e.message));
   };
 
-  const handleOpenDock = (tab: "files" | "terminal", filePath?: string) => {
+  const handleOpenDock = (tab: "files" | "git" | "terminal", filePath?: string) => {
     if (!showCanvas && !m3eOpen) {
       setDockOpen(true);
       setDockTab(tab);
@@ -809,6 +809,7 @@ export function ChatPane() {
           {([
             ["chat", "chat_bubble", "Chat"],
             ["files", "account_tree", "Files"],
+            ["git", "commit", "Git"],
             ["terminal", "terminal", "Terminal"],
           ] as const).map(([id, icon, label]) => {
             const on = leftTab === id;
@@ -849,6 +850,8 @@ export function ChatPane() {
 
       {leftTab === "files" ? (
         <FilesPanel />
+      ) : leftTab === "git" ? (
+        <GitPanel />
       ) : leftTab === "terminal" ? (
         <TerminalPanel />
       ) : (
@@ -887,7 +890,17 @@ export function ChatPane() {
                     )}
                   >
                     <Icon name="account_tree" size={14} />
-                    Project Files
+                    Files
+                  </button>
+                  <button
+                    onClick={() => setDockTab("git")}
+                    className={cn(
+                      "state flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium",
+                      dockTab === "git" ? "bg-surface-high text-on-surface font-semibold" : "text-on-surface-variant"
+                    )}
+                  >
+                    <Icon name="commit" size={14} />
+                    Git
                   </button>
                   <button
                     onClick={() => setDockTab("terminal")}
@@ -905,7 +918,7 @@ export function ChatPane() {
                 </IconBtn>
               </div>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                {dockTab === "files" ? <FilesPanel /> : <TerminalPanel />}
+                {dockTab === "files" ? <FilesPanel /> : dockTab === "git" ? <GitPanel /> : <TerminalPanel />}
               </div>
             </div>
           )}

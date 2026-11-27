@@ -4,14 +4,18 @@ import type { FileNode } from "../types";
 import { focusArtboard } from "../lib/actions";
 import {
   listWorkspaceDir,
+  nativeAudit,
   nativeCheckpoints,
+  nativeGit,
   nativeShell,
   openWorkspace,
   readWorkspaceFile,
   refreshTree,
   writeWorkspaceFile,
   type NativeCheckpointManifest,
+  type NativeGitStatus,
 } from "../lib/bridge";
+import { DiffUtils } from "../lib/stormyAgent";
 import { cn } from "../utils/cn";
 import { IconBtn } from "./ui";
 import { Icon } from "./Icon";
@@ -104,12 +108,23 @@ export function FilesPanel() {
   const notify = useStore((s) => s.notify);
   const addOrSelectProject = useStore((s) => s.addOrSelectProject);
   const [q, setQ] = useState("");
-  const [activeFile, setActiveFile] = useState<{ path: string; content: string; dirty: boolean } | null>(null);
+  const [activeFile, setActiveFile] = useState<{
+    path: string;
+    content: string;
+    originalContent: string;
+    dirty: boolean;
+  } | null>(null);
+  const [editorMode, setEditorMode] = useState<"code" | "diff">("code");
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [syntaxFindings, setSyntaxFindings] = useState<string[] | null>(null);
   const [creatingFile, setCreatingFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [checkpoints, setCheckpoints] = useState<NativeCheckpointManifest[]>([]);
+  const gutterRef = useRef<HTMLDivElement>(null);
 
   const loadCheckpoints = async () => {
     if (!ws?.root) return;
@@ -140,7 +155,9 @@ export function FilesPanel() {
     if (!curWs) return;
     try {
       const content = await readWorkspaceFile(curWs, path);
-      setActiveFile({ path, content, dirty: false });
+      setActiveFile({ path, content, originalContent: content, dirty: false });
+      setEditorMode("code");
+      setSyntaxFindings(null);
     } catch {
       notify(`Could not read ${path}`);
     }
@@ -162,7 +179,11 @@ export function FilesPanel() {
       await writeWorkspaceFile(ws, activeFile.path, activeFile.content);
       const tree = await refreshTree(ws);
       patchUI({ workspace: { ...ws, tree } });
-      setActiveFile({ ...activeFile, dirty: false });
+      setActiveFile({ ...activeFile, originalContent: activeFile.content, dirty: false });
+      if (ws.root) {
+        const issues = await nativeAudit.check(ws.root, [activeFile.path]);
+        setSyntaxFindings(issues);
+      }
       notify(`Saved ${activeFile.path}`);
     } catch (e) {
       notify(e instanceof Error ? e.message : "Failed to save file");
@@ -180,7 +201,9 @@ export function FilesPanel() {
       patchUI({ workspace: { ...ws, tree } });
       setCreatingFile(false);
       setNewFilePath("");
-      setActiveFile({ path: p, content: "", dirty: false });
+      setActiveFile({ path: p, content: "", originalContent: "", dirty: false });
+      setEditorMode("code");
+      setSyntaxFindings(null);
       notify(`Created ${p}`);
     } catch (e) {
       notify(e instanceof Error ? e.message : "Failed to create file");
@@ -321,7 +344,7 @@ export function FilesPanel() {
 
       {activeFile ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center gap-1.5 border-b border-outline-variant/60 bg-surface-low px-3 py-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-outline-variant/60 bg-surface-low px-3 py-1.5">
             <button
               onClick={() => setActiveFile(null)}
               className="state inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-on-surface-variant hover:text-on-surface"
@@ -333,6 +356,40 @@ export function FilesPanel() {
               {activeFile.path}
               {activeFile.dirty ? " *" : ""}
             </span>
+            <div className="flex items-center rounded-full border border-outline-variant/60 bg-surface p-0.5 text-[11px] font-medium">
+              {(["code", "diff"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setEditorMode(m)}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 capitalize transition-colors",
+                    editorMode === m ? "bg-surface-high font-semibold text-on-surface" : "text-on-surface-variant"
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <IconBtn
+              label="Find & Replace (Ctrl+F)"
+              size={28}
+              active={findOpen}
+              onClick={() => setFindOpen(!findOpen)}
+            >
+              <Icon name="find_replace" size={14} />
+            </IconBtn>
+            <IconBtn
+              label="Check syntax (QualityAuditor)"
+              size={28}
+              onClick={async () => {
+                if (!ws?.root) return;
+                const issues = await nativeAudit.check(ws.root, [activeFile.path]);
+                setSyntaxFindings(issues);
+                notify(issues.length === 0 ? "0 syntax issues found" : `${issues.length} finding(s)`);
+              }}
+            >
+              <Icon name="fact_check" size={14} />
+            </IconBtn>
             {/\.html?$/i.test(activeFile.path) && (
               <button
                 onClick={() => {
@@ -360,7 +417,7 @@ export function FilesPanel() {
                 }}
                 className="state h-7 rounded-lg bg-secondary-container px-2.5 text-[11.5px] font-semibold text-on-secondary-container"
               >
-                Open in Workbench
+                Workbench
               </button>
             )}
             <button
@@ -379,9 +436,9 @@ export function FilesPanel() {
                 patchUI({ leftTab: "chat" });
                 notify(`Attached ${activeFile.path}`);
               }}
-              className="state h-7 rounded-lg bg-surface-high px-2.5 text-[11.5px] font-medium text-on-surface"
+              className="state h-7 rounded-lg bg-surface-high px-2 text-[11.5px] font-medium text-on-surface"
             >
-              Attach to chat
+              Attach
             </button>
             <button
               disabled={!activeFile.dirty || saving}
@@ -392,18 +449,128 @@ export function FilesPanel() {
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
-          <textarea
-            value={activeFile.content}
-            spellCheck={false}
-            onChange={(e) => setActiveFile({ ...activeFile, content: e.target.value, dirty: true })}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-                e.preventDefault();
-                void saveActiveFile();
-              }
-            }}
-            className="min-h-0 flex-1 resize-none bg-surface-dim p-3 font-mono text-[12px] leading-relaxed text-on-surface outline-none"
-          />
+
+          {findOpen && (
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-outline-variant/60 bg-surface px-3 py-1.5 text-xs">
+              <input
+                value={findText}
+                onChange={(e) => setFindText(e.target.value)}
+                placeholder="Find…"
+                className="h-7 min-w-[110px] flex-1 rounded-lg border border-outline-variant/60 bg-surface-container px-2 font-mono text-xs outline-none focus:border-primary"
+              />
+              <input
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                placeholder="Replace with…"
+                className="h-7 min-w-[110px] flex-1 rounded-lg border border-outline-variant/60 bg-surface-container px-2 font-mono text-xs outline-none focus:border-primary"
+              />
+              <button
+                disabled={!findText}
+                onClick={() => {
+                  if (!findText || !activeFile.content.includes(findText)) return;
+                  setActiveFile({
+                    ...activeFile,
+                    content: activeFile.content.replace(findText, replaceText),
+                    dirty: true,
+                  });
+                }}
+                className="state h-7 rounded-lg bg-surface-high px-2.5 text-[11px] font-medium text-on-surface disabled:opacity-40"
+              >
+                Replace
+              </button>
+              <button
+                disabled={!findText}
+                onClick={() => {
+                  if (!findText || !activeFile.content.includes(findText)) return;
+                  setActiveFile({
+                    ...activeFile,
+                    content: activeFile.content.split(findText).join(replaceText),
+                    dirty: true,
+                  });
+                }}
+                className="state h-7 rounded-lg bg-primary px-2.5 text-[11px] font-semibold text-on-primary disabled:opacity-40"
+              >
+                All
+              </button>
+            </div>
+          )}
+
+          {syntaxFindings !== null && (
+            <div className="flex items-center justify-between gap-2 border-b border-outline-variant/50 bg-surface-low px-3 py-1.5 text-[11.5px]">
+              {syntaxFindings.length === 0 ? (
+                <span className="font-medium text-tertiary">check_syntax: 0 errors or warnings</span>
+              ) : (
+                <div className="min-w-0 flex-1 space-y-0.5 font-mono text-[11px] text-error">
+                  {syntaxFindings.slice(0, 4).map((f, idx) => (
+                    <div key={idx} className="truncate">{f}</div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setSyntaxFindings(null)} className="text-on-surface-variant hover:text-on-surface">
+                <Icon name="close" size={13} />
+              </button>
+            </div>
+          )}
+
+          {editorMode === "diff" ? (
+            <div className="min-h-0 flex-1 overflow-auto bg-surface-lowest p-3 font-mono text-[12px] leading-relaxed select-text">
+              {(() => {
+                const d = DiffUtils.computeDiff(activeFile.originalContent, activeFile.content, 3);
+                if (d.additions === 0 && d.deletions === 0) {
+                  return <div className="py-8 text-center font-sans text-xs text-on-surface-variant">No unsaved changes in {activeFile.path}</div>;
+                }
+                return (
+                  <div className="space-y-0.5">
+                    {d.lines.map((dl, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "flex items-baseline gap-2 rounded-sm px-2 py-0.5",
+                          dl.kind === "add" && "bg-tertiary-container/30 text-tertiary",
+                          dl.kind === "del" && "bg-error-container/30 text-error",
+                          dl.kind === "ctx" && "text-on-surface-variant"
+                        )}
+                      >
+                        <span className="w-8 shrink-0 select-none text-right text-[10.5px] opacity-55">
+                          {dl.newLine ?? dl.oldLine ?? ""}
+                        </span>
+                        <span className="whitespace-pre-wrap break-all">{dl.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 overflow-hidden bg-surface-dim">
+              <div
+                ref={gutterRef}
+                className="no-bar select-none overflow-hidden border-r border-outline-variant/40 bg-surface-low py-3 pl-2 pr-2.5 text-right font-mono text-[11.5px] leading-[1.625] text-on-surface-variant/55"
+              >
+                {activeFile.content.split("\n").map((_, i) => (
+                  <div key={i}>{i + 1}</div>
+                ))}
+              </div>
+              <textarea
+                value={activeFile.content}
+                spellCheck={false}
+                onScroll={(e) => {
+                  if (gutterRef.current) gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+                }}
+                onChange={(e) => setActiveFile({ ...activeFile, content: e.target.value, dirty: true })}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+                    e.preventDefault();
+                    void saveActiveFile();
+                  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+                    e.preventDefault();
+                    setFindOpen((v) => !v);
+                  }
+                }}
+                className="min-h-0 flex-1 resize-none bg-surface-dim p-3 font-mono text-[12px] leading-[1.625] text-on-surface outline-none"
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
@@ -741,6 +908,288 @@ export function ProjectWorkspaceCard({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stormy GitDrawer (GitDrawer.kt — Source Control, Staging & Diffs)   */
+/* ------------------------------------------------------------------ */
+export function GitPanel() {
+  const ws = useStore((s) => s.ui.workspace);
+  const curProject = useStore(activeProject);
+  const patchUI = useStore((s) => s.patchUI);
+  const notify = useStore((s) => s.notify);
+  const root = ws?.root ?? curProject?.root ?? "";
+  const [git, setGit] = useState<NativeGitStatus>({
+    isRepo: false,
+    branch: "",
+    changed: [],
+    commits: [],
+  });
+  const [loading, setLoading] = useState(false);
+  const [commitMsg, setCommitMsg] = useState("");
+  const [selectedDiff, setSelectedDiff] = useState<{ path: string; diff: string } | null>(null);
+
+  const refreshGit = async () => {
+    if (!root) return;
+    setLoading(true);
+    try {
+      const st = await nativeGit.status(root);
+      setGit(st);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshGit();
+  }, [root]);
+
+  const runGitAction = async (cmd: string, doneMsg?: string) => {
+    if (!root) return;
+    setLoading(true);
+    try {
+      const res = await nativeShell.run(root, cmd);
+      if (res.code !== 0) {
+        notify(res.stderr.trim() || `Git exited with ${res.code}`);
+      } else if (doneMsg) {
+        notify(doneMsg);
+      }
+      await refreshGit();
+      if (ws) {
+        const tree = await refreshTree(ws);
+        patchUI({ workspace: { ...ws, tree } });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const viewFileDiff = async (path: string) => {
+    if (!root) return;
+    const res = await nativeShell.run(root, `git diff HEAD -- "${path}"`);
+    setSelectedDiff({
+      path,
+      diff: res.stdout.trim() || "(no working tree diff against HEAD)",
+    });
+  };
+
+  if (!root) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="grid size-12 place-items-center rounded-2xl bg-surface-container text-primary">
+          <Icon name="commit" size={24} />
+        </div>
+        <div className="text-base font-semibold text-on-surface">Open a project folder to use Git</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-outline-variant/60 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon name="commit" size={17} className="shrink-0 text-primary" />
+          <span className="truncate font-mono text-xs font-semibold text-on-surface">
+            {git.isRepo ? git.branch || "HEAD" : "Not a Git repo"}
+          </span>
+          {git.changed.length > 0 && (
+            <span className="rounded-full bg-primary-container px-2 py-0.5 font-mono text-[10.5px] font-semibold text-on-primary-container">
+              {git.changed.length} changed
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {git.isRepo && (
+            <>
+              <button
+                disabled={loading}
+                onClick={() => void runGitAction("git pull --rebase", "Pulled latest changes")}
+                className="state h-7 rounded-lg bg-surface-high px-2 text-[11px] font-medium text-on-surface"
+              >
+                Pull
+              </button>
+              <button
+                disabled={loading}
+                onClick={() => void runGitAction("git push", "Pushed to remote")}
+                className="state h-7 rounded-lg bg-surface-high px-2 text-[11px] font-medium text-on-surface"
+              >
+                Push
+              </button>
+            </>
+          )}
+          <IconBtn label="Refresh Git status" size={28} onClick={() => void refreshGit()}>
+            <Icon name="refresh" size={15} />
+          </IconBtn>
+        </div>
+      </div>
+
+      {!git.isRepo ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <div className="text-xs text-on-surface-variant">This folder does not have a `.git` repository yet.</div>
+          <button
+            onClick={() => void runGitAction("git init", "Initialized Git repository")}
+            className="state h-9 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary"
+          >
+            Initialize Git Repository
+          </button>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+          <div className="space-y-2 rounded-2xl border border-outline-variant/60 bg-surface-low p-2.5">
+            <input
+              value={commitMsg}
+              onChange={(e) => setCommitMsg(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && commitMsg.trim()) {
+                  e.preventDefault();
+                  void runGitAction(
+                    `git add -A && git commit -m "${commitMsg.trim().replace(/"/g, "'")}"`,
+                    "Committed changes"
+                  ).then(() => setCommitMsg(""));
+                }
+              }}
+              placeholder="Commit message…"
+              className="h-8 w-full rounded-xl border border-outline-variant/60 bg-surface px-3 text-xs text-on-surface outline-none focus:border-primary"
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={loading || !commitMsg.trim() || git.changed.length === 0}
+                onClick={() =>
+                  void runGitAction(
+                    `git add -A && git commit -m "${commitMsg.trim().replace(/"/g, "'")}"`,
+                    "Committed changes"
+                  ).then(() => setCommitMsg(""))
+                }
+                className="state flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-on-primary disabled:opacity-40"
+              >
+                <Icon name="check" size={14} />
+                Stage All & Commit
+              </button>
+              <button
+                onClick={() => {
+                  patchUI({ leftTab: "chat" });
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent("zeus:prefill", {
+                        detail: "Inspect git_status and git_diff, review all changes, and summarize or commit them.",
+                      })
+                    );
+                  }, 30);
+                }}
+                className="state h-8 rounded-xl bg-surface-high px-2.5 text-xs font-medium text-on-surface"
+              >
+                Ask Zeus
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between px-1 text-[11.5px] font-semibold text-on-surface-variant">
+              <span>Changed Files ({git.changed.length})</span>
+              {git.changed.length > 0 && (
+                <button
+                  onClick={() => void runGitAction("git add -A", "Staged all files")}
+                  className="text-[11px] font-medium text-primary"
+                >
+                  Stage all
+                </button>
+              )}
+            </div>
+            {git.changed.length === 0 ? (
+              <div className="rounded-xl border border-outline-variant/40 bg-surface-low px-3 py-3 text-center text-xs text-on-surface-variant">
+                Working tree clean
+              </div>
+            ) : (
+              git.changed.map((f) => (
+                <div
+                  key={f.path}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant/50 bg-surface-low px-2.5 py-1.5 text-xs"
+                >
+                  <button
+                    onClick={() => void viewFileDiff(f.path)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold",
+                        f.status.includes("D")
+                          ? "bg-error-container text-on-error-container"
+                          : f.status.includes("?") || f.status.includes("A")
+                          ? "bg-tertiary-container text-on-tertiary-container"
+                          : "bg-primary-container text-on-primary-container"
+                      )}
+                    >
+                      {f.status}
+                    </span>
+                    <span className="truncate font-mono text-[11.5px] font-medium text-on-surface">{f.path}</span>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() =>
+                        void runGitAction(
+                          f.staged ? `git reset HEAD -- "${f.path}"` : `git add -- "${f.path}"`
+                        )
+                      }
+                      className="state rounded bg-surface-high px-2 py-0.5 text-[10.5px] font-medium text-on-surface"
+                    >
+                      {f.staged ? "Unstage" : "Stage"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        patchUI({ leftTab: "files" });
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: f.path }));
+                        }, 30);
+                      }}
+                      className="state rounded bg-surface-high px-2 py-0.5 text-[10.5px] font-medium text-on-surface"
+                    >
+                      Open
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {selectedDiff && (
+            <div className="overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-lowest">
+              <div className="flex items-center justify-between border-b border-outline-variant/50 bg-surface-low px-3 py-1.5 text-xs">
+                <span className="truncate font-mono font-semibold text-on-surface">{selectedDiff.path}</span>
+                <button onClick={() => setSelectedDiff(null)} className="text-on-surface-variant hover:text-on-surface">
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+              <pre className="max-h-56 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-on-surface-variant select-text">
+                {selectedDiff.diff}
+              </pre>
+            </div>
+          )}
+
+          {git.commits.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="px-1 text-[11.5px] font-semibold text-on-surface-variant">
+                Recent Commits ({git.commits.length})
+              </div>
+              {git.commits.map((c) => (
+                <div
+                  key={c.hash}
+                  className="rounded-xl border border-outline-variant/40 bg-surface-low px-2.5 py-1.5 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-medium text-on-surface">{c.message}</span>
+                    <span className="shrink-0 font-mono text-[10.5px] text-primary">{c.hash}</span>
+                  </div>
+                  <div className="mt-0.5 text-[10.5px] text-on-surface-variant">
+                    {c.author} · {c.date}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
