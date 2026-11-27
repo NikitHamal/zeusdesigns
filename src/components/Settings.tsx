@@ -31,8 +31,9 @@ import { DEVICE_SIZE } from "../types";
 import { canvasApi } from "../lib/canvasApi";
 import { cn } from "../utils/cn";
 import { checkForUpdate, installUpdate } from "../lib/updater";
-import { download, nativePerf, nativeServer, refreshTree, type PerfStats, type ServerStatus } from "../lib/bridge";
+import { download, nativePerf, nativeServer, refreshTree, writeWorkspaceFile, type PerfStats, type ServerStatus } from "../lib/bridge";
 import { verifyModelAuthenticity, type ModelFingerprintReport } from "../lib/lmFingerprint";
+import { ModelProfiles, STORMY_TOOLS } from "../lib/stormyAgent";
 import { Icon } from "./Icon";
 import { MemoryTab } from "./MemoryPanel";
 import { ConnectorsTab } from "./Connectors";
@@ -227,9 +228,37 @@ function LibraryTab() {
   const [sub, setSub] = useState<"harness" | "skills" | "opendesign">("harness");
   const [q, setQ] = useState("");
   const [writingTree, setWritingTree] = useState(false);
+  const [skillName, setSkillName] = useState("");
+  const [skillDesc, setSkillDesc] = useState("");
+  const [skillBody, setSkillBody] = useState("");
   const skills = useMemo(() => SKILLS.filter((s) => (s.name + s.desc + s.category).toLowerCase().includes(q.toLowerCase())), [q]);
   const summary = getActiveHarnessSummary(settings.providerId, settings.modelId);
+  const stormyProfile = useMemo(
+    () => ModelProfiles.forIds(settings.providerId, settings.modelId),
+    [settings.providerId, settings.modelId]
+  );
   const lessons = getProjectHarnessLessons(ui.workspace?.root);
+
+  const handleSaveCustomSkill = async () => {
+    if (!ui.workspace) {
+      notify("Open a project folder first to save a custom .oro/skills playbook");
+      return;
+    }
+    const slug = skillName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
+    if (!slug || !skillBody.trim()) return;
+    const md = `---\nname: ${slug}\ndescription: ${skillDesc.trim() || slug}\n---\n${skillBody.trim()}\n`;
+    try {
+      await writeWorkspaceFile(ui.workspace, `.oro/skills/${slug}.md`, md);
+      const tree = await refreshTree(ui.workspace);
+      useStore.getState().patchUI({ workspace: { ...ui.workspace, tree } });
+      setSkillName("");
+      setSkillDesc("");
+      setSkillBody("");
+      notify(`Saved custom skill .oro/skills/${slug}.md`);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to save skill");
+    }
+  };
   const nsLabel = buildHarnessNamespace({
     benchmark: "zeus",
     substrate: summary.family,
@@ -302,6 +331,79 @@ function LibraryTab() {
               <Icon name="save" size={15} />
               {writingTree ? "Writing…" : "Materialize c1..c8 in Project"}
             </button>
+          </div>
+
+          <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  Stormy Agent Loop &amp; ModelProfile ({stormyProfile.name.toUpperCase()})
+                </span>
+                <span className="rounded-full bg-surface-high px-2.5 py-0.5 font-mono text-[11px] text-on-surface">
+                  {STORMY_TOOLS.length} tools · {stormyProfile.qualityPasses} QualityGate passes · {Math.round(stormyProfile.contextBudgetTokens / 1000)}k context budget
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  onClick={() => patch({ autonomy: (settings.autonomy ?? "unleashed") === "unleashed" ? "leashed" : "unleashed" })}
+                  className="state rounded-full bg-surface-high px-3 py-1 font-medium text-on-surface"
+                >
+                  Autonomy: {(settings.autonomy ?? "unleashed") === "unleashed" ? "Unleashed" : "Leashed"}
+                </button>
+                <button
+                  onClick={() => patch({ askBeforeBuilding: !settings.askBeforeBuilding })}
+                  className="state rounded-full bg-surface-high px-3 py-1 font-medium text-on-surface"
+                >
+                  BriefCheck: {settings.askBeforeBuilding ? "Ask first" : "Auto-decide"}
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {STORMY_TOOLS.map((t) => (
+                <span
+                  key={t.name}
+                  title={t.summary}
+                  className="rounded-lg border border-outline-variant/50 bg-surface-high px-2 py-0.5 font-mono text-[11px] text-on-surface"
+                >
+                  {t.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-outline-variant/60 bg-surface-container p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+              Author Custom Project Playbook (.oro/skills/*.md)
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                className={field}
+                placeholder="Skill name (e.g. api-client)"
+                value={skillName}
+                onChange={(e) => setSkillName(e.target.value)}
+              />
+              <input
+                className={field}
+                placeholder="When to use (short description)"
+                value={skillDesc}
+                onChange={(e) => setSkillDesc(e.target.value)}
+              />
+              <textarea
+                rows={3}
+                placeholder="Step-by-step instructions for use_skill(name)…"
+                value={skillBody}
+                onChange={(e) => setSkillBody(e.target.value)}
+                className="w-full rounded-2xl bg-surface-high p-3 font-mono text-xs text-on-surface outline-none sm:col-span-2"
+              />
+              <button
+                disabled={!skillName.trim() || !skillBody.trim()}
+                onClick={() => void handleSaveCustomSkill()}
+                className="state morph flex h-9 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-on-primary disabled:opacity-40 sm:col-span-2"
+              >
+                <Icon name="save" size={14} />
+                Save .oro/skills Playbook to Project
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

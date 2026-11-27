@@ -226,6 +226,7 @@ function ProjectGroup({
               <MenuItem icon={<Icon name="add" size={16} />} label="New chat in project" onClick={() => { close(); activateProject(); newConversation(project.id); }} />
               <MenuItem icon={<Icon name="folder_open" size={16} />} label={project.root ? "Change local folder…" : "Bind local folder…"} onClick={() => { close(); onPickFolder(project.id); }} />
               <MenuItem icon={<Icon name="account_tree" size={16} />} label="Browse project files" onClick={() => { close(); activateProject(); patchUI({ leftTab: "files", chatCollapsed: false }); }} />
+              <MenuItem icon={<Icon name="commit" size={16} />} label="Open Git source control" onClick={() => { close(); activateProject(); patchUI({ leftTab: "git", chatCollapsed: false }); }} />
               <MenuItem icon={<Icon name="terminal" size={16} />} label="Open project terminal" onClick={() => { close(); activateProject(); patchUI({ leftTab: "terminal", chatCollapsed: false }); }} />
               <MenuItem icon={<Icon name="edit" size={16} />} label="Rename project" onClick={() => { close(); setRenaming(true); }} />
               <MenuItem danger icon={<Icon name="delete" size={16} />} label="Remove project" onClick={() => { close(); removeProject(project.id); }} />
