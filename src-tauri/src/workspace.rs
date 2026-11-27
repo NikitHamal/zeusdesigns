@@ -1368,4 +1368,23 @@ mod tests {
         assert_eq!(sanitize_shell_command("start cmd /c npm test && pause"), "npm test");
         assert_eq!(sanitize_shell_command("cmd /k git status -sb"), "git status -sb");
     }
+
+    #[test]
+    fn test_builtin_posix_rg_and_find_on_windows() {
+        let workdir = Path::new(".");
+        let rg_res = try_builtin_posix_shell(
+            workdir,
+            "rg -i --files-with-matches \"sanitize_shell_command|safe_join\" src/",
+        )
+        .expect("rg should be handled by builtin posix shell");
+        assert_eq!(rg_res.get("code").and_then(|c| c.as_i64()), Some(0));
+        let out = rg_res.get("stdout").and_then(|s| s.as_str()).unwrap_or("");
+        assert!(out.contains("workspace.rs"));
+
+        let find_res = try_builtin_posix_shell(workdir, "find src -maxdepth 2 -type f -name \"*.rs\"")
+            .expect("find should be handled by builtin posix shell");
+        assert_eq!(find_res.get("code").and_then(|c| c.as_i64()), Some(0));
+        let find_out = find_res.get("stdout").and_then(|s| s.as_str()).unwrap_or("");
+        assert!(find_out.contains("workspace.rs"));
+    }
 }

@@ -11039,4 +11039,37 @@ mod tests {
             Some("https://chat.qwen.ai/api/v2/auths/activate?token=abc&id=1")
         );
     }
+
+    #[test]
+    fn test_lmfingerprint_family_classification_and_reroute_detection() {
+        assert_eq!(
+            classify_claimed_family("gemini4hydrogen", "gemini-4-hydrogen"),
+            "Google Gemini 4 Family"
+        );
+        assert_eq!(
+            classify_claimed_family("agnescloud", "agnes-3.0-pro"),
+            "Sapiens Agnes AI"
+        );
+        assert_eq!(
+            classify_claimed_family("volcark", "doubao-seed-2-0-lite-260428"),
+            "ByteDance Doubao (Volcengine Ark)"
+        );
+        assert_eq!(
+            classify_claimed_family("zhipudirect", "glm-4.5-flash"),
+            "Z.ai / Zhipu GLM"
+        );
+        assert_eq!(
+            classify_claimed_family("logfarehub", "devstral-latest"),
+            "Mistral AI"
+        );
+        // Detect under-the-hood proxy rerouting (e.g. devstral-latest -> openai/gpt-oss-120b)
+        let claimed = classify_claimed_family("logfarehub", "devstral-latest");
+        let detected = classify_detected_family(
+            "openai/gpt-oss-120b",
+            "I am GPT-OSS, an open-weight model by OpenAI. 17*23=391.",
+            "OpenAI ChatCompletions JSON/SSE",
+        );
+        assert_eq!(detected, "OpenAI GPT-OSS Open-Weights");
+        assert!(!families_compatible(claimed, detected));
+    }
 }
