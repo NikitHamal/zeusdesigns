@@ -179,4 +179,13 @@ assert.ok(
   "engine.ts must serialize Round-2+ tool calls as <tool_call> for native tool providers"
 );
 console.log("[PASS] 7. TS/Rust native tool protocol alignment, multiline JSON edit_file, and Round-2 <tool_call> history verified");
+
+// 8. Verify multi-turn coding tool history in buildPlainContext (src/lib/agent.ts) and no duplicate includes in providers.rs
+assert.ok(
+  agentTs.includes("m.tools?.length") && agentTs.includes("[Executed ${t.name}"),
+  "buildPlainContext in agent.ts must preserve completed tool summaries and outputs across multi-turn coding sessions"
+);
+const includeCount = (providersBaseRs.match(/include!\("providers_cat_1\.rs"\);/g) || []).length;
+assert.equal(includeCount, 1, "providers.rs must include each submodule exactly once");
+console.log("[PASS] 8. Multi-turn buildPlainContext tool history and single-include Rust module graph verified");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");
