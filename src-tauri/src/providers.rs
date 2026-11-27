@@ -5064,11 +5064,16 @@ where
     if let Some(last) = messages.last() {
         if wants_tools && !last.content.contains("<tool_result") && !last.content.contains("[XML DSL") {
             prompt.push_str(&format!(
-                "{}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                "[User]: {}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                last.content
+            ));
+        } else if wants_tools && last.content.contains("<tool_result") {
+            prompt.push_str(&format!(
+                "[User]: {}\n\n[Execution Rule: Do NOT stop mid-task and NEVER ask 'tell me to proceed'. If the user's request is not yet 100% completed on disk, emit the next <zeus_tool name=\"read_file\"|\"edit_file\"|\"write_file\"|\"search_code\"|\"list_dir\"|\"shell\"|\"python\">...</zeus_tool> block outside <think> right now.]",
                 last.content
             ));
         } else {
-            prompt.push_str(&last.content);
+            prompt.push_str(&format!("[User]: {}", last.content));
         }
     }
 
@@ -5093,7 +5098,7 @@ where
 
     let outer = json!([Value::Null, Value::Array(inner).to_string()]).to_string();
     let body = format!("f.req={}", url_encode(&outer));
-    let client = build_client(35)?;
+    let client = build_client(16)?;
 
     let mut bl = "boq_assistant-bard-web-server_20260716.08_p0".to_string();
     for attempt in 0..2 {
@@ -7963,7 +7968,13 @@ where
 
     let client = build_client(timeout_secs)?;
     for &(endpoint, upstream_model) in targets {
-        let max_tok = if deep {
+        let max_tok = if deep
+            || endpoint.contains("apihub.agnes-ai.com")
+            || endpoint.contains("ark.cn-beijing.volces.com")
+            || endpoint.contains("token.sensenova.cn")
+            || endpoint.contains("open.bigmodel.cn")
+            || endpoint.contains("api.longcat.chat")
+        {
             16384
         } else if endpoint.contains("bun008-freellmapi") {
             4096
@@ -8017,14 +8028,39 @@ where
                     ],
                 );
             }
+            let prior_transcript = if (endpoint.contains("gemini-web2api") || endpoint.contains("gemini2api")) && target_msgs.len() > 2 {
+                let mut hist = String::new();
+                for m in &target_msgs[..target_msgs.len() - 1] {
+                    let r = m.get("role").and_then(|v| v.as_str()).unwrap_or("user");
+                    if r == "system" {
+                        continue;
+                    }
+                    if let Some(txt) = m.get("content").and_then(|v| v.as_str()) {
+                        if txt.contains("[XML DSL Output Mode") && txt.contains("Confirm XML DSL parser connection") {
+                            continue;
+                        }
+                        let tag = if r == "assistant" { "[Assistant]" } else { "[User]" };
+                        let compact: String = txt.chars().take(4000).collect();
+                        hist.push_str(&format!("{}: {}\n\n", tag, compact));
+                    }
+                }
+                hist
+            } else {
+                String::new()
+            };
             if let Some(last_m) = target_msgs.last_mut() {
                 if last_m.get("role").and_then(|r| r.as_str()) == Some("user") {
                     if let Some(orig) = last_m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()) {
-                        if endpoint.contains("gemini-web2api") && !orig.contains("[XML DSL Output Mode") {
-                            last_m["content"] = json!(format!(
-                                "{}\n\n{}\n(First think briefly inside <think>...</think>, then if a workspace action is needed, output the <zeus_tool> XML tag outside <think>.)",
-                                scraper_xml_dsl_banner(),
+                        if (endpoint.contains("gemini-web2api") || endpoint.contains("gemini2api")) && !orig.contains("[XML DSL Output Mode") {
+                            let merged = if prior_transcript.is_empty() {
                                 orig
+                            } else {
+                                format!("Prior conversation & tool turns:\n{}\nCurrent turn:\n{}", prior_transcript, orig)
+                            };
+                            last_m["content"] = json!(format!(
+                                "{}\n\n{}\n(First think briefly inside <think>...</think>, then if a workspace action is needed, output the <zeus_tool> XML tag outside <think>. Never stop mid-task and never ask 'tell me to proceed'.)",
+                                scraper_xml_dsl_banner(),
+                                merged
                             ));
                         } else if !orig.contains("<tool_result") && !orig.contains("[XML DSL") {
                             last_m["content"] = json!(format!(
@@ -8511,10 +8547,9 @@ where
         _ => "gemini-4-hydrogen",
     };
 
-    let targets: [(&str, &str); 3] = [
-        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
-        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
+    let targets: [(&str, &str); 2] = [
         ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
+        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
     ];
 
     stream_oai_targets_auth(
@@ -8523,7 +8558,7 @@ where
         system,
         messages,
         false,
-        20,
+        14,
         false,
         cancel,
         on_delta,
@@ -9473,9 +9508,10 @@ where
         _ => "glm-4.5-flash",
     };
     let zhipu_key = ["5777264968af4e048941f71c01b94eb3", "LSmsNY0AUfXGcmJH"].join(".");
-    let zhipu_targets: [(&str, &str); 2] = [
+    let zhipu_targets: [(&str, &str); 3] = [
         ("https://open.bigmodel.cn/api/paas/v4/chat/completions", zhipu_model),
-        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.5-flash"),
+        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-z1-flash"),
+        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash-250414"),
     ];
     stream_oai_targets_bearer(
         "Z.ai BigModel PaaS v4 Direct",
@@ -9483,7 +9519,7 @@ where
         system,
         messages,
         zhipu_model == "glm-4v-flash",
-        30,
+        14,
         Some(&zhipu_key),
         cancel,
         on_delta,
