@@ -16,13 +16,13 @@ function renderInline(s: string, keyPrefix: string): ReactNode[] {
     if (tok.startsWith("**")) {
       out.push(
         <strong key={k} className="font-semibold text-on-surface">
-          {tok.slice(2, -2)}
+          {renderInline(tok.slice(2, -2), `${k}-b`)}
         </strong>
       );
     } else if (tok.startsWith("~~")) {
       out.push(
         <del key={k} className="text-on-surface-variant line-through">
-          {tok.slice(2, -2)}
+          {renderInline(tok.slice(2, -2), `${k}-d`)}
         </del>
       );
     } else if (tok.startsWith("`")) {
@@ -276,17 +276,69 @@ export function Markdown({ text, compact }: { text: string; compact?: boolean })
       continue;
     }
 
-    // 6. Ordered list
+    // 6. Ordered list (supports nested sub-bullets, blank lines between items, and explicit start={N})
     if (/^\s*\d+\.\s+/.test(l)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(lines[i++].replace(/^\s*\d+\.\s+/, ""));
+      const firstMatch = /^\s*(\d+)\.\s+(.*)$/.exec(l)!;
+      const startNum = Math.max(1, parseInt(firstMatch[1], 10) || 1);
+      type OlItem = { text: string; subBullets: { text: string; indent: number }[] };
+      const items: OlItem[] = [];
+      while (i < lines.length) {
+        const cur = lines[i];
+        const olMatch = /^\s*(\d+)\.\s+(.*)$/.exec(cur);
+        if (olMatch) {
+          const item: OlItem = { text: olMatch[2], subBullets: [] };
+          i++;
+          // Absorb blank lines + nested/following bullets belonging to this ordered item
+          while (i < lines.length) {
+            const next = lines[i];
+            if (!next.trim()) {
+              // Look ahead past blank lines: only continue if next non-empty line is another ordered item or an indented/sub-bullet
+              let j = i + 1;
+              while (j < lines.length && !lines[j].trim()) j++;
+              if (j < lines.length && (/^\s*\d+\.\s+/.test(lines[j]) || /^\s*[-*•]\s+/.test(lines[j]))) {
+                i = j;
+                continue;
+              }
+              break;
+            }
+            if (/^\s*[-*•]\s+/.test(next)) {
+              const leadingSpaces = next.match(/^\s*/)?.[0].length ?? 0;
+              item.subBullets.push({
+                text: next.replace(/^\s*[-*•]\s+/, ""),
+                indent: Math.floor(leadingSpaces / 2),
+              });
+              i++;
+              continue;
+            }
+            break;
+          }
+          items.push(item);
+          continue;
+        }
+        break;
       }
       nodes.push(
-        <ol key={k++} className="my-1.5 space-y-1 pl-5 list-decimal">
+        <ol
+          key={k++}
+          start={startNum}
+          className="my-2 space-y-2 pl-6 list-decimal marker:font-medium marker:text-on-surface-variant"
+        >
           {items.map((it, j) => (
             <li key={j} className="leading-relaxed">
-              {renderInline(it, `o${k}-${j}`)}
+              <div>{renderInline(it.text, `o${k}-${j}`)}</div>
+              {it.subBullets.length > 0 && (
+                <ul className="mt-1.5 space-y-1 pl-4 list-disc">
+                  {it.subBullets.map((sb, sj) => (
+                    <li
+                      key={sj}
+                      style={sb.indent > 1 ? { marginLeft: `${(sb.indent - 1) * 14}px` } : undefined}
+                      className="leading-relaxed"
+                    >
+                      {renderInline(sb.text, `o${k}-${j}-s${sj}`)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ol>

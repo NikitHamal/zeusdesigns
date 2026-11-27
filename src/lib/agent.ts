@@ -125,10 +125,11 @@ export function buildPlainContext(opts: {
       );
       if (realTools.length > 0) {
         const isLatestAsst = idx === lastAsstIdx;
-        const perToolCap = isLatestAsst ? 3200 : 600;
-        const toolSummaries = realTools
-          .slice(-8)
-          .map((t) => {
+        const recentTools = isLatestAsst ? realTools.slice(-28) : realTools.slice(-12);
+        const toolSummaries = recentTools
+          .map((t, ti) => {
+            const isRecentTail = ti >= recentTools.length - 8;
+            const perToolCap = isLatestAsst ? (isRecentTail ? 2400 : 450) : 400;
             let argDesc = t.args ?? "";
             try {
               const j = JSON.parse(argDesc);
@@ -146,6 +147,16 @@ export function buildPlainContext(opts: {
       }
     }
     if (m.role === "assistant" && m.artboardIds?.length) content += `\n[Opened ${m.artboardIds.length} artifact${m.artboardIds.length > 1 ? "s" : ""} in the preview]`;
+    if (
+      m.role === "user" &&
+      idx === all.length - 1 &&
+      opts.mode === "code" &&
+      lastAsstIdx >= 0 &&
+      /^(cont|continue|go|proceed|do it|apply|yes|ok|okay|start|execute)\b[.!]?$/i.test(content.trim())
+    ) {
+      content +=
+        "\n\n[Continuation directive: The files you already read are in the conversation above. Do NOT re-explore or repeat a plan. Immediately apply the code edits using edit_file / write_file / shell and verify them.]";
+    }
     return {
       role: m.role,
       content,

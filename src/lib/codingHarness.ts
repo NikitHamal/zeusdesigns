@@ -436,7 +436,7 @@ function buildWorkflowDirective(
 2. **Bash & Python Power Tools**: You have full local \`shell\` (bash/cmd) and \`python\` (Python 3) execution in the workspace.
    - Use ${shellRef} for \`rg\`, \`git\`, \`find\`, test suites (\`npm test\`, \`pytest\`, \`cargo check\`, \`node --test\`), and compound shell pipelines.
    - Use ${pyRef} to execute multi-line Python 3 scripts via stdin for complex multi-file edits, JSON/AST analysis, data transformation, and algorithmic verification.
-3. **Surgical File Edits**: Use \`write_file\` to create new files or replace small files completely, and \`edit_file\` (\`old_string\`/\`new_string\` or \`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE\`) for targeted changes in existing files.
+3. **Surgical File Edits — Never Stop at a Plan**: Unless the user explicitly asks for a read-only plan, NEVER stop after exploring to print a plan or ask the user to type \`continue\`/\`go\`. Once you inspect the target files, immediately apply the edits using \`write_file\` or \`edit_file\` (\`old_string\`/\`new_string\` or \`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE\`) in the same session.
 4. **Verify & Conclude**: After modifying code, run the relevant test or verification command when one exists. Once verified, stop calling tools and answer in 1-3 concise sentences.`;
 }
 
