@@ -781,12 +781,7 @@ where
     }
 
     let wants_tools = is_agent_tool_request(system);
-    let sys_raw = smart_cap_system(system, 24000);
-    let sys_safe = if wants_tools {
-        format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
-    } else {
-        sys_raw
-    };
+    let sys_safe = smart_cap_system(system, 120000);
 
     let candidates = [
         anth_model,

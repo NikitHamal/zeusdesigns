@@ -76,7 +76,7 @@ export async function toolsPrompt(opts: { design?: boolean } = { design: true })
   const protocolSection = usesNativeTools
     ? [
         "## Agent Tools (Native Function Calling)",
-        "Invoke workspace, shell, python, git, search, plan, and memory tools using the native tool/function-calling API provided in this request.",
+        "Invoke workspace, shell, python, git, search, plan, and memory tools using the native tool/function-calling API provided in this request (or if the upstream gateway strips native tool definitions, emit `<zeus_tool name=\"TOOL_NAME\" path=\"...\">...</zeus_tool>` XML blocks outside `<think>`).",
         "- Pass complete, un-truncated file contents or exact search/replace blocks in your tool arguments.",
         "- You may batch independent read/search calls in a single turn; they execute in dependency-ordered waves after your response stream finishes.",
         "- Never fabricate tool output or write `<tool_result>` yourself.",

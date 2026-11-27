@@ -168,23 +168,12 @@ where
     let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_raw: String = system.chars().take(22000).collect();
-        let sys_safe = if wants_tools {
-            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
-        } else {
-            sys_raw
-        };
+        let sys_safe = smart_cap_system(system, 120000);
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
-    let last_idx = messages.len().saturating_sub(1);
-    for (idx, m) in messages.iter().enumerate() {
+    for m in messages.iter() {
         if !m.content.trim().is_empty() {
-            let content = if idx == last_idx && wants_tools && !m.content.contains("<tool_result") && !m.content.contains("[XML DSL") {
-                format!("{}\n(Output ONLY the <zeus_tool> XML block outside <think> if a workspace action is needed.)", m.content)
-            } else {
-                m.content.clone()
-            };
-            oai_msgs.push(json!({ "role": m.role, "content": content }));
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
         }
     }
 
@@ -443,7 +432,7 @@ where
 
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(24000).collect();
+        let sys_safe = smart_cap_system(system, 120000);
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in messages {
@@ -623,7 +612,7 @@ where
 
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(24000).collect();
+        let sys_safe = smart_cap_system(system, 120000);
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in messages {

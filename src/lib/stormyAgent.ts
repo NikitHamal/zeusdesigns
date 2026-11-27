@@ -493,6 +493,26 @@ export const RunLedger = {
             ran.add(name);
           }
         }
+        for (const match of m.content.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)) {
+          try {
+            const j = JSON.parse(match[1]);
+            const name = ToolAliases.canonicalName(String(j.name ?? ""));
+            const args = (j.arguments ?? {}) as Record<string, unknown>;
+            const path = String(args.path ?? args.file ?? "").trim();
+            if (!name) continue;
+            if (["write_file", "edit_file", "multi_edit", "delete_file", "move_file"].includes(name) && path) {
+              const set = changed.get(path) ?? new Set<string>();
+              set.add(name.replace("_file", ""));
+              changed.set(path, set);
+            } else if (["read_file", "list_files", "glob", "grep", "search_project"].includes(name) && path) {
+              read.add(path);
+            } else {
+              ran.add(name);
+            }
+          } catch {
+            /* ignore malformed tool_call */
+          }
+        }
       } else if (m.role === "user" && m.content.includes('ok="false"')) {
         const errMatch = /<tool_result\s+name="([^"]+)"\s+ok="false">\s*([^\n<]+)/i.exec(m.content);
         if (errMatch) {
@@ -540,13 +560,35 @@ export const HistoryPruner = {
             body.length > 1200 ? `${openTag}\n${HistoryPruner.PRUNED_TOOL_OUTPUT}\n${closeTag}` : _all
         );
       } else if (m.role === "assistant" && content.length > HistoryPruner.LARGE_ARGUMENT_CHARS) {
-        content = content.replace(
-          /(<zeus_tool\s+name="(?:write_file|edit_file)"[^>]*>)([\s\S]*?)(<\/zeus_tool>)/gi,
-          (_all, openTag: string, body: string, closeTag: string) =>
-            body.length > HistoryPruner.LARGE_ARGUMENT_CHARS
-              ? `${openTag}[file content omitted (${body.split("\n").length} lines)]${closeTag}`
-              : _all
-        );
+        content = content
+          .replace(
+            /(<zeus_tool\s+name="(?:write_file|edit_file)"[^>]*>)([\s\S]*?)(<\/zeus_tool>)/gi,
+            (_all, openTag: string, body: string, closeTag: string) =>
+              body.length > HistoryPruner.LARGE_ARGUMENT_CHARS
+                ? `${openTag}[file content omitted (${body.split("\n").length} lines)]${closeTag}`
+                : _all
+          )
+          .replace(
+            /(<tool_call>)([\s\S]*?)(<\/tool_call>)/gi,
+            (all, openTag: string, body: string, closeTag: string) => {
+              if (body.length <= HistoryPruner.LARGE_ARGUMENT_CHARS) return all;
+              try {
+                const j = JSON.parse(body);
+                const name = ToolAliases.canonicalName(String(j.name ?? ""));
+                if (name === "write_file" || name === "edit_file" || name === "multi_edit") {
+                  const args = (j.arguments ?? {}) as Record<string, unknown>;
+                  const path = String(args.path ?? args.file ?? "");
+                  return `${openTag}${JSON.stringify({
+                    name: j.name,
+                    arguments: { path, note: `[file content omitted (${body.split("\n").length} lines)]` },
+                  })}${closeTag}`;
+                }
+              } catch {
+                /* keep original */
+              }
+              return all;
+            }
+          );
       }
       return content === m.content ? m : { ...m, content };
     });

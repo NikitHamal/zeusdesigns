@@ -852,12 +852,19 @@ export async function sendMessage(opts: {
         }
 
         const strippedRound = parseStream(roundText).text.trim();
+        const usesNativeProtocol =
+          codingProfile.nativeToolProtocol === "openai_tools" ||
+          codingProfile.nativeToolProtocol === "anthropic_tool_use";
         const canonicalTools = roundTools
           .map((t) => {
             let p = "";
             let b = "";
+            let parsedObj: Record<string, unknown> | null = null;
             try {
               const parsed = JSON.parse(t.args ?? "{}");
+              if (parsed && typeof parsed === "object") {
+                parsedObj = parsed as Record<string, unknown>;
+              }
               p = parsed.path ?? "";
               b =
                 typeof parsed.body === "string" && Object.keys(parsed).every((k) => k === "path" || k === "body")
@@ -865,6 +872,10 @@ export async function sendMessage(opts: {
                   : JSON.stringify(parsed);
             } catch {
               b = t.args ?? "";
+            }
+            if (usesNativeProtocol) {
+              const argsPayload = parsedObj ?? { ...(p ? { path: p } : {}), ...(b ? { body: b } : {}) };
+              return `<tool_call>${JSON.stringify({ name: t.name, arguments: argsPayload })}</tool_call>`;
             }
             return `<zeus_tool name="${t.name}"${p ? ` path="${p}"` : ""}>${b}</zeus_tool>`;
           })

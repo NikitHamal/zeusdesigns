@@ -487,11 +487,29 @@ where
             || endpoint.contains("garystu-openai-nim-proxy")
             || endpoint.contains("mmoranguito-openai-nim-proxy")
             || endpoint.contains("vireonix.ai")
+            || endpoint.contains("w902287-firebase-gemini-proxy")
+            || endpoint.contains("opencode.ai/zen")
+            || endpoint.contains("api.kilo.ai")
+            || endpoint.contains("blockrun.ai")
+            || endpoint.contains("oai.endpoints.kepler.ai.cloud.ovh.net")
+            || endpoint.contains("api.llm7.io")
+            || endpoint.contains("lolmaobruhhh-test")
+            || endpoint.contains("mychat-ai.cloud")
+            || endpoint.contains("vdspcxotxhxfjowqndix.supabase.co")
             || (endpoint.contains("w902287-ai-bridge")
                 && !upstream_model.contains("claude")
                 && !upstream_model.contains("grok"));
         let mut target_msgs = oai_msgs.clone();
         if wants_agent_tools && !supports_native_oai_tools {
+            if let Some(first_m) = target_msgs.first_mut() {
+                if first_m.get("role").and_then(|r| r.as_str()) == Some("system") {
+                    if let Some(orig_sys) = first_m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()) {
+                        if !orig_sys.contains("<zeus_tool") && !orig_sys.contains("[XML DSL Output Mode") {
+                            first_m["content"] = json!(format!("{}\n\n{}", scraper_xml_dsl_banner(), orig_sys));
+                        }
+                    }
+                }
+            }
             if (endpoint.contains("gemini-web2api") || endpoint.contains("gemini2api")) && target_msgs.len() >= 1 {
                 if let Some(last_m) = target_msgs.last_mut() {
                     if last_m.get("role").and_then(|r| r.as_str()) == Some("user") {

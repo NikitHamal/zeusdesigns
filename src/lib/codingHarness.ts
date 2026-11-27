@@ -57,7 +57,6 @@ const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
   "zhipudirect",
   "logfarehub",
   "antigravity",
-  "gemini4hydrogen",
   "freellmhub",
   "litellmhub",
   "kilo",
@@ -68,13 +67,6 @@ const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
   "llm7",
   "opencodezen",
   "together2api",
-  "hfcluster",
-  "gemma4pro",
-  "frontierlab",
-  "liquidai",
-  "koboldcloud",
-  "bonsaicloud",
-  "unslothcloud",
 ]);
 
 export function detectNativeToolProtocol(providerId: string, modelId: string): NativeToolProtocol {
@@ -146,7 +138,7 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
       : "medium";
 
   const familyDirective = buildFamilyDirective(family, modelLabel, nativeToolProtocol);
-  const workflowDirective = buildWorkflowDirective(style, family);
+  const workflowDirective = buildWorkflowDirective(style, family, nativeToolProtocol);
   const toolExamples = buildToolExamples(style);
 
   return {
@@ -168,23 +160,27 @@ export function getCodingHarnessProfile(providerId: string, modelId: string): Co
 }
 
 function buildFamilyDirective(family: ModelFamily, label: string, protocol: NativeToolProtocol): string {
+  const isNative = protocol === "openai_tools" || protocol === "anthropic_tool_use";
   const protoTag =
     protocol === "openai_tools"
       ? "Native OpenAI Function-Calling + XML Bridge"
       : protocol === "anthropic_tool_use"
       ? "Native Anthropic tool_use + XML Bridge"
       : "Specialized Scraper XML DSL Bridge";
+  const shellRef = isNative ? "`shell`" : '`<zeus_tool name="shell">`';
+  const pyRef = isNative ? "`python`" : '`<zeus_tool name="python">`';
+  const writeRef = isNative ? "`write_file`" : '`<zeus_tool name="write_file" path="...">...</zeus_tool>`';
 
   switch (family) {
     case "mercury":
       return `## Model Harness²: ${label} (${protoTag} · Diffusion Architect)
-- Keep internal reasoning plain text and emit tool tags only in your final visible response.
-- When asked to create or write a file (such as \`AGENTS.md\`, \`README.md\`, a script, or a module), emit \`<zeus_tool name="write_file" path="...">...</zeus_tool>\` immediately in your first turn. Do NOT call \`list_dir\` before writing a requested file when the target path is already known.
+- Keep internal reasoning plain text and emit tool calls only in your final visible response.
+- When asked to create or write a file (such as \`AGENTS.md\`, \`README.md\`, a script, or a module), invoke ${writeRef} immediately in your first turn. Do NOT call \`list_dir\` before writing a requested file when the target path is already known.
 - Never repeat the same \`list_dir\` or \`read_file\` call if it returned empty or you already saw the result.`;
 
     case "claude":
       return `## Model Harness²: ${label} (${protoTag} · Claude Code Bash & Python Specialist)
-- Operate with Claude Code discipline: prefer \`<zeus_tool name="shell">\` (bash) and \`<zeus_tool name="python">\` to inspect, transform, test, and verify code in minimal turns.
+- Operate with Claude Code discipline: prefer ${shellRef} (bash) and ${pyRef} to inspect, transform, test, and verify code in minimal turns.
 - Combine shell exploration into single compound commands (e.g., \`rg -n "symbol" src/ && git status -sb\`) instead of sequential single-file reads when mapping a codebase.
 - Use \`edit_file\` for targeted single-file changes or \`python\` scripts for multi-file deterministic refactoring.`;
 
@@ -196,23 +192,23 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "deepseek":
       return `## Model Harness²: ${label} (${protoTag} · DeepSeek V4/R1 Bash & Python Agent Profile)
-- Keep internal reasoning focused plain text and emit tool tags only in your final visible response.
-- Leverage your strong \`shell\` (bash) and \`python\` training: use \`<zeus_tool name="shell">\` for ripgrep/git/test commands and \`<zeus_tool name="python">\` for programmatic multi-hunk edits, AST/JSON inspection, and algorithmic verification.
+- Keep internal reasoning focused plain text and emit tool calls only in your final visible response.
+- Leverage your strong \`shell\` (bash) and \`python\` training: use ${shellRef} for ripgrep/git/test commands and ${pyRef} for programmatic multi-hunk edits, AST/JSON inspection, and algorithmic verification.
 - When creating a new file, call \`write_file\` directly without preliminary directory listing.`;
 
     case "kimi":
       return `## Model Harness²: ${label} (${protoTag} · Moonshot Kimi K2.7/K3 SWE-Agent Profile)
 - Use your SWE-agent strengths: prefer compound \`shell\` commands (\`rg -n\`, \`find\`, \`pytest\`, \`npm test\`, \`cargo check\`) and \`python\` execution over slow file-by-file browsing.
-- Emit raw \`<zeus_tool name="...">...</zeus_tool>\` blocks in your final response. Do not re-run \`list_dir\` on directories already shown in \`## Project\`.`;
+- ${isNative ? "Invoke tools via native function calling (or `<zeus_tool>` XML if native tools are unavailable)." : 'Emit raw `<zeus_tool name="...">...</zeus_tool>` blocks in your final response.'} Do not re-run \`list_dir\` on directories already shown in \`## Project\`.`;
 
     case "glm":
       return `## Model Harness²: ${label} (${protoTag} · Z.ai GLM-5 Agentic Coder Profile)
-- Emit \`<zeus_tool>\` blocks directly as top-level XML (never wrap \`<zeus_tool>\` inside \`\`\`xml markdown fences).
-- Prefer \`<zeus_tool name="shell">\` and \`<zeus_tool name="python">\` for fast workspace inspection, batch edits, and running tests/typechecks.`;
+- ${isNative ? "Invoke workspace tools via native function calling (or top-level `<zeus_tool>` XML without markdown fences)." : "Emit `<zeus_tool>` blocks directly as top-level XML (never wrap `<zeus_tool>` inside ```xml markdown fences)."}
+- Prefer ${shellRef} and ${pyRef} for fast workspace inspection, batch edits, and running tests/typechecks.`;
 
     case "qwen":
       return `## Model Harness²: ${label} (${protoTag} · Qwen Coder Bash & Python Profile)
-- Prefer \`<zeus_tool name="shell">\` (bash) and \`<zeus_tool name="python">\` for rapid code search, multi-file edits, and test verification, alongside \`edit_file\` and \`write_file\`.
+- Prefer ${shellRef} (bash) and ${pyRef} for rapid code search, multi-file edits, and test verification, alongside \`edit_file\` and \`write_file\`.
 - Top-level project files are already listed in \`## Project\`; jump straight to reading/editing target files or running shell/python commands.`;
 
     case "gemini":
@@ -221,7 +217,7 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "nemotron":
       return `## Model Harness²: ${label} (${protoTag} · NVIDIA Nemotron 3 Software Engineering Profile)
-- Keep internal reasoning concise plain text and emit tool tags only in your final visible response.
+- Keep internal reasoning concise plain text and emit tool calls only in your final visible response.
 - Use \`shell\`, \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` directly; never call \`list_dir\` if the target file path is already known.`;
 
     case "mistral":
@@ -234,29 +230,38 @@ function buildFamilyDirective(family: ModelFamily, label: string, protocol: Nati
 
     case "frontier_moe":
       return `## Model Harness²: ${label} (${protoTag} · Frontier Agentic Engineering Profile)
-- Use \`shell\` (bash), \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` to solve tasks in minimal rounds. Emit tool tags only in your final visible response.`;
+- Use \`shell\` (bash), \`python\`, \`read_file\`, \`edit_file\`, and \`write_file\` to solve tasks in minimal rounds. Emit tool calls only in your final visible response.`;
 
     case "compact_open":
       return `## Model Harness²: ${label} (${protoTag} · Compact High-Speed Agent Profile)
-- Work in direct, single-step actions. When asked to create a file, use \`<zeus_tool name="write_file" path="filename">content</zeus_tool>\` immediately. When asked to run a command or test, use \`<zeus_tool name="shell">command</zeus_tool>\`.`;
+- Work in direct, single-step actions. When asked to create a file, call ${writeRef} immediately. When asked to run a command or test, call ${shellRef}.`;
   }
 }
 
-function buildWorkflowDirective(style: ToolExecutionStyle, family: ModelFamily): string {
+function buildWorkflowDirective(
+  style: ToolExecutionStyle,
+  family: ModelFamily,
+  protocol: NativeToolProtocol = "scraper_xml_dsl"
+): string {
+  const isNative = protocol === "openai_tools" || protocol === "anthropic_tool_use";
+  const shellRef = isNative ? "`shell`" : '`<zeus_tool name="shell">`';
+  const pyRef = isNative ? "`python`" : '`<zeus_tool name="python">`';
+  const writeRef = isNative ? "`write_file`" : '`<zeus_tool name="write_file" path="...">`';
+
   if (style === "guided_compact") {
     return `## Coding Workflow
-1. If the user asks to create a new file, emit \`<zeus_tool name="write_file" path="...">\` immediately (do not call \`list_dir\` first).
+1. If the user asks to create a new file, invoke ${writeRef} immediately (do not call \`list_dir\` first).
 2. If you need to inspect or change existing code, read the target file with \`read_file\` or search with \`search_code\` / \`shell\`, then update it with \`edit_file\` or \`write_file\`.
-3. Run tests or verification with \`<zeus_tool name="shell">\` or \`<zeus_tool name="python">\` when applicable.
+3. Run tests or verification with ${shellRef} or ${pyRef} when applicable.
 4. Reply with 1-3 direct sentences summarizing the change.`;
   }
 
   return `## Coding & Agent Execution Protocol (${style === "bash_python_first" ? "Bash & Python-First" : "High-Speed Hybrid"} · ${family.toUpperCase()})
 1. **Zero Wasted Turns**: Top-level files are already shown in \`## Project\`. Never call \`list_dir\` on \`.\` unless \`## Project\` is missing. When asked to create a new file (like \`AGENTS.md\` or a new module), write it immediately on Turn 1 with complete, production-ready content (at least 150+ chars for documentation files like \`AGENTS.md\`) unless you specifically need to inspect an existing file first.
 2. **Bash & Python Power Tools**: You have full local \`shell\` (bash/cmd) and \`python\` (Python 3) execution in the workspace.
-   - Use \`<zeus_tool name="shell">\` for \`rg\`, \`git\`, \`find\`, test suites (\`npm test\`, \`pytest\`, \`cargo check\`, \`node --test\`), and compound shell pipelines.
-   - Use \`<zeus_tool name="python">\` to execute multi-line Python 3 scripts via stdin for complex multi-file edits, JSON/AST analysis, data transformation, and algorithmic verification.
-3. **Surgical File Edits**: Use \`write_file\` to create new files or replace small files completely, and \`edit_file\` (\`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE\`) for targeted changes in existing files.
+   - Use ${shellRef} for \`rg\`, \`git\`, \`find\`, test suites (\`npm test\`, \`pytest\`, \`cargo check\`, \`node --test\`), and compound shell pipelines.
+   - Use ${pyRef} to execute multi-line Python 3 scripts via stdin for complex multi-file edits, JSON/AST analysis, data transformation, and algorithmic verification.
+3. **Surgical File Edits**: Use \`write_file\` to create new files or replace small files completely, and \`edit_file\` (\`old_string\`/\`new_string\` or \`<<<<<<< SEARCH / ======= / >>>>>>> REPLACE\`) for targeted changes in existing files.
 4. **Verify & Conclude**: After modifying code, run the relevant test or verification command when one exists. Once verified, stop calling tools and answer in 1-3 concise sentences.`;
 }
 

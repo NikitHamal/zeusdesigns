@@ -377,7 +377,7 @@ where
         };
         let mut inc_msgs = Vec::new();
         if !system.trim().is_empty() {
-            let sys_full: String = system.chars().take(24000).collect();
+            let sys_full = smart_cap_system(system, 96000);
             let is_opencode = sys_full.contains("OpenCode / OpenAI Tool-Calling Protocol");
             let is_design = sys_full.contains("## Current canvas page");
             let is_tools = is_agent_tool_request(&sys_full);
@@ -825,7 +825,9 @@ where
 /// Stream from Kilo Gateway (`https://api.kilo.ai/api/gateway/chat/completions`, free frontier & multimodal models).
 
 fn is_agent_tool_request(system: &str) -> bool {
-    (system.contains("## Agent tools")
+    (system.contains("## Agent Tools")
+        || system.contains("## Agent tools")
+        || system.contains("## Calling Tools")
         || system.contains("## Local Workspace Agent Tools")
         || system.contains("<zeus_tool"))
         && !system.contains("## Current canvas page")
@@ -920,17 +922,6 @@ fn is_upstream_error_text(s: &str) -> bool {
 // Native thinking support ("enable_thinking": true) is wired in providers_oai_a.rs and providers_oai_b.rs
 
 include!("providers_cat_1.rs");
-include!("providers_cat_2.rs");
-include!("providers_cat_3.rs");
-include!("providers_cat_4.rs");
-include!("providers_neb_a.rs");
-include!("providers_neb_b.rs");
-include!("providers_gateways_a.rs");
-include!("providers_gateways_b.rs");
-include!("providers_oai_a.rs");
-include!("providers_oai_b.rs");
-include!("providers_direct.rs");
-include!("providers_fingerprint.rs");include!("providers_cat_1.rs");
 include!("providers_cat_2.rs");
 include!("providers_cat_3.rs");
 include!("providers_cat_4.rs");

@@ -613,7 +613,7 @@ where
 
     let mut kilo_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_safe: String = system.chars().take(24000).collect();
+        let sys_safe = smart_cap_system(system, 120000);
         kilo_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in messages {

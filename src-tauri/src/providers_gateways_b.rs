@@ -110,12 +110,7 @@ where
     }
 
     let wants_tools = is_agent_tool_request(system);
-    let sys_raw: String = system.chars().take(24000).collect();
-    let sys_safe = if wants_tools {
-        format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
-    } else {
-        sys_raw
-    };
+    let sys_safe = smart_cap_system(system, 120000);
     let mut candidate_routes: Vec<(&str, &str, u64)> = Vec::new();
     for &h in hosts {
         let t_secs = if eff_model.contains("/gemini/") || eff_model.contains("kimi-k3.1-pro") || eff_model.contains("step-5") {
@@ -432,12 +427,7 @@ where
     let wants_tools = is_agent_tool_request(system);
     let mut oai_msgs = Vec::new();
     if !system.trim().is_empty() {
-        let sys_raw: String = system.chars().take(24000).collect();
-        let sys_safe = if wants_tools {
-            format!("{}\n\n{}", scraper_xml_dsl_banner(), sys_raw)
-        } else {
-            sys_raw
-        };
+        let sys_safe = smart_cap_system(system, 120000);
         oai_msgs.push(json!({ "role": "system", "content": sys_safe }));
     }
     for m in messages {
