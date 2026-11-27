@@ -9,6 +9,7 @@ import { BottomToolbar } from "./BottomToolbar";
 import { CompareDialog, GridView, SingleView } from "./Views";
 import { Icon } from "./Icon";
 import { Inspector } from "./Inspector";
+import { HarnessBanner, InspectToggle, VersionsMenu } from "./HarnessControls";
 import { editor, useEditor } from "../lib/editor";
 import { DESIGN_SYSTEMS, getDS } from "../lib/designSystems";
 import { BLOCK_CATEGORIES, insertBlockIntoHtml, UI_BLOCKS, type BlockCategory } from "../lib/blocks";
@@ -633,6 +634,8 @@ export function CanvasPane() {
               </>
             )}
           </Dropdown>
+          <InspectToggle />
+          <VersionsMenu />
           {view === "canvas" && <ZoomControls />}
         </div>
       </header>
@@ -643,6 +646,7 @@ export function CanvasPane() {
         <div className="relative min-w-0 flex-1 overflow-hidden">
           {view === "canvas" ? <InfiniteCanvas /> : view === "grid" ? <GridView /> : <SingleView />}
           <BottomToolbar />
+          <HarnessBanner />
         </div>
         <Inspector />
       </div>

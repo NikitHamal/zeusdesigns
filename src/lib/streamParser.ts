@@ -6,6 +6,7 @@
 // 4. Deterministic fallback summary generation when an agent completes tool calls without trailing prose
 
 import type { ToolCall } from "../types";
+import { zeusToArtboards } from "./sovereign/fsm";
 
 export interface ParsedBlock {
   attrs: Record<string, string>;
@@ -372,7 +373,9 @@ export function parseStream(
   extraThink = ""
 ): ParsedStreamResult {
   const { withoutReasoning, reasoning, thinkOpen } = extractReasoningFromRaw(rawFull, extraThink);
-  const full = normalizeStream(stripToolMarkupFromText(withoutReasoning));
+  // Sovereign protocol: <zeus_plan>/<zeus_artifact>/<zeus_action> become <artboard> markup; the plan joins the reasoning.
+  const zeus = zeusToArtboards(withoutReasoning);
+  const full = normalizeStream(stripToolMarkupFromText(zeus.text));
   const skipRanges = computeMarkdownCodeSkipRanges(full, true);
 
   let text = "";
@@ -403,6 +406,8 @@ export function parseStream(
         .replace(/\s*```\s*$/i, "")
         .trim();
     const isRealHtmlBlock = (h: string, a: Record<string, string>) => {
+      // surgical patch bodies are SEARCH/REPLACE text, not HTML: always a real block (even while partially streamed)
+      if (a.mode === "patch") return true;
       if (a.name === "..." || h.startsWith('".') || h.startsWith("'.")) return false;
       return /<(?:!doctype|html|head|body|style|div|main|section|header|nav|article|canvas|svg|script|h1|h2|table|form)\b/i.test(
         h
@@ -428,7 +433,7 @@ export function parseStream(
 
   const cleanedStray = text.replace(/^\s*(?:``|''|,,)+\s*$/gm, "").trim();
   const { cleanText, leakedPlan } = extractLeakedPlan(cleanedStray);
-  const mergedReasoning = [reasoning, leakedPlan].filter(Boolean).join("\n\n").trim();
+  const mergedReasoning = [reasoning, zeus.plan, leakedPlan].filter(Boolean).join("\n\n").trim();
 
   return {
     text: cleanText,

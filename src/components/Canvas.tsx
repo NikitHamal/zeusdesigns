@@ -15,6 +15,9 @@ import { editor, editorBridge, injectEditor, useEditor } from "../lib/editor";
 import { insertBlockIntoHtml, UI_BLOCKS } from "../lib/blocks";
 import { getDS } from "../lib/designSystems";
 import { hasCustomScript, ShadowFrame } from "../lib/shadowRenderer";
+import { prepareSandboxDocument } from "../lib/sovereign/runtime";
+import { useSovereign } from "../lib/sovereign/state";
+import { installHostBridge } from "../lib/sovereign/host";
 
 const DEFAULT_VP = { x: 140, y: 120, z: 0.7 };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -27,7 +30,9 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
   const ref = useRef<HTMLIFrameElement>(null);
   const [doc, setDoc] = useState(html);
   const emitted = useRef<string | null>(null);
-  const needsIframe = editing || (interactive && hasCustomScript(html));
+  const inspecting = useSovereign((s) => s.inspect.on && s.inspect.boardId === id);
+  const needsIframe = editing || inspecting || (interactive && hasCustomScript(html));
+  useEffect(() => { installHostBridge(); }, []);
 
   // entering edit mode reloads the document with the editor runtime; outside changes (AI revise, undo) reload too
   useLayoutEffect(() => { if (editing) { emitted.current = null; setDoc(html); } }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -57,7 +62,7 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
     return () => { window.removeEventListener("message", onMsg); editorBridge.attach(null); };
   }, [editing, id]);
 
-  if (culled && !editing && !interactive) {
+  if (culled && !editing && !interactive && !inspecting) {
     return <div style={{ width: w, height: h }} className="bg-surface-container/40" />;
   }
 
@@ -65,11 +70,12 @@ const Frame = memo(function Frame({ id, w, h, html, interactive, editing, culled
     return <ShadowFrame html={html} w={w} h={h} interactive={interactive} />;
   }
 
-  const src = quiet(editing ? injectEditor(doc) : html);
+  // Sovereign: telemetry bridge + import map + inspector are injected at render time only (stored HTML stays clean)
+  const src = quiet(editing ? injectEditor(doc) : prepareSandboxDocument(html, { boardId: id, inspect: inspecting }));
   return (
     <iframe
       ref={ref} title="design" srcDoc={src} sandbox="allow-scripts allow-forms allow-popups allow-modals"
-      style={{ width: "100%", height: "100%", border: 0, background: "#fff", pointerEvents: interactive || editing ? "auto" : "none" }}
+      style={{ width: "100%", height: "100%", border: 0, background: "#fff", pointerEvents: interactive || editing || inspecting ? "auto" : "none" }}
     />
   );
 });

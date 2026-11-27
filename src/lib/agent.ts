@@ -7,6 +7,7 @@ import { getCodingHarnessProfile } from "./codingHarness";
 import { composeHarness2Surface } from "./harness2";
 import { buildOpenDesignDeliverablePrompt, type OpenDesignCreationMode } from "./openDesign";
 import { M3E_GUIDE, M3E_TRIGGER } from "./m3e";
+import { sovereignDeliverableSection } from "./sovereign/integration";
 
 export type Intent = "chat" | "code" | "design";
 
@@ -74,11 +75,17 @@ When the user asks for a visual deliverable (an interactive prototype, a HyperFr
         odMode = s.settings.openDesignMode && s.settings.openDesignMode !== "code" ? s.settings.openDesignMode : "prototype";
       }
       if (!odMode) return "";
-      return buildOpenDesignDeliverablePrompt({
-        mode: odMode,
-        brandId: s.settings.openDesignBrandId ?? "m3-expressive",
-        aspect: s.settings.openDesignAspect ?? "16:9",
-      });
+      return [
+        buildOpenDesignDeliverablePrompt({
+          mode: odMode,
+          brandId: s.settings.openDesignBrandId ?? "m3-expressive",
+          aspect: s.settings.openDesignAspect ?? "16:9",
+        }),
+        // Sovereign planning protocol + craft skills, only when a visual deliverable was actually requested
+        sovereignDeliverableSection(userText),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     })(),
     spec.isKeylessScraper
       ? `Native workspace tools (\`shell\`/\`bash\`, \`python\`, \`read_file\`, \`write_file\`, \`edit_file\`, \`search_code\`, \`list_dir\`, \`web_fetch\`) are connected and execute live via \`<zeus_tool>\` blocks. Never claim you lack file, terminal, or python access.`

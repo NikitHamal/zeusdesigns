@@ -33,6 +33,8 @@ function secs(ms?: number) {
 const TOOL_LABEL: Record<string, string> = {
   design_lint: "Enforced design system & tokens",
   design_audit: "Audited layout geometry",
+  zeus_patch: "Applied surgical patch",
+  zeus_guard: "Protected existing design from truncation",
   design_repair: "Refined screen layout",
   context_compact: "Compacted conversation context",
   auto_continue: "Continued truncated stream",
@@ -101,6 +103,8 @@ const TOOL_LABEL: Record<string, string> = {
 const TOOL_RUNNING: Record<string, string> = {
   design_lint: "Enforcing design system & tokens…",
   design_audit: "Auditing layout geometry…",
+  zeus_patch: "Applying surgical patch…",
+  zeus_guard: "Checking rewrite for truncation…",
   design_repair: "Refining screen layout…",
   context_compact: "Compacting conversation context…",
   auto_continue: "Continuing truncated stream…",

@@ -41,8 +41,22 @@ import {
   normalizeStream,
   parseStream,
   synthesizeToolCompletionSummary,
+  type ParsedBlock,
 } from "./streamParser";
 import { demoRun } from "./demoEngine";
+import {
+  adaptHistory,
+  afterGeneration,
+  announcePatch,
+  beginTurn,
+  computePatch,
+  createLiveTelemetry,
+  guardRevise,
+  registerHealSender,
+  sovereignSystemSection,
+} from "./sovereign/integration";
+import { installHostBridge } from "./sovereign/host";
+import { sanitizePartialHtml } from "./sovereign/sanitizer";
 import { formatFingerprintMarkdown, verifyModelAuthenticity } from "./lmFingerprint";
 import {
   BROWSER_FALLBACK_PROVIDER_IDS,
@@ -55,7 +69,7 @@ export { extractLeakedPlan, normalizeStream, parseStream };
 /* ------------------------------------------------------------------ */
 /* System prompt                                                       */
 /* ------------------------------------------------------------------ */
-export function buildSystemPrompt(opts: { intent?: string; device?: Device; tools?: string } = {}): string {
+export function buildSystemPrompt(opts: { intent?: string; device?: Device; tools?: string; sovereign?: string } = {}): string {
   const s = useStore.getState();
   const ds = getDS(s.settings.designSystemId);
   const spec = getProviderSpecialization(s.settings.providerId, s.settings.modelId);
@@ -64,6 +78,7 @@ export function buildSystemPrompt(opts: { intent?: string; device?: Device; tool
   const ws = s.ui.workspace;
   return [
     harnessPrompt(ds, opts.intent, opts.device),
+    opts.sovereign ?? "",
     spec.specializationPrompt,
     skills.length ? `## Enabled skills\n${skills.map((k) => `### ${k.name}\n${k.prompt}`).join("\n")}` : "",
     studioBrief(opts.intent ?? "", ds, opts.device),
@@ -162,6 +177,8 @@ export async function sendMessage(opts: {
   attachments?: Attachment[];
   quote?: Quote;
   asVariant?: boolean;
+  /** Set by the self-healing controller: the turn repairs a captured runtime/compile error. */
+  heal?: boolean;
 }) {
   const st = useStore.getState();
   if (st.busy || !opts.text.trim()) return;
@@ -277,6 +294,7 @@ export async function sendMessage(opts: {
     artboardIds: [],
   });
   freshSt.setBusy(true);
+  beginTurn({ heal: Boolean(opts.heal) });
   void learnFromText(opts.text).then((l) => {
     if (l.length) {
       useStore.getState().notify(l.length === 1 ? "Saved to memory" : `Saved ${l.length} lines to memory`);
@@ -295,7 +313,7 @@ export async function sendMessage(opts: {
     asVariant: opts.asVariant,
     workspace: Boolean(freshSt.ui.workspace),
   });
-  const { messages: history, themeOverride, isCanvasFollowUp } =
+  const { messages: history0, themeOverride, isCanvasFollowUp } =
     mode === "design"
       ? buildMultiTurnContext({
           convMessages: conv.messages,
@@ -307,6 +325,18 @@ export async function sendMessage(opts: {
           spec,
         })
       : buildPlainContext({ convMessages: conv.messages, userMsg, quoteToText, mode });
+  // Sovereign context compaction: authoritative compact canvas state, selected element, telemetry, lean history
+  const history =
+    mode === "design"
+      ? adaptHistory(history0, {
+          userText: opts.text,
+          boards,
+          target,
+          quote: opts.quote,
+          maxCharsPerScreen: spec.maxCharsPerScreen,
+          lastTouchedIds: [...conv.messages].reverse().find((m) => m.role === "assistant" && m.artboardIds?.length)?.artboardIds,
+        })
+      : history0;
 
   controller = new AbortController();
   const signal = controller.signal;
@@ -349,7 +379,69 @@ export async function sendMessage(opts: {
   let thinkT0 = 0;
   let thinkEnd = 0;
 
+  // Sovereign harness state for this turn
+  const live = createLiveTelemetry();
+  const patchedIdx = new Set<number>();
+  const guardCache = new Map<number, { input: string; output: string | null }>();
+  const committed = new Map<number, string>();
+  let patchedCount = 0;
+
+  const resolvePatchTarget = (b: ParsedBlock, i: number): Artboard | undefined => {
+    const S = useStore.getState();
+    const pool = getConversationBoards(S);
+    const byId = b.attrs.id ? S.artboards.find((a) => a.id === b.attrs.id) : undefined;
+    const byName =
+      !byId && b.attrs.name ? pool.find((a) => a.name.toLowerCase() === b.attrs.name.toLowerCase()) : undefined;
+    return byId ?? byName ?? target ?? (pool.length === 1 ? pool[0] : pool[i]);
+  };
+
+  /** Surgical SEARCH/REPLACE edit of an existing screen. Applied once, when the block closes (or the stream ends). */
+  const handlePatchBlock = (b: ParsedBlock, i: number, final: boolean) => {
+    const S = useStore.getState();
+    const board = resolvePatchTarget(b, i);
+    if (!board) {
+      if ((b.closed || final) && !patchedIdx.has(i)) {
+        patchedIdx.add(i);
+        tools.push({
+          id: uid(),
+          name: "zeus_patch",
+          args: b.attrs.name || "screen",
+          status: "error",
+          output: "No matching screen on the canvas for this patch.",
+        });
+      }
+      return;
+    }
+    idMap.set(i, board.id);
+    if (!(b.closed || final)) {
+      if (!board.loading) S.updateArtboard(board.id, { loading: true });
+      return;
+    }
+    if (patchedIdx.has(i)) return;
+    patchedIdx.add(i);
+    const outcome = computePatch(board.html, b.html);
+    if (outcome.html) {
+      const dsNow = getDS(S.settings.designSystemId);
+      const out = harden(outcome.html, dsNow, { intent: opts.text, name: board.name, device: board.device });
+      S.reviseArtboard(board.id, themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html);
+      patchedCount++;
+    }
+    S.updateArtboard(board.id, { loading: false });
+    announcePatch(board, outcome);
+    tools.push({
+      id: uid(),
+      name: "zeus_patch",
+      args: board.name,
+      status: outcome.applied > 0 ? "ok" : "error",
+      output:
+        outcome.applied > 0
+          ? `${outcome.applied} block(s) applied (${[...new Set(outcome.strategies)].join(", ")})${outcome.failed ? `, ${outcome.failed} did not match` : ""}`
+          : outcome.reasons.join("\n") || "Patch did not apply.",
+    });
+  };
+
   const sync = (final = false) => {
+    live.update(full);
     const parsed = parseStream(extractRemember(full).clean, extraThink);
     const { blocks, reasoning, thinkOpen } = parsed;
     let { text } = parsed;
@@ -359,6 +451,10 @@ export async function sendMessage(opts: {
 
     const S = useStore.getState();
     blocks.forEach((b, i) => {
+      if (b.attrs.mode === "patch") {
+        handlePatchBlock(b, i, final);
+        return;
+      }
       let id = idMap.get(i);
       const bDevice = (
         ["mobile", "tablet", "web"].includes(b.attrs.device)
@@ -407,10 +503,39 @@ export async function sendMessage(opts: {
       const isRevise = !created.includes(id);
       const dsNow = getDS(S.settings.designSystemId);
       if (b.closed || final) {
-        const out = harden(b.html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
-        const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
-        if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
-        else S.updateArtboard(id, { html: finalHtml });
+        // Anti-truncation guard: lazy "rest unchanged" placeholders are merged with the previous version, and a
+        // rewrite that still loses content is rejected so the last good render stays on the canvas.
+        let html = b.html;
+        let rejected = false;
+        const cur = isRevise && !preSyncedIds.has(id) ? S.artboards.find((x) => x.id === id) : undefined;
+        if (cur) {
+          let gc = guardCache.get(i);
+          if (!gc || gc.input !== b.html) {
+            const g = guardRevise(cur, b.html);
+            gc = { input: b.html, output: g.status === "rejected" ? null : g.html };
+            guardCache.set(i, gc);
+            if (g.status !== "ok") {
+              tools.push({
+                id: uid(),
+                name: "zeus_guard",
+                args: cur.name,
+                status: g.status === "rejected" ? "error" : "ok",
+                output: g.reasons.join("\n"),
+              });
+            }
+          }
+          if (gc.output === null) rejected = true;
+          else html = gc.output;
+        }
+        if (!rejected) {
+          const out = harden(html, dsNow, { intent: opts.text, name: b.attrs.name, device: bDevice });
+          const finalHtml = themeOverride ? applyThemeOverrideToHtml(out.html, themeOverride) : out.html;
+          if (committed.get(i) !== finalHtml) {
+            committed.set(i, finalHtml);
+            if (isRevise && !preSyncedIds.has(id)) S.reviseArtboard(id, finalHtml);
+            else S.updateArtboard(id, { html: finalHtml });
+          }
+        }
         S.updateArtboard(id, { loading: false });
         lastPush.set(i, { t: now, len: -1 });
       } else if (
@@ -420,7 +545,7 @@ export async function sendMessage(opts: {
         now - lp.t > 700 &&
         b.html.length - lp.len > 300
       ) {
-        const partialHtml = harden(b.html, dsNow, {
+        const partialHtml = harden(sanitizePartialHtml(b.html), dsNow, {
           partial: true,
           intent: opts.text,
           name: b.attrs.name,
@@ -472,6 +597,14 @@ export async function sendMessage(opts: {
     controller = null;
     nativeCancel = null;
     void nativePerf.trim();
+    live.finish();
+    afterGeneration({
+      boardIds: [...idMap.values(), ...syncedWorkspaceBoardIds],
+      patched: patchedCount,
+      ms: performance.now() - t0,
+      label: opts.text,
+      heal: Boolean(opts.heal),
+    });
   };
 
   const designTokensAnswer = (args?: string) => {
@@ -555,7 +688,19 @@ export async function sendMessage(opts: {
   const toolsText = nativeOn && !isGreeting ? await toolsPrompt({ design: mode === "design" }).catch(() => "") : "";
   const system =
     mode === "design"
-      ? buildSystemPrompt({ intent: opts.text, device: target?.device, tools: toolsText })
+      ? buildSystemPrompt({
+          intent: opts.text,
+          device: target?.device,
+          tools: toolsText,
+          sovereign: sovereignSystemSection({
+            userText: opts.text,
+            boards,
+            target,
+            quote: opts.quote,
+            heal: opts.heal,
+            isFollowUp: isCanvasFollowUp,
+          }),
+        })
       : [agentPrompt(mode, opts.text), toolsText].filter(Boolean).join("\n\n");
   const activeProjRoot = st.projects.find((p) => p.id === st.activeProjectId)?.root;
   const effectiveWorkspaceRoot = st.ui.workspace?.root || activeProjRoot;
@@ -1081,3 +1226,7 @@ export async function sendMessage(opts: {
     finish(signal.aborted ? undefined : (e as Error).message || "Request failed");
   }
 }
+
+// Sovereign harness: let the self-healing controller start repair turns, and listen to sandbox telemetry.
+registerHealSender((o) => sendMessage(o));
+installHostBridge();
