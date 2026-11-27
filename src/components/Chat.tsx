@@ -147,13 +147,13 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
         {m.attachments && m.attachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-1.5">
             {m.attachments.map((a) => (
-              <span key={a.id} className="flex items-center gap-1.5 rounded-full bg-surface-high px-2.5 py-1 text-xs">
+              <span key={a.id} className="oc-hairline flex items-center gap-1.5 rounded-md bg-surface-container px-2 py-1 text-xs">
                 {a.dataUrl ? <img src={a.dataUrl} className="size-5 rounded object-cover" /> : <Icon name="description" size={13} />}{a.name}
               </span>
             ))}
           </div>
         )}
-        <div className="select-text whitespace-pre-wrap rounded-[24px] rounded-br-[8px] bg-surface-high px-4 py-2.5 text-[14.5px] leading-relaxed text-on-surface">{m.text}</div>
+        <div className="select-text whitespace-pre-wrap oc-hairline rounded-lg bg-surface-container px-3.5 py-2 text-[14px] leading-[1.55] text-on-surface">{m.text}</div>
       </div>
     );
   }
@@ -171,9 +171,9 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
       {shown.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${i}`} streaming={m.streaming} />)}
       {m.artboardIds && m.artboardIds.length > 0 && <ArtboardCards ids={m.artboardIds} />}
       <LiveStatus m={m} />
-      {m.error && <div className="flex items-start gap-2 rounded-2xl bg-error-container px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
+      {m.error && <div className="flex items-start gap-2 rounded-lg border border-[var(--oc-critical)]/40 bg-error-container/60 px-3 py-2 text-[13px] text-on-error-container"><Icon name="error" size={15} className="mt-0.5 shrink-0" /><span className="select-text">{m.error}</span></div>}
       {!m.streaming && m.truncated && (
-        <div className="flex items-center justify-between gap-2 rounded-2xl border border-outline-variant/60 bg-surface-low px-3 py-2 text-xs text-on-surface-variant">
+        <div className="oc-hairline flex items-center justify-between gap-2 rounded-lg bg-surface-low px-3 py-2 text-xs text-on-surface-variant">
           <span>Output reached the turn limit before closing the artboard.</span>
           <button
             disabled={busy}

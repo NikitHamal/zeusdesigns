@@ -329,8 +329,8 @@ function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresenta
   const isCode = pres.detail === "Code" || pres.detail === "Terminal";
 
   return (
-    <div className="ml-9 mr-1 mt-1 mb-1.5 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-lowest">
-      <div className="flex items-center justify-end gap-1 border-b border-outline-variant/40 px-1.5 py-1">
+    <div className="oc-hairline ml-9 mr-1 mt-1 mb-1.5 overflow-hidden rounded-lg bg-surface-lowest">
+      <div className="flex items-center justify-end gap-1 border-b border-[var(--oc-border-weak)] px-1.5 py-1">
         {hasDiff && (tool.newContent || tool.oldContent) && (
           <div className="mr-auto flex items-center rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11px] font-medium">
             {(["diff", "new", "old"] as const).map((k) => (
@@ -382,9 +382,9 @@ function ToolDetail({ tool, pres, parsed }: { tool: ToolCall; pres: ToolPresenta
               <div
                 key={idx}
                 className={cn(
-                  "flex items-baseline gap-2 rounded-sm px-1.5",
-                  dl.kind === "add" && "bg-tertiary-container/30 text-tertiary",
-                  dl.kind === "del" && "bg-error-container/30 text-error",
+                  "flex items-baseline gap-2 px-1.5",
+                  dl.kind === "add" && "bg-[var(--oc-diff-add-bg)] text-[var(--oc-diff-add-text)]",
+                  dl.kind === "del" && "bg-[var(--oc-diff-del-bg)] text-[var(--oc-diff-del-text)]",
                   dl.kind === "ctx" && "text-on-surface-variant"
                 )}
               >
@@ -638,17 +638,18 @@ export function WorkLog({ m }: { m: Message }) {
       summaryText = "Working…";
     }
   } else {
-    summaryText = tools.length
-      ? `${tools.length} tool call${tools.length === 1 ? "" : "s"}${m.stats?.ms ? ` · ${secs(m.stats.ms)}` : ""}`
-      : `Thought${m.thinkMs ? ` · ${secs(m.thinkMs)}` : ""}`;
+    const ms = m.stats?.ms || m.thinkMs;
+    summaryText = ms
+      ? `Worked for ${secs(ms)}`
+      : tools.length ? `${tools.length} tool call${tools.length === 1 ? "" : "s"}` : "Thought";
   }
 
   return (
     <div className="space-y-1.5">
-      <div className="rounded-2xl border border-outline-variant/55 bg-surface-low/50">
+      <div className="oc-hairline rounded-lg bg-surface-low/40">
         <button
           onClick={() => setOpen(!shown)}
-          className="state flex w-full items-center gap-2 rounded-2xl px-3.5 py-2 text-left text-[13px]"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] outline-none hover:bg-surface-low"
         >
           <Icon
             name="expand_more"
@@ -674,7 +675,7 @@ export function WorkLog({ m }: { m: Message }) {
         </button>
 
         <Collapse open={shown}>
-          <div className="space-y-0.5 border-t border-outline-variant/35 px-2 pb-2 pt-1.5">
+          <div className="space-y-0.5 border-t border-[var(--oc-border-weak)] px-2 pb-2 pt-1.5">
             {m.reasoning && <ThinkingBlock text={m.reasoning} live={thinkLive} ms={m.thinkMs} />}
             {tools.map((t) => (
               <ToolCard key={t.id} t={t} />
@@ -694,7 +695,7 @@ export function WorkLog({ m }: { m: Message }) {
                   window.dispatchEvent(new CustomEvent("zeus:open-file", { detail: cf.path }));
                 }, 30);
               }}
-              className="state inline-flex items-center gap-1.5 rounded-full border border-outline-variant/60 bg-surface-low px-2.5 py-1 font-mono text-[11.5px] text-on-surface hover:bg-surface-high"
+              className="state oc-hairline inline-flex items-center gap-1.5 rounded-md bg-surface-low px-2 py-1 font-mono text-[11.5px] text-on-surface hover:bg-surface-high"
             >
               <Icon name="description" size={13} className="text-primary" />
               <span>{shortenPath(cf.path, 28)}</span>

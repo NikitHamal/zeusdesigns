@@ -10,11 +10,26 @@ import { Icon } from "./Icon";
 
 function NavItem({ icon, label, onClick, active, right }: { icon: string; label: string; onClick: () => void; active?: boolean; right?: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={cn("state flex h-8.5 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] font-medium text-on-surface", active && "bg-surface-high")}>
-      <Icon name={icon} size={18} />
+    <button onClick={onClick} className={cn("flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] font-medium outline-none transition-colors hover:bg-surface-low", active ? "bg-surface-container text-on-surface" : "text-on-surface-variant hover:text-on-surface")}>
+      <Icon name={icon} size={17} />
       <span className="flex-1 truncate">{label}</span>
       {right}
     </button>
+  );
+}
+
+const AVATAR_HUES = [17, 38, 110, 172, 320, 346];
+function ProjectAvatar({ name, active }: { name: string; active: boolean }) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const hue = AVATAR_HUES[h % AVATAR_HUES.length];
+  return (
+    <span
+      style={{ background: `hsl(${hue} 30% ${active ? 34 : 26}%)`, color: `hsl(${hue} 60% 88%)` }}
+      className="grid size-5 shrink-0 place-items-center rounded-[5px] text-[11px] font-semibold uppercase"
+    >
+      {(name.trim()[0] ?? "Z")}
+    </span>
   );
 }
 
@@ -82,7 +97,7 @@ function ChatRow({ id, title, active, screenCount }: { id: string; title: string
     );
   }
   return (
-    <div className={cn("group relative rounded-lg", active && "bg-surface-high")}>
+    <div className={cn("group relative rounded-md", active ? "bg-surface-container" : "hover:bg-surface-low")}>
       <button
         onClick={() => {
           const st = useStore.getState();
@@ -90,9 +105,8 @@ function ChatRow({ id, title, active, screenCount }: { id: string; title: string
           patchUI({ showCanvas: convArtifactCount(st, id) > 0, leftTab: "chat" });
         }}
         onDoubleClick={() => setRename(true)}
-        className="state flex h-8 w-full items-center gap-2 rounded-lg pl-2.5 pr-8 text-left text-[13px] text-on-surface"
+        className={cn("flex h-7 w-full items-center gap-2 rounded-md pl-2 pr-8 text-left text-[13px] outline-none", active ? "text-on-surface" : "text-on-surface-variant")}
       >
-        <Icon name="chat_bubble" size={13} className={cn("shrink-0", active ? "text-primary" : "text-on-surface-variant/70")} />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {screenCount > 0 && <span className="shrink-0 rounded-full bg-surface-container px-1.5 py-0.5 text-[10.5px] font-medium text-on-surface-variant group-hover:opacity-0">{screenCount}</span>}
       </button>
@@ -156,7 +170,7 @@ function ProjectGroup({
   }, [convs, activeConvId]);
 
   return (
-    <div className={cn("mb-1.5 rounded-xl border transition-colors", activeProj ? "border-outline-variant/70 bg-surface-container/60" : "border-transparent")}>
+    <div className="mb-1">
       <div className="group flex h-9 items-center gap-1 px-1.5">
         <button
           onClick={() => toggleProjectExpanded(project.id)}
@@ -187,19 +201,10 @@ function ProjectGroup({
             title={project.root ? `${project.name}\n${project.root}` : `${project.name} (Click to select or bind a local folder)`}
             className="state flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 text-left"
           >
-            <Icon
-              name={activeProj ? "folder_open" : "folder"}
-              size={16}
-              className={cn("shrink-0", activeProj ? "text-primary" : "text-on-surface-variant")}
-            />
-            <span className={cn("truncate text-[13px] font-semibold", activeProj ? "text-on-surface" : "text-on-surface-variant")}>
+            <ProjectAvatar name={project.name} active={activeProj} />
+            <span className={cn("truncate text-[13px] font-medium", activeProj ? "text-on-surface" : "text-on-surface-variant")}>
               {project.name}
             </span>
-            {!project.root && (
-              <span className="shrink-0 rounded bg-surface-high px-1 py-0.2 text-[9.5px] font-medium text-on-surface-variant">
-                local
-              </span>
-            )}
           </button>
         )}
         <button
@@ -235,7 +240,7 @@ function ProjectGroup({
         </Dropdown>
       </div>
       {expanded && (
-        <div className="space-y-0.5 pb-1.5 pl-4 pr-1.5">
+        <div className="space-y-0.5 pb-1 pl-5 pr-1">
           {visibleConvs.map((c) => (
             <ChatRow
               key={c.id}
@@ -357,15 +362,16 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full w-[272px] shrink-0 flex-col border-r border-outline-variant bg-surface-dim">
-      <div className="flex h-14 shrink-0 items-center justify-between gap-1 px-3">
-        <div className="flex items-center gap-1">
-          <IconBtn label="Hide sidebar" size={34} onClick={() => patchUI({ sidebarOpen: false })}><Icon name="left_panel_close" size={20} /></IconBtn>
-          <span className="px-1 font-display text-[19px] font-semibold tracking-tight text-on-surface">Zeus Codes</span>
-        </div>
-        <div className="flex items-center gap-0.5">
-          <IconBtn label="Search chats" size={32} onClick={() => setSearch(true)}><Icon name="search" size={18} /></IconBtn>
-          <IconBtn label={`New chat in ${curProject?.name ?? "project"}`} size={32} onClick={startNewInActiveProject}><Icon name="add" size={19} /></IconBtn>
-        </div>
+      <div className="flex shrink-0 items-center gap-1.5 p-2">
+        <button
+          onClick={startNewInActiveProject}
+          title={`New session in ${curProject?.name ?? "project"}`}
+          className="oc-hairline flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface px-2.5 text-[13px] font-medium text-on-surface outline-none transition-colors hover:bg-surface-container"
+        >
+          <Icon name="add" size={17} />
+          New session
+        </button>
+        <IconBtn label="Search sessions" size={32} className="!rounded-md" onClick={() => setSearch(true)}><Icon name="search" size={17} /></IconBtn>
       </div>
 
       <div className="flex flex-col gap-0.5 border-b border-outline-variant/60 px-2 pb-2">
@@ -380,14 +386,12 @@ export function Sidebar() {
           label="Brand & DESIGN.md"
           active={ui.odTab === "design-systems"}
           onClick={() => patchUI({ odTab: "design-systems" })}
-          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-on-surface-variant">16</span>}
         />
         <NavItem
           icon="movie"
           label="HyperFrames & Skills"
           active={ui.odTab === "skills"}
           onClick={() => patchUI({ odTab: "skills" })}
-          right={<span className="rounded-full bg-surface-container px-1.5 py-0.5 font-mono text-[10px] text-primary">VIDEO</span>}
         />
         <NavItem
           icon="grid_view"
@@ -397,14 +401,15 @@ export function Sidebar() {
         />
       </div>
 
-      <div className="flex items-center justify-between px-3.5 pb-1.5 pt-2">
-        <span className="text-[11.5px] font-semibold uppercase tracking-wider text-on-surface-variant">Projects</span>
+      <div className="flex items-center justify-between px-3.5 pb-1 pt-2.5">
+        <span className="text-[12px] font-medium text-on-surface-variant">Projects</span>
         <button
           onClick={() => pickProjectFolder()}
-          className="state inline-flex h-6 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-primary"
+          title="Open project folder"
+          aria-label="Open project folder"
+          className="grid size-6 place-items-center rounded-md text-on-surface-variant outline-none transition-colors hover:bg-surface-container hover:text-on-surface"
         >
-          <Icon name="create_new_folder" size={14} />
-          Add folder
+          <Icon name="create_new_folder" size={15} />
         </button>
       </div>
 
@@ -431,7 +436,6 @@ export function Sidebar() {
           label="Project files"
           active={ui.leftTab === "files"}
           onClick={() => patchUI({ leftTab: ui.leftTab === "files" ? "chat" : "files", chatCollapsed: false })}
-          right={curProject?.root ? <span className="max-w-[90px] truncate font-mono text-[10.5px] text-on-surface-variant">{curProject.name}</span> : undefined}
         />
         <NavItem
           icon="terminal"

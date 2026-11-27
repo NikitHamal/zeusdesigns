@@ -2,7 +2,17 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 33 (Latest — 5 New Live-Verified Keyless Multi-Turn Providers: `pouluogemini`, `peijungemini`, `zunkogemma4`, `tomgemma4q5` & `amansonillama`)
+## Session 34 (Latest — OpenCode Shell, Titlebar, Palette & Session Header Parity in React 19 + Tailwind 4)
+Goal: Rebuild OpenCode's shell UX natively in `src/` (no SolidJS ports) with Zeus Codes branding, zero shadows/emojis/LIVE badges, keeping the Composer, model/effort selector and Settings UI untouched (owner directive).
+
+Shipped:
+1. **oc-2 surface tokens (`src/lib/theme.ts`, `src/index.css`)**: M3 token names kept, dark/light surface ladders replaced with OpenCode's neutral ramp (`#101010/#121212/#151515/#1c1c1c`, borders `#282828`/`#e5e5e5`); added `--oc-*` semantic tokens (borders, text, raised/inset surfaces, diff add/delete, success/warning/critical), `.oc-titlebar`, `.oc-hairline`; Markdown prose/code now hairline-bordered 8px blocks.
+2. **Frameless titlebar (`src/components/Titlebar.tsx`, `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`)**: `decorations: false`, drag region, sidebar toggle, centered path/search pill that opens the palette, settings, and native minimize/maximize/close (permissions added for start-dragging, minimize, maximize, toggle-maximize, close, is-maximized).
+3. **Command palette (`src/components/CommandPalette.tsx`)**: `Ctrl/Cmd+K`; real commands only (new session, open folder, sidebar, panes, theme, settings tabs, projects, sessions). Canvas "Ask Zeus" moved to `Ctrl+Shift+K` (also reachable from the palette via `zeus:ask`).
+4. **Session header (`src/components/SessionHeader.tsx`)**: project pill / session title breadcrumb with right-side `Canvas`, `Files`, `Terminal`, `Review diffs` pane toggles (Canvas always available); dock toggles preserve the split IDE layout.
+5. **Sidebar / Home / Timeline**: sidebar rail has `New session`, project letter avatars, hairline active rows, no VIDEO/16/local pills; Home has a compact project chip and a recent projects list; `WorkLog` collapses to `Worked for Ns`; diff previews use `--oc-diff-*`; user bubbles/error banners use hairline cards.
+
+## Session 33 ( — 5 New Live-Verified Keyless Multi-Turn Providers: `pouluogemini`, `peijungemini`, `zunkogemma4`, `tomgemma4q5` & `amansonillama`)
 Goal: Discover and integrate 5 genuinely new, unintegrated, keyless, multi-turn-capable providers verified live across Turn 1, Turn 2 context retention, and `<zeus_tool>` tool calling, with exact verbatim `/v1/models` IDs, zero wrapper/duplicate providers, zero silent cross-model/cross-provider fallbacks, and all `.ts`, `.tsx`, and `.rs` files strictly `<= 1,000` lines and memory `< 20 MB`.
 
 Shipped:
