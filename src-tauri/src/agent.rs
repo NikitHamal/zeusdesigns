@@ -3,8 +3,9 @@ use crate::providers::{
     ModelFingerprintReport, ProviderEngine, ProviderInfo,
 };
 use crate::workspace::{
-    fs_delete, fs_read, fs_write, python_run, safe_join, search_workspace_code, shell_run,
-    walk_workspace, FileNode,
+    audit_workspace_files, bm25_search_project, checkpoint_capture_file, docs_lookup_reference,
+    fs_delete, fs_move, fs_read, fs_write, glob_workspace_files, project_outline_of, python_run,
+    safe_join, search_workspace_code, shell_run, walk_workspace, FileNode,
 };
 use serde_json::{json, Value};
 use std::path::Path;
@@ -245,34 +246,60 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "cat_file"
             | "view_file"
             | "open_file"
+            | "read_file_lines"
             | "write_file"
             | "write"
             | "create_file"
             | "save_file"
             | "overwrite_file"
+            | "append_file"
             | "sync_artboard"
             | "delete_file"
+            | "delete"
             | "remove_file"
             | "rm"
             | "del"
             | "unlink"
+            | "move_file"
+            | "rename_file"
+            | "mv"
             | "edit_file"
             | "edit"
             | "patch_file"
             | "replace_in_file"
             | "str_replace"
+            | "str_replace_editor"
+            | "multi_edit"
+            | "multiedit"
+            | "multi_edit_file"
             | "search_code"
             | "grep"
             | "rg"
             | "search"
+            | "search_files"
             | "ripgrep"
             | "find_in_files"
+            | "search_project"
+            | "docs_lookup"
             | "list_dir"
             | "ls"
             | "dir"
             | "list_files"
+            | "list_directory"
+            | "print_tree"
+            | "tree"
             | "glob"
             | "find_files"
+            | "check_syntax"
+            | "audit_project"
+            | "review_project"
+            | "lint_project"
+            | "update_plan"
+            | "todowrite"
+            | "todo_write"
+            | "ask_user"
+            | "ask"
+            | "question"
             | "shell"
             | "bash"
             | "sh"
@@ -295,7 +322,9 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "memory_list"
             | "memory_get"
             | "memory_read"
+            | "recall_memory"
             | "memory_save"
+            | "save_memory"
             | "memory_add"
             | "memory_set"
             | "memory_edit"
@@ -304,8 +333,12 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "memory_remove"
             | "memory_forget"
             | "load_skill"
+            | "use_skill"
+            | "get_skill"
+            | "read_skill"
             | "skill"
             | "subagent"
+            | "spawn_subagent"
             | "task"
             | "lmfingerprint"
             | "verify_model"
@@ -718,6 +751,89 @@ pub fn parse_inline_invocations_segment(
                 }
                 if !saw_params {
                     body_out = inner.to_string();
+                } else {
+                    // Unpack Stormy `<parameter=old_string>` + `<parameter=new_string>` or `<parameter=source>` + `<parameter=destination>`
+                    let mut param_map = serde_json::Map::new();
+                    for ptag in ["parameter", "param", "antml:parameter"] {
+                        let p_open = format!("<{}", ptag);
+                        let p_close = format!("</{}>", ptag);
+                        let mut pfrom = 0;
+                        while let Some(ps) = inner[pfrom..].find(&p_open) {
+                            let pstart = pfrom + ps;
+                            let prest = &inner[pstart..];
+                            let Some(pgt) = prest.find('>') else { break };
+                            let phead = &prest[p_open.len()..pgt];
+                            let Some(pend) = prest.find(&p_close) else { break };
+                            let pval = prest[pgt + 1..pend].trim_matches(|c| c == '\n' || c == '\r');
+                            let pname = extract_attr(phead, "name")
+                                .or_else(|| {
+                                    phead
+                                        .trim()
+                                        .strip_prefix('=')
+                                        .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                                })
+                                .unwrap_or_default();
+                            if !pname.is_empty() {
+                                param_map.insert(pname, Value::String(pval.to_string()));
+                            }
+                            pfrom = pstart + pend + p_close.len();
+                        }
+                    }
+                    let old_s = param_map
+                        .get("old_string")
+                        .or_else(|| param_map.get("oldString"))
+                        .or_else(|| param_map.get("old_str"))
+                        .or_else(|| param_map.get("search"))
+                        .and_then(|v| v.as_str());
+                    let new_s = param_map
+                        .get("new_string")
+                        .or_else(|| param_map.get("newString"))
+                        .or_else(|| param_map.get("new_str"))
+                        .or_else(|| param_map.get("replace"))
+                        .and_then(|v| v.as_str());
+                    if let (Some(o), Some(n)) = (old_s, new_s) {
+                        let rep_all = param_map
+                            .get("replace_all")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.eq_ignore_ascii_case("true"))
+                            .unwrap_or(false);
+                        body_out = json!({
+                            "old_string": o,
+                            "new_string": n,
+                            "replace_all": rep_all
+                        })
+                        .to_string();
+                    } else if param_map.contains_key("edits")
+                        || param_map.contains_key("questions")
+                        || param_map.contains_key("tasks")
+                        || param_map.contains_key("plan")
+                        || param_map.contains_key("source")
+                        || param_map.contains_key("destination")
+                        || param_map.contains_key("symbols")
+                        || param_map.contains_key("append")
+                        || param_map.contains_key("paths")
+                        || param_map.contains_key("include")
+                    {
+                        if path_arg.is_empty() {
+                            if let Some(p) = param_map
+                                .get("path")
+                                .or_else(|| param_map.get("source"))
+                                .or_else(|| param_map.get("pattern"))
+                                .or_else(|| param_map.get("query"))
+                                .or_else(|| param_map.get("name"))
+                                .and_then(|v| v.as_str())
+                            {
+                                path_arg = p.to_string();
+                            }
+                        }
+                        if let Some(off) = param_map.get("offset").and_then(|v| v.as_str()).and_then(|s| s.parse::<usize>().ok()) {
+                            start_line = Some(off);
+                            if let Some(lim) = param_map.get("limit").and_then(|v| v.as_str()).and_then(|s| s.parse::<usize>().ok()) {
+                                end_line = Some(off + lim.saturating_sub(1));
+                            }
+                        }
+                        body_out = Value::Object(param_map).to_string();
+                    }
                 }
                 list.push(InlineToolInvocation {
                     name,
@@ -994,6 +1110,88 @@ pub fn parse_inline_invocations_segment(
         }
     }
 
+    // 8. Support Stormy's Kimi K2 (`<|tool_call_begin|>functions.NAME:0<|tool_call_argument_begin|>{...}<|tool_call_end|>`),
+    // DeepSeek (`<｜tool▁call▁begin｜>function<｜tool▁sep｜>NAME\n{...}<｜tool▁call▁end｜>`), and Mistral (`[TOOL_CALLS][{...}]`)
+    if clean_text.contains("<|tool_call_begin|>") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("<|tool_call_begin|>") {
+            let start = from + rel_s;
+            let after_open = start + "<|tool_call_begin|>".len();
+            let rest = &clean_text[after_open..];
+            let Some(arg_s) = rest.find("<|tool_call_argument_begin|>") else { break };
+            let raw_name = rest[..arg_s].trim();
+            let clean_name = raw_name
+                .strip_prefix("functions.")
+                .unwrap_or(raw_name)
+                .split(':')
+                .next()
+                .unwrap_or("")
+                .trim();
+            let after_arg = arg_s + "<|tool_call_argument_begin|>".len();
+            let end_call = rest[after_arg..]
+                .find("<|tool_call_end|>")
+                .unwrap_or(rest.len() - after_arg);
+            let json_arg = rest[after_arg..after_arg + end_call].trim();
+            from = after_open + (after_arg + end_call + "<|tool_call_end|>".len()).min(rest.len());
+            if !clean_name.is_empty() {
+                let wrapped = format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({
+                        "name": clean_name,
+                        "arguments": serde_json::from_str::<Value>(json_arg).unwrap_or_else(|_| json!({ "body": json_arg }))
+                    })
+                );
+                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+            }
+        }
+    }
+    if clean_text.contains("<｜tool▁call▁begin｜>") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("<｜tool▁call▁begin｜>") {
+            let start = from + rel_s;
+            let after_open = start + "<｜tool▁call▁begin｜>".len();
+            let rest = &clean_text[after_open..];
+            let Some(sep_s) = rest.find("<｜tool▁sep｜>") else { break };
+            let after_sep = sep_s + "<｜tool▁sep｜>".len();
+            let end_call = rest[after_sep..]
+                .find("<｜tool▁call▁end｜>")
+                .unwrap_or(rest.len() - after_sep);
+            let inner = rest[after_sep..after_sep + end_call].trim();
+            from = after_open + (after_sep + end_call + "<｜tool▁call▁end｜>".len()).min(rest.len());
+            let name_end = inner.find(|c: char| c.is_whitespace() || c == '{' || c == '`').unwrap_or(inner.len());
+            let clean_name = inner[..name_end].trim();
+            let json_part = inner[name_end..]
+                .trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+            if !clean_name.is_empty() {
+                let wrapped = format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({
+                        "name": clean_name,
+                        "arguments": serde_json::from_str::<Value>(json_part).unwrap_or_else(|_| json!({ "body": json_part }))
+                    })
+                );
+                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+            }
+        }
+    }
+    if clean_text.contains("[TOOL_CALLS]") {
+        if let Some(pos) = clean_text.find("[TOOL_CALLS]") {
+            let rest = clean_text[pos + "[TOOL_CALLS]".len()..].trim();
+            if rest.starts_with('[') {
+                if let Ok(Value::Array(arr)) = serde_json::from_str::<Value>(rest) {
+                    for item in arr {
+                        let wrapped = format!("<tool_call>{}</tool_call>", item);
+                        list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+                    }
+                }
+            }
+        }
+    }
+
     list.sort_by_key(|x| x.offset);
     list
 }
@@ -1050,7 +1248,49 @@ fn execute_inline_workspace_tools(
             continue;
         }
 
+        // Stormy Checkpoints: capture pre-image before any file mutation tool runs
+        let is_file_mutation = matches!(
+            name.as_str(),
+            "write_file"
+                | "write"
+                | "create_file"
+                | "save_file"
+                | "overwrite_file"
+                | "append_file"
+                | "sync_artboard"
+                | "edit_file"
+                | "edit"
+                | "patch_file"
+                | "replace_in_file"
+                | "str_replace"
+                | "str_replace_editor"
+                | "multi_edit"
+                | "multiedit"
+                | "multi_edit_file"
+                | "delete_file"
+                | "delete"
+                | "remove_file"
+                | "rm"
+                | "del"
+                | "unlink"
+                | "move_file"
+                | "rename_file"
+                | "mv"
+        );
+        let old_content = if is_file_mutation && !path_arg.is_empty() {
+            checkpoint_capture_file(&eff_root, req_tag, &format!("{} {}", name, path_arg), &path_arg);
+            fs_read(eff_root.clone(), path_arg.clone()).ok()
+        } else {
+            None
+        };
+
         let (ok, output) = execute_single_workspace_tool(&eff_root, &inv);
+
+        let new_content = if ok && is_file_mutation && !path_arg.is_empty() {
+            fs_read(eff_root.clone(), path_arg.clone()).ok()
+        } else {
+            None
+        };
 
         let _ = app.emit(
             event_topic,
@@ -1058,9 +1298,25 @@ fn execute_inline_workspace_tools(
                 "type": "tool_result",
                 "id": tool_id,
                 "ok": ok,
-                "output": output
+                "output": output,
+                "oldContent": old_content.as_ref().map(|s| if s.len() <= 80_000 { s.as_str() } else { &s[..80_000] }),
+                "newContent": new_content.as_ref().map(|s| if s.len() <= 80_000 { s.as_str() } else { &s[..80_000] }),
+                "checkpointId": if is_file_mutation && ok { Some(req_tag) } else { None }
             }),
         );
+    }
+}
+
+/// Appends Stormy's `ProjectTools.withQuickCheck` note when a file write/edit introduces syntax or asset issues.
+fn append_quick_check(eff_root: &str, rel_path: &str, base_msg: String) -> String {
+    if rel_path.trim().is_empty() {
+        return base_msg;
+    }
+    let issues = audit_workspace_files(eff_root, Some(&[rel_path.to_string()]));
+    if issues.is_empty() {
+        base_msg
+    } else {
+        format!("{}\n\n[Quick syntax check]\n{}", base_msg, issues.join("\n"))
     }
 }
 
@@ -1071,43 +1327,137 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
     let eff_root = resolve_workspace_root(eff_root);
 
     match name {
-        "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" => {
-            match fs_read(eff_root.clone(), path_arg.clone()) {
-                Ok(content) => {
-                    let total = content.lines().count();
-                    let start = inv.start_line.unwrap_or(1).max(1);
-                    let end = inv.end_line.unwrap_or(usize::MAX);
-                    let mut out = String::new();
-                    let mut last = start;
-                    for (i, line) in content.lines().enumerate() {
-                        let n = i + 1;
-                        if n < start {
-                            continue;
+        "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" | "read_file_lines" => {
+            // Support Stormy's batch `paths: ["a.ts", "b.ts"]` parameter when passed in JSON body
+            let mut target_paths = Vec::new();
+            if !path_arg.is_empty() {
+                target_paths.push(path_arg.clone());
+            }
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(p) = j.get("path").and_then(|v| v.as_str()) {
+                        if !p.is_empty() && !target_paths.contains(&p.to_string()) {
+                            target_paths.push(p.to_string());
                         }
-                        if n > end {
-                            break;
-                        }
-                        if out.len() > 48000 {
-                            out.push_str("\n[truncated: call read_file again with start/end]");
-                            break;
-                        }
-                        out.push_str(line);
-                        out.push('\n');
-                        last = n;
                     }
-                    (
-                        true,
-                        format!("[{} lines {}-{} of {}]\n{}", path_arg, start, last, total, out),
-                    )
+                    if let Some(arr) = j.get("paths").and_then(|v| v.as_array()) {
+                        for item in arr.iter().take(8) {
+                            if let Some(s) = item.as_str() {
+                                if !s.is_empty() && !target_paths.contains(&s.to_string()) {
+                                    target_paths.push(s.to_string());
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+            if target_paths.is_empty() && !body.is_empty() && !body.contains('\n') {
+                target_paths.push(body.trim_matches(|c| c == '"' || c == '\'').to_string());
+            }
+            if target_paths.is_empty() {
+                return (false, "read_file: missing file path".to_string());
+            }
+            let start = inv.start_line.unwrap_or(1).max(1);
+            let end = inv.end_line.unwrap_or(start + 1999);
+            let mut sections = Vec::new();
+            let mut any_ok = false;
+            for tp in target_paths.iter().take(8) {
+                match fs_read(eff_root.clone(), tp.clone()) {
+                    Ok(content) => {
+                        any_ok = true;
+                        let total = content.lines().count();
+                        let mut out = String::new();
+                        let mut last = start;
+                        for (i, line) in content.lines().enumerate() {
+                            let n = i + 1;
+                            if n < start {
+                                continue;
+                            }
+                            if n > end {
+                                break;
+                            }
+                            if out.len() > 48000 {
+                                out.push_str("\n[truncated: call read_file again with start/end or offset/limit]");
+                                break;
+                            }
+                            out.push_str(&format!("{:>4}|{}\n", n, line));
+                            last = n;
+                        }
+                        sections.push(format!("[{} lines {}-{} of {}]\n{}", tp, start, last, total, out));
+                    }
+                    Err(e) => sections.push(e),
+                }
+            }
+            (any_ok, sections.join("\n\n"))
+        }
+        "multi_edit" | "multiedit" | "multi_edit_file" => {
+            let Ok(content) = fs_read(eff_root.clone(), path_arg.clone()) else {
+                return (false, format!("File not found: {}", path_arg));
+            };
+            let Ok(j) = serde_json::from_str::<Value>(body) else {
+                return (false, "multi_edit: arguments must be JSON with an `edits` array".to_string());
+            };
+            let edits_val = j.get("edits").cloned().unwrap_or(Value::Null);
+            let edits_arr: Vec<Value> = if let Some(arr) = edits_val.as_array() {
+                arr.clone()
+            } else if let Some(s) = edits_val.as_str() {
+                serde_json::from_str::<Vec<Value>>(s).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            if edits_arr.is_empty() {
+                return (false, "multi_edit: `edits` array is empty".to_string());
+            }
+            let mut current = content;
+            for (idx, ed) in edits_arr.iter().enumerate() {
+                let old_s = ed
+                    .get("old_string")
+                    .or_else(|| ed.get("oldString"))
+                    .or_else(|| ed.get("old_str"))
+                    .or_else(|| ed.get("search"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let new_s = ed
+                    .get("new_string")
+                    .or_else(|| ed.get("newString"))
+                    .or_else(|| ed.get("new_str"))
+                    .or_else(|| ed.get("replace"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let rep_all = ed
+                    .get("replace_all")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                match apply_stormy_text_edit(&current, old_s, new_s, rep_all, idx + 1) {
+                    Ok(next) => current = next,
+                    Err(e) => {
+                        return (
+                            false,
+                            format!("Edit {} of {} failed, so no edits were applied: {}", idx + 1, edits_arr.len(), e),
+                        );
+                    }
+                }
+            }
+            match fs_write(eff_root.clone(), path_arg.clone(), current) {
+                Ok(_) => (
+                    true,
+                    append_quick_check(
+                        &eff_root,
+                        path_arg,
+                        format!("Applied {} edits to {}", edits_arr.len(), path_arg),
+                    ),
+                ),
                 Err(e) => (false, e),
             }
         }
-        "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" => {
+        "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" | "str_replace_editor" => {
             match fs_read(eff_root.clone(), path_arg.clone()) {
                 Ok(content) => match apply_search_replace(&content, body) {
                     Ok(updated) => match fs_write(eff_root.clone(), path_arg.clone(), updated) {
-                        Ok(_) => (true, format!("Edited {}", path_arg)),
+                        Ok(_) => (
+                            true,
+                            append_quick_check(&eff_root, path_arg, format!("Edited {}", path_arg)),
+                        ),
                         Err(e) => (false, e),
                     },
                     Err(e) => {
@@ -1133,7 +1483,14 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     };
                     if !new_body.trim().is_empty() {
                         match fs_write(eff_root.clone(), path_arg.clone(), new_body.clone()) {
-                            Ok(_) => (true, format!("Created {} ({} bytes)", path_arg, new_body.len())),
+                            Ok(_) => (
+                                true,
+                                append_quick_check(
+                                    &eff_root,
+                                    path_arg,
+                                    format!("Created {} ({} bytes)", path_arg, new_body.len()),
+                                ),
+                            ),
                             Err(e) => (false, e),
                         }
                     } else {
@@ -1142,16 +1499,78 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 }
             }
         }
-        "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "sync_artboard" => {
-            match fs_write(eff_root.clone(), path_arg.clone(), body.to_string()) {
+        "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "append_file" | "sync_artboard" => {
+            let mut is_append = name == "append_file";
+            let mut content_to_write = body.to_string();
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(app_flag) = j.get("append").and_then(|v| {
+                        v.as_bool().or_else(|| v.as_str().map(|s| s.eq_ignore_ascii_case("true")))
+                    }) {
+                        is_append = app_flag;
+                    }
+                    if let Some(c) = j.get("content").or_else(|| j.get("text")).and_then(|v| v.as_str()) {
+                        content_to_write = c.to_string();
+                    }
+                }
+            }
+            let final_content = if is_append {
+                let existing = fs_read(eff_root.clone(), path_arg.clone()).unwrap_or_default();
+                format!("{}{}", existing, content_to_write)
+            } else {
+                content_to_write
+            };
+            match fs_write(eff_root.clone(), path_arg.clone(), final_content.clone()) {
                 Ok(_) => (
                     true,
-                    format!("Synchronized {} ({} bytes)", path_arg, body.len()),
+                    append_quick_check(
+                        &eff_root,
+                        path_arg,
+                        format!(
+                            "{} {} ({} bytes)",
+                            if is_append { "Appended to" } else { "Wrote" },
+                            path_arg,
+                            final_content.len()
+                        ),
+                    ),
                 ),
                 Err(e) => (false, e),
             }
         }
-        "delete_file" | "remove_file" | "rm" | "del" | "unlink" => {
+        "move_file" | "rename_file" | "mv" => {
+            let mut src = path_arg.clone();
+            let mut dst = body.to_string();
+            let mut overwrite = false;
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(s) = j
+                        .get("source")
+                        .or_else(|| j.get("old_path"))
+                        .or_else(|| j.get("from"))
+                        .and_then(|v| v.as_str())
+                    {
+                        src = s.to_string();
+                    }
+                    if let Some(d) = j
+                        .get("destination")
+                        .or_else(|| j.get("new_path"))
+                        .or_else(|| j.get("to"))
+                        .and_then(|v| v.as_str())
+                    {
+                        dst = d.to_string();
+                    }
+                    overwrite = j
+                        .get("overwrite")
+                        .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s == "true")))
+                        .unwrap_or(false);
+                }
+            }
+            match fs_move(eff_root.clone(), src, dst, Some(overwrite)) {
+                Ok(msg) => (true, msg),
+                Err(e) => (false, e),
+            }
+        }
+        "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink" => {
             let target_path = if !path_arg.is_empty() {
                 path_arg.clone()
             } else {
@@ -1162,9 +1581,114 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 Err(e) => (false, e),
             }
         }
-        "search_code" | "grep" | "rg" | "search" | "ripgrep" | "find_in_files" => {
+        "glob" | "find_files" => {
+            let mut pattern = if !path_arg.is_empty() {
+                path_arg.clone()
+            } else {
+                body.to_string()
+            };
+            let mut subpath: Option<String> = None;
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(pat) = j.get("pattern").or_else(|| j.get("glob")).and_then(|v| v.as_str()) {
+                        pattern = pat.to_string();
+                    }
+                    if let Some(sp) = j.get("path").or_else(|| j.get("directory")).and_then(|v| v.as_str()) {
+                        subpath = Some(sp.to_string());
+                    }
+                }
+            }
+            let files = glob_workspace_files(&eff_root, &pattern, subpath.as_deref());
+            if files.is_empty() {
+                (true, format!("(0 files matched glob '{}')", pattern))
+            } else {
+                (true, files.join("\n"))
+            }
+        }
+        "search_project" => {
+            let mut query = if !body.is_empty() {
+                body.to_string()
+            } else {
+                path_arg.clone()
+            };
+            let mut limit = 8usize;
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(q) = j.get("query").and_then(|v| v.as_str()) {
+                        query = q.to_string();
+                    }
+                    if let Some(l) = j.get("limit").and_then(|v| v.as_u64()) {
+                        limit = (l as usize).clamp(1, 25);
+                    }
+                }
+            }
+            let hits = bm25_search_project(&eff_root, &query, limit);
+            if hits.is_empty() {
+                (true, format!("No semantic/BM25 project matches for '{}'", query))
+            } else {
+                let formatted = hits
+                    .iter()
+                    .filter_map(|h| {
+                        Some(format!(
+                            "## {} (lines {}-{}, score {})\n{}",
+                            h.get("path")?.as_str()?,
+                            h.get("startLine")?.as_u64()?,
+                            h.get("endLine")?.as_u64()?,
+                            h.get("score")?.as_f64()?,
+                            h.get("snippet")?.as_str()?
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+                (true, formatted)
+            }
+        }
+        "docs_lookup" => {
             let query = if !body.is_empty() { body } else { path_arg.as_str() };
-            let results = search_workspace_code(&eff_root, query, 25);
+            (true, docs_lookup_reference(query))
+        }
+        "check_syntax" | "audit_project" | "review_project" | "lint_project" => {
+            let target = if !path_arg.is_empty() {
+                Some(vec![path_arg.clone()])
+            } else if !body.is_empty() && !body.starts_with('{') {
+                Some(vec![body.to_string()])
+            } else {
+                None
+            };
+            let findings = audit_workspace_files(&eff_root, target.as_deref());
+            if findings.is_empty() {
+                (true, "check_syntax: 0 errors or warnings found.".to_string())
+            } else {
+                (true, findings.join("\n"))
+            }
+        }
+        "update_plan" | "todowrite" | "todo_write" => {
+            let plan_payload = if !body.is_empty() { body } else { path_arg.as_str() };
+            (true, format!("[Plan updated]\n{}", plan_payload))
+        }
+        "ask_user" | "ask" | "question" => {
+            let q_payload = if !body.is_empty() { body } else { path_arg.as_str() };
+            (true, format!("[Question presented to user]\n{}", q_payload))
+        }
+        "search_code" | "grep" | "rg" | "search" | "search_files" | "ripgrep" | "find_in_files" => {
+            let mut query = if !body.is_empty() {
+                body.to_string()
+            } else {
+                path_arg.clone()
+            };
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(p) = j
+                        .get("pattern")
+                        .or_else(|| j.get("query"))
+                        .or_else(|| j.get("search"))
+                        .and_then(|v| v.as_str())
+                    {
+                        query = p.to_string();
+                    }
+                }
+            }
+            let results = search_workspace_code(&eff_root, &query, 30);
             if results.is_empty() {
                 (true, format!("No matches found for '{}'", query))
             } else {
@@ -1183,29 +1707,69 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 (true, formatted)
             }
         }
-        "list_dir" | "ls" | "dir" | "list_files" | "glob" | "find_files" => {
+        "list_dir" | "ls" | "dir" | "list_files" | "list_directory" | "print_tree" | "tree" => {
             let p = Path::new(&eff_root);
-            let trimmed_arg = path_arg.trim();
+            let mut trimmed_arg = path_arg.trim().to_string();
+            let mut symbols = false;
+            let mut depth = 2usize;
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(pa) = j.get("path").or_else(|| j.get("directory")).and_then(|v| v.as_str()) {
+                        if trimmed_arg.is_empty() {
+                            trimmed_arg = pa.trim().to_string();
+                        }
+                    }
+                    symbols = j
+                        .get("symbols")
+                        .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s == "true")))
+                        .unwrap_or(false);
+                    if let Some(d) = j
+                        .get("depth")
+                        .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok())))
+                    {
+                        depth = (d as usize).clamp(1, 6);
+                    }
+                }
+            }
             let target_res = if trimmed_arg.is_empty() || trimmed_arg == "." || trimmed_arg == "./" || trimmed_arg == ".\\" {
                 Ok(p.to_path_buf())
             } else {
-                safe_join(&eff_root, trimmed_arg)
+                safe_join(&eff_root, &trimmed_arg)
             };
             match target_res {
                 Err(e) => (false, e),
                 Ok(target) => {
-                    let tree = walk_workspace(p, &target, 2);
-                if tree.is_empty() {
-                    (
-                        true,
-                        "Directory is empty (0 files). Proceed directly without re-listing."
-                            .to_string(),
-                    )
-                } else {
-                    let mut out = String::new();
-                    format_tree_compact(&tree, 0, &mut out);
-                    (true, out.trim_end().to_string())
-                }
+                    let tree = walk_workspace(p, &target, depth);
+                    if tree.is_empty() {
+                        (
+                            true,
+                            "Directory is empty (0 files). Proceed directly without re-listing.".to_string(),
+                        )
+                    } else if symbols {
+                        fn format_tree_with_symbols(base: &Path, nodes: &[FileNode], indent: usize, out: &mut String) {
+                            let pad = "  ".repeat(indent);
+                            for n in nodes {
+                                if n.dir {
+                                    out.push_str(&format!("{}{}/\n", pad, n.name));
+                                    if let Some(children) = &n.children {
+                                        format_tree_with_symbols(base, children, indent + 1, out);
+                                    }
+                                } else {
+                                    let outline = project_outline_of(&base.join(&n.path))
+                                        .map(|s| format!(" — {}", s))
+                                        .unwrap_or_default();
+                                    out.push_str(&format!("{}{}{}\n", pad, n.name, outline));
+                                }
+                            }
+                        }
+                        let mut out = String::new();
+                        format_tree_with_symbols(p, &tree, 0, &mut out);
+                        (true, out.trim_end().to_string())
+                    } else {
+                        let mut out = String::new();
+                        format_tree_compact(&tree, 0, &mut out);
+                        (true, out.trim_end().to_string())
+                    }
                 }
             }
         }
@@ -1508,30 +2072,87 @@ fn html_to_text(html: &str) -> String {
     res
 }
 
-fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: usize) -> Result<String, String> {
+/// Stormy `TextEdits.stripLineNumberPrefixes`: strips `"  12|"` prefixes if every non-blank line has one.
+fn strip_read_file_line_prefixes(text: &str) -> String {
+    fn has_line_prefix(line: &str) -> Option<&str> {
+        let trimmed = line.trim_start_matches(' ');
+        let digits = trimmed.chars().take_while(|c| c.is_ascii_digit()).count();
+        if digits > 0 && trimmed[digits..].starts_with('|') {
+            Some(&trimmed[digits + 1..])
+        } else {
+            None
+        }
+    }
+    let lines: Vec<&str> = text.split('\n').collect();
+    let non_blank: Vec<&&str> = lines.iter().filter(|l| !l.trim().is_empty()).collect();
+    if non_blank.is_empty() || !non_blank.iter().all(|l| has_line_prefix(l).is_some()) {
+        return text.to_string();
+    }
+    lines
+        .into_iter()
+        .map(|l| has_line_prefix(l).unwrap_or(l))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Stormy `TextEdits.apply`: 4-stage exact + line-trimmed + whitespace-collapsed + block-anchor edit engine.
+pub fn apply_stormy_text_edit(
+    content: &str,
+    search_raw: &str,
+    replace_raw: &str,
+    replace_all: bool,
+    idx: usize,
+) -> Result<String, String> {
+    let cleaned_search = strip_read_file_line_prefixes(search_raw);
+    let cleaned_replace = if cleaned_search != search_raw {
+        strip_read_file_line_prefixes(replace_raw)
+    } else {
+        replace_raw.to_string()
+    };
+
     let crlf = content.contains("\r\n");
     let (search, replace) = if crlf {
         (
-            search_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
-            replace_raw.replace("\r\n", "\n").replace('\n', "\r\n"),
+            cleaned_search.replace("\r\n", "\n").replace('\n', "\r\n"),
+            cleaned_replace.replace("\r\n", "\n").replace('\n', "\r\n"),
         )
     } else {
-        (search_raw.replace("\r\n", "\n"), replace_raw.replace("\r\n", "\n"))
+        (
+            cleaned_search.replace("\r\n", "\n"),
+            cleaned_replace.replace("\r\n", "\n"),
+        )
     };
     let count = content.matches(search.as_str()).count();
-    if count == 1 {
-        return Ok(content.replacen(search.as_str(), replace.as_str(), 1));
+    if count == 1 || (count > 1 && replace_all) {
+        return Ok(if replace_all {
+            content.replace(search.as_str(), replace.as_str())
+        } else {
+            content.replacen(search.as_str(), replace.as_str(), 1)
+        });
     }
     if count > 1 {
+        let mut line_nums = Vec::new();
+        let mut from = 0usize;
+        while let Some(rel) = content[from..].find(search.as_str()) {
+            let pos = from + rel;
+            let ln = content[..pos].bytes().filter(|&b| b == b'\n').count() + 1;
+            line_nums.push(ln.to_string());
+            if line_nums.len() >= 6 {
+                break;
+            }
+            from = pos + search.len();
+        }
         return Err(format!(
-            "edit_file: SEARCH block {} matches {} places. Add surrounding lines so it is unique.",
-            idx, count
+            "edit_file: old_string/SEARCH block {} matches {} places (lines {}). Include more surrounding lines to make it unique, or set replace_all=true.",
+            idx,
+            count,
+            line_nums.join(", ")
         ));
     }
 
-    // Fallback: line-trimmed whitespace-insensitive match when exact whitespace/indentation differs slightly
+    // Stage 2: Line-trimmed unique match when indentation/trailing whitespace differs
     let file_lines: Vec<&str> = content.lines().collect();
-    let search_lines: Vec<&str> = search_raw.lines().map(|l| l.trim()).collect();
+    let search_lines: Vec<&str> = cleaned_search.lines().map(|l| l.trim()).collect();
     if search_lines.is_empty() {
         return Err("edit_file: SEARCH block is empty".to_string());
     }
@@ -1548,7 +2169,7 @@ fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: u
         let start = match_indices[0];
         let mut rebuilt = Vec::new();
         rebuilt.extend_from_slice(&file_lines[..start]);
-        for rl in replace_raw.lines() {
+        for rl in cleaned_replace.lines() {
             rebuilt.push(rl);
         }
         rebuilt.extend_from_slice(&file_lines[start + search_lines.len()..]);
@@ -1566,10 +2187,68 @@ fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: u
             match_indices.len()
         ));
     }
+
+    // Stage 3: Block-anchor match (first and last lines match trimmed, middle lines share >= 80% token overlap)
+    if search_lines.len() >= 3 {
+        let first_t = search_lines[0];
+        let last_t = search_lines[search_lines.len() - 1];
+        if first_t.len() >= 3 && !last_t.is_empty() {
+            let mut anchor_matches: Vec<(usize, usize)> = Vec::new();
+            for a in 0..file_lines.len() {
+                if file_lines[a].trim() != first_t {
+                    continue;
+                }
+                let max_b = (file_lines.len() - 1).min(a + search_lines.len() * 2 + 2);
+                for b in (a + 1)..=max_b {
+                    if file_lines[b].trim() == last_t {
+                        let mid_old = search_lines[1..search_lines.len() - 1].join(" ");
+                        let mid_file = file_lines[a + 1..b]
+                            .iter()
+                            .map(|l| l.trim())
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let old_words: std::collections::HashSet<&str> = mid_old.split_whitespace().collect();
+                        let file_words: std::collections::HashSet<&str> = mid_file.split_whitespace().collect();
+                        let sim = if old_words.is_empty() && file_words.is_empty() {
+                            1.0
+                        } else {
+                            let inter = old_words.intersection(&file_words).count() as f64;
+                            let union = old_words.union(&file_words).count().max(1) as f64;
+                            inter / union
+                        };
+                        if sim >= 0.78 {
+                            anchor_matches.push((a, b));
+                        }
+                        break;
+                    }
+                }
+            }
+            if anchor_matches.len() == 1 {
+                let (a, b) = anchor_matches[0];
+                let mut rebuilt = Vec::new();
+                rebuilt.extend_from_slice(&file_lines[..a]);
+                for rl in cleaned_replace.lines() {
+                    rebuilt.push(rl);
+                }
+                rebuilt.extend_from_slice(&file_lines[b + 1..]);
+                let sep = if crlf { "\r\n" } else { "\n" };
+                let mut joined = rebuilt.join(sep);
+                if content.ends_with('\n') && !joined.ends_with('\n') {
+                    joined.push_str(sep);
+                }
+                return Ok(joined);
+            }
+        }
+    }
+
     Err(format!(
         "edit_file: SEARCH block {} not found. Read the file again and copy the lines accurately.",
         idx
     ))
+}
+
+fn replace_hunk_fuzzy(content: &str, search_raw: &str, replace_raw: &str, idx: usize) -> Result<String, String> {
+    apply_stormy_text_edit(content, search_raw, replace_raw, false, idx)
 }
 
 fn find_marker_line(text: &str, ch: char) -> Option<(usize, usize)> {
@@ -1655,7 +2334,12 @@ fn apply_search_replace(content: &str, body: &str) -> Result<String, String> {
                 .or_else(|| j.get("replace"))
                 .and_then(|v| v.as_str());
             if let (Some(o), Some(r)) = (old_s, new_s) {
-                return replace_hunk_fuzzy(&out, o, r, 1);
+                let rep_all = j
+                    .get("replace_all")
+                    .or_else(|| j.get("replaceAll"))
+                    .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s == "true")))
+                    .unwrap_or(false);
+                return apply_stormy_text_edit(&out, o, r, rep_all, 1);
             }
         }
     }
@@ -1748,15 +2432,27 @@ pub fn chat_stream(
                 || stripped.contains("</read_file>")
                 || stripped.contains("</write_file>")
                 || stripped.contains("</edit_file>")
+                || stripped.contains("</multi_edit>")
+                || stripped.contains("</move_file>")
                 || stripped.contains("</delete_file>")
                 || stripped.contains("</search_code>")
+                || stripped.contains("</search_project>")
+                || stripped.contains("</docs_lookup>")
+                || stripped.contains("</check_syntax>")
+                || stripped.contains("</update_plan>")
+                || stripped.contains("</ask_user>")
                 || stripped.contains("</list_dir>")
+                || stripped.contains("</list_files>")
+                || stripped.contains("</glob>")
+                || stripped.contains("</grep>")
                 || stripped.contains("</web_fetch>")
                 || stripped.contains("</memory_search>")
                 || stripped.contains("</memory_save>")
                 || stripped.contains("</memory_edit>")
                 || stripped.contains("</memory_delete>")
                 || stripped.contains("</ifm|tool_call>")
+                || stripped.contains("<|tool_call_end|>")
+                || stripped.contains("<｜tool▁call▁end｜>")
                 || (stripped.contains("<zeus_tool") && stripped.contains("/>"))
                 || (stripped.contains("<read_file") && stripped.contains("/>"))
                 || (stripped.contains("<list_dir") && stripped.contains("/>"))
@@ -1784,15 +2480,28 @@ pub fn chat_stream(
                 || accumulated.contains("<invoke")
                 || accumulated.contains("<antml:invoke")
                 || accumulated.contains("<ifm|tool_call>")
+                || accumulated.contains("<|tool_call_begin|>")
+                || accumulated.contains("<｜tool▁call▁begin｜>")
+                || accumulated.contains("[TOOL_CALLS]")
                 || accumulated.contains("<bash")
                 || accumulated.contains("<shell")
                 || accumulated.contains("<python")
                 || accumulated.contains("<read_file")
                 || accumulated.contains("<write_file")
                 || accumulated.contains("<edit_file")
+                || accumulated.contains("<multi_edit")
+                || accumulated.contains("<move_file")
                 || accumulated.contains("<delete_file")
                 || accumulated.contains("<search_code")
+                || accumulated.contains("<search_project")
+                || accumulated.contains("<docs_lookup")
+                || accumulated.contains("<check_syntax")
+                || accumulated.contains("<update_plan")
+                || accumulated.contains("<ask_user")
                 || accumulated.contains("<list_dir")
+                || accumulated.contains("<list_files")
+                || accumulated.contains("<glob")
+                || accumulated.contains("<grep")
                 || accumulated.contains("<web_fetch")
                 || accumulated.contains("<memory_"))
         {

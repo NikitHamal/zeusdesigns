@@ -1726,6 +1726,418 @@ pub fn audit_workspace_files(root: &str, target_paths: Option<&[String]>) -> Vec
     findings
 }
 
+/// Stormy `ProjectSearch`: on-device BM25 search over 40-line overlapping chunks (8-line overlap)
+/// with camelCase/kebab-case/snake_case splitting, light stemming, and code/web synonym expansion.
+pub fn bm25_search_project(root: &str, query: &str, limit: usize) -> Vec<Value> {
+    let base = Path::new(root);
+    if !base.exists() || query.trim().is_empty() {
+        return Vec::new();
+    }
+
+    fn stem_word(w: &str) -> String {
+        if w.len() > 5 && w.ends_with("ing") {
+            w[..w.len() - 3].to_string()
+        } else if w.len() > 4 && w.ends_with("es") {
+            w[..w.len() - 2].to_string()
+        } else if w.len() > 3 && w.ends_with('s') && !w.ends_with("ss") {
+            w[..w.len() - 1].to_string()
+        } else if w.len() > 4 && w.ends_with("ed") {
+            w[..w.len() - 2].to_string()
+        } else {
+            w.to_string()
+        }
+    }
+
+    fn tokenize_code(text: &str) -> Vec<String> {
+        let mut spaced = String::with_capacity(text.len() + 16);
+        let chars: Vec<char> = text.chars().collect();
+        for i in 0..chars.len() {
+            let c = chars[i];
+            if i > 0 && c.is_ascii_uppercase() && chars[i - 1].is_ascii_lowercase() {
+                spaced.push(' ');
+            }
+            if c.is_ascii_alphanumeric() {
+                spaced.push(c.to_ascii_lowercase());
+            } else {
+                spaced.push(' ');
+            }
+        }
+        let stop = [
+            "the", "and", "for", "with", "that", "this", "from", "into", "what", "where", "find",
+        ];
+        spaced
+            .split_whitespace()
+            .filter(|w| w.len() > 1 && !stop.contains(w))
+            .map(stem_word)
+            .collect()
+    }
+
+    fn expand_synonyms(terms: &[String]) -> Vec<(String, f64)> {
+        let mut out: Vec<(String, f64)> = Vec::new();
+        for t in terms {
+            if !out.iter().any(|(k, _)| k == t) {
+                out.push((t.clone(), 1.0));
+            }
+        }
+        let syn_table: &[(&str, &[&str])] = &[
+            ("nav", &["navbar", "navigation", "menu", "header"]),
+            ("menu", &["nav", "navbar", "sidebar", "dropdown"]),
+            ("button", &["btn", "cta", "action"]),
+            ("image", &["img", "picture", "photo", "icon", "svg"]),
+            ("pricing", &["price", "plan", "tier", "billing"]),
+            ("footer", &["bottom", "copyright"]),
+            ("hero", &["banner", "headline", "header"]),
+            ("color", &["colour", "theme", "palette", "token"]),
+            ("dark", &["theme", "mode", "light"]),
+            ("form", &["input", "submit", "field", "validation"]),
+            ("auth", &["login", "token", "session", "user", "password"]),
+            ("route", &["router", "endpoint", "handler", "path", "api"]),
+            ("style", &["css", "class", "stylesheet"]),
+            ("script", &["function", "handler", "event"]),
+            ("test", &["spec", "assert", "expect", "verify"]),
+        ];
+        for t in terms {
+            for (k, syns) in syn_table {
+                if t == k {
+                    for s in *syns {
+                        let st = stem_word(s);
+                        if !out.iter().any(|(existing, _)| existing == &st) {
+                            out.push((st, 0.5));
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    let q_terms = expand_synonyms(&tokenize_code(query));
+    if q_terms.is_empty() {
+        return Vec::new();
+    }
+
+    struct ChunkDoc {
+        path: String,
+        start_line: usize,
+        end_line: usize,
+        text: String,
+        tf: std::collections::HashMap<String, usize>,
+        len: usize,
+    }
+
+    let all_files = glob_workspace_files(root, "**/*", None);
+    let mut chunks: Vec<ChunkDoc> = Vec::new();
+    const CHUNK_LINES: usize = 40;
+    const OVERLAP_LINES: usize = 8;
+
+    for rel in all_files.into_iter().take(250) {
+        let Ok(full) = safe_join(root, &rel) else { continue };
+        let Ok(meta) = fs::metadata(&full) else { continue };
+        if !meta.is_file() || meta.len() > 350_000 {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&full) else { continue };
+        let lines: Vec<&str> = content.lines().collect();
+        if lines.is_empty() {
+            continue;
+        }
+        let path_toks = tokenize_code(&rel);
+        let mut i = 0usize;
+        while i < lines.len() {
+            let end = (i + CHUNK_LINES).min(lines.len());
+            let slice_text = lines[i..end].join("\n");
+            let mut toks = tokenize_code(&slice_text);
+            toks.extend(path_toks.iter().cloned());
+            let doc_len = toks.len().max(1);
+            let mut tf = std::collections::HashMap::new();
+            for tok in toks {
+                *tf.entry(tok).or_insert(0) += 1;
+            }
+            chunks.push(ChunkDoc {
+                path: rel.clone(),
+                start_line: i + 1,
+                end_line: end,
+                text: slice_text,
+                tf,
+                len: doc_len,
+            });
+            if end >= lines.len() {
+                break;
+            }
+            i += CHUNK_LINES - OVERLAP_LINES;
+        }
+    }
+
+    if chunks.is_empty() {
+        return Vec::new();
+    }
+
+    let n_docs = chunks.len() as f64;
+    let avg_len = (chunks.iter().map(|c| c.len).sum::<usize>() as f64) / n_docs;
+    let k1 = 1.4_f64;
+    let b = 0.72_f64;
+
+    let mut df_map = std::collections::HashMap::new();
+    for (t, _) in &q_terms {
+        let df = chunks.iter().filter(|c| c.tf.contains_key(t)).count();
+        df_map.insert(t.clone(), df as f64);
+    }
+
+    let mut scored: Vec<(f64, &ChunkDoc)> = Vec::new();
+    for c in &chunks {
+        let mut score = 0.0_f64;
+        for (t, w) in &q_terms {
+            let Some(&f) = c.tf.get(t) else { continue };
+            let df = *df_map.get(t).unwrap_or(&0.0);
+            let idf = (1.0 + (n_docs - df + 0.5) / (df + 0.5)).ln();
+            let f_f64 = f as f64;
+            score += w * idf * (f_f64 * (k1 + 1.0)) / (f_f64 + k1 * (1.0 - b + b * (c.len as f64) / avg_len));
+        }
+        if q_terms.iter().any(|(t, _)| c.path.to_lowercase().contains(t)) {
+            score *= 1.3;
+        }
+        if score > 0.0 {
+            scored.push((score, c));
+        }
+    }
+
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut seen_buckets = HashSet::new();
+    let mut results = Vec::new();
+    for (score, c) in scored {
+        let bucket = format!("{}:{}", c.path, c.start_line / 20);
+        if seen_buckets.contains(&bucket) {
+            continue;
+        }
+        seen_buckets.insert(bucket);
+        let c_lines: Vec<&str> = c.text.lines().collect();
+        let best_idx = c_lines
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, l)| {
+                let low = l.to_lowercase();
+                q_terms.iter().filter(|(t, _)| low.contains(t.as_str())).count()
+            })
+            .map(|(idx, _)| idx)
+            .unwrap_or(0);
+        let s_from = best_idx.saturating_sub(1);
+        let s_to = (best_idx + 3).min(c_lines.len());
+        let snippet: String = c_lines[s_from..s_to].join("\n").chars().take(360).collect();
+        results.push(json!({
+            "path": c.path,
+            "startLine": c.start_line,
+            "endLine": c.end_line,
+            "score": (score * 100.0).round() / 100.0,
+            "snippet": snippet
+        }));
+        if results.len() >= limit {
+            break;
+        }
+    }
+    results
+}
+
+/// Stormy `WebDocs`: built-in offline reference lookup for HTML, CSS, JavaScript, TypeScript, and UI patterns.
+pub fn docs_lookup_reference(query: &str) -> String {
+    let q = query.to_lowercase();
+    let entries: &[(&str, &str, &str, &str)] = &[
+        (
+            "dialog / modal",
+            "HTML <dialog>",
+            "Native accessible modal dialog with backdrop and Escape handling.",
+            "<dialog id=\"sheet\">\n  <form method=\"dialog\">\n    <h2>Settings</h2>\n    <button value=\"cancel\">Cancel</button>\n    <button value=\"ok\">Save</button>\n  </form>\n</dialog>\n<script>\n  const d = document.getElementById('sheet');\n  openBtn.onclick = () => d.showModal();\n</script>",
+        ),
+        (
+            "grid auto-fit / responsive cards",
+            "CSS Grid",
+            "Responsive fluid card grid without media queries.",
+            ".grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));\n  gap: 1rem;\n}",
+        ),
+        (
+            "sticky header / navigation",
+            "CSS Layout",
+            "Sticky top navigation bar with surface border.",
+            ".site-header {\n  position: sticky;\n  top: 0;\n  z-index: 40;\n  background: var(--surface, #141318);\n  border-bottom: 1px solid var(--outline-variant, #48454e);\n}",
+        ),
+        (
+            "dark mode / theme tokens",
+            "CSS Custom Properties",
+            "Theme toggle using data-theme attribute and CSS variables.",
+            ":root, [data-theme=\"light\"] {\n  --bg: #fdf8fd;\n  --fg: #1c1b1f;\n}\n[data-theme=\"dark\"] {\n  --bg: #141318;\n  --fg: #e6e1e9;\n}",
+        ),
+        (
+            "fetch / async JSON API",
+            "JavaScript Fetch",
+            "Fetch JSON with timeout, status check, and error handling.",
+            "async function requestJson(url, opts = {}) {\n  const res = await fetch(url, {\n    headers: { 'Content-Type': 'application/json', ...opts.headers },\n    ...opts,\n  });\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json();\n}",
+        ),
+    ];
+    let mut matched = Vec::new();
+    for (title, kind, summary, example) in entries {
+        if q.split_whitespace().any(|w| {
+            title.to_lowercase().contains(w)
+                || kind.to_lowercase().contains(w)
+                || summary.to_lowercase().contains(w)
+        }) {
+            matched.push(format!("### {} ({})\n{}\n```\n{}\n```", title, kind, summary, example));
+        }
+    }
+    if matched.is_empty() {
+        entries
+            .iter()
+            .take(2)
+            .map(|(title, kind, summary, example)| format!("### {} ({})\n{}\n```\n{}\n```", title, kind, summary, example))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    } else {
+        matched.join("\n\n")
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointFileEntry {
+    pub path: String,
+    pub existed: bool,
+    pub blob: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckpointManifest {
+    pub id: String,
+    pub label: String,
+    pub created_at: u64,
+    pub files: Vec<CheckpointFileEntry>,
+}
+
+/// Stormy `Checkpoints.Recorder.capture`: copy-on-first-write pre-image capture before a tool mutates `rel_path`.
+pub fn checkpoint_capture_file(root: &str, checkpoint_id: &str, label: &str, rel_path: &str) {
+    let base = Path::new(root);
+    if !base.exists() || checkpoint_id.trim().is_empty() {
+        return;
+    }
+    let clean_rel = rel_path.trim().replace('\\', "/").trim_start_matches("./").trim_start_matches('/').to_string();
+    if clean_rel.is_empty() || clean_rel.starts_with(".zeusdesigns/") || clean_rel.starts_with(".git/") {
+        return;
+    }
+    let cp_dir = base.join(".zeusdesigns").join("checkpoints").join(checkpoint_id);
+    let manifest_path = cp_dir.join("manifest.json");
+    let mut manifest: CheckpointManifest = if manifest_path.exists() {
+        fs::read_to_string(&manifest_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| CheckpointManifest {
+                id: checkpoint_id.to_string(),
+                label: label.chars().take(80).collect(),
+                created_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0),
+                files: Vec::new(),
+            })
+    } else {
+        CheckpointManifest {
+            id: checkpoint_id.to_string(),
+            label: label.chars().take(80).collect(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0),
+            files: Vec::new(),
+        }
+    };
+
+    if manifest.files.iter().any(|f| f.path.eq_ignore_ascii_case(&clean_rel)) {
+        return;
+    }
+    if manifest.files.len() >= 100 {
+        return;
+    }
+
+    let Ok(target) = safe_join(root, &clean_rel) else { return };
+    let _ = fs::create_dir_all(&cp_dir);
+    if target.is_file() {
+        let size = fs::metadata(&target).map(|m| m.len()).unwrap_or(0);
+        if size <= 1_000_000 {
+            let blob_name = format!("f{}", manifest.files.len());
+            if fs::copy(&target, cp_dir.join(&blob_name)).is_ok() {
+                manifest.files.push(CheckpointFileEntry {
+                    path: clean_rel,
+                    existed: true,
+                    blob: Some(blob_name),
+                });
+            }
+        }
+    } else {
+        manifest.files.push(CheckpointFileEntry {
+            path: clean_rel,
+            existed: false,
+            blob: None,
+        });
+    }
+
+    if let Ok(serialized) = serde_json::to_string_pretty(&manifest) {
+        let _ = fs::write(&manifest_path, serialized);
+    }
+}
+
+#[tauri::command(async)]
+pub fn workspace_checkpoints(root: String) -> Result<Vec<CheckpointManifest>, String> {
+    let cp_base = Path::new(&root).join(".zeusdesigns").join("checkpoints");
+    if !cp_base.exists() {
+        return Ok(Vec::new());
+    }
+    let mut list: Vec<CheckpointManifest> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&cp_base) {
+        for e in entries.flatten() {
+            let m_path = e.path().join("manifest.json");
+            if let Ok(txt) = fs::read_to_string(&m_path) {
+                if let Ok(m) = serde_json::from_str::<CheckpointManifest>(&txt) {
+                    if !m.files.is_empty() {
+                        list.push(m);
+                    }
+                }
+            }
+        }
+    }
+    list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(list.into_iter().take(30).collect())
+}
+
+#[tauri::command(async)]
+pub fn workspace_restore_checkpoint(root: String, checkpoint_id: String) -> Result<Value, String> {
+    let cp_dir = Path::new(&root).join(".zeusdesigns").join("checkpoints").join(&checkpoint_id);
+    let m_path = cp_dir.join("manifest.json");
+    let txt = fs::read_to_string(&m_path).map_err(|_| format!("Checkpoint '{}' not found", checkpoint_id))?;
+    let manifest: CheckpointManifest = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
+    let mut restored_files = Vec::new();
+    for f in &manifest.files {
+        let Ok(target) = safe_join(&root, &f.path) else { continue };
+        if f.existed {
+            if let Some(blob) = &f.blob {
+                let blob_path = cp_dir.join(blob);
+                if blob_path.exists() {
+                    if let Some(parent) = target.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
+                    if fs::copy(&blob_path, &target).is_ok() {
+                        restored_files.push(f.path.clone());
+                    }
+                }
+            }
+        } else if target.is_file() {
+            if fs::remove_file(&target).is_ok() {
+                restored_files.push(f.path.clone());
+            }
+        }
+    }
+    Ok(json!({
+        "id": manifest.id,
+        "restoredFiles": restored_files
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
