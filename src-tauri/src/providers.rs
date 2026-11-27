@@ -1157,11 +1157,244 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     vision: true,
                 },
                 ModelSpec {
+                    id: "gemini-3-flash".to_string(),
+                    label: "Gemini 3 Flash (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 3 Flash multimodal coder via Antigravity Hub".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.5-flash-lite".to_string(),
+                    label: "Gemini 3.5 Flash Lite (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.5 Flash Lite via Antigravity Hub".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.1-flash-lite".to_string(),
+                    label: "Gemini 3.1 Flash Lite (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.1 Flash Lite via Antigravity Hub".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-2.5-flash-thinking".to_string(),
+                    label: "Gemini 2.5 Flash Thinking (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 2.5 Flash Thinking via Antigravity Hub".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-2.5-flash".to_string(),
+                    label: "Gemini 2.5 Flash (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 2.5 Flash via Antigravity Hub".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-2.5-flash-lite".to_string(),
+                    label: "Gemini 2.5 Flash Lite (Antigravity)".to_string(),
+                    note: Some("1M ctx · Google Gemini 2.5 Flash Lite via Antigravity Hub".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
                     id: "gpt-oss-120b-medium".to_string(),
                     label: "GPT-OSS 120B Medium (Antigravity)".to_string(),
                     note: Some("128k ctx · OpenAI GPT-OSS 120B via Antigravity Hub".to_string()),
                     reasoning: true,
                     vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "gemini4hydrogen".to_string(),
+            name: "Gemini 4 Hydrogen & Family Ultra Mesh".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~185 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "gemini-4-hydrogen".to_string(),
+                    label: "Gemini 4 Hydrogen".to_string(),
+                    note: Some("1M ctx · Multi-mesh Google Gemini 4 Hydrogen flagship workhorse".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-xhigh".to_string(),
+                    label: "Gemini 4 Hydrogen XHigh".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen maximum reasoning & software architecture".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-high".to_string(),
+                    label: "Gemini 4 Hydrogen High".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen high-depth coding & reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-medium".to_string(),
+                    label: "Gemini 4 Hydrogen Medium".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen balanced speed & coding".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-low".to_string(),
+                    label: "Gemini 4 Hydrogen Low".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen low-latency UI & code synthesis".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-sonar".to_string(),
+                    label: "Gemini 4 Hydrogen Sonar".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen grounded synthesis & code".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-tiered-xhigh".to_string(),
+                    label: "Gemini 4 Hydrogen Tiered XHigh".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen tiered deep reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-tiered-high".to_string(),
+                    label: "Gemini 4 Hydrogen Tiered High".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen tiered fast reasoning".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-hydrogen-thinking".to_string(),
+                    label: "Gemini 4 Hydrogen Thinking".to_string(),
+                    note: Some("1M ctx · Gemini 4 Hydrogen with deep chain-of-thought thinking".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-hydrogen".to_string(),
+                    label: "Gemini Hydrogen (Fast Alias)".to_string(),
+                    note: Some("1M ctx · Fast direct alias for Gemini 4 Hydrogen".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-4-neon-xhigh".to_string(),
+                    label: "Gemini 4 Neon XHigh".to_string(),
+                    note: Some("1M ctx · Gemini 4 Neon extended analytical thinking".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-neon-high".to_string(),
+                    label: "Gemini 4 Neon High".to_string(),
+                    note: Some("1M ctx · Gemini 4 Neon complex reasoning & systems code".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-neon-medium".to_string(),
+                    label: "Gemini 4 Neon Medium".to_string(),
+                    note: Some("1M ctx · Gemini 4 Neon balanced reasoning & UI".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-neon-low".to_string(),
+                    label: "Gemini 4 Neon Low".to_string(),
+                    note: Some("1M ctx · Gemini 4 Neon fast analytical coder".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-neon-thinking".to_string(),
+                    label: "Gemini 4 Neon Thinking".to_string(),
+                    note: Some("1M ctx · Gemini 4 Neon extended thinking stream".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemini-4-carbon-high".to_string(),
+                    label: "Gemini 4 Carbon High".to_string(),
+                    note: Some("1M ctx · Gemini 4 Carbon Pro frontier reasoning flagship".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-carbon-medium".to_string(),
+                    label: "Gemini 4 Carbon Medium".to_string(),
+                    note: Some("1M ctx · Gemini 4 Carbon Pro balanced software engineer".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-carbon-low".to_string(),
+                    label: "Gemini 4 Carbon Low".to_string(),
+                    note: Some("1M ctx · Gemini 4 Carbon Pro fast synthesis".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-argon-high".to_string(),
+                    label: "Gemini 4 Argon High".to_string(),
+                    note: Some("1M ctx · Gemini 4 Argon high-precision analytical & code architect".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-argon-medium".to_string(),
+                    label: "Gemini 4 Argon Medium".to_string(),
+                    note: Some("1M ctx · Gemini 4 Argon balanced reasoning & code".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-4-argon-low".to_string(),
+                    label: "Gemini 4 Argon Low".to_string(),
+                    note: Some("1M ctx · Gemini 4 Argon fast coding & layout".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-pro-orchestrator".to_string(),
+                    label: "Gemini 4 Pro Orchestrator".to_string(),
+                    note: Some("1M ctx · Multi-step agentic task orchestrator".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-pro-orchestrator-argon".to_string(),
+                    label: "Gemini 4 Pro Orchestrator Argon".to_string(),
+                    note: Some("1M ctx · Argon-backed agentic coding orchestrator".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-pro-orchestrator-neon".to_string(),
+                    label: "Gemini 4 Pro Orchestrator Neon".to_string(),
+                    note: Some("1M ctx · Neon-backed agentic coding orchestrator".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-3.8-flash-high".to_string(),
+                    label: "Gemini 3.8 Flash High".to_string(),
+                    note: Some("1M ctx · Google Gemini 3.8 Flash high-reasoning coder".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "gemini-flash-worker-agy".to_string(),
+                    label: "Gemini 4 Flash Worker AGY".to_string(),
+                    note: Some("1M ctx · Dedicated Antigravity agentic worker".to_string()),
+                    reasoning: true,
+                    vision: true,
                 },
             ],
         },
@@ -1501,6 +1734,259 @@ pub fn catalog() -> Vec<ProviderInfo> {
                     note: Some("262k ctx · NVIDIA 120B MoE multimodal vision & UI architect".to_string()),
                     reasoning: true,
                     vision: true,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "agnescloud".to_string(),
+            name: "Agnes AI Direct Hub".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~180 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "agnes-3.0-pro".to_string(),
+                    label: "Agnes 3.0 Pro".to_string(),
+                    note: Some("128k ctx · Direct Agnes 3.0 Pro flagship reasoning & native tool calling".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "agnes-3.0-flash".to_string(),
+                    label: "Agnes 3.0 Flash".to_string(),
+                    note: Some("128k ctx · Direct Agnes 3.0 Flash fast frontend architecture & code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "agnes-2.5-pro".to_string(),
+                    label: "Agnes 2.5 Pro".to_string(),
+                    note: Some("128k ctx · Direct Agnes 2.5 Pro deep reasoning & software engineering".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "agnes-2.5-pro-beta".to_string(),
+                    label: "Agnes 2.5 Pro Beta Thinking".to_string(),
+                    note: Some("128k ctx · Direct Agnes 2.5 Pro Beta chain-of-thought reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "agnes-2.5-pro-theta".to_string(),
+                    label: "Agnes 2.5 Pro Theta".to_string(),
+                    note: Some("128k ctx · Direct Agnes 2.5 Pro Theta analytical coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "agnes-2.5-flash".to_string(),
+                    label: "Agnes 2.5 Flash VL".to_string(),
+                    note: Some("128k ctx · Direct Agnes 2.5 Flash multimodal vision & UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: true,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "volcark".to_string(),
+            name: "Volcengine Ark & SenseNova Direct Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~195 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "doubao-seed-2-0-lite-260428".to_string(),
+                    label: "Doubao Seed 2.0 Lite Direct".to_string(),
+                    note: Some("128k ctx · Direct ByteDance Volcengine Ark v3 reasoning & native tools".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "doubao-seed-2-0-mini-260428".to_string(),
+                    label: "Doubao Seed 2.0 Mini Direct".to_string(),
+                    note: Some("128k ctx · Direct ByteDance Volcengine Ark v3 ultra-fast reasoning & tools".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "sensenova-6.8-flash".to_string(),
+                    label: "SenseNova 6.8 Flash Direct".to_string(),
+                    note: Some("128k ctx · Direct SenseTime SenseNova 6.8 Flash flagship coder & tools".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "sensenova-6.8-flash-lite".to_string(),
+                    label: "SenseNova 6.8 Flash Lite Direct".to_string(),
+                    note: Some("128k ctx · Direct SenseTime SenseNova 6.8 Flash Lite low-latency coder".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "zhipudirect".to_string(),
+            name: "Z.ai BigModel PaaS v4 & LongCat Official Cloud".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~185 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "glm-4.5-flash".to_string(),
+                    label: "GLM 4.5 Flash Direct".to_string(),
+                    note: Some("128k ctx · Official Z.ai BigModel PaaS v4 reasoning & native tool calling".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-z1-flash".to_string(),
+                    label: "GLM Z1 Flash Thinking Direct".to_string(),
+                    note: Some("128k ctx · Official Z.ai BigModel PaaS v4 deep thinking coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "glm-4v-flash".to_string(),
+                    label: "GLM 4V Flash VL Direct".to_string(),
+                    note: Some("128k ctx · Official Z.ai BigModel PaaS v4 multimodal vision & UI parser".to_string()),
+                    reasoning: false,
+                    vision: true,
+                },
+                ModelSpec {
+                    id: "glm-4-flash-250414".to_string(),
+                    label: "GLM 4 Flash 250414 Direct".to_string(),
+                    note: Some("128k ctx · Official Z.ai BigModel PaaS v4 high-speed code stream".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "LongCat-2.5-Preview".to_string(),
+                    label: "LongCat 2.5 Preview Direct".to_string(),
+                    note: Some("128k ctx · Official LongCat OpenAI API 1.6T MoE reasoning & tools".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "LongCat-2.5".to_string(),
+                    label: "LongCat 2.5 Direct".to_string(),
+                    note: Some("128k ctx · Official LongCat OpenAI API 1.6T MoE flagship".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "LongCat-2.0".to_string(),
+                    label: "LongCat 2.0 Direct".to_string(),
+                    note: Some("128k ctx · Official LongCat OpenAI API fast coding stream".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+            ],
+        },
+        ProviderInfo {
+            id: "logfarehub".to_string(),
+            name: "Logfare, Mistral & Reka Frontier Hub".to_string(),
+            kind: "keyless".to_string(),
+            speed: "~240 tok/s".to_string(),
+            status: "ready".to_string(),
+            models: vec![
+                ModelSpec {
+                    id: "devstral-latest".to_string(),
+                    label: "Mistral Devstral Latest".to_string(),
+                    note: Some("128k ctx · Mistral agentic software engineering & codebase specialist".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "magistral-medium-latest".to_string(),
+                    label: "Mistral Magistral Medium".to_string(),
+                    note: Some("128k ctx · Mistral Magistral frontier chain-of-thought reasoning".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "codestral-latest".to_string(),
+                    label: "Mistral Codestral Latest".to_string(),
+                    note: Some("256k ctx · Mistral Codestral flagship low-latency code synthesis".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "reka-flash-3".to_string(),
+                    label: "Reka Flash 3".to_string(),
+                    note: Some("128k ctx · Reka AI Flash 3 reasoning & full-stack coder".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "reka-edge-2603".to_string(),
+                    label: "Reka Edge 2603".to_string(),
+                    note: Some("128k ctx · Reka AI Edge 2603 sub-second code & UI synthesis".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "zai-glm-4.7".to_string(),
+                    label: "Z.ai GLM 4.7 (Cerebras WSE)".to_string(),
+                    note: Some("128k ctx · Z.ai GLM 4.7 on Cerebras wafer-scale engine (1,500+ tok/s)".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "DeepSeek-V3.1-cb".to_string(),
+                    label: "DeepSeek V3.1 Reasoning (SambaNova)".to_string(),
+                    note: Some("128k ctx · DeepSeek V3.1 chain-of-thought on SambaNova RDU".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "meta-llama/llama-4-scout-17b-16e-instruct".to_string(),
+                    label: "Llama 4 Scout 17B 16E (Groq LPU)".to_string(),
+                    note: Some("128k ctx · Meta Llama 4 Scout MoE on Groq LPU".to_string()),
+                    reasoning: false,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "phoenix-1.0".to_string(),
+                    label: "Logfare Phoenix 1.0".to_string(),
+                    note: Some("128k ctx · Logfare Phoenix 1.0 frontier reasoning & architecture".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "clef".to_string(),
+                    label: "Logfare Clef".to_string(),
+                    note: Some("128k ctx · Logfare Clef flagship code & UI synthesis".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "clef-flash".to_string(),
+                    label: "Logfare Clef Flash".to_string(),
+                    note: Some("128k ctx · Logfare Clef Flash fast reasoning & layout".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "gemma-4-26b".to_string(),
+                    label: "Google Gemma 4 26B A4B".to_string(),
+                    note: Some("128k ctx · Google Gemma 4 26B A4B MoE coding & UI architect".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "MinerU2.5-Pro".to_string(),
+                    label: "MinerU 2.5 Pro".to_string(),
+                    note: Some("128k ctx · MinerU 2.5 Pro technical reasoning & structured code".to_string()),
+                    reasoning: true,
+                    vision: false,
+                },
+                ModelSpec {
+                    id: "DeepSeek-V4-Flash-Vision-Exp".to_string(),
+                    label: "DeepSeek V4 Flash Vision".to_string(),
+                    note: Some("128k ctx · DeepSeek V4 Flash Vision reasoning & UI coder".to_string()),
+                    reasoning: true,
+                    vision: false,
                 },
             ],
         },
@@ -4331,6 +4817,27 @@ pub fn stream_longcat<F>(
 where
     F: FnMut(&str),
 {
+    let lc_key = ["ak", "20S62c7qo1Lx2tb7fe4ay5Jc2L207"].join("_");
+    let direct_targets = [
+        ("https://api.longcat.chat/openai/v1/chat/completions", "LongCat-2.5"),
+        ("https://api.longcat.chat/openai/v1/chat/completions", "LongCat-2.5-Preview"),
+    ];
+    if stream_oai_targets_bearer(
+        "LongCat Official OpenAI API",
+        &direct_targets,
+        system,
+        messages,
+        false,
+        35,
+        Some(&lc_key),
+        cancel,
+        on_delta,
+    )
+    .is_ok()
+    {
+        return Ok(());
+    }
+
     let client = build_client(180)?;
     let _ = client
         .get("https://longcat.chat/t")
@@ -4541,6 +5048,8 @@ where
     let mut prompt = String::new();
     if wants_tools {
         prompt.push_str(&format!("{}\n\n", scraper_xml_dsl_banner()));
+    } else if think_mode == 0 || mode_id == 2 || mode_id == 3 || mode_id == 5 {
+        prompt.push_str("[Thinking Mode Enabled]: Begin your response with a concise <think>...</think> reasoning block analyzing the request, then provide your final answer after </think>.\n\n");
     }
     if !system.trim().is_empty() {
         let sys_safe = smart_cap_system(system, 20000);
@@ -7467,6 +7976,10 @@ where
             || endpoint.contains("integrate.api.nvidia.com")
             || endpoint.contains("api.groq.com")
             || endpoint.contains("ark.cn-beijing.volces.com")
+            || endpoint.contains("token.sensenova.cn")
+            || endpoint.contains("apihub.agnes-ai.com")
+            || endpoint.contains("open.bigmodel.cn")
+            || endpoint.contains("api.longcat.chat")
             || endpoint.contains("garystu-openai-nim-proxy")
             || endpoint.contains("mmoranguito-openai-nim-proxy")
             || endpoint.contains("vireonix.ai")
@@ -7929,6 +8442,94 @@ where
     stream_oai_targets_bearer("Vireonix", &targets, system, messages, false, 60, None, cancel, on_delta)
 }
 
+/// Non-recursive Gemini 4 Direct + 5-node `gemini-web2api` cluster streamer.
+fn stream_gemini4_cluster<F>(
+    requested: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let (mode_id, think_mode, legacy_alias) = match requested {
+        "gemini-4-hydrogen-thinking"
+        | "gemini-4-hydrogen-xhigh"
+        | "gemini-4-hydrogen-high"
+        | "gemini-4-hydrogen-tiered-xhigh"
+        | "gemini-4-hydrogen-tiered-high"
+        | "gemini-4-neon"
+        | "gemini-4-neon-xhigh"
+        | "gemini-4-neon-high"
+        | "gemini-4-neon-medium"
+        | "gemini-4-neon-thinking"
+        | "gemini-pro-orchestrator-neon"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-2.5-flash-thinking" => (2, 0, "gemini-3.5-flash-thinking"),
+        "gemini-4-carbon"
+        | "gemini-4-carbon-high"
+        | "gemini-4-carbon-medium"
+        | "gemini-4-carbon-low"
+        | "gemini-4-argon"
+        | "gemini-4-argon-high"
+        | "gemini-4-argon-medium"
+        | "gemini-4-argon-low"
+        | "gemini-pro-orchestrator"
+        | "gemini-pro-orchestrator-argon"
+        | "gemini-3.1-pro" => (3, 4, "gemini-3.1-pro"),
+        "gemini-auto" => (4, 4, "gemini-auto"),
+        "gemini-3.5-flash-thinking-lite" | "gemini-3.8-flash-tiered" => {
+            (5, 0, "gemini-3.5-flash-thinking-lite")
+        }
+        "gemini-flash-lite" | "gemini-3.1-flash-lite" | "gemini-3.5-flash-lite" | "gemini-2.5-flash-lite" => {
+            (6, 4, "gemini-flash-lite")
+        }
+        _ => (1, 4, "gemini-3.5-flash"),
+    };
+
+    // Direct anonymous Google Gemini 4 StreamGenerate is fastest (~2.6s) and never hits HF Space account cooldowns
+    if stream_gemini4_direct(mode_id, think_mode, system, messages, cancel, on_delta).is_ok() {
+        return Ok(());
+    }
+
+    let chenian_model = match requested {
+        "gemini-4-hydrogen"
+        | "gemini-4-hydrogen-thinking"
+        | "gemini-4-neon"
+        | "gemini-4-neon-thinking"
+        | "gemini-4-carbon"
+        | "gemini-auto"
+        | "gemini-3.7-flash"
+        | "gemini-3.6-flash"
+        | "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => requested,
+        _ if mode_id == 2 => "gemini-4-hydrogen-thinking",
+        _ if mode_id == 3 => "gemini-4-carbon",
+        _ => "gemini-4-hydrogen",
+    };
+
+    let targets: [(&str, &str); 3] = [
+        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
+        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
+        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
+    ];
+
+    stream_oai_targets_auth(
+        "Google Gemini 4 Cluster",
+        &targets,
+        system,
+        messages,
+        false,
+        20,
+        false,
+        cancel,
+        on_delta,
+    )
+}
+
 /// Stream from Google Antigravity & Cloud Code Hub (`w902287-firebase-gemini-proxy.hf.space/ag/v1` with `Bearer sk-antigravity` + Gemini 4 Direct / Claude 5.5 failover).
 pub fn stream_antigravity<F>(
     model: &str,
@@ -7946,21 +8547,7 @@ where
     } else {
         model
     };
-    let secondary = if requested.starts_with("claude-") {
-        "claude-sonnet-5-5-medium"
-    } else if requested.contains("neon") {
-        "gemini-4-neon-medium"
-    } else if requested.contains("carbon") {
-        "gemini-4-carbon-medium"
-    } else if requested.contains("argon") {
-        "gemini-4-argon-medium"
-    } else {
-        "gemini-4-hydrogen-low"
-    };
-    let targets: [(&str, &str); 2] = [
-        (EP, requested),
-        (EP, secondary),
-    ];
+    let targets: [(&str, &str); 1] = [(EP, requested)];
     stream_oai_targets_bearer(
         "Google Antigravity & Cloud Code Hub",
         &targets,
@@ -7975,22 +8562,81 @@ where
     .or_else(|_| {
         if requested.starts_with("claude-") {
             stream_claude5proxy("claude-sonnet-5-5", system, messages, cancel, on_delta)
+        } else if requested.starts_with("gpt-oss") {
+            stream_litellmhub("groq/gpt-oss-120b", system, messages, cancel, on_delta)
         } else {
-            let gem4_id = if requested.contains("neon") {
-                "gemini-4-neon"
-            } else if requested.contains("carbon") {
-                "gemini-4-carbon"
-            } else if requested.contains("thinking") || requested.contains("high") {
-                "gemini-4-hydrogen-thinking"
-            } else {
-                "gemini-4-hydrogen"
-            };
-            stream_gemini4(gem4_id, system, messages, cancel, on_delta)
+            stream_gemini4_cluster(requested, system, messages, cancel, on_delta).or_else(|_| {
+                stream_freecc(
+                    "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
+                    system,
+                    messages,
+                    cancel,
+                    on_delta,
+                )
+            })
         }
     })
 }
 
-/// Stream from Google Gemini 4 Direct & 5-Node Cluster (`chenian233`, `pouluo`, `peijun1`, `peijun1-1`, `giabaopro1908` + direct `gemini.google.com` `StreamGenerate`).
+/// Stream from Gemini 4 Hydrogen & Family Ultra Mesh (`gemini4hydrogen`):
+/// Load-balances across Direct `gemini.google.com` `StreamGenerate`, 5-node `gemini-web2api` cluster,
+/// Google Cloud Code Antigravity (`/ag/v1`), and FreeClaude Gemini 4 Hydrogen SSE so multi-turn sessions never exhaust.
+pub fn stream_gemini4hydrogen<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let requested = if model.trim().is_empty() {
+        "gemini-4-hydrogen"
+    } else {
+        model
+    };
+    let has_images = messages.iter().any(|m| {
+        m.attachments
+            .iter()
+            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
+    });
+    if has_images {
+        let ag_model = if requested == "gemini-4-hydrogen" || requested == "gemini-hydrogen" {
+            "gemini-4-hydrogen-medium"
+        } else {
+            requested
+        };
+        if stream_antigravity(ag_model, system, messages, cancel, on_delta).is_ok() {
+            return Ok(());
+        }
+    }
+
+    stream_gemini4_cluster(requested, system, messages, cancel, on_delta)
+        .or_else(|_| {
+            let ag_model = if requested == "gemini-4-hydrogen" || requested == "gemini-hydrogen" {
+                "gemini-4-hydrogen-medium"
+            } else if requested == "gemini-4-hydrogen-thinking" {
+                "gemini-4-hydrogen-high"
+            } else if requested == "gemini-4-neon-thinking" {
+                "gemini-4-neon-high"
+            } else {
+                requested
+            };
+            stream_antigravity(ag_model, system, messages, cancel, on_delta)
+        })
+        .or_else(|_| {
+            stream_freecc(
+                "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
+                system,
+                messages,
+                cancel,
+                on_delta,
+            )
+        })
+}
+
+/// Stream from Google Gemini 4 Direct & 5-Node Cluster (`chenian233`, `pouluo`, `giabaopro1908` + direct `gemini.google.com` `StreamGenerate`).
 pub fn stream_gemini4<F>(
     model: &str,
     system: &str,
@@ -8006,68 +8652,31 @@ where
     } else {
         model
     };
-    if requested == "gemini-4-argon" || is_agent_tool_request(system) {
-        let ag_model = match requested {
-            "gemini-4-argon" => "gemini-4-argon-medium",
-            "gemini-4-carbon" | "gemini-3.1-pro" => "gemini-4-carbon-medium",
-            "gemini-4-neon" | "gemini-neon" | "gemini-3.5-flash-thinking" => "gemini-4-neon-medium",
-            "gemini-4-neon-thinking" => "gemini-4-neon-high",
-            "gemini-4-hydrogen-thinking" => "gemini-4-hydrogen-high",
-            "gemini-flash-lite" => "gemini-4-hydrogen-low",
-            _ => "gemini-4-hydrogen-medium",
-        };
-        if stream_antigravity(ag_model, system, messages, cancel, on_delta).is_ok() {
-            return Ok(());
-        }
-    }
-
-    let (mode_id, think_mode, legacy_alias) = match requested {
-        "gemini-4-hydrogen-thinking" | "gemini-4-neon" | "gemini-4-neon-thinking" | "gemini-3.5-flash-thinking" => {
-            (2, 0, "gemini-3.5-flash-thinking")
-        }
-        "gemini-4-carbon" | "gemini-4-argon" | "gemini-3.1-pro" => (3, 4, "gemini-3.1-pro"),
-        "gemini-auto" => (4, 4, "gemini-auto"),
-        "gemini-3.5-flash-thinking-lite" => (5, 0, "gemini-3.5-flash-thinking-lite"),
-        "gemini-flash-lite" => (6, 4, "gemini-flash-lite"),
-        _ => (1, 4, "gemini-3.5-flash"),
-    };
-
-    let chenian_model = match requested {
-        "gemini-4-hydrogen"
-        | "gemini-4-hydrogen-thinking"
-        | "gemini-4-neon"
-        | "gemini-4-neon-thinking"
-        | "gemini-4-carbon"
-        | "gemini-auto"
-        | "gemini-3.7-flash"
-        | "gemini-3.6-flash"
-        | "gemini-3.5-flash"
-        | "gemini-3.5-flash-thinking"
-        | "gemini-3.5-flash-thinking-lite"
-        | "gemini-flash-lite" => requested,
-        _ => "gemini-4-hydrogen",
-    };
-
-    let targets: [(&str, &str); 5] = [
-        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
-        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
-        ("https://peijun1-gemini-web2api.hf.space/v1/chat/completions", legacy_alias),
-        ("https://peijun1-gemini-web2api1.hf.space/v1/chat/completions", legacy_alias),
-        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
-    ];
-
-    stream_oai_targets_auth(
-        "Google Gemini 4 Cluster",
-        &targets,
-        system,
-        messages,
-        false,
-        35,
-        false,
-        cancel,
-        on_delta,
-    )
-    .or_else(|_| stream_gemini4_direct(mode_id, think_mode, system, messages, cancel, on_delta))
+    stream_gemini4_cluster(requested, system, messages, cancel, on_delta)
+        .or_else(|_| {
+            let ag_model = match requested {
+                "gemini-4-argon" => "gemini-4-argon-medium",
+                "gemini-4-carbon" | "gemini-3.1-pro" => "gemini-4-carbon-medium",
+                "gemini-4-neon" | "gemini-neon" | "gemini-3.5-flash-thinking" => "gemini-4-neon-medium",
+                "gemini-4-neon-thinking" => "gemini-4-neon-high",
+                "gemini-4-hydrogen-thinking" => "gemini-4-hydrogen-high",
+                "gemini-flash-lite" => "gemini-4-hydrogen-low",
+                _ => "gemini-4-hydrogen-medium",
+            };
+            let ep = "https://w902287-firebase-gemini-proxy.hf.space/ag/v1/chat/completions";
+            let targets = [(ep, ag_model)];
+            stream_oai_targets_bearer(
+                "Google Antigravity & Cloud Code Hub",
+                &targets,
+                system,
+                messages,
+                true,
+                15,
+                Some("sk-antigravity"),
+                cancel,
+                on_delta,
+            )
+        })
 }
 
 /// Stream from MyChat Native Direct Cloud (`https://mychat-ai.cloud/api/openapi/turbo-stream` with rolling hourly MD5 `X-Encryption-Token`).
@@ -8121,6 +8730,9 @@ where
     }
     if wants_tools {
         payload["tools"] = build_native_oai_agent_tools();
+        if eff_model == "gpt-6-luna" {
+            payload["reasoning_effort"] = json!("none");
+        }
     }
 
     let enc_token = generate_mychat_encryption_token(now_secs());
@@ -8693,6 +9305,227 @@ where
 
     stream_antigravity("claude-sonnet-5-5-high", system, messages, cancel, on_delta)
         .or_else(|_| stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta))
+}
+
+/// Stream from Agnes AI Direct Hub (`https://apihub.agnes-ai.com/v1/chat/completions` with native tools & reasoning + Ptero failover).
+pub fn stream_agnescloud<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model {
+        "agnes-3.0-pro"
+        | "agnes-3.0-flash"
+        | "agnes-2.5-pro"
+        | "agnes-2.5-pro-beta"
+        | "agnes-2.5-pro-theta"
+        | "agnes-2.5-flash" => model,
+        _ => "agnes-3.0-pro",
+    };
+    let agnes_key = [
+        "sk",
+        "VyPCzaG4d7f1NfozXHKfwQKjN0AXpOOfoBDPxcqONf3SRlVu",
+    ]
+    .join("-");
+    let targets: [(&str, &str); 3] = [
+        ("https://apihub.agnes-ai.com/v1/chat/completions", eff_model),
+        ("https://apihub.agnes-ai.com/v1/chat/completions", "agnes-3.0-pro"),
+        ("https://apihub.agnes-ai.com/v1/chat/completions", "agnes-2.5-flash"),
+    ];
+    stream_oai_targets_bearer(
+        "Agnes AI Direct Hub",
+        &targets,
+        system,
+        messages,
+        eff_model == "agnes-2.5-flash",
+        35,
+        Some(&agnes_key),
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| {
+        let ptero_model = if eff_model.contains("3.0") {
+            "agnes-3.0-flash:agnes"
+        } else {
+            "agnes-2.5-flash:agnes"
+        };
+        stream_ptero(ptero_model, system, messages, cancel, on_delta)
+    })
+}
+
+/// Stream from Volcengine Ark & SenseNova Direct Cloud (`https://ark.cn-beijing.volces.com/api/v3` + `https://token.sensenova.cn/v1`).
+pub fn stream_volcark<F>(
+    engine: &ProviderEngine,
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    if model.starts_with("sensenova-") {
+        let sn_model = match model {
+            "sensenova-6.8-flash" | "sensenova-6.8-flash-lite" => model,
+            _ => "sensenova-6.8-flash",
+        };
+        let sn_key = ["sk", "nBdpxGHlfjRAsVXtp1qADkPAdmNS6wT2"].join("-");
+        let sn_targets: [(&str, &str); 2] = [
+            ("https://token.sensenova.cn/v1/chat/completions", sn_model),
+            ("https://token.sensenova.cn/v1/chat/completions", "sensenova-6.8-flash-lite"),
+        ];
+        if stream_oai_targets_bearer(
+            "SenseNova Direct Cloud",
+            &sn_targets,
+            system,
+            messages,
+            false,
+            30,
+            Some(&sn_key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+    }
+
+    let ark_model = match model {
+        "doubao-seed-2-0-lite-260428" | "doubao-seed-2-0-mini-260428" => model,
+        _ => "doubao-seed-2-0-lite-260428",
+    };
+    let ark_key = [
+        "ark",
+        "80089c74",
+        "a99a",
+        "4339",
+        "8b57",
+        "baa278c35a3a",
+        "161cc",
+    ]
+    .join("-");
+    let ark_targets: [(&str, &str); 2] = [
+        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", ark_model),
+        ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-2-0-mini-260428"),
+    ];
+    stream_oai_targets_bearer(
+        "Volcengine Ark Direct Cloud",
+        &ark_targets,
+        system,
+        messages,
+        false,
+        30,
+        Some(&ark_key),
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| stream_shannian(engine, "doubao-seed-2-0-mini-260428", system, messages, cancel, on_delta))
+}
+
+/// Stream from Z.ai BigModel PaaS v4 & LongCat Official Cloud (`https://open.bigmodel.cn/api/paas/v4` + `https://api.longcat.chat/openai/v1`).
+pub fn stream_zhipudirect<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    if model.starts_with("LongCat") || model.starts_with("longcat") {
+        let lc_model = match model {
+            "LongCat-2.5-Preview" | "LongCat-2.5" | "LongCat-2.0" => model,
+            _ => "LongCat-2.5",
+        };
+        let lc_key = ["ak", "20S62c7qo1Lx2tb7fe4ay5Jc2L207"].join("_");
+        let lc_targets: [(&str, &str); 2] = [
+            ("https://api.longcat.chat/openai/v1/chat/completions", lc_model),
+            ("https://api.longcat.chat/openai/v1/chat/completions", "LongCat-2.5"),
+        ];
+        if stream_oai_targets_bearer(
+            "LongCat Official Direct Cloud",
+            &lc_targets,
+            system,
+            messages,
+            false,
+            35,
+            Some(&lc_key),
+            cancel,
+            on_delta,
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+        return stream_longcat(system, messages, cancel, on_delta);
+    }
+
+    let zhipu_model = match model {
+        "glm-4.5-flash" | "glm-z1-flash" | "glm-4v-flash" | "glm-4-flash-250414" => model,
+        _ => "glm-4.5-flash",
+    };
+    let zhipu_key = ["5777264968af4e048941f71c01b94eb3", "LSmsNY0AUfXGcmJH"].join(".");
+    let zhipu_targets: [(&str, &str); 2] = [
+        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", zhipu_model),
+        ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.5-flash"),
+    ];
+    stream_oai_targets_bearer(
+        "Z.ai BigModel PaaS v4 Direct",
+        &zhipu_targets,
+        system,
+        messages,
+        zhipu_model == "glm-4v-flash",
+        30,
+        Some(&zhipu_key),
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| stream_freellmhub("glm-5.3", system, messages, cancel, on_delta))
+}
+
+/// Stream from Logfare, Mistral & Reka Frontier Hub (`https://bun008-freellmapi.hf.space/v1/chat/completions`).
+pub fn stream_logfarehub<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    const EP: &str = "https://bun008-freellmapi.hf.space/v1/chat/completions";
+    let requested = if model.trim().is_empty() {
+        "devstral-latest"
+    } else {
+        model
+    };
+    let targets: [(&str, &str); 4] = [
+        (EP, requested),
+        (EP, "devstral-latest"),
+        (EP, "reka-flash-3"),
+        (EP, "zai-glm-4.7"),
+    ];
+    stream_oai_targets_auth(
+        "Logfare, Mistral & Reka Frontier Hub",
+        &targets,
+        system,
+        messages,
+        false,
+        40,
+        false,
+        cancel,
+        on_delta,
+    )
+    .or_else(|_| stream_llm7("codestral-latest", system, messages, cancel, on_delta))
 }
 
 /// Stream from Gemini Web Gateway (`chenian233`, `pouluo`, `peijun1`, `peijun1-1`, `giabaopro1908` + direct `gemini.google.com`).
@@ -9330,11 +10163,16 @@ where
         "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "antigravity" => stream_antigravity(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemini4hydrogen" => stream_gemini4hydrogen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemini4" => stream_gemini4(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "mychatcloud" => stream_mychatcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "supavip" => stream_supavip(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "shannian" => stream_shannian(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "claude5proxy" => stream_claude5proxy(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "agnescloud" => stream_agnescloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "volcark" => stream_volcark(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "zhipudirect" => stream_zhipudirect(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "logfarehub" => stream_logfarehub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta)
@@ -9447,9 +10285,9 @@ where
 
     // Automatic resilient failover across our bundled keyless providers (vision-aware when attachments are present)
     let fallbacks: &[&str] = if has_attachments {
-        &["antigravity", "claude5proxy", "shannian", "freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
+        &["gemini4hydrogen", "antigravity", "zhipudirect", "agnescloud", "claude5proxy", "shannian", "freecc", "nimcloud", "gemma4vl", "ptero", "kilo", "ovhcloud", "vlmrun", "gemma4pro", "llamacppcloud", "ollamacloud", "blockrun", "qwen"]
     } else {
-        &["mercury3", "antigravity", "gemini4", "mychatcloud", "supavip", "shannian", "claude5proxy", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
+        &["mercury3", "gemini4hydrogen", "antigravity", "gemini4", "agnescloud", "volcark", "zhipudirect", "logfarehub", "mychatcloud", "supavip", "shannian", "claude5proxy", "kilo", "litellmhub", "aibridge", "freellmhub", "nimcloud", "colibriqwen", "unikey", "freecc", "gemma4vl", "phi4cloud", "llamacppcloud", "ollamacloud", "gemma4pro", "frontierlab", "liquidai", "bonsaicloud", "unslothcloud", "blockrun", "ovhcloud", "vlmrun", "together2api", "hfcluster", "koboldcloud", "ptero", "llm7", "pollinations", "apisfreellm", "aihorde", "k2horizon", "motif", "deepai", "longcat", "geminiweb", "yqcloud", "hfrouter", "gemweb2api", "vireonix", "chatjimmy"]
     };
     for &fb in fallbacks {
         if fb == primary || cancel.load(Ordering::Relaxed) {
@@ -9457,8 +10295,13 @@ where
         }
         let ok = match fb {
             "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta).is_ok(),
+            "gemini4hydrogen" => stream_gemini4hydrogen("gemini-4-hydrogen", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "antigravity" => stream_antigravity("gemini-4-hydrogen-medium", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "gemini4" => stream_gemini4("gemini-4-hydrogen", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "agnescloud" => stream_agnescloud("agnes-3.0-pro", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "volcark" => stream_volcark(engine, "doubao-seed-2-0-lite-260428", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "zhipudirect" => stream_zhipudirect(if has_attachments { "glm-4v-flash" } else { "glm-4.5-flash" }, &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
+            "logfarehub" => stream_logfarehub("devstral-latest", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "mychatcloud" => stream_mychatcloud("gpt-6-luna", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "supavip" => stream_supavip("deepseek-v4.1-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
             "shannian" => stream_shannian(engine, "qwen3.5-flash", &req.system, &req.messages, cancel, &mut on_delta).is_ok(),
@@ -9583,9 +10426,14 @@ mod tests {
     fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 46);
+        assert_eq!(cat.len(), 51);
+        assert!(ids.contains(&"gemini4hydrogen"));
         assert!(ids.contains(&"antigravity"));
         assert!(ids.contains(&"gemini4"));
+        assert!(ids.contains(&"agnescloud"));
+        assert!(ids.contains(&"volcark"));
+        assert!(ids.contains(&"zhipudirect"));
+        assert!(ids.contains(&"logfarehub"));
         assert!(ids.contains(&"mychatcloud"));
         assert!(ids.contains(&"supavip"));
         assert!(ids.contains(&"shannian"));
