@@ -45,6 +45,11 @@ enum class ProviderFormat {
     SCRAPER_QWEN3MOE30B,// Qwen3 30B A3B Instruct 2507 Cloud (hsuwill000-llamacpp-webui01.hf.space)
     SCRAPER_MINICPMV46, // OpenBMB MiniCPM-V 4.6 & Bonsai Cloud (misterai-llamacpp-llamaui-demo-b9501.hf.space)
     SCRAPER_TITOOQWEN35,// Qwen 3.5 4B UD-Q5 Cloud (titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space)
+    SCRAPER_POULUOGEMINI,// Pouluo Gemini 3.5 & 3.1 Pro Gateway (pouluo-gemini-web2api.hf.space)
+    SCRAPER_PEIJUNGEMINI,// Peijun Gemini 3.5 & 3.1 Pro Cloud (peijun1-gemini-web2api.hf.space)
+    SCRAPER_ZUNKOGEMMA4,// Zunko Gemma 4 E4B Abliterated Cloud (zunko2-gemma4-e4b-ablitereted-server.hf.space)
+    SCRAPER_TOMGEMMA4Q5,// Tom Gemma 4 E2B UD-Q5 Cloud (tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space)
+    SCRAPER_AMANSONILLAMA,// Amansoni Llama Instruct Cloud (amansoni7477030-ollama-server.hf.space)
     SCRAPER_VIREONIX,   // Vireonix (vireonix.ai/v1) anonymous request-aware router, 1M context
     SCRAPER_OPENCODEZEN,// OpenCode Zen (opencode.ai/zen/v1) free tier, Bearer public
     SCRAPER_GEMMA4VL,    // Gemma 4 Vision & QAT Studio (will-resolute / titoo3 / hispa-nico / elseodelasgalletas / gefdsv)

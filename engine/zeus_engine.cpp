@@ -212,6 +212,84 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "~165 tok/s"
         },
         {
+            "pouluogemini",
+            "Pouluo Gemini 3.5 & 3.1 Pro Gateway",
+            ProviderFormat::SCRAPER_POULUOGEMINI,
+            "https://pouluo-gemini-web2api.hf.space/v1",
+            "gemini-3.5-flash",
+            {
+                {"gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini 3.5 Flash fast coder", false, false, false, 175},
+                {"gemini-3.5-flash-thinking", "Gemini 3.5 Flash Thinking", "Google Gemini 3.5 Flash chain-of-thought reasoning", true, false, false, 170},
+                {"gemini-3.1-pro", "Gemini 3.1 Pro", "Google Gemini 3.1 Pro software engineer", true, false, false, 160},
+                {"gemini-3.5-flash-thinking-lite", "Gemini 3.5 Flash Thinking Lite", "Google Gemini 3.5 Flash Thinking Lite", true, false, false, 180},
+                {"gemini-flash-lite", "Gemini Flash Lite", "Google Gemini Flash Lite low-latency", false, false, false, 190}
+            },
+            1000000,
+            16384,
+            false,
+            "~170 tok/s"
+        },
+        {
+            "peijungemini",
+            "Peijun Gemini 3.5 & 3.1 Pro Cloud",
+            ProviderFormat::SCRAPER_PEIJUNGEMINI,
+            "https://peijun1-gemini-web2api.hf.space/v1",
+            "gemini-3.5-flash",
+            {
+                {"gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini 3.5 Flash fast coder", false, false, false, 175},
+                {"gemini-3.5-flash-thinking", "Gemini 3.5 Flash Thinking", "Google Gemini 3.5 Flash chain-of-thought reasoning", true, false, false, 170},
+                {"gemini-3.1-pro", "Gemini 3.1 Pro", "Google Gemini 3.1 Pro software engineer", true, false, false, 160},
+                {"gemini-3.5-flash-thinking-lite", "Gemini 3.5 Flash Thinking Lite", "Google Gemini 3.5 Flash Thinking Lite", true, false, false, 180},
+                {"gemini-flash-lite", "Gemini Flash Lite", "Google Gemini Flash Lite low-latency", false, false, false, 190}
+            },
+            1000000,
+            16384,
+            false,
+            "~170 tok/s"
+        },
+        {
+            "zunkogemma4",
+            "Zunko Gemma 4 E4B Abliterated Cloud",
+            ProviderFormat::SCRAPER_ZUNKOGEMMA4,
+            "https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1",
+            "gemma4-e4b",
+            {
+                {"gemma4-e4b", "Gemma 4 E4B Abliterated", "Google Gemma 4 E4B Abliterated llama.cpp server", false, false, false, 155}
+            },
+            65536,
+            8192,
+            false,
+            "~155 tok/s"
+        },
+        {
+            "tomgemma4q5",
+            "Tom Gemma 4 E2B UD-Q5 Cloud",
+            ProviderFormat::SCRAPER_TOMGEMMA4Q5,
+            "https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1",
+            "gemma-4-E2B-it-UD-Q5_K_XL.gguf",
+            {
+                {"gemma-4-E2B-it-UD-Q5_K_XL.gguf", "Gemma 4 E2B IT (UD-Q5_K_XL)", "Google Gemma 4 E2B IT Unsloth Dynamic Q5_K_XL coder", true, false, false, 165}
+            },
+            65536,
+            8192,
+            false,
+            "~165 tok/s"
+        },
+        {
+            "amansonillama",
+            "Amansoni Llama Instruct Cloud",
+            ProviderFormat::SCRAPER_AMANSONILLAMA,
+            "https://amansoni7477030-ollama-server.hf.space/v1",
+            "llama:latest",
+            {
+                {"llama:latest", "Meta Llama Instruct", "Meta Llama Instruct dedicated Ollama server", false, false, false, 150}
+            },
+            65536,
+            8192,
+            false,
+            "~150 tok/s"
+        },
+        {
             "qwen",
             "Qwen (Android App Gateway)",
             ProviderFormat::SCRAPER_QWEN,

@@ -220,18 +220,34 @@ const providersDirectRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/sr
 const providersCat1Rs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_cat_1.rs"), "utf8");
 const zeusEngineCpp = fs.readFileSync(path.join(process.cwd(), "engine/zeus_engine.cpp"), "utf8");
 
-for (const slug of ["gemweb2api", "clinebot", "qwen3moe30b", "minicpmv46", "titooqwen35"]) {
+for (const slug of [
+  "gemweb2api",
+  "clinebot",
+  "qwen3moe30b",
+  "minicpmv46",
+  "titooqwen35",
+  "pouluogemini",
+  "peijungemini",
+  "zunkogemma4",
+  "tomgemma4q5",
+  "amansonillama",
+]) {
   assert.ok(providersTs.includes(`id: "${slug}"`), `src/lib/providers.ts must register ${slug}`);
   assert.ok(providersCat1Rs.includes(`id: "${slug}".to_string()`), `src-tauri/src/providers_cat_1.rs must register ${slug}`);
   assert.ok(zeusEngineCpp.includes(`"${slug}"`), `engine/zeus_engine.cpp must register ${slug}`);
 }
 assert.ok(
   providersDirectRs.includes("https://chenian233-gemini-web2api.hf.space/v1/chat/completions") &&
+    providersDirectRs.includes("https://pouluo-gemini-web2api.hf.space/v1/chat/completions") &&
+    providersDirectRs.includes("https://peijun1-gemini-web2api.hf.space/v1/chat/completions") &&
     providersOaiBRs.includes("https://api.cline.bot/api/v1/chat/completions") &&
     providersOaiBRs.includes("https://hsuwill000-llamacpp-webui01.hf.space/v1/chat/completions") &&
     providersOaiBRs.includes("https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1/chat/completions") &&
-    providersOaiBRs.includes("https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions"),
-  "All 5 new keyless provider upstream hosts must be wired in Rust"
+    providersOaiBRs.includes("https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions") &&
+    providersOaiBRs.includes("https://amansoni7477030-ollama-server.hf.space/v1/chat/completions"),
+  "All 10 live-verified keyless provider upstream hosts must be wired in Rust"
 );
-console.log("[PASS] 10. All 5 new live-verified multi-turn keyless providers (gemweb2api, clinebot, qwen3moe30b, minicpmv46, titooqwen35) verified across TS, Rust, and C++20");
+console.log("[PASS] 10. All 10 live-verified multi-turn keyless providers (including pouluogemini, peijungemini, zunkogemma4, tomgemma4q5, amansonillama) verified across TS, Rust, and C++20");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");

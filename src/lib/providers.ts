@@ -72,6 +72,49 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
+    id: "pouluogemini", name: "Pouluo Gemini 3.5 & 3.1 Pro Gateway", tagline: "", speed: "~170 tok/s", color: "#2f9e66", icon: "diamond",
+    contextWindow: 1000000,
+    models: [
+      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", note: "Google Gemini 3.5 Flash fast coder", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking", label: "Gemini 3.5 Flash Thinking", note: "Google Gemini 3.5 Flash chain-of-thought reasoning", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", note: "Google Gemini 3.1 Pro software engineer", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking-lite", label: "Gemini 3.5 Flash Thinking Lite", note: "Google Gemini 3.5 Flash Thinking Lite", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-flash-lite", label: "Gemini Flash Lite", note: "Google Gemini Flash Lite low-latency", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "peijungemini", name: "Peijun Gemini 3.5 & 3.1 Pro Cloud", tagline: "", speed: "~170 tok/s", color: "#0ca678", icon: "diamond",
+    contextWindow: 1000000,
+    models: [
+      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", note: "Google Gemini 3.5 Flash fast coder", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking", label: "Gemini 3.5 Flash Thinking", note: "Google Gemini 3.5 Flash chain-of-thought reasoning", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", note: "Google Gemini 3.1 Pro software engineer", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking-lite", label: "Gemini 3.5 Flash Thinking Lite", note: "Google Gemini 3.5 Flash Thinking Lite", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-flash-lite", label: "Gemini Flash Lite", note: "Google Gemini Flash Lite low-latency", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "zunkogemma4", name: "Zunko Gemma 4 E4B Abliterated Cloud", tagline: "", speed: "~155 tok/s", color: "#d96b43", icon: "bolt",
+    contextWindow: 65536,
+    models: [
+      { id: "gemma4-e4b", label: "Gemma 4 E4B Abliterated", note: "Google Gemma 4 E4B Abliterated llama.cpp server", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "tomgemma4q5", name: "Tom Gemma 4 E2B UD-Q5 Cloud", tagline: "", speed: "~165 tok/s", color: "#12b886", icon: "memory",
+    contextWindow: 65536,
+    models: [
+      { id: "gemma-4-E2B-it-UD-Q5_K_XL.gguf", label: "Gemma 4 E2B IT (UD-Q5_K_XL)", note: "Google Gemma 4 E2B IT Unsloth Dynamic Q5_K_XL coder", reasoning: true, vision: false, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "amansonillama", name: "Amansoni Llama Instruct Cloud", tagline: "", speed: "~150 tok/s", color: "#e8590c", icon: "hub",
+    contextWindow: 65536,
+    models: [
+      { id: "llama:latest", label: "Meta Llama Instruct", note: "Meta Llama Instruct dedicated Ollama server", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
     id: "kilo", name: "Kilo Gateway", tagline: "Free frontier & VL pool · no key", speed: "~140 tok/s", color: "#2f9e66", icon: "bolt",
     contextWindow: 262144,
     models: [

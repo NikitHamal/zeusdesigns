@@ -716,7 +716,12 @@ mod tests {
     fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 49);
+        assert_eq!(cat.len(), 54);
+        assert!(ids.contains(&"pouluogemini"));
+        assert!(ids.contains(&"peijungemini"));
+        assert!(ids.contains(&"zunkogemma4"));
+        assert!(ids.contains(&"tomgemma4q5"));
+        assert!(ids.contains(&"amansonillama"));
         assert!(ids.contains(&"antigravity"));
         assert!(ids.contains(&"gemini4"));
         assert!(ids.contains(&"agnescloud"));

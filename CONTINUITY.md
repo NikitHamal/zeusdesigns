@@ -2,7 +2,18 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 32 (Latest — 5 New Live-Verified Keyless Multi-Turn Providers & Strict 1-to-1 Model Routing Integrity)
+## Session 33 (Latest — 5 New Live-Verified Keyless Multi-Turn Providers: `pouluogemini`, `peijungemini`, `zunkogemma4`, `tomgemma4q5` & `amansonillama`)
+Goal: Discover and integrate 5 genuinely new, unintegrated, keyless, multi-turn-capable providers verified live across Turn 1, Turn 2 context retention, and `<zeus_tool>` tool calling, with exact verbatim `/v1/models` IDs, zero wrapper/duplicate providers, zero silent cross-model/cross-provider fallbacks, and all `.ts`, `.tsx`, and `.rs` files strictly `<= 1,000` lines and memory `< 20 MB`.
+
+Shipped:
+1. **Added 5 New Live-Verified Multi-Turn Keyless Providers (`src-tauri/src/providers_direct.rs`, `src-tauri/src/providers_oai_b.rs`, `src-tauri/src/providers_cat_1.rs`, `src-tauri/src/providers_fingerprint.rs`, `src-tauri/src/providers_neb_a.rs`, `src-tauri/src/server_models.rs`, `src/lib/providers.ts`, `src/lib/browserProviders.ts`, `include/zeus/providers.hpp`, `engine/zeus_engine.cpp`, `engine/test_engine.cpp`)**:
+   - `pouluogemini` (**Pouluo Gemini 3.5 & 3.1 Pro Gateway**, `https://pouluo-gemini-web2api.hf.space/v1/chat/completions`): Verified live across all 5 verbatim upstream `/v1/models` IDs (`gemini-3.5-flash`, `gemini-3.5-flash-thinking`, `gemini-3.1-pro`, `gemini-3.5-flash-thinking-lite`, `gemini-flash-lite`) for 2-turn context recall (`VELVET_QUASAR_73`, `TITAN_ORBIT_88`, `QUARTZ_FALCON_55`) and `[Text-Only XML Serializer Task]` `<zeus_tool>` workspace tool synthesis.
+   - `peijungemini` (**Peijun Gemini 3.5 & 3.1 Pro Cloud**, `https://peijun1-gemini-web2api.hf.space/v1/chat/completions`): Verified live across all 5 verbatim upstream `/v1/models` IDs (`gemini-3.5-flash`, `gemini-3.5-flash-thinking`, `gemini-3.1-pro`, `gemini-3.5-flash-thinking-lite`, `gemini-flash-lite`) for 2-turn context recall and `<zeus_tool>` XML workspace tool synthesis.
+   - `zunkogemma4` (**Zunko Gemma 4 E4B Abliterated Cloud**, `https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions`): Verified live with exact verbatim `/v1/models` ID `gemma4-e4b` across 2-turn recall (`QUARTZ_FALCON_55`) and `<zeus_tool>` XML tool calling.
+   - `tomgemma4q5` (**Tom Gemma 4 E2B UD-Q5 Cloud**, `https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions`): Verified live with exact verbatim `/v1/models` ID `gemma-4-E2B-it-UD-Q5_K_XL.gguf` across 2-turn recall (`VELVET_QUASAR_73`, `TITAN_ORBIT_88`, `QUARTZ_FALCON_55`) and `<zeus_tool>` XML tool calling.
+   - `amansonillama` (**Amansoni Llama Instruct Cloud**, `https://amansoni7477030-ollama-server.hf.space/v1/chat/completions`): Verified live with exact verbatim `/v1/models` ID `llama:latest` across 2-turn recall (`ONYX_DELTA_33`) and `<zeus_tool>` XML tool calling.
+
+## Session 32 (5 Live-Verified Keyless Multi-Turn Providers & Strict 1-to-1 Model Routing Integrity)
 Goal: Discover and integrate 5 genuinely new, unintegrated, keyless, multi-turn-capable providers verified live across Turn 1, Turn 2 context retention (`COBALT77` + `17 * 23 = 391`), and tool calling (`<zeus_tool>` / native OpenAI `tools`), while removing all remaining silent cross-provider and cross-model fallbacks across `src-tauri/src/providers*.rs` and keeping all files strictly `<= 1,000` lines and memory `< 20 MB`.
 
 Shipped:

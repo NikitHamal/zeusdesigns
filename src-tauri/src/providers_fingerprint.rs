@@ -60,6 +60,11 @@ where
         "qwen3moe30b" => stream_qwen3moe30b(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "minicpmv46" => stream_minicpmv46(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "titooqwen35" => stream_titooqwen35(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "pouluogemini" => stream_pouluogemini(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "peijungemini" => stream_peijungemini(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "zunkogemma4" => stream_zunkogemma4(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "tomgemma4q5" => stream_tomgemma4q5(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "amansonillama" => stream_amansonillama(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -645,6 +650,31 @@ pub fn verify_model_fingerprint(
                 upstream_endpoint = "https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions".to_string();
                 upstream_reported_model = eff_model.clone();
                 protocol_sig = "Llama.cpp Qwen 3.5 4B UD-Q5_K_XL OpenAI SSE Stream".to_string();
+            }
+            "pouluogemini" => {
+                upstream_endpoint = "https://pouluo-gemini-web2api.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Pouluo Google Gemini 3.5 & 3.1 Pro Web2API OpenAI SSE Stream".to_string();
+            }
+            "peijungemini" => {
+                upstream_endpoint = "https://peijun1-gemini-web2api.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Peijun Google Gemini 3.5 & 3.1 Pro Web2API OpenAI SSE Stream".to_string();
+            }
+            "zunkogemma4" => {
+                upstream_endpoint = "https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Llama.cpp Gemma 4 E4B Abliterated OpenAI SSE Stream".to_string();
+            }
+            "tomgemma4q5" => {
+                upstream_endpoint = "https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Llama.cpp Gemma 4 E2B IT UD-Q5_K_XL OpenAI SSE Stream".to_string();
+            }
+            "amansonillama" => {
+                upstream_endpoint = "https://amansoni7477030-ollama-server.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Ollama Meta Llama Instruct OpenAI SSE Stream".to_string();
             }
             "freecc" => {
                 upstream_endpoint = "https://calkotter-free-claude-code.hf.space/v1/messages (origin: generativelanguage.googleapis.com/v1beta)".to_string();

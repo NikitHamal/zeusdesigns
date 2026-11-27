@@ -799,3 +799,57 @@ where
     )];
     stream_oai_targets("Qwen 3.5 4B UD-Q5 Cloud", &targets, system, messages, true, 60, cancel, on_delta)
 }
+
+/// Stream from Zunko Gemma 4 E4B Abliterated Cloud (`https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions`).
+pub fn stream_zunkogemma4<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 1] = [(
+        "https://zunko2-gemma4-e4b-ablitereted-server.hf.space/v1/chat/completions",
+        "gemma4-e4b",
+    )];
+    stream_oai_targets("Zunko Gemma 4 E4B Abliterated Cloud", &targets, system, messages, false, 60, cancel, on_delta)
+}
+
+/// Stream from Tom Gemma 4 E2B UD-Q5_K_XL Cloud (`https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions`).
+pub fn stream_tomgemma4q5<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 1] = [(
+        "https://tom199328-gemma-4-e2b-it-gguf-ud-q5-k-xl.hf.space/v1/chat/completions",
+        "gemma-4-E2B-it-UD-Q5_K_XL.gguf",
+    )];
+    stream_oai_targets("Tom Gemma 4 E2B UD-Q5 Cloud", &targets, system, messages, false, 60, cancel, on_delta)
+}
+
+/// Stream from Amansoni Llama Instruct Cloud (`https://amansoni7477030-ollama-server.hf.space/v1/chat/completions`).
+pub fn stream_amansonillama<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 1] = [(
+        "https://amansoni7477030-ollama-server.hf.space/v1/chat/completions",
+        "llama:latest",
+    )];
+    stream_oai_targets("Amansoni Llama Instruct Cloud", &targets, system, messages, false, 60, cancel, on_delta)
+}

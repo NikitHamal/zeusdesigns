@@ -690,9 +690,10 @@ where
     }
 }
 
-/// Stream from Gemini 4 Web2API Gateway (`https://chenian233-gemini-web2api.hf.space/v1/chat/completions`).
-pub fn stream_gemweb2api<F>(
-    model: &str,
+fn stream_gemini_web2api_endpoint<F>(
+    provider_label: &str,
+    endpoint_url: &str,
+    eff_model: &str,
     system: &str,
     messages: &[ChatMessage],
     cancel: &AtomicBool,
@@ -701,22 +702,6 @@ pub fn stream_gemweb2api<F>(
 where
     F: FnMut(&str),
 {
-    let eff_model = match model.trim() {
-        "gemini-4-hydrogen"
-        | "gemini-4-hydrogen-thinking"
-        | "gemini-4-neon"
-        | "gemini-4-neon-thinking"
-        | "gemini-4-carbon"
-        | "gemini-3.7-flash"
-        | "gemini-3.6-flash"
-        | "gemini-3.5-flash"
-        | "gemini-3.5-flash-thinking"
-        | "gemini-3.1-pro"
-        | "gemini-3.5-flash-thinking-lite"
-        | "gemini-flash-lite" => model.trim(),
-        _ => "gemini-4-hydrogen",
-    };
-
     let wants_tools = is_agent_tool_request(system);
     let norm_msgs = normalize_multi_turn_messages(messages, 64, 36000, 140000);
     let oai_msgs = if wants_tools {
@@ -778,14 +763,14 @@ where
     });
     let client = build_client(60)?;
     let resp = client
-        .post("https://chenian233-gemini-web2api.hf.space/v1/chat/completions")
+        .post(endpoint_url)
         .header("Content-Type", "application/json")
         .header("Accept", "text/event-stream, application/json")
         .json(&payload)
         .send()
-        .map_err(|e| format!("Gemini 4 Web2API request failed: {}", e))?;
+        .map_err(|e| format!("{} request failed: {}", provider_label, e))?;
     if !resp.status().is_success() {
-        return Err(format!("Gemini 4 Web2API HTTP {} for '{}'", resp.status(), eff_model));
+        return Err(format!("{} HTTP {} for '{}'", provider_label, resp.status(), eff_model));
     }
 
     let mut reader = BufReader::new(resp);
@@ -838,6 +823,103 @@ where
     if saw_text {
         Ok(())
     } else {
-        Err(format!("Gemini 4 Web2API stream ended without output for '{}'", eff_model))
+        Err(format!("{} stream ended without output for '{}'", provider_label, eff_model))
     }
+}
+
+/// Stream from Gemini 4 Web2API Gateway (`https://chenian233-gemini-web2api.hf.space/v1/chat/completions`).
+pub fn stream_gemweb2api<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "gemini-4-hydrogen"
+        | "gemini-4-hydrogen-thinking"
+        | "gemini-4-neon"
+        | "gemini-4-neon-thinking"
+        | "gemini-4-carbon"
+        | "gemini-3.7-flash"
+        | "gemini-3.6-flash"
+        | "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.1-pro"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => model.trim(),
+        _ => "gemini-4-hydrogen",
+    };
+    stream_gemini_web2api_endpoint(
+        "Gemini 4 Web2API",
+        "https://chenian233-gemini-web2api.hf.space/v1/chat/completions",
+        eff_model,
+        system,
+        messages,
+        cancel,
+        on_delta,
+    )
+}
+
+/// Stream from Pouluo Gemini 3.5 & 3.1 Pro Gateway (`https://pouluo-gemini-web2api.hf.space/v1/chat/completions`).
+pub fn stream_pouluogemini<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.1-pro"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => model.trim(),
+        _ => "gemini-3.5-flash",
+    };
+    stream_gemini_web2api_endpoint(
+        "Pouluo Gemini 3.5 & 3.1 Pro Gateway",
+        "https://pouluo-gemini-web2api.hf.space/v1/chat/completions",
+        eff_model,
+        system,
+        messages,
+        cancel,
+        on_delta,
+    )
+}
+
+/// Stream from Peijun Gemini 3.5 & 3.1 Pro Cloud (`https://peijun1-gemini-web2api.hf.space/v1/chat/completions`).
+pub fn stream_peijungemini<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.1-pro"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => model.trim(),
+        _ => "gemini-3.5-flash",
+    };
+    stream_gemini_web2api_endpoint(
+        "Peijun Gemini 3.5 & 3.1 Pro Cloud",
+        "https://peijun1-gemini-web2api.hf.space/v1/chat/completions",
+        eff_model,
+        system,
+        messages,
+        cancel,
+        on_delta,
+    )
 }
