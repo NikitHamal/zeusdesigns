@@ -884,55 +884,25 @@ function ServerTab() {
         )}
 
         <div className="flex flex-wrap gap-1.5 pt-1">
-          {OPENCODE_FEATURED_MODELS.map((m) => {
-            const on = selectedModel === m.id;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setSelectedModel(m.id)}
-                className={cn(
-                  "state rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                  on ? "bg-primary text-on-primary font-semibold" : "bg-surface-high text-on-surface-variant hover:text-on-surface"
-                )}
-              >
-                {m.label}
-              </button>
-            );
-          })}
+          {OPENCODE_FEATURED_MODELS.map((m) => (
+            <button key={m.id} onClick={() => setSelectedModel(m.id)} className={cn("state rounded-full px-3 py-1 text-xs font-medium transition-colors", selectedModel === m.id ? "bg-primary text-on-primary font-semibold" : "bg-surface-high text-on-surface-variant hover:text-on-surface")}>
+              {m.label}
+            </button>
+          ))}
         </div>
-
         <div className="flex items-center gap-2 pt-1">
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-high px-3 text-xs font-medium text-on-surface outline-none focus:border-primary"
-          >
+          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="h-9 min-w-0 flex-1 rounded-xl border border-outline-variant bg-surface-high px-3 text-xs font-medium text-on-surface outline-none focus:border-primary">
             <optgroup label="Featured OpenCode Aliases">
-              {OPENCODE_FEATURED_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label} · {m.provider} (zeusdesigns/{m.id})
-                </option>
-              ))}
+              {OPENCODE_FEATURED_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.provider} (zeusdesigns/{m.id})</option>)}
             </optgroup>
             {PROVIDERS.map((p) => (
               <optgroup key={p.id} label={`${p.name} (${p.speed})`}>
-                {p.models.map((m) => {
-                  const scoped = `${p.id}/${m.id}`;
-                  return (
-                    <option key={scoped} value={scoped}>
-                      {m.label} (zeusdesigns/{scoped})
-                    </option>
-                  );
-                })}
+                {p.models.map((m) => <option key={`${p.id}/${m.id}`} value={`${p.id}/${m.id}`}>{m.label} (zeusdesigns/{p.id}/{m.id})</option>)}
               </optgroup>
             ))}
           </select>
-          <button
-            onClick={() => copy(`zeusdesigns/${selectedModel}`, "OpenCode model ID")}
-            className="state flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-high px-3 font-mono text-xs font-medium text-on-surface"
-          >
-            <Icon name="content_copy" size={13} />
-            zeusdesigns/{selectedModel}
+          <button onClick={() => copy(`zeusdesigns/${selectedModel}`, "OpenCode model ID")} className="state flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-high px-3 font-mono text-xs font-medium text-on-surface">
+            <Icon name="content_copy" size={13} />zeusdesigns/{selectedModel}
           </button>
         </div>
 

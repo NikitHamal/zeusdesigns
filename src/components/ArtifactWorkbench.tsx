@@ -933,42 +933,22 @@ export function ArtifactWorkbench() {
               </div>
             )}
 
-            {/* Open-Slide Bottom Navigation & Speaker Notes Bar */}
             {deliverableKind === "deck" && slideDeck.slides.length > 0 && (
               <div className="flex shrink-0 flex-col gap-1.5 border-t border-outline-variant/60 bg-surface-low px-3.5 py-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => gotoSlide(activeSlideIdx - 1)}
-                      className="state grid size-7 place-items-center rounded-lg border border-outline-variant/60 bg-surface text-on-surface"
-                    >
-                      <Icon name="chevron_left" size={16} />
-                    </button>
-                    <span className="font-mono text-xs font-semibold text-on-surface">
-                      Slide {activeSlideIdx + 1} / {slideDeck.slides.length}
-                    </span>
-                    <button
-                      onClick={() => gotoSlide(activeSlideIdx + 1)}
-                      className="state grid size-7 place-items-center rounded-lg border border-outline-variant/60 bg-surface text-on-surface"
-                    >
-                      <Icon name="chevron_right" size={16} />
-                    </button>
-                    <span className="ml-2 truncate text-xs font-medium text-on-surface-variant">
-                      {slideDeck.slides[activeSlideIdx]?.headline}
-                    </span>
+                    <button onClick={() => gotoSlide(activeSlideIdx - 1)} className="state grid size-7 place-items-center rounded-lg border border-outline-variant/60 bg-surface text-on-surface"><Icon name="chevron_left" size={16} /></button>
+                    <span className="font-mono text-xs font-semibold text-on-surface">Slide {activeSlideIdx + 1} / {slideDeck.slides.length}</span>
+                    <button onClick={() => gotoSlide(activeSlideIdx + 1)} className="state grid size-7 place-items-center rounded-lg border border-outline-variant/60 bg-surface text-on-surface"><Icon name="chevron_right" size={16} /></button>
+                    <span className="ml-2 truncate text-xs font-medium text-on-surface-variant">{slideDeck.slides[activeSlideIdx]?.headline}</span>
                   </div>
-                  <button
-                    onClick={() => setShowNotes(!showNotes)}
-                    className="state inline-flex h-6 items-center gap-1 rounded-md border border-outline-variant/60 bg-surface px-2 text-[11px] font-medium text-on-surface-variant"
-                  >
-                    <Icon name="notes" size={13} />
-                    <span>{showNotes ? "Hide notes" : "Speaker notes"}</span>
+                  <button onClick={() => setShowNotes(!showNotes)} className="state inline-flex h-6 items-center gap-1 rounded-md border border-outline-variant/60 bg-surface px-2 text-[11px] font-medium text-on-surface-variant">
+                    <Icon name="notes" size={13} /><span>{showNotes ? "Hide notes" : "Speaker notes"}</span>
                   </button>
                 </div>
                 {showNotes && slideDeck.slides[activeSlideIdx]?.notes && (
                   <div className="rounded-lg border border-outline-variant/40 bg-surface px-3 py-1.5 text-xs text-on-surface-variant">
-                    <span className="font-mono text-[10.5px] font-semibold uppercase text-primary">Speaker Notes: </span>
-                    {slideDeck.slides[activeSlideIdx]?.notes}
+                    <span className="font-mono text-[10.5px] font-semibold uppercase text-primary">Speaker Notes: </span>{slideDeck.slides[activeSlideIdx]?.notes}
                   </div>
                 )}
               </div>

@@ -861,11 +861,7 @@ export function Inspector() {
                 <div className="mt-2 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <Num label="G" value={s.gap} onChange={(v) => editor.style({ gap: v + "px" })} />
-                    <select
-                      value={s.jc || "flex-start"}
-                      onChange={(e) => editor.style({ "justify-content": e.target.value })}
-                      className="h-8 rounded-xl bg-surface-high px-2 text-[11.5px] font-medium text-on-surface outline-none"
-                    >
+                    <select value={s.jc || "flex-start"} onChange={(e) => editor.style({ "justify-content": e.target.value })} className="h-8 rounded-xl bg-surface-high px-2 text-[11.5px] font-medium text-on-surface outline-none">
                       <option value="flex-start">Pack Start</option>
                       <option value="center">Center</option>
                       <option value="flex-end">Pack End</option>
@@ -873,22 +869,8 @@ export function Inspector() {
                     </select>
                   </div>
                   <div className="grid grid-cols-4 gap-1 rounded-xl bg-surface-low p-1">
-                    {([
-                      ["flex-start", "Align Start"],
-                      ["center", "Center"],
-                      ["flex-end", "End"],
-                      ["stretch", "Stretch"],
-                    ] as const).map(([val, lbl]) => (
-                      <button
-                        key={val}
-                        onClick={() => editor.style({ "align-items": val })}
-                        className={cn(
-                          "state h-6 rounded-lg text-[10.5px] font-semibold",
-                          s.ai === val ? "bg-surface-highest text-on-surface" : "text-on-surface-variant"
-                        )}
-                      >
-                        {lbl}
-                      </button>
+                    {([["flex-start", "Align Start"], ["center", "Center"], ["flex-end", "End"], ["stretch", "Stretch"]] as const).map(([val, lbl]) => (
+                      <button key={val} onClick={() => editor.style({ "align-items": val })} className={cn("state h-6 rounded-lg text-[10.5px] font-semibold", s.ai === val ? "bg-surface-highest text-on-surface" : "text-on-surface-variant")}>{lbl}</button>
                     ))}
                   </div>
                 </div>
@@ -974,19 +956,12 @@ export function Inspector() {
               </Section>
             )}
 
-            {/* Surface Fill & Design Tokens */}
             <Section title="Fill & System Tokens">
               <div className="space-y-2">
                 <Color label="Fill" value={s.bg} onChange={(c) => editor.style({ "background-color": c, "background-image": "none" })} onClear={() => editor.style({ "background-color": "transparent", "background-image": "none" })} />
                 <div className="flex flex-wrap gap-1">
                   {TOKEN_SWATCHES.map((t) => (
-                    <button
-                      key={t.val}
-                      onClick={() => editor.style({ "background-color": t.val, ...(t.val === "var(--primary)" ? { color: "var(--on-primary)" } : t.val === "var(--container)" ? { color: "var(--on-container)" } : {}) })}
-                      className="state rounded-full border border-outline-variant/60 bg-surface-low px-2 py-0.5 text-[10.5px] font-medium text-on-surface-variant hover:border-primary hover:text-on-surface"
-                    >
-                      {t.label}
-                    </button>
+                    <button key={t.val} onClick={() => editor.style({ "background-color": t.val, ...(t.val === "var(--primary)" ? { color: "var(--on-primary)" } : t.val === "var(--container)" ? { color: "var(--on-container)" } : {}) })} className="state rounded-full border border-outline-variant/60 bg-surface-low px-2 py-0.5 text-[10.5px] font-medium text-on-surface-variant hover:border-primary hover:text-on-surface">{t.label}</button>
                   ))}
                 </div>
                 <div className="flex h-8 items-center gap-3 rounded-xl bg-surface-high px-3 text-[12px] text-on-surface-variant">
@@ -996,8 +971,6 @@ export function Inspector() {
                 </div>
               </div>
             </Section>
-
-            {/* Border & Corner Radius */}
             <Section title="Corner Radius & Border">
               <div className="grid grid-cols-2 gap-2">
                 <Num label="R" value={s.br} max={999} onChange={(v) => editor.style({ "border-radius": v + "px" })} />
@@ -1005,13 +978,7 @@ export function Inspector() {
               </div>
               <div className="mt-1.5 flex gap-1">
                 {[0, 8, 14, 24, 999].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => editor.style({ "border-radius": r + "px" })}
-                    className="state flex-1 rounded-lg bg-surface-low py-1 text-[10.5px] font-semibold text-on-surface-variant hover:bg-surface-high hover:text-on-surface"
-                  >
-                    {r === 999 ? "Pill" : `${r}px`}
-                  </button>
+                  <button key={r} onClick={() => editor.style({ "border-radius": r + "px" })} className="state flex-1 rounded-lg bg-surface-low py-1 text-[10.5px] font-semibold text-on-surface-variant hover:bg-surface-high hover:text-on-surface">{r === 999 ? "Pill" : `${r}px`}</button>
                 ))}
               </div>
               {s.bw > 0 && <div className="mt-2"><Color label="Border" value={s.bc} onChange={(c) => editor.style({ "border-color": c })} /></div>}

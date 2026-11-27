@@ -354,3 +354,113 @@ pub fn extract_attr(header: &str, key: &str) -> Option<String> {
     }
     None
 }
+
+pub fn unpack_function_parameters(
+    inner: &str,
+    path_arg: &mut String,
+    start_line: &mut Option<usize>,
+    end_line: &mut Option<usize>,
+) -> String {
+    let mut body_out = String::new();
+    let mut saw_params = false;
+    let mut param_map = serde_json::Map::new();
+    for ptag in ["parameter", "param", "antml:parameter"] {
+        let p_open = format!("<{}", ptag);
+        let p_close = format!("</{}>", ptag);
+        let mut pfrom = 0;
+        while let Some(ps) = inner[pfrom..].find(&p_open) {
+            let pstart = pfrom + ps;
+            let prest = &inner[pstart..];
+            let Some(pgt) = prest.find('>') else { break };
+            let phead = &prest[p_open.len()..pgt];
+            if !phead.is_empty() && !phead.starts_with(char::is_whitespace) && !phead.starts_with('=') {
+                pfrom = pstart + pgt + 1;
+                continue;
+            }
+            let Some(pend) = prest.find(&p_close) else { break };
+            let pval = prest[pgt + 1..pend].trim_matches(|c| c == '\n' || c == '\r');
+            let pname = extract_attr(phead, "name")
+                .or_else(|| {
+                    phead
+                        .trim()
+                        .strip_prefix('=')
+                        .map(|s| s.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+                })
+                .unwrap_or_default();
+            saw_params = true;
+            if !pname.is_empty() {
+                param_map.insert(pname.clone(), Value::String(pval.to_string()));
+            }
+            if matches!(pname.as_str(), "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
+                *path_arg = pval.trim().to_string();
+            } else if pname == "start" {
+                *start_line = pval.trim().parse::<usize>().ok();
+            } else if pname == "end" {
+                *end_line = pval.trim().parse::<usize>().ok();
+            } else if matches!(
+                pname.as_str(),
+                "content" | "body" | "command" | "cmd" | "script" | "code" | "query" | "pattern" | "text" | "fact" | "value"
+            ) {
+                body_out = pval.to_string();
+            } else if body_out.is_empty() && path_arg.is_empty() {
+                body_out = pval.to_string();
+            }
+            pfrom = pstart + pend + p_close.len();
+        }
+    }
+    if !saw_params {
+        return inner.to_string();
+    }
+    let old_s = param_map
+        .get("old_string")
+        .or_else(|| param_map.get("oldString"))
+        .or_else(|| param_map.get("old_str"))
+        .or_else(|| param_map.get("search"))
+        .and_then(|v| v.as_str());
+    let new_s = param_map
+        .get("new_string")
+        .or_else(|| param_map.get("newString"))
+        .or_else(|| param_map.get("new_str"))
+        .or_else(|| param_map.get("replace"))
+        .and_then(|v| v.as_str());
+    if let (Some(o), Some(n)) = (old_s, new_s) {
+        let rep_all = param_map
+            .get("replace_all")
+            .and_then(|v| v.as_str())
+            .map(|s| s.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        return serde_json::json!({ "old_string": o, "new_string": n, "replace_all": rep_all }).to_string();
+    }
+    if param_map.contains_key("edits")
+        || param_map.contains_key("questions")
+        || param_map.contains_key("tasks")
+        || param_map.contains_key("plan")
+        || param_map.contains_key("source")
+        || param_map.contains_key("destination")
+        || param_map.contains_key("symbols")
+        || param_map.contains_key("append")
+        || param_map.contains_key("paths")
+        || param_map.contains_key("include")
+    {
+        if path_arg.is_empty() {
+            if let Some(p) = param_map
+                .get("path")
+                .or_else(|| param_map.get("source"))
+                .or_else(|| param_map.get("pattern"))
+                .or_else(|| param_map.get("query"))
+                .or_else(|| param_map.get("name"))
+                .and_then(|v| v.as_str())
+            {
+                *path_arg = p.to_string();
+            }
+        }
+        if let Some(off) = param_map.get("offset").and_then(|v| v.as_str()).and_then(|s| s.parse::<usize>().ok()) {
+            *start_line = Some(off);
+            if let Some(lim) = param_map.get("limit").and_then(|v| v.as_str()).and_then(|s| s.parse::<usize>().ok()) {
+                *end_line = Some(off + lim.saturating_sub(1));
+            }
+        }
+        return Value::Object(param_map).to_string();
+    }
+    body_out
+}

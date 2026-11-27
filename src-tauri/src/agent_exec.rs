@@ -900,12 +900,10 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
             }
         }
         "add_ui_kit" | "install_ui_kit" => {
-            let css_rel = "oro-ui/oro.css";
-            let js_rel = "oro-ui/oro.js";
-            let kit_css = ":root {\n  --surface: #141318;\n  --surface-low: #1c1b20;\n  --surface-high: #2b2930;\n  --on-surface: #e6e1e9;\n  --on-surface-variant: #cac4d0;\n  --primary: #d0bcff;\n  --on-primary: #381e72;\n  --outline-variant: #49454f;\n  --radius-md: 16px;\n  --radius-lg: 24px;\n}\n* { box-sizing: border-box; }\nbody { margin: 0; background: var(--surface); color: var(--on-surface); font-family: system-ui, sans-serif; }\n.oro-card { background: var(--surface-low); border: 1px solid var(--outline-variant); border-radius: var(--radius-lg); padding: 1.25rem; }\n.oro-btn { display: inline-flex; align-items: center; gap: 0.5rem; height: 2.5rem; padding: 0 1.25rem; border-radius: 9999px; border: none; background: var(--primary); color: var(--on-primary); font-weight: 600; cursor: pointer; }\n";
-            let kit_js = "window.OroUI = {\n  toggleTheme() {\n    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';\n    document.documentElement.dataset.theme = next;\n    try { localStorage.setItem('oro-theme', next); } catch {}\n  }\n};\n";
-            let _ = fs_write(eff_root.clone(), css_rel.to_string(), kit_css.to_string());
-            let _ = fs_write(eff_root.clone(), js_rel.to_string(), kit_js.to_string());
+            let kit_css = ":root { --surface: #141318; --surface-low: #1c1b20; --surface-high: #2b2930; --on-surface: #e6e1e9; --primary: #d0bcff; --on-primary: #381e72; --outline-variant: #49454f; }\n* { box-sizing: border-box; }\nbody { margin: 0; background: var(--surface); color: var(--on-surface); font-family: system-ui, sans-serif; }\n";
+            let kit_js = "window.OroUI = { toggleTheme() { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; } };\n";
+            let _ = fs_write(eff_root.clone(), "oro-ui/oro.css".to_string(), kit_css.to_string());
+            let _ = fs_write(eff_root.clone(), "oro-ui/oro.js".to_string(), kit_js.to_string());
             (true, "Installed UI kit:\n- oro-ui/oro.css\n- oro-ui/oro.js".to_string())
         }
         "subagent" | "spawn_subagent" | "task" => {

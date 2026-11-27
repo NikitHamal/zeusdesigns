@@ -5053,7 +5053,7 @@ where
         prompt.push_str("[Thinking Mode Enabled]: Begin your response with a concise <think>...</think> reasoning block analyzing the request, then provide your final answer after </think>.\n\n");
     }
     if !system.trim().is_empty() {
-        let sys_safe = smart_cap_system(system, 20000);
+        let sys_safe = smart_cap_system(system, 96000);
         prompt.push_str(&format!("[System instruction]: {}\n\n", sys_safe));
     }
     if messages.len() > 1 {
@@ -9006,7 +9006,7 @@ where
     let client = build_client(45)?;
     let pub_key = ["sb", "publishable", "ebGg9D2f0dOdhh32BJx83g", "IoXOtrHB"].join("_");
 
-    for &(max_turns, older_chars, last_chars, sys_chars) in &[(8usize, 2000usize, 10000usize, 9500usize), (4, 1000, 5000, 5000)] {
+    for &(max_turns, older_chars, last_chars, sys_chars) in &[(48usize, 32000usize, 120000usize, 96000usize), (16, 12000, 48000, 32000)] {
         let norm_msgs = normalize_multi_turn_messages(messages, max_turns, older_chars, last_chars);
         let mut oai_msgs = Vec::new();
         if !system.trim().is_empty() {

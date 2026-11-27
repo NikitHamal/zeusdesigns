@@ -886,71 +886,36 @@ export function InfiniteCanvas() {
           {ctxMenu.boardId ? (
             <>
               <MenuItem icon={<Icon name="ads_click" size={15} />} label="Edit elements & layers" desc="Enter" onClick={() => {
-                const st = useStore.getState();
-                const b = st.artboards.find((a) => a.id === ctxMenu.boardId);
-                if (b && !b.loading) {
-                  useEditor.getState().begin(b.id, b.html, "design");
-                  useEditor.getState().setInsertOpen(true);
-                  st.patchUI({ editId: b.id, interactId: null });
-                  setTimeout(() => canvasApi.fit([b.id], { right: 310 }), 40);
-                }
+                const st = useStore.getState(), b = st.artboards.find((a) => a.id === ctxMenu.boardId);
+                if (b && !b.loading) { useEditor.getState().begin(b.id, b.html, "design"); useEditor.getState().setInsertOpen(true); st.patchUI({ editId: b.id, interactId: null }); setTimeout(() => canvasApi.fit([b.id], { right: 310 }), 40); }
                 setCtxMenu(null);
               }} />
               <MenuItem icon={<Icon name="add" size={15} />} label="Insert UI component" desc="I" onClick={() => {
-                const st = useStore.getState();
-                const b = st.artboards.find((a) => a.id === ctxMenu.boardId);
-                if (b && !b.loading) {
-                  useEditor.getState().begin(b.id, b.html, "insert");
-                  useEditor.getState().setInsertOpen(true);
-                  st.patchUI({ editId: b.id, interactId: null });
-                }
+                const st = useStore.getState(), b = st.artboards.find((a) => a.id === ctxMenu.boardId);
+                if (b && !b.loading) { useEditor.getState().begin(b.id, b.html, "insert"); useEditor.getState().setInsertOpen(true); st.patchUI({ editId: b.id, interactId: null }); }
                 setCtxMenu(null);
               }} />
-              <MenuItem icon={<Icon name="touch_app" size={15} />} label="Interact live preview" onClick={() => {
-                useStore.getState().patchUI({ interactId: ctxMenu.boardId, editId: null });
-                setCtxMenu(null);
-              }} />
-              <MenuItem icon={<Icon name="content_copy" size={15} />} label="Duplicate as variant" desc="Ctrl+D" onClick={() => {
-                useStore.getState().duplicateArtboard(ctxMenu.boardId!);
-                setCtxMenu(null);
-              }} />
-              <MenuItem icon={<Icon name="delete" size={15} />} danger label="Delete screen" desc="Del" onClick={() => {
-                useStore.getState().removeArtboards([ctxMenu.boardId!]);
-                setCtxMenu(null);
-              }} />
+              <MenuItem icon={<Icon name="touch_app" size={15} />} label="Interact live preview" onClick={() => { useStore.getState().patchUI({ interactId: ctxMenu.boardId, editId: null }); setCtxMenu(null); }} />
+              <MenuItem icon={<Icon name="content_copy" size={15} />} label="Duplicate as variant" desc="Ctrl+D" onClick={() => { useStore.getState().duplicateArtboard(ctxMenu.boardId!); setCtxMenu(null); }} />
+              <MenuItem icon={<Icon name="delete" size={15} />} danger label="Delete screen" desc="Del" onClick={() => { useStore.getState().removeArtboards([ctxMenu.boardId!]); setCtxMenu(null); }} />
             </>
           ) : (
             <>
               <MenuLabel>Canvas</MenuLabel>
               <MenuItem icon={<Icon name="smartphone" size={15} />} label="New Mobile Frame" desc="390×844" onClick={() => {
-                const st = useStore.getState();
-                const ab = st.addBlankFrame(ctxMenu.wx - 195, ctxMenu.wy - 100, 390, 844);
+                const st = useStore.getState(), ab = st.addBlankFrame(ctxMenu.wx - 195, ctxMenu.wy - 100, 390, 844);
                 st.updateArtboard(ab.id, { device: "mobile", name: "Mobile Frame" });
-                st.setSel([ab.id]);
-                useEditor.getState().begin(ab.id, ab.html, "insert");
-                useEditor.getState().setInsertOpen(true);
-                st.patchUI({ editId: ab.id, interactId: null });
-                setCtxMenu(null);
+                st.setSel([ab.id]); useEditor.getState().begin(ab.id, ab.html, "insert"); useEditor.getState().setInsertOpen(true);
+                st.patchUI({ editId: ab.id, interactId: null }); setCtxMenu(null);
               }} />
               <MenuItem icon={<Icon name="desktop_windows" size={15} />} label="New Web Frame" desc="1280×800" onClick={() => {
-                const st = useStore.getState();
-                const ab = st.addBlankFrame(ctxMenu.wx - 640, ctxMenu.wy - 100, 1280, 800);
+                const st = useStore.getState(), ab = st.addBlankFrame(ctxMenu.wx - 640, ctxMenu.wy - 100, 1280, 800);
                 st.updateArtboard(ab.id, { device: "web", name: "Web Frame" });
-                st.setSel([ab.id]);
-                useEditor.getState().begin(ab.id, ab.html, "insert");
-                useEditor.getState().setInsertOpen(true);
-                st.patchUI({ editId: ab.id, interactId: null });
-                setCtxMenu(null);
+                st.setSel([ab.id]); useEditor.getState().begin(ab.id, ab.html, "insert"); useEditor.getState().setInsertOpen(true);
+                st.patchUI({ editId: ab.id, interactId: null }); setCtxMenu(null);
               }} />
-              <MenuItem icon={<Icon name="widgets" size={15} />} label="Open Component Studio" desc="I" onClick={() => {
-                useEditor.getState().setTab("insert");
-                useEditor.getState().setInsertOpen(true);
-                setCtxMenu(null);
-              }} />
-              <MenuItem icon={<Icon name="fit_screen" size={15} />} label="Fit all screens" desc="1" onClick={() => {
-                canvasApi.fit();
-                setCtxMenu(null);
-              }} />
+              <MenuItem icon={<Icon name="widgets" size={15} />} label="Open Component Studio" desc="I" onClick={() => { useEditor.getState().setTab("insert"); useEditor.getState().setInsertOpen(true); setCtxMenu(null); }} />
+              <MenuItem icon={<Icon name="fit_screen" size={15} />} label="Fit all screens" desc="1" onClick={() => { canvasApi.fit(); setCtxMenu(null); }} />
             </>
           )}
         </div>
@@ -961,61 +926,38 @@ export function InfiniteCanvas() {
   );
 }
 
-/* Figma-style alignment & distribution toolbar when 2+ items are selected on the canvas */
 function SelectionAlignBar() {
   const sel = useStore((s) => s.sel);
   const pageId = useStore((s) => s.activePageId);
   const boards = useStore((s) => s.artboards);
   const els = useStore((s) => s.elements);
-  const items = [
-    ...boards.filter((a) => a.pageId === pageId && sel.includes(a.id)),
-    ...els.filter((e) => e.pageId === pageId && sel.includes(e.id)),
-  ];
+  const items = [...boards.filter((a) => a.pageId === pageId && sel.includes(a.id)), ...els.filter((e) => e.pageId === pageId && sel.includes(e.id))];
   if (items.length < 2) return null;
-
   const applyAlign = (mode: "left" | "center" | "right" | "top" | "middle" | "bottom" | "distribute") => {
-    const minX = Math.min(...items.map((i) => i.x));
-    const maxX = Math.max(...items.map((i) => i.x + i.w));
-    const minY = Math.min(...items.map((i) => i.y));
-    const maxY = Math.max(...items.map((i) => i.y + i.h));
-    const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
-
+    const minX = Math.min(...items.map((i) => i.x)), maxX = Math.max(...items.map((i) => i.x + i.w));
+    const minY = Math.min(...items.map((i) => i.y)), maxY = Math.max(...items.map((i) => i.y + i.h));
+    const midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
     const posMap = new Map<string, { x: number; y: number }>();
     if (mode === "distribute") {
-      const sorted = [...items].sort((a, b) => a.x - b.x);
       let cursor = minX;
-      for (const it of sorted) {
+      for (const it of [...items].sort((a, b) => a.x - b.x)) {
         posMap.set(it.id, { x: Math.round(cursor), y: Math.round(minY) });
         cursor += it.w + 80;
       }
     } else {
       for (const it of items) {
-        const x =
-          mode === "left" ? minX
-            : mode === "center" ? Math.round(midX - it.w / 2)
-              : mode === "right" ? maxX - it.w
-                : it.x;
-        const y =
-          mode === "top" ? minY
-            : mode === "middle" ? Math.round(midY - it.h / 2)
-              : mode === "bottom" ? maxY - it.h
-                : it.y;
+        const x = mode === "left" ? minX : mode === "center" ? Math.round(midX - it.w / 2) : mode === "right" ? maxX - it.w : it.x;
+        const y = mode === "top" ? minY : mode === "middle" ? Math.round(midY - it.h / 2) : mode === "bottom" ? maxY - it.h : it.y;
         posMap.set(it.id, { x, y });
       }
     }
-
     useStore.setState((s) => ({
       artboards: s.artboards.map((a) => (posMap.has(a.id) ? { ...a, ...posMap.get(a.id)! } : a)),
       elements: s.elements.map((e) => (posMap.has(e.id) ? { ...e, ...posMap.get(e.id)! } : e)),
     }));
   };
-
   return (
-    <div
-      onPointerDown={(e) => e.stopPropagation()}
-      className="anim-pop pointer-events-auto absolute left-1/2 top-16 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-outline-variant bg-surface-container px-2.5 py-1"
-    >
+    <div onPointerDown={(e) => e.stopPropagation()} className="anim-pop pointer-events-auto absolute left-1/2 top-16 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-outline-variant bg-surface-container px-2.5 py-1">
       <span className="px-1.5 text-xs font-semibold text-on-surface-variant">{items.length} selected</span>
       <span className="mx-0.5 h-4 w-px bg-outline-variant" />
       <IconBtn label="Align left" size={28} onClick={() => applyAlign("left")}><Icon name="format_align_left" size={15} /></IconBtn>
@@ -1026,9 +968,7 @@ function SelectionAlignBar() {
       <IconBtn label="Align middle" size={28} onClick={() => applyAlign("middle")}><Icon name="vertical_align_center" size={15} /></IconBtn>
       <IconBtn label="Align bottom" size={28} onClick={() => applyAlign("bottom")}><Icon name="vertical_align_bottom" size={15} /></IconBtn>
       <span className="mx-0.5 h-4 w-px bg-outline-variant" />
-      <button onClick={() => applyAlign("distribute")} className="state rounded-full bg-surface-high px-2.5 py-1 text-[11px] font-semibold text-on-surface">
-        Tidy row
-      </button>
+      <button onClick={() => applyAlign("distribute")} className="state rounded-full bg-surface-high px-2.5 py-1 text-[11px] font-semibold text-on-surface">Tidy row</button>
     </div>
   );
 }
