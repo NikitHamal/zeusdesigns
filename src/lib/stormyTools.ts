@@ -462,3 +462,153 @@ export function cleanDisplayText(text: string): string {
     })
     .join("`");
 }
+
+function canonToolName(name: string): string {
+  const clean = name.trim().toLowerCase().split(".").pop() ?? name.trim().toLowerCase();
+  return NAME_ALIASES[clean] ?? clean;
+}
+
+export function formatRoundToolsForHistory(roundTools: ToolCall[], usesNativeProtocol: boolean): string {
+  return roundTools
+    .map((t) => {
+      let p = "";
+      let b = "";
+      let parsedObj: Record<string, unknown> | null = null;
+      try {
+        const parsed = JSON.parse(t.args ?? "{}");
+        if (parsed && typeof parsed === "object") parsedObj = parsed as Record<string, unknown>;
+        p = parsed.path ?? "";
+        b =
+          typeof parsed.body === "string" && Object.keys(parsed).every((k) => k === "path" || k === "body")
+            ? parsed.body
+            : JSON.stringify(parsed);
+      } catch {
+        b = t.args ?? "";
+      }
+      if (!usesNativeProtocol) {
+        return `<zeus_tool name="${t.name}"${p ? ` path="${p}"` : ""}>${b}</zeus_tool>`;
+      }
+      const canonName = canonToolName(t.name);
+      let argsPayload: Record<string, unknown>;
+      if (b.startsWith("{") && b.endsWith("}")) {
+        try {
+          const inner = JSON.parse(b) as Record<string, unknown>;
+          argsPayload = { ...(p && !inner.path ? { path: p } : {}), ...inner };
+        } catch {
+          argsPayload = parsedObj ?? { ...(p ? { path: p } : {}), ...(b ? { body: b } : {}) };
+        }
+      } else if (canonName === "run_command" || t.name === "shell" || t.name === "bash") {
+        argsPayload = { command: b || p };
+      } else if (canonName === "python") {
+        argsPayload = { code: b || p };
+      } else if (canonName === "write_file") {
+        argsPayload = { path: p, content: b };
+      } else if (canonName === "read_file") {
+        argsPayload = {
+          path: p || b,
+          ...(parsedObj?.start ? { start: parsedObj.start } : {}),
+          ...(parsedObj?.end ? { end: parsedObj.end } : {}),
+        };
+      } else if (canonName === "grep") {
+        argsPayload =
+          t.name === "search_code"
+            ? { query: b || p, ...(b && p ? { path: p } : {}) }
+            : { pattern: b || p, ...(b && p ? { path: p } : {}) };
+      } else if (canonName === "glob") {
+        argsPayload = { pattern: b || p, ...(b && p ? { path: p } : {}) };
+      } else if (canonName === "search_project" || canonName === "docs_lookup" || canonName === "memory_search") {
+        argsPayload = { query: b || p, ...(b && p ? { path: p } : {}) };
+      } else if (canonName === "memory_save" || canonName === "memory_edit") {
+        argsPayload = { ...(p ? { path: p } : {}), content: b };
+      } else if (canonName === "web_fetch") {
+        argsPayload = { url: p || b };
+      } else if (canonName === "use_skill") {
+        argsPayload = { name: p || b };
+      } else {
+        argsPayload = { ...(p ? { path: p } : {}), ...(b ? { content: b } : {}) };
+      }
+      return `<tool_call>${JSON.stringify({ name: t.name, arguments: argsPayload })}</tool_call>`;
+    })
+    .join("\n");
+}
+
+export function summarizeRunLedgerDropped(dropped: Array<{ role: string; content: string }>, maxChars = 3000): string {
+  const changed = new Map<string, Set<string>>();
+  const read = new Set<string>();
+  const ran = new Set<string>();
+  const failures: string[] = [];
+  let steps = 0;
+
+  const recordTool = (rawName: string, path: string) => {
+    const name = canonToolName(rawName);
+    if (!name) return;
+    if (["write_file", "edit_file", "multi_edit", "delete_file", "move_file"].includes(name) && path) {
+      const set = changed.get(path) ?? new Set<string>();
+      set.add(name.replace("_file", ""));
+      changed.set(path, set);
+    } else if (["read_file", "list_files", "glob", "grep", "search_project"].includes(name) && path) {
+      read.add(path);
+    } else {
+      ran.add(name);
+    }
+  };
+
+  for (const m of dropped) {
+    if (m.role === "assistant") {
+      steps++;
+      for (const match of m.content.matchAll(/<zeus_tool\s+name="([^"]+)"(?:\s+path="([^"]*)")?[^>]*>/gi)) {
+        recordTool(match[1], (match[2] ?? "").trim());
+      }
+      for (const match of m.content.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)) {
+        try {
+          const j = JSON.parse(match[1]);
+          const args = (j.arguments ?? {}) as Record<string, unknown>;
+          recordTool(String(j.name ?? ""), String(args.path ?? args.file ?? "").trim());
+        } catch {
+          /* ignore */
+        }
+      }
+    } else if (m.role === "user" && m.content.includes('ok="false"')) {
+      const errMatch = /<tool_result\s+name="([^"]+)"\s+ok="false">\s*([^\n<]+)/i.exec(m.content);
+      if (errMatch) failures.push(`${errMatch[1]}: ${errMatch[2].trim().slice(0, 90)}`);
+    }
+  }
+
+  const parts: string[] = [`[Earlier in this run (${steps} step${steps === 1 ? "" : "s"} folded into RunLedger):`];
+  if (changed.size > 0) {
+    const items = [...changed.entries()].slice(0, 15).map(([p, verbs]) => `${p} (${[...verbs].join("+")})`);
+    parts.push(`- Changed files: ${items.join(", ")}`);
+  }
+  if (read.size > 0) parts.push(`- Read/searched: ${[...read].slice(0, 15).join(", ")}`);
+  if (ran.size > 0) parts.push(`- Executed tools: ${[...ran].slice(0, 10).join(", ")}`);
+  if (failures.length > 0) parts.push(`- Resolved earlier errors: ${failures.slice(-3).join("; ")}`);
+  parts.push("Continue from the newest steps below; re-read a file before editing it if needed.]");
+  return parts.join("\n").slice(0, maxChars);
+}
+
+export function compactLargeAssistantArguments(content: string, maxArgChars = 3000): string {
+  return content
+    .replace(
+      /(<zeus_tool\s+name="(?:write_file|edit_file)"[^>]*>)([\s\S]*?)(<\/zeus_tool>)/gi,
+      (_all, openTag: string, body: string, closeTag: string) =>
+        body.length > maxArgChars ? `${openTag}[file content omitted (${body.split("\n").length} lines)]${closeTag}` : _all
+    )
+    .replace(/(<tool_call>)([\s\S]*?)(<\/tool_call>)/gi, (all, openTag: string, body: string, closeTag: string) => {
+      if (body.length <= maxArgChars) return all;
+      try {
+        const j = JSON.parse(body);
+        const name = canonToolName(String(j.name ?? ""));
+        if (name === "write_file" || name === "edit_file" || name === "multi_edit") {
+          const args = (j.arguments ?? {}) as Record<string, unknown>;
+          const path = String(args.path ?? args.file ?? "");
+          return `${openTag}${JSON.stringify({
+            name: j.name,
+            arguments: { path, note: `[file content omitted (${body.split("\n").length} lines)]` },
+          })}${closeTag}`;
+        }
+      } catch {
+        /* keep original */
+      }
+      return all;
+    });
+}

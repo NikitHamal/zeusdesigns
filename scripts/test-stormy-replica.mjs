@@ -137,4 +137,46 @@ assert.ok(
 );
 void mixedTurnSample;
 console.log("[PASS] 6. Behavioral parser & wave execution safeguards verified");
+
+// 7. Verify TS/Rust NATIVE_OPENAI_TOOLS_PROVIDERS vs supports_native_oai_tools alignment & multiline JSON edit_file safety
+const codingHarnessTs = fs.readFileSync(path.join(process.cwd(), "src/lib/codingHarness.ts"), "utf8");
+const providersOaiARs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_oai_a.rs"), "utf8");
+const providersOaiBRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_oai_b.rs"), "utf8");
+const providersBaseRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers.rs"), "utf8");
+const agentEditRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_edit.rs"), "utf8");
+const stormyToolsTs = fs.readFileSync(path.join(process.cwd(), "src/lib/stormyTools.ts"), "utf8");
+
+assert.ok(
+  providersBaseRs.includes('system.contains("## Agent Tools")'),
+  "is_agent_tool_request must match uppercase '## Agent Tools'"
+);
+assert.ok(
+  providersOaiARs.includes('endpoint.contains("w902287-firebase-gemini-proxy")') &&
+    providersOaiARs.includes('endpoint.contains("opencode.ai/zen")') &&
+    providersOaiARs.includes('endpoint.contains("api.kilo.ai")') &&
+    providersOaiARs.includes('endpoint.contains("blockrun.ai")') &&
+    providersOaiARs.includes('endpoint.contains("api.llm7.io")') &&
+    providersOaiARs.includes('endpoint.contains("lolmaobruhhh-test")'),
+  "supports_native_oai_tools in providers_oai_a.rs must match all native OpenAI tool providers"
+);
+for (const scraperOrGguf of ["gemini4hydrogen", "hfcluster", "gemma4pro", "frontierlab", "liquidai", "koboldcloud", "bonsaicloud", "unslothcloud"]) {
+  assert.ok(
+    !codingHarnessTs.includes(`"${scraperOrGguf}"`),
+    `${scraperOrGguf} should use scraper_xml_dsl rather than NATIVE_OPENAI_TOOLS_PROVIDERS`
+  );
+}
+assert.ok(
+  !providersOaiBRs.includes("smart_cap_system(system, 24000)"),
+  "providers_oai_b.rs must not cap system prompt at 24,000 chars"
+);
+assert.ok(
+  agentEditRs.includes("if raw_trimmed.starts_with('{') && raw_trimmed.ends_with('}')"),
+  "apply_search_replace must parse JSON edit_file arguments before newline unescaping"
+);
+assert.ok(
+  stormyToolsTs.includes("export function formatRoundToolsForHistory") &&
+    engineTs.includes("formatRoundToolsForHistory(roundTools, usesNativeProtocol)"),
+  "engine.ts must serialize Round-2+ tool calls as <tool_call> for native tool providers"
+);
+console.log("[PASS] 7. TS/Rust native tool protocol alignment, multiline JSON edit_file, and Round-2 <tool_call> history verified");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");

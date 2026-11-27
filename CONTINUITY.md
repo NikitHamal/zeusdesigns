@@ -2,7 +2,24 @@
 
 Running log across agent sessions. Newest session first. Rules live in `AGENTS.md`.
 
-## Session 28 (Latest — Coding Harness Architecture Overhaul & Sub-1,000-Line Full-Stack Modularization)
+## Session 29 (Latest — TS/Rust Native Tool Protocol Alignment, Multiline JSON `edit_file` Fix & Round-2 `<tool_call>` History)
+Goal: Resolve the TypeScript/Rust tool protocol mismatch across all native OpenAI/Anthropic and scraper/GGUF providers, fix `is_agent_tool_request` header matching, fix multiline JSON `edit_file` corruption, unify Round-2 `<tool_call>` history serialization, and preserve multi-turn coding tool history across turns while keeping all files `<= 1,000` lines and memory `< 20 MB`.
+
+Shipped:
+1. **Aligned `NATIVE_OPENAI_TOOLS_PROVIDERS` (`codingHarness.ts`) with `supports_native_oai_tools` (`providers_oai_a.rs`) & Fixed `is_agent_tool_request` (`providers.rs`)**:
+   - Expanded `is_agent_tool_request(system)` in `src-tauri/src/providers.rs` to match `"## Agent Tools"`, `"## Agent tools"`, `"## Calling Tools"`, `"## Local Workspace Agent Tools"`, and `"<zeus_tool"`, fixing a case-sensitivity bug where native tool providers emitting `"## Agent Tools (Native Function Calling)"` were not recognized as agent tool requests.
+   - Expanded `supports_native_oai_tools` in `src-tauri/src/providers_oai_a.rs` to match `w902287-firebase-gemini-proxy` (`antigravity`), `opencode.ai/zen` (`opencodezen`), `api.kilo.ai` (`kilo`), `blockrun.ai` (`blockrun`), `oai.endpoints.kepler.ai.cloud.ovh.net` (`ovhcloud`), `api.llm7.io` (`llm7`), `lolmaobruhhh-test` (`together2api`), `mychat-ai.cloud` (`mychatcloud`), and `vdspcxotxhxfjowqndix.supabase.co` (`supavip`), and added automatic HTTP 400/404/422/500 XML DSL retry fallback if an upstream model rejects the `tools` parameter.
+   - Removed web-scraper and GGUF llama.cpp/koboldcpp providers (`gemini4hydrogen`, `hfcluster`, `gemma4pro`, `frontierlab`, `liquidai`, `koboldcloud`, `bonsaicloud`, `unslothcloud`) from `NATIVE_OPENAI_TOOLS_PROVIDERS` in `src/lib/codingHarness.ts` so they consistently receive `<zeus_tool>` XML DSL instructions matching their backend transport.
+   - Removed duplicate `include!(...)` statements at the end of `src-tauri/src/providers.rs` and raised remaining `24,000`-char system caps in `providers_oai_b.rs`, `providers_gateways_a.rs`, `providers_gateways_b.rs`, and `providers_neb_b.rs` to `120,000` chars.
+2. **Fixed Multiline JSON `edit_file` Corruption & `glob`/`grep` Subpath Handling (`src-tauri/src/agent_edit.rs`, `src-tauri/src/agent_exec.rs`, `src-tauri/src/agent.rs`, `src-tauri/src/providers_oai_a.rs`)**:
+   - Fixed `apply_search_replace` in `src-tauri/src/agent_edit.rs` so JSON `edit_file` payloads (`{"old_string": "...", "new_string": "..."}`) are parsed with `serde_json` before `body.replace("\\n", "\n")` runs, preventing multiline JSON strings from failing JSON parse and falling through to whole-file overwrite.
+   - Fixed `glob` and `grep`/`search_code` in `src-tauri/src/agent_exec.rs` so passing both `pattern`/`query` and `path` scopes the search to the subdirectory instead of overwriting `pattern` with `path`.
+   - Synced `build_native_oai_agent_tools` (`providers_oai_a.rs`) and `STORMY_TOOLS_LIST` (`stormyTools.ts`) so `python(code/script)`, `read_file(start/end/offset/limit/paths)`, `write_file(append)`, `list_dir`/`list_files`, `copy_file`, `create_folder`, `insert_at_line`, `get_file_info`, `diff_files`, `docs_lookup`, `use_skill`, `spawn_subagent`, `security_scan`, and `lmfingerprint` match 1-to-1.
+3. **Canonical Round-2 `<tool_call>` Serialization & Multi-Turn Coding Tool Ledger (`src/lib/engine.ts`, `src/lib/stormyTools.ts`, `src/lib/stormyAgent.ts`, `src/lib/agent.ts`, `src-tauri/src/server_oc_session.rs`)**:
+   - Added `formatRoundToolsForHistory` in `src/lib/stormyTools.ts` and wired it into `src/lib/engine.ts` so native `openai_tools` and `anthropic_tool_use` models receive `<tool_call>{"name": "...", "arguments": {...}}</tool_call>` with canonical parameter keys (`command`, `code`, `content`, `old_string`/`new_string`, `query`, `pattern`) in Round 2+ history instead of `<zeus_tool>`.
+   - Updated `buildPlainContext` in `src/lib/agent.ts` to include a compact tool execution ledger and recent tool outputs on assistant turns so Turn 2+ coding follow-ups retain full visibility of files read and commands executed in Turn 1.
+
+## Session 28 (Coding Harness Architecture Overhaul & Sub-1,000-Line Full-Stack Modularization)
 Goal: Permanently fix the 5 root causes of coding agent failures across `engine.ts`, `tools.ts`, `agent.ts`, `stormyAgent.ts`, `agent.rs`, and `providers.rs`, and refactor every file over 1,000 lines across both TypeScript and Rust below 1,000 lines while keeping memory strictly below 20 MB.
 
 Shipped:

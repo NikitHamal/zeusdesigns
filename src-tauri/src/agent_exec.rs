@@ -44,32 +44,17 @@ pub fn format_exec_result(v: &Value) -> (bool, String) {
         parts.push(stdout.to_string());
     }
     if !stderr.is_empty() {
-        parts.push(if stdout.is_empty() {
-            stderr.to_string()
-        } else {
-            format!("[stderr]\n{}", stderr)
-        });
+        parts.push(if stdout.is_empty() { stderr.to_string() } else { format!("[stderr]\n{}", stderr) });
     }
     if code != 0 {
         parts.push(format!("[exit code: {}]", code));
         if let Some(sh) = v.get("shell").and_then(|s| s.as_str()) {
             let cwd = v.get("cwd").and_then(|s| s.as_str()).unwrap_or("");
-            parts.push(format!(
-                "[shell: {}{}]",
-                sh,
-                if cwd.is_empty() {
-                    String::new()
-                } else {
-                    format!(", cwd: {}", cwd)
-                }
-            ));
+            let cwd_part = if cwd.is_empty() { String::new() } else { format!(", cwd: {}", cwd) };
+            parts.push(format!("[shell: {}{}]", sh, cwd_part));
         }
     }
-    let text = if parts.is_empty() {
-        format!("[exit {}] (no output)", code)
-    } else {
-        parts.join("\n")
-    };
+    let text = if parts.is_empty() { format!("[exit {}] (no output)", code) } else { parts.join("\n") };
     (code == 0, text)
 }
 /// Appends Stormy's `ProjectTools.withQuickCheck` note when a file write/edit introduces syntax or asset issues.
@@ -989,31 +974,17 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     true,
                     format!(
                         "[LMFingerprint Verification Report]\nProvider: {}\nRequested Model: {}\nClaimed Family: {}\nDetected Family: {}\nUpstream Endpoint: {}\nUpstream Reported Model: {}\nProtocol Signature: {}\nVerdict: {} ({})\nCanary (17*23=391): {}\nNative Reasoning: {}\nLatency: {} ms ({} tok/s)\nFingerprint Hash: {}\nSelf-Report: {}\nSummary: {}",
-                        rep.provider,
-                        rep.requested_model,
-                        rep.claimed_family,
-                        rep.detected_family,
-                        rep.upstream_endpoint,
-                        rep.upstream_reported_model,
-                        rep.protocol_signature,
-                        rep.verdict,
-                        rep.verdict_label,
-                        if rep.canary_passed { "PASS" } else { "PARTIAL" },
-                        if rep.has_native_reasoning { "YES" } else { "NO" },
-                        rep.latency_ms,
-                        rep.tokens_per_sec,
-                        rep.fingerprint_hash,
-                        rep.self_report,
-                        rep.explanation
+                        rep.provider, rep.requested_model, rep.claimed_family, rep.detected_family,
+                        rep.upstream_endpoint, rep.upstream_reported_model, rep.protocol_signature,
+                        rep.verdict, rep.verdict_label, if rep.canary_passed { "PASS" } else { "PARTIAL" },
+                        if rep.has_native_reasoning { "YES" } else { "NO" }, rep.latency_ms, rep.tokens_per_sec,
+                        rep.fingerprint_hash, rep.self_report, rep.explanation
                     ),
                 ),
                 Err(e) => (false, format!("LMFingerprint probe error: {}", e)),
             }
         }
-        other if other.starts_with("mcp:") => {
-            let reg = crate::mcp::McpRegistry::default();
-            reg.invoke_tool(other, body)
-        }
+        other if other.starts_with("mcp:") => crate::mcp::McpRegistry::default().invoke_tool(other, body),
         _ => (
             false,
             format!(

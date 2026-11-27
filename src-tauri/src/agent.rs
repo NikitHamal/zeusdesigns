@@ -181,81 +181,63 @@ pub struct InlineToolInvocation {
     pub body: String,
     pub offset: usize,
 }
+fn has_structured_tool_keys(j: &Value) -> bool {
+    [
+        "edits", "old_string", "oldString", "old_str", "old_content", "search", "source", "destination",
+        "old_path", "new_path", "from", "to", "path1", "path2", "paths", "questions", "question",
+        "tasks", "plan", "todos", "steps", "symbols", "depth", "append", "limit", "line",
+        "replacement", "agent_type",
+    ]
+    .iter()
+    .any(|k| j.get(k).is_some())
+}
 pub fn is_known_valid_tool(name: &str) -> bool {
     matches!(
         name,
         "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" | "read_file_lines"
             | "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "append_file" | "sync_artboard"
-            | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink"
-            | "move_file" | "rename_file" | "mv"
+            | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink" | "move_file" | "rename_file" | "mv"
             | "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" | "str_replace_editor"
-            | "multi_edit" | "multiedit" | "multi_edit_file"
-            | "search_code" | "grep" | "rg" | "search" | "search_files" | "ripgrep" | "find_in_files"
-            | "search_project" | "docs_lookup"
-            | "list_dir" | "ls" | "dir" | "list_files" | "list_directory" | "print_tree" | "tree"
-            | "glob" | "find_files"
-            | "check_syntax" | "audit_project" | "review_project" | "lint_project"
-            | "update_plan" | "todowrite" | "todo_write"
-            | "ask_user" | "ask" | "question"
-            | "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run"
-            | "python" | "python3" | "py" | "python_exec" | "run_python"
-            | "web_fetch" | "fetch" | "curl" | "webfetch"
-            | "memory" | "memory_search" | "memory_list" | "memory_get" | "memory_read" | "recall_memory"
-            | "memory_save" | "save_memory" | "memory_add" | "memory_set"
-            | "memory_edit" | "memory_update"
-            | "memory_delete" | "memory_remove" | "memory_forget"
-            | "load_skill" | "use_skill" | "get_skill" | "read_skill" | "skill"
-            | "subagent" | "spawn_subagent" | "task"
-            | "add_ui_kit" | "install_ui_kit"
-            | "copy_file" | "cp"
-            | "create_folder" | "mkdir" | "create_directory"
-            | "insert_at_line" | "append_to_file" | "prepend_to_file" | "regex_replace"
-            | "get_file_info" | "file_info" | "file_outline" | "stat"
-            | "diff_files" | "compare_files"
+            | "multi_edit" | "multiedit" | "multi_edit_file" | "search_code" | "grep" | "rg" | "search"
+            | "search_files" | "ripgrep" | "find_in_files" | "search_project" | "docs_lookup" | "list_dir" | "ls"
+            | "dir" | "list_files" | "list_directory" | "print_tree" | "tree" | "glob" | "find_files"
+            | "check_syntax" | "audit_project" | "review_project" | "lint_project" | "update_plan" | "todowrite"
+            | "todo_write" | "ask_user" | "ask" | "question" | "shell" | "bash" | "sh" | "cmd" | "terminal"
+            | "exec" | "run_command" | "run" | "python" | "python3" | "py" | "python_exec" | "run_python"
+            | "web_fetch" | "fetch" | "curl" | "webfetch" | "memory" | "memory_search" | "memory_list"
+            | "memory_get" | "memory_read" | "recall_memory" | "memory_save" | "save_memory" | "memory_add"
+            | "memory_set" | "memory_edit" | "memory_update" | "memory_delete" | "memory_remove" | "memory_forget"
+            | "load_skill" | "use_skill" | "get_skill" | "read_skill" | "skill" | "subagent" | "spawn_subagent"
+            | "task" | "add_ui_kit" | "install_ui_kit" | "copy_file" | "cp" | "create_folder" | "mkdir"
+            | "create_directory" | "insert_at_line" | "append_to_file" | "prepend_to_file" | "regex_replace"
+            | "get_file_info" | "file_info" | "file_outline" | "stat" | "diff_files" | "compare_files"
             | "git_status" | "git_diff" | "git_log" | "git_branch" | "git_stage" | "git_unstage" | "git_commit"
-            | "security_scan" | "find_secrets" | "audit_security"
-            | "request_approval"
-            | "lmfingerprint" | "verify_model" | "model_fingerprint"
+            | "security_scan" | "find_secrets" | "audit_security" | "request_approval" | "lmfingerprint"
+            | "verify_model" | "model_fingerprint"
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
 fn is_mutating_or_exec_tool(name: &str) -> bool {
     matches!(
         name,
-        "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "append_file"
-            | "append_to_file" | "prepend_to_file" | "insert_at_line" | "regex_replace"
-            | "edit_file" | "edit" | "patch_file" | "replace_in_file" | "str_replace" | "str_replace_editor"
-            | "multi_edit" | "multiedit" | "multi_edit_file"
-            | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink"
-            | "move_file" | "rename_file" | "mv" | "copy_file" | "cp"
-            | "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run"
-            | "python" | "python3" | "py" | "python_exec" | "run_python"
+        "write_file" | "write" | "create_file" | "save_file" | "overwrite_file" | "append_file" | "append_to_file"
+            | "prepend_to_file" | "insert_at_line" | "regex_replace" | "edit_file" | "edit" | "patch_file"
+            | "replace_in_file" | "str_replace" | "str_replace_editor" | "multi_edit" | "multiedit"
+            | "multi_edit_file" | "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink"
+            | "move_file" | "rename_file" | "mv" | "copy_file" | "cp" | "shell" | "bash" | "sh" | "cmd"
+            | "terminal" | "exec" | "run_command" | "run" | "python" | "python3" | "py" | "python_exec" | "run_python"
     )
 }
 fn is_template_placeholder(name: &str, path: &str, body: &str) -> bool {
-    let p = path.trim();
-    let b = body.trim();
-    if matches!(
-        p,
-        "ARG" | "relative/file" | "relative/path" | "subdir" | "sub/dir" | "filename" | "https://..." | "..." | "path/to/file"
-    ) || matches!(
-        b,
-        "BODY" | "command" | "python3_code" | "python_script_code" | "complete file content"
-            | "complete content" | "full_file_content" | "substring_or_symbol" | "pattern"
-            | "one durable fact worth keeping" | "..."
-    ) {
+    let (p, b) = (path.trim(), body.trim());
+    if matches!(p, "ARG" | "relative/file" | "relative/path" | "subdir" | "sub/dir" | "filename" | "https://..." | "..." | "path/to/file")
+        || matches!(b, "BODY" | "command" | "python3_code" | "python_script_code" | "complete file content" | "complete content" | "full_file_content" | "substring_or_symbol" | "pattern" | "one durable fact worth keeping" | "...")
+    {
         return true;
     }
-    if matches!(name, "shell" | "bash" | "sh" | "cmd" | "python" | "python3" | "py") && b.is_empty() && p.is_empty() {
-        return true;
-    }
-    if matches!(name, "read_file" | "read" | "cat" | "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && p.is_empty() {
-        return true;
-    }
-    if matches!(name, "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && b.is_empty() {
-        return true;
-    }
-    false
+    (matches!(name, "shell" | "bash" | "sh" | "cmd" | "python" | "python3" | "py") && b.is_empty() && p.is_empty())
+        || (matches!(name, "read_file" | "read" | "cat" | "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && p.is_empty())
+        || (matches!(name, "write_file" | "write" | "create_file" | "edit_file" | "edit" | "patch_file") && b.is_empty())
 }
 fn is_offset_covered(spans: &[(usize, usize)], pos: usize) -> bool {
     spans.iter().any(|&(s, e)| pos >= s && pos < e)
@@ -400,34 +382,7 @@ pub fn parse_inline_invocations_segment(
                         path_arg = p.to_string();
                     }
                 }
-                let has_structured_fields = j.get("edits").is_some()
-                    || j.get("old_string").is_some()
-                    || j.get("oldString").is_some()
-                    || j.get("old_str").is_some()
-                    || j.get("old_content").is_some()
-                    || j.get("search").is_some()
-                    || j.get("source").is_some()
-                    || j.get("destination").is_some()
-                    || j.get("old_path").is_some()
-                    || j.get("new_path").is_some()
-                    || j.get("from").is_some()
-                    || j.get("to").is_some()
-                    || j.get("path1").is_some()
-                    || j.get("path2").is_some()
-                    || j.get("paths").is_some()
-                    || j.get("questions").is_some()
-                    || j.get("question").is_some()
-                    || j.get("tasks").is_some()
-                    || j.get("plan").is_some()
-                    || j.get("todos").is_some()
-                    || j.get("steps").is_some()
-                    || j.get("symbols").is_some()
-                    || j.get("depth").is_some()
-                    || j.get("append").is_some()
-                    || j.get("limit").is_some()
-                    || j.get("line").is_some()
-                    || j.get("replacement").is_some()
-                    || j.get("agent_type").is_some();
+                let has_structured_fields = has_structured_tool_keys(&j);
                 if !has_structured_fields {
                     if let Some(c) = j
                         .get("content")
@@ -545,34 +500,7 @@ pub fn parse_inline_invocations_segment(
                         let lim = args_obj.get("limit").and_then(|x| x.as_u64())? as usize;
                         Some(off + lim.saturating_sub(1))
                     });
-                let has_structured = args_obj.get("edits").is_some()
-                    || args_obj.get("old_string").is_some()
-                    || args_obj.get("oldString").is_some()
-                    || args_obj.get("old_str").is_some()
-                    || args_obj.get("old_content").is_some()
-                    || args_obj.get("search").is_some()
-                    || args_obj.get("source").is_some()
-                    || args_obj.get("destination").is_some()
-                    || args_obj.get("old_path").is_some()
-                    || args_obj.get("new_path").is_some()
-                    || args_obj.get("from").is_some()
-                    || args_obj.get("to").is_some()
-                    || args_obj.get("path1").is_some()
-                    || args_obj.get("path2").is_some()
-                    || args_obj.get("paths").is_some()
-                    || args_obj.get("questions").is_some()
-                    || args_obj.get("question").is_some()
-                    || args_obj.get("tasks").is_some()
-                    || args_obj.get("plan").is_some()
-                    || args_obj.get("todos").is_some()
-                    || args_obj.get("steps").is_some()
-                    || args_obj.get("symbols").is_some()
-                    || args_obj.get("depth").is_some()
-                    || args_obj.get("append").is_some()
-                    || args_obj.get("limit").is_some()
-                    || args_obj.get("line").is_some()
-                    || args_obj.get("replacement").is_some()
-                    || args_obj.get("agent_type").is_some();
+                let has_structured = has_structured_tool_keys(&args_obj);
                 let body = if !has_structured {
                     if let Some(b) = args_obj
                         .get("command")

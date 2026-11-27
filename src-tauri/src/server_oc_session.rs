@@ -839,16 +839,30 @@ fn handle_opencode_session_message(
                 }
             }));
 
-            canonical_calls.push(format!(
-                "<zeus_tool name=\"{}\" path=\"{}\">{}</zeus_tool>",
-                inv.name, inv.path, inv.body
-            ));
+            if uses_native_fn_tools {
+                canonical_calls.push(format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({
+                        "name": inv.name,
+                        "arguments": { "path": inv.path, "body": inv.body }
+                    })
+                ));
+            } else {
+                canonical_calls.push(format!(
+                    "<zeus_tool name=\"{}\" path=\"{}\">{}</zeus_tool>",
+                    inv.name, inv.path, inv.body
+                ));
+            }
             tool_results_block.push_str(&format!(
                 "<tool_result name=\"{}\" ok=\"{}\">\n{}\n</tool_result>\n",
                 inv.name, ok, output
             ));
         }
-        tool_results_block.push_str("Continue from these tool results. Emit another <zeus_tool> if more steps are needed, or provide the final response.");
+        if uses_native_fn_tools {
+            tool_results_block.push_str("Continue from these tool results. Invoke the next tool if more steps are needed, or provide the final response.");
+        } else {
+            tool_results_block.push_str("Continue from these tool results. Emit another <zeus_tool> if more steps are needed, or provide the final response.");
+        }
         history.push(ChatMessage {
             role: "assistant".to_string(),
             content: canonical_calls.join("\n"),

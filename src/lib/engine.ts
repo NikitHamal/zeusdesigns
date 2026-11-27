@@ -13,6 +13,7 @@ import { agentPrompt, buildPlainContext, classifyIntent, GREETING_RE } from "./a
 import { getCodingHarnessProfile } from "./codingHarness";
 import { recordTrajectoryReflection, runPostToolUseHook, runPreToolUseHook } from "./harness2";
 import { AutonomyPolicy, BriefCheck, computeToolBatchWaves, DiffUtils, HistoryPruner, ModelProfiles, parseApprovalFromToolCall, parseAskUserFromToolCall, parsePlanFromToolCall, ProjectInstructions, ProjectSnapshot, QualityGate, runVerifySlashCommand, StuckDetector, syncHtmlFileToWorkbench, ToolAliases } from "./stormyAgent";
+import { formatRoundToolsForHistory } from "./stormyTools";
 import { runOpenCode } from "./opencode";
 import { auditHtml, patchFor } from "./audit";
 import { canCallModel, oneShot } from "./oneshot";
@@ -855,68 +856,7 @@ export async function sendMessage(opts: {
         const usesNativeProtocol =
           codingProfile.nativeToolProtocol === "openai_tools" ||
           codingProfile.nativeToolProtocol === "anthropic_tool_use";
-        const canonicalTools = roundTools
-          .map((t) => {
-            let p = "";
-            let b = "";
-            let parsedObj: Record<string, unknown> | null = null;
-            try {
-              const parsed = JSON.parse(t.args ?? "{}");
-              if (parsed && typeof parsed === "object") {
-                parsedObj = parsed as Record<string, unknown>;
-              }
-              p = parsed.path ?? "";
-              b =
-                typeof parsed.body === "string" && Object.keys(parsed).every((k) => k === "path" || k === "body")
-                  ? parsed.body
-                  : JSON.stringify(parsed);
-            } catch {
-              b = t.args ?? "";
-            }
-            if (usesNativeProtocol) {
-              const canonName = ToolAliases.canonicalName(t.name);
-              let argsPayload: Record<string, unknown>;
-              if (b.startsWith("{") && b.endsWith("}")) {
-                try {
-                  const inner = JSON.parse(b) as Record<string, unknown>;
-                  argsPayload = { ...(p && !inner.path ? { path: p } : {}), ...inner };
-                } catch {
-                  argsPayload = parsedObj ?? { ...(p ? { path: p } : {}), ...(b ? { body: b } : {}) };
-                }
-              } else if (canonName === "run_command" || t.name === "shell" || t.name === "bash") {
-                argsPayload = { command: b || p };
-              } else if (canonName === "python") {
-                argsPayload = { code: b || p };
-              } else if (canonName === "write_file") {
-                argsPayload = { path: p, content: b };
-              } else if (canonName === "read_file") {
-                argsPayload = {
-                  path: p || b,
-                  ...(parsedObj?.start ? { start: parsedObj.start } : {}),
-                  ...(parsedObj?.end ? { end: parsedObj.end } : {}),
-                };
-              } else if (canonName === "grep") {
-                argsPayload = t.name === "search_code"
-                  ? { query: b || p, ...(b && p ? { path: p } : {}) }
-                  : { pattern: b || p, ...(b && p ? { path: p } : {}) };
-              } else if (canonName === "glob") {
-                argsPayload = { pattern: b || p, ...(b && p ? { path: p } : {}) };
-              } else if (canonName === "search_project" || canonName === "docs_lookup" || canonName === "memory_search") {
-                argsPayload = { query: b || p, ...(b && p ? { path: p } : {}) };
-              } else if (canonName === "memory_save" || canonName === "memory_edit") {
-                argsPayload = { ...(p ? { path: p } : {}), content: b };
-              } else if (canonName === "web_fetch") {
-                argsPayload = { url: p || b };
-              } else if (canonName === "use_skill") {
-                argsPayload = { name: p || b };
-              } else {
-                argsPayload = { ...(p ? { path: p } : {}), ...(b ? { content: b } : {}) };
-              }
-              return `<tool_call>${JSON.stringify({ name: t.name, arguments: argsPayload })}</tool_call>`;
-            }
-            return `<zeus_tool name="${t.name}"${p ? ` path="${p}"` : ""}>${b}</zeus_tool>`;
-          })
-          .join("\n");
+        const canonicalTools = formatRoundToolsForHistory(roundTools, usesNativeProtocol);
         const said = [strippedRound, canonicalTools].filter(Boolean).join("\n");
         const roundHadError = roundTools.some((t) => t.status === "error");
         const hasMutatedSoFar = tools.some(
