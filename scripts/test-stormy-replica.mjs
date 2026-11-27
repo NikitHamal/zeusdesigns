@@ -188,4 +188,29 @@ assert.ok(
 const includeCount = (providersBaseRs.match(/include!\("providers_cat_1\.rs"\);/g) || []).length;
 assert.equal(includeCount, 1, "providers.rs must include each submodule exactly once");
 console.log("[PASS] 8. Multi-turn buildPlainContext tool history and single-include Rust module graph verified");
+
+// 9. Verify Session 31 OpenCode Coding Harness Parity (calculateCeiling, 15k keep tail, ToolOutput retention, MAX_STEPS_PROMPT, CONTINUE_AFTER_OUTPUT_LIMIT, doom-loop guard, usesPatch)
+const contextTs = fs.readFileSync(path.join(process.cwd(), "src/lib/context.ts"), "utf8");
+const agentExecRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_exec.rs"), "utf8");
+assert.ok(
+  contextTs.includes("export function calculateCeiling") &&
+    contextTs.includes("export const COMPACTION_KEEP_TOKENS = 15_000") &&
+    contextTs.includes("export const OPENCODE_SUMMARY_TEMPLATE") &&
+    !contextTs.includes("conv.messages.length >= 14"),
+  "context.ts must implement OpenCode calculateCeiling, 15k keep tail, structured summary sections, and remove premature 14-message compaction trigger"
+);
+assert.ok(
+  agentExecRs.includes("pub const TOOL_OUTPUT_MAX_LINES: usize = 2_000") &&
+    agentExecRs.includes("pub const TOOL_OUTPUT_MAX_BYTES: usize = 50 * 1024") &&
+    agentExecRs.includes("pub fn bound_tool_output_with_retention"),
+  "agent_exec.rs must bound tool outputs at 2000 lines / 50 KiB and save full output to .zeusdesigns/tool-output/"
+);
+assert.ok(
+  codingHarnessTs.includes("export const MAX_STEPS_PROMPT") &&
+    codingHarnessTs.includes("export const CONTINUE_AFTER_OUTPUT_LIMIT") &&
+    codingHarnessTs.includes("export function detectDoomLoop") &&
+    codingHarnessTs.includes("export function usesPatchPolicy"),
+  "codingHarness.ts must export MAX_STEPS_PROMPT, CONTINUE_AFTER_OUTPUT_LIMIT, detectDoomLoop, and usesPatchPolicy"
+);
+console.log("[PASS] 9. OpenCode coding harness parity (calculateCeiling, 15k keep, ToolOutput retention, MAX_STEPS_PROMPT, CONTINUE_AFTER_OUTPUT_LIMIT, doom-loop guard & usesPatch) verified");
 console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");
