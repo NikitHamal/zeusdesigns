@@ -1,6 +1,6 @@
 // Stormy (Oro / Orobi) Core Agent System Replica & Desktop Upgrade for ZeusDesigns.
 import { activeConv, uid, useStore } from "../store";
-import { DEVICE_SIZE, type AgentPlan, type PendingApproval, type PendingUserQuestion, type PlanTask, type ToolCall } from "../types";
+import { DEVICE_SIZE, type AgentPlan, type PendingApproval, type PendingUserQuestion, type ToolCall } from "../types";
 import { nativeAudit, readWorkspaceFile, type Workspace } from "./bridge";
 import { formatFingerprintMarkdown, verifyModelAuthenticity } from "./lmFingerprint";
 import {
