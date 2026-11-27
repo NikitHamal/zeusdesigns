@@ -5,7 +5,7 @@ use crate::providers::{
 use crate::workspace::{
     audit_workspace_files, bm25_search_project, checkpoint_capture_file, docs_lookup_reference,
     fs_delete, fs_move, fs_read, fs_write, glob_workspace_files, project_outline_of, python_run,
-    safe_join, search_workspace_code, shell_run, walk_workspace, FileNode,
+    safe_join, scan_workspace_security, search_workspace_code, shell_run, walk_workspace, FileNode,
 };
 use serde_json::{json, Value};
 use std::path::Path;
@@ -340,6 +340,34 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "subagent"
             | "spawn_subagent"
             | "task"
+            | "add_ui_kit"
+            | "install_ui_kit"
+            | "copy_file"
+            | "cp"
+            | "create_folder"
+            | "mkdir"
+            | "create_directory"
+            | "insert_at_line"
+            | "append_to_file"
+            | "prepend_to_file"
+            | "regex_replace"
+            | "get_file_info"
+            | "file_info"
+            | "file_outline"
+            | "stat"
+            | "diff_files"
+            | "compare_files"
+            | "git_status"
+            | "git_diff"
+            | "git_log"
+            | "git_branch"
+            | "git_stage"
+            | "git_unstage"
+            | "git_commit"
+            | "security_scan"
+            | "find_secrets"
+            | "audit_security"
+            | "request_approval"
             | "lmfingerprint"
             | "verify_model"
             | "model_fingerprint"
@@ -1257,6 +1285,12 @@ fn execute_inline_workspace_tools(
                 | "save_file"
                 | "overwrite_file"
                 | "append_file"
+                | "append_to_file"
+                | "prepend_to_file"
+                | "insert_at_line"
+                | "regex_replace"
+                | "copy_file"
+                | "cp"
                 | "sync_artboard"
                 | "edit_file"
                 | "edit"
@@ -1669,6 +1703,237 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         "ask_user" | "ask" | "question" => {
             let q_payload = if !body.is_empty() { body } else { path_arg.as_str() };
             (true, format!("[Question presented to user]\n{}", q_payload))
+        }
+        "request_approval" => {
+            let payload = if !body.is_empty() { body } else { path_arg.as_str() };
+            (true, format!("[Approval requested from user]\n{}", payload))
+        }
+        "copy_file" | "cp" => {
+            let mut src = path_arg.clone();
+            let mut dst = body.to_string();
+            let mut overwrite = true;
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(s) = j.get("source").or_else(|| j.get("from")).or_else(|| j.get("path")).and_then(|v| v.as_str()) {
+                        src = s.to_string();
+                    }
+                    if let Some(d) = j.get("destination").or_else(|| j.get("to")).or_else(|| j.get("target")).and_then(|v| v.as_str()) {
+                        dst = d.to_string();
+                    }
+                    overwrite = j.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(true);
+                }
+            }
+            match (safe_join(&eff_root, &src), safe_join(&eff_root, &dst)) {
+                (Ok(s_path), Ok(d_path)) => {
+                    if !s_path.exists() {
+                        (false, format!("copy_file: source '{}' not found", src))
+                    } else if d_path.exists() && !overwrite {
+                        (false, format!("copy_file: destination '{}' already exists", dst))
+                    } else {
+                        if let Some(p) = d_path.parent() {
+                            let _ = std::fs::create_dir_all(p);
+                        }
+                        match std::fs::copy(&s_path, &d_path) {
+                            Ok(bytes) => (true, format!("Copied {} -> {} ({} bytes)", src, dst, bytes)),
+                            Err(e) => (false, format!("copy_file failed: {}", e)),
+                        }
+                    }
+                }
+                (Err(e), _) | (_, Err(e)) => (false, e),
+            }
+        }
+        "create_folder" | "mkdir" | "create_directory" => {
+            let target = if !path_arg.is_empty() { path_arg.clone() } else { body.trim().to_string() };
+            match safe_join(&eff_root, &target) {
+                Ok(dir_path) => match std::fs::create_dir_all(&dir_path) {
+                    Ok(_) => (true, format!("Created folder {}", target)),
+                    Err(e) => (false, format!("create_folder failed: {}", e)),
+                },
+                Err(e) => (false, e),
+            }
+        }
+        "insert_at_line" => {
+            let mut target = path_arg.clone();
+            let mut line_num = inv.start_line.unwrap_or(1).max(1);
+            let mut text_to_insert = body.to_string();
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(p) = j.get("path").and_then(|v| v.as_str()) {
+                        target = p.to_string();
+                    }
+                    if let Some(ln) = j.get("line").and_then(|v| v.as_u64()) {
+                        line_num = (ln as usize).max(1);
+                    }
+                    if let Some(c) = j.get("content").or_else(|| j.get("text")).and_then(|v| v.as_str()) {
+                        text_to_insert = c.to_string();
+                    }
+                }
+            }
+            match fs_read(eff_root.clone(), target.clone()) {
+                Ok(existing) => {
+                    let mut lines: Vec<&str> = existing.lines().collect();
+                    let idx = (line_num - 1).min(lines.len());
+                    let insert_lines: Vec<&str> = text_to_insert.lines().collect();
+                    for (offset, il) in insert_lines.iter().enumerate() {
+                        lines.insert(idx + offset, il);
+                    }
+                    let updated = lines.join("\n") + if existing.ends_with('\n') { "\n" } else { "" };
+                    match fs_write(eff_root.clone(), target.clone(), updated) {
+                        Ok(_) => (true, append_quick_check(&eff_root, &target, format!("Inserted {} line(s) at line {} in {}", insert_lines.len(), line_num, target))),
+                        Err(e) => (false, e),
+                    }
+                }
+                Err(e) => (false, e),
+            }
+        }
+        "append_to_file" | "prepend_to_file" => {
+            let is_prepend = name == "prepend_to_file";
+            let mut target = path_arg.clone();
+            let mut add_text = body.to_string();
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(p) = j.get("path").and_then(|v| v.as_str()) {
+                        target = p.to_string();
+                    }
+                    if let Some(c) = j.get("content").or_else(|| j.get("text")).and_then(|v| v.as_str()) {
+                        add_text = c.to_string();
+                    }
+                }
+            }
+            let existing = fs_read(eff_root.clone(), target.clone()).unwrap_or_default();
+            let updated = if is_prepend {
+                format!("{}\n{}", add_text, existing)
+            } else if existing.is_empty() || existing.ends_with('\n') {
+                format!("{}{}", existing, add_text)
+            } else {
+                format!("{}\n{}", existing, add_text)
+            };
+            match fs_write(eff_root.clone(), target.clone(), updated) {
+                Ok(_) => (true, append_quick_check(&eff_root, &target, format!("{} {}", if is_prepend { "Prepended to" } else { "Appended to" }, target))),
+                Err(e) => (false, e),
+            }
+        }
+        "regex_replace" => {
+            let mut target = path_arg.clone();
+            let mut pat = String::new();
+            let mut rep = String::new();
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(p) = j.get("path").and_then(|v| v.as_str()) {
+                        target = p.to_string();
+                    }
+                    pat = j.get("pattern").or_else(|| j.get("search")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    rep = j.get("replacement").or_else(|| j.get("replace")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                }
+            }
+            match fs_read(eff_root.clone(), target.clone()) {
+                Ok(existing) => match apply_stormy_text_edit(&existing, &pat, &rep, true, 1) {
+                    Ok(updated) => match fs_write(eff_root.clone(), target.clone(), updated) {
+                        Ok(_) => (true, append_quick_check(&eff_root, &target, format!("Replaced pattern in {}", target))),
+                        Err(e) => (false, e),
+                    },
+                    Err(e) => (false, e),
+                },
+                Err(e) => (false, e),
+            }
+        }
+        "get_file_info" | "file_info" | "file_outline" | "stat" => {
+            let target = if !path_arg.is_empty() { path_arg.clone() } else { body.trim().to_string() };
+            match safe_join(&eff_root, &target) {
+                Ok(full) => {
+                    if !full.exists() {
+                        (false, format!("File not found: {}", target))
+                    } else {
+                        let meta = std::fs::metadata(&full).ok();
+                        let bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+                        let outline = project_outline_of(&full).unwrap_or_else(|| format!("{} bytes", bytes));
+                        (true, format!("File: {}\nSize: {} bytes\nOutline: {}", target, bytes, outline))
+                    }
+                }
+                Err(e) => (false, e),
+            }
+        }
+        "diff_files" | "compare_files" => {
+            let mut p1 = path_arg.clone();
+            let mut p2 = body.trim().to_string();
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    p1 = j.get("path1").or_else(|| j.get("source")).and_then(|v| v.as_str()).unwrap_or(&p1).to_string();
+                    p2 = j.get("path2").or_else(|| j.get("destination")).and_then(|v| v.as_str()).unwrap_or(&p2).to_string();
+                }
+            }
+            match (fs_read(eff_root.clone(), p1.clone()), fs_read(eff_root.clone(), p2.clone())) {
+                (Ok(c1), Ok(c2)) => {
+                    if c1 == c2 {
+                        (true, format!("Files {} and {} are identical.", p1, p2))
+                    } else {
+                        let l1: Vec<&str> = c1.lines().collect();
+                        let l2: Vec<&str> = c2.lines().collect();
+                        let mut out = format!("--- {}\n+++ {}\n", p1, p2);
+                        let max_l = l1.len().max(l2.len()).min(150);
+                        for i in 0..max_l {
+                            match (l1.get(i), l2.get(i)) {
+                                (Some(a), Some(b)) if a != b => {
+                                    out.push_str(&format!("-{:>4}| {}\n+{:>4}| {}\n", i + 1, a, i + 1, b));
+                                }
+                                (Some(a), None) => out.push_str(&format!("-{:>4}| {}\n", i + 1, a)),
+                                (None, Some(b)) => out.push_str(&format!("+{:>4}| {}\n", i + 1, b)),
+                                _ => {}
+                            }
+                        }
+                        (true, out)
+                    }
+                }
+                (Err(e), _) | (_, Err(e)) => (false, e),
+            }
+        }
+        "git_status" | "git_diff" | "git_log" | "git_branch" | "git_stage" | "git_unstage" | "git_commit" => {
+            let git_cmd = match name {
+                "git_status" => "git status -sb".to_string(),
+                "git_diff" => {
+                    let target = if !path_arg.is_empty() { path_arg.as_str() } else { body };
+                    if target.is_empty() || target.starts_with('{') {
+                        "git diff --stat && git diff".to_string()
+                    } else {
+                        format!("git diff -- \"{}\"", target.replace('"', ""))
+                    }
+                }
+                "git_log" => "git log --oneline -n 15".to_string(),
+                "git_branch" => "git branch -a".to_string(),
+                "git_stage" => {
+                    let target = if !path_arg.is_empty() { path_arg.as_str() } else if !body.is_empty() { body } else { "." };
+                    format!("git add -- \"{}\"", target.replace('"', ""))
+                }
+                "git_unstage" => {
+                    let target = if !path_arg.is_empty() { path_arg.as_str() } else { body };
+                    format!("git reset HEAD -- \"{}\"", target.replace('"', ""))
+                }
+                "git_commit" => {
+                    let mut msg = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
+                    if body.starts_with('{') && body.ends_with('}') {
+                        if let Ok(j) = serde_json::from_str::<Value>(body) {
+                            if let Some(m) = j.get("message").or_else(|| j.get("title")).and_then(|v| v.as_str()) {
+                                msg = m.to_string();
+                            }
+                        }
+                    }
+                    format!("git commit -m \"{}\"", msg.replace('"', "'"))
+                }
+                _ => "git status -sb".to_string(),
+            };
+            match shell_run(eff_root.clone(), git_cmd) {
+                Ok(v) => format_exec_result(&v),
+                Err(e) => (false, e),
+            }
+        }
+        "security_scan" | "find_secrets" | "audit_security" => {
+            let target = if !path_arg.is_empty() { Some(vec![path_arg.clone()]) } else { None };
+            let issues = scan_workspace_security(&eff_root, target.as_deref());
+            if issues.is_empty() {
+                (true, "security_scan: 0 hardcoded secrets or high-risk patterns found.".to_string())
+            } else {
+                (true, issues.join("\n"))
+            }
         }
         "search_code" | "grep" | "rg" | "search" | "search_files" | "ripgrep" | "find_in_files" => {
             let mut query = if !body.is_empty() {

@@ -2138,6 +2138,110 @@ pub fn workspace_restore_checkpoint(root: String, checkpoint_id: String) -> Resu
     }))
 }
 
+#[tauri::command(async)]
+pub fn workspace_audit(root: String, paths: Option<Vec<String>>) -> Result<Vec<String>, String> {
+    Ok(audit_workspace_files(&root, paths.as_deref()))
+}
+
+#[tauri::command(async)]
+pub fn workspace_git_status(root: String) -> Result<Value, String> {
+    let workdir = Path::new(&root);
+    if !workdir.exists() {
+        return Err(format!("Workspace root not found: {}", root));
+    }
+    let branch_out = shell_run(root.clone(), "git rev-parse --abbrev-ref HEAD".to_string())
+        .ok()
+        .and_then(|v| v.get("stdout").and_then(|s| s.as_str()).map(|s| s.trim().to_string()))
+        .unwrap_or_default();
+    let status_out = shell_run(root.clone(), "git status --porcelain".to_string())?;
+    let code = status_out.get("code").and_then(|c| c.as_i64()).unwrap_or(1);
+    if code != 0 {
+        return Ok(json!({
+            "isRepo": false,
+            "branch": "",
+            "changed": [],
+            "commits": []
+        }));
+    }
+    let raw_lines = status_out.get("stdout").and_then(|s| s.as_str()).unwrap_or("");
+    let mut changed = Vec::new();
+    for line in raw_lines.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let xy = &line[..2];
+        let file_path = line[3..].trim().trim_matches('"').to_string();
+        let staged = !xy.starts_with(' ') && !xy.starts_with('?');
+        let status_code = xy.trim().to_string();
+        changed.push(json!({
+            "path": file_path,
+            "status": if status_code.is_empty() { "M".to_string() } else { status_code },
+            "staged": staged
+        }));
+    }
+    let log_out = shell_run(
+        root,
+        "git log -n 12 --pretty=format:\"%h|%an|%ar|%s\"".to_string(),
+    )
+    .ok()
+    .and_then(|v| v.get("stdout").and_then(|s| s.as_str()).map(|s| s.to_string()))
+    .unwrap_or_default();
+    let mut commits = Vec::new();
+    for l in log_out.lines() {
+        let parts: Vec<&str> = l.splitn(4, '|').collect();
+        if parts.len() == 4 {
+            commits.push(json!({
+                "hash": parts[0],
+                "author": parts[1],
+                "date": parts[2],
+                "message": parts[3]
+            }));
+        }
+    }
+    Ok(json!({
+        "isRepo": true,
+        "branch": branch_out,
+        "changed": changed,
+        "commits": commits
+    }))
+}
+
+/// Stormy `SecurityScan`: scans workspace files for hardcoded secrets, unsafe eval/innerHTML, and risky patterns.
+pub fn scan_workspace_security(root: &str, only_paths: Option<&[String]>) -> Vec<String> {
+    let files: Vec<String> = match only_paths {
+        Some(list) if !list.is_empty() => list.to_vec(),
+        _ => glob_workspace_files(root, "**/*", None),
+    };
+    let mut findings = Vec::new();
+    for rel in files.into_iter().take(120) {
+        let Ok(full) = safe_join(root, &rel) else { continue };
+        let Ok(text) = fs::read_to_string(&full) else { continue };
+        for (idx, line) in text.lines().enumerate() {
+            let ln = idx + 1;
+            let trimmed = line.trim();
+            if trimmed.starts_with("//") || trimmed.starts_with('#') {
+                continue;
+            }
+            if (trimmed.contains("sk-proj-") || trimmed.contains("AKIA") || trimmed.contains("ghp_") || trimmed.contains("AIzaSy"))
+                && !trimmed.contains("REDACTED")
+                && !trimmed.contains("example")
+            {
+                findings.push(format!("HIGH {}:{}: Potential hardcoded API key or token detected.", rel, ln));
+            }
+            if trimmed.contains("eval(") {
+                findings.push(format!("MEDIUM {}:{}: Dynamic `eval()` call can introduce code injection risks.", rel, ln));
+            }
+            if trimmed.contains("dangerouslySetInnerHTML") || (trimmed.contains(".innerHTML") && trimmed.contains('=')) {
+                findings.push(format!("LOW {}:{}: Unsanitized HTML assignment (`innerHTML`) — verify input is escaped.", rel, ln));
+            }
+        }
+        if findings.len() >= 30 {
+            break;
+        }
+    }
+    findings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -88,6 +88,8 @@ pub fn run() {
             workspace::workspace_search,
             workspace::workspace_checkpoints,
             workspace::workspace_restore_checkpoint,
+            workspace::workspace_audit,
+            workspace::workspace_git_status,
             workspace::fs_read,
             workspace::fs_write,
             workspace::fs_delete,
