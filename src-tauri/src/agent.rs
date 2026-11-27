@@ -907,8 +907,9 @@ pub fn chat_stream(
                 }),
             );
         });
-        // Execute tools ONLY after stream completion in dependency-ordered waves.
-        if res.is_ok() && !cancel_flag.load(Ordering::Relaxed) {
+        // Execute tools ONLY after stream completion in dependency-ordered waves (disabled on MAX_STEPS_PROMPT final turn).
+        let tools_disabled_for_max_steps = enriched_req.system.contains("CRITICAL - MAXIMUM STEPS REACHED");
+        if res.is_ok() && !cancel_flag.load(Ordering::Relaxed) && !tools_disabled_for_max_steps {
             let root = enriched_req.workspace_root.as_deref().unwrap_or("");
             execute_inline_workspace_tools(&app, &topic, root, &accumulated, &mut executed_tools);
         }
@@ -976,14 +977,11 @@ mod tests {
     #[test]
     fn test_multiline_json_edit_file_does_not_corrupt_json() {
         let src = "def compute(a, b):\n    total = a - b\n    return total\n";
-        let tool_json = serde_json::json!({
-            "path": "math.py",
-            "old_string": "def compute(a, b):\n    total = a - b",
-            "new_string": "def compute(a, b):\n    total = a + b"
-        })
-        .to_string();
-        let res = agent_edit::apply_search_replace(src, &tool_json)
-            .expect("multiline JSON edit_file should apply cleanly");
+        let tool_json = serde_json::json!({"path": "math.py", "old_string": "def compute(a, b):\n    total = a - b", "new_string": "def compute(a, b):\n    total = a + b"}).to_string();
+        let res = agent_edit::apply_search_replace(src, &tool_json).expect("multiline JSON edit_file should apply cleanly");
         assert_eq!(res, "def compute(a, b):\n    total = a + b\n    return total\n");
+        let big = (1..=2050).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n");
+        let bounded = agent_exec::bound_tool_output_with_retention(".", big);
+        assert!(bounded.contains("[showing lines 1-2000 of 2050; full output saved to"));
     }
 }

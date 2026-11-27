@@ -750,97 +750,34 @@ export async function sendMessage(opts: {
 
           const parsedRound = parseStream(roundText, extraThink);
           const cleanVisibleRound = parsedRound.text.trim();
-          const hasFileOrMemMutation = tools.some((t) =>
-            /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(
-              t.name
-            )
-          );
-          const isInspectionPrompt =
-            /\b(what'?s\s+going\s+on|see\s+what'?s|explain|summarize|summary|status|check|insepct|inspect|analyze|review|why|how\s+does|show\s+me|fetch\s+latest)\b/i.test(
-              opts.text
-            ) && !/\b(edit_file|write_file|remove\s+that|delete\s+the|in\s+["'`][\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md)["'`]\s*,\s*(?:update|remove|change|replace|fix))\b/i.test(opts.text);
-          const asksForMutation =
-            !isInspectionPrompt &&
-            /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(
-              opts.text
-            );
-          const hasReadAnyFile = tools.some((t) =>
-            /^(read_file|read|cat|view_file|open_file|search_code|grep|rg)$/.test(t.name) && t.status === "ok"
-          );
+          const hasFileOrMemMutation = tools.some((t) => /^(write_file|write|create_file|edit_file|edit|patch_file|delete_file|remove_file|rm|del|unlink|python|python3|shell|bash|memory_save|memory_edit|memory_delete)$/.test(t.name));
+          const isInspectionPrompt = /\b(what'?s\s+going\s+on|see\s+what'?s|explain|summarize|summary|status|check|insepct|inspect|analyze|review|why|how\s+does|show\s+me|fetch\s+latest)\b/i.test(opts.text) && !/\b(edit_file|write_file|remove\s+that|delete\s+the|in\s+["'`][\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md)["'`]\s*,\s*(?:update|remove|change|replace|fix))\b/i.test(opts.text);
+          const asksForMutation = !isInspectionPrompt && /\b(write|create|edit|fix|update|add|remove|delete|refactor|implement|patch|save|record|deduplicate|filter|change|replace)\b/i.test(opts.text);
+          const hasReadAnyFile = tools.some((t) => /^(read_file|read|cat|view_file|open_file|search_code|grep|rg)$/.test(t.name) && t.status === "ok");
           const lastToolFailed = tools.length > 0 && tools[tools.length - 1].status === "error";
-          const deferredToUser =
-            /\b(tell me to proceed|let me know if you(?:'d like| want) me to (?:proceed|continue|inspect)|shall I (?:proceed|continue)|if you want to start there|and I will inspect)\b/i.test(
-              cleanVisibleRound
-            ) || (lastToolFailed && !hasReadAnyFile && !hasFileOrMemMutation);
-          const stoppedAfterReadOnly =
-            asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
+          const deferredToUser = /\b(tell me to proceed|let me know if you(?:'d like| want) me to (?:proceed|continue|inspect)|shall I (?:proceed|continue)|if you want to start there|and I will inspect)\b/i.test(cleanVisibleRound) || (lastToolFailed && !hasReadAnyFile && !hasFileOrMemMutation);
+          const stoppedAfterReadOnly = asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
           const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning) || tools.length > 0);
-          const dumpedCodeWithoutWrite =
-            asksForMutation &&
-            !hasFileOrMemMutation &&
-            cleanVisibleRound.length < 400 &&
-            (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) ||
-              /\bwith\s+open\s*\(/.test(cleanVisibleRound));
-          const visibleAnnouncementOnly =
-            tools.length === 0 &&
-            cleanVisibleRound.length < 220 &&
-            /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|test|create|write|edit|delete|save|update|remove)|we\s+need\s+to\s+(call|pull|list|check|run|read|inspect|update|fix|delete|save|remove)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test|edit|update|write))\b/i.test(
-              cleanVisibleRound
-            );
-          const statedPlanOnly =
-            cutOffAfterThink ||
-            stoppedAfterReadOnly ||
-            dumpedCodeWithoutWrite ||
-            deferredToUser ||
-            visibleAnnouncementOnly;
+          const dumpedCodeWithoutWrite = asksForMutation && !hasFileOrMemMutation && cleanVisibleRound.length < 400 && (/```(?:js|javascript|ts|typescript|py|python|rust|go|cpp|c|html|css|json|md|bash|sh)\b/i.test(roundText) || /\bwith\s+open\s*\(/.test(cleanVisibleRound));
+          const visibleAnnouncementOnly = tools.length === 0 && cleanVisibleRound.length < 220 && /\b(let'?s\s+(call|list|check|run|read|inspect|pull|fetch|search|look|verify|test|create|write|edit|delete|save|update|remove)|we\s+need\s+to\s+(call|pull|list|check|run|read|inspect|update|fix|delete|save|remove)|i\s+(will|need\s+to|should)\s+(call|list|check|run|read|inspect|pull|fetch|search|verify|test|edit|update|write))\b/i.test(cleanVisibleRound);
+          const statedPlanOnly = cutOffAfterThink || stoppedAfterReadOnly || dumpedCodeWithoutWrite || deferredToUser || visibleAnnouncementOnly;
 
-          if (
-            (mode === "code" || Boolean(st.ui.workspace)) &&
-            !produced &&
-            nudgeCount < 2 &&
-            (round === 0
-              ? tools.length === 0 && (statedPlanOnly || !cleanVisibleRound)
-              : cutOffAfterThink || deferredToUser || stoppedAfterReadOnly || dumpedCodeWithoutWrite)
-          ) {
+          if ((mode === "code" || Boolean(st.ui.workspace)) && !produced && nudgeCount < 2 && (round === 0 ? tools.length === 0 && (statedPlanOnly || !cleanVisibleRound) : cutOffAfterThink || deferredToUser || stoppedAfterReadOnly || dumpedCodeWithoutWrite)) {
             nudgeCount++;
             const roundOnlyParsed = parseStream(roundText, "");
-            if (roundOnlyParsed.reasoning) {
-              extraThink = [extraThink, roundOnlyParsed.reasoning].filter(Boolean).join("\n\n");
-            }
-            if (roundText && full.endsWith(roundText) && cleanVisibleRound.length < 120) {
-              full = full.slice(0, full.length - roundText.length);
-            }
-            const inspectedFiles = tools
-              .map((t) => {
-                try {
-                  return JSON.parse(t.args ?? "{}").path || "";
-                } catch {
-                  return "";
-                }
-              })
-              .filter(Boolean);
-            const targetFileHint =
-              inspectedFiles[0] ||
-              opts.text.match(/["'`]([\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md))["'`]/i)?.[1] ||
-              "";
-            const specificInstruction =
-              cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
-                ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete visible answer to the user now (or call the next tool if another workspace action is required).`
-                : deferredToUser
-                ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now using \`search_code\`, \`list_dir\`, or \`read_file\`.`
-                : `You inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"}, now apply the requested modification on disk using \`edit_file\` or \`write_file\`.`;
+            if (roundOnlyParsed.reasoning) extraThink = [extraThink, roundOnlyParsed.reasoning].filter(Boolean).join("\n\n");
+            if (roundText && full.endsWith(roundText) && cleanVisibleRound.length < 120) full = full.slice(0, full.length - roundText.length);
+            const inspectedFiles = tools.map((t) => { try { return JSON.parse(t.args ?? "{}").path || ""; } catch { return ""; } }).filter(Boolean);
+            const targetFileHint = inspectedFiles[0] || opts.text.match(/["'`]([\w./-]+\.(?:html?|tsx?|jsx?|css|py|rs|json|md))["'`]/i)?.[1] || "";
+            const specificInstruction = cutOffAfterThink && tools.length > 0 && !stoppedAfterReadOnly && !deferredToUser
+              ? `You finished reasoning about the ${tools.length} completed tool step${tools.length > 1 ? "s" : ""}, but your stream ended before writing the visible response. Provide your clear, complete visible answer to the user now (or call the next tool if another workspace action is required).`
+              : deferredToUser
+              ? `Do NOT stop or ask the user "tell me to proceed". Continue inspecting the codebase right now using \`search_code\`, \`list_dir\`, or \`read_file\`.`
+              : `You inspected ${targetFileHint ? `\`${targetFileHint}\`` : "the codebase"}, now apply the requested modification on disk using \`edit_file\` or \`write_file\`.`;
             msgs = [
               ...msgs,
-              {
-                role: "assistant",
-                content:
-                  cleanVisibleRound ||
-                  `Thought summary: ${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}`,
-              },
-              {
-                role: "user",
-                content: `Original user request: ${opts.text.slice(0, 1000)}\n\n${specificInstruction}`,
-              },
+              { role: "assistant", content: cleanVisibleRound || `Thought summary: ${(roundOnlyParsed.reasoning || "Analyzed tool results.").slice(0, 800)}` },
+              { role: "user", content: `Original user request: ${opts.text.slice(0, 1000)}\n\n${specificInstruction}` },
             ];
             current = { ...req, requestId: uid(), messages: msgs };
             continue;
