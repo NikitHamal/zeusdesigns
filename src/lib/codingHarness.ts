@@ -92,8 +92,8 @@ export function detectNativeToolProtocol(providerId: string, modelId: string): N
 export function detectModelFamily(providerId: string, modelId: string, label = ""): ModelFamily {
   const s = `${providerId} ${modelId} ${label}`.toLowerCase();
   if (providerId === "mercury3" || /\bmercury[-_ ]?[23]\b/.test(s)) return "mercury";
-  if (/\bclaude\b|\bhaiku\b|\bsonnet\b|\bopus\b/.test(s) && !s.includes("gemini") && !s.includes("nvidia_nim")) return "claude";
-  if (/\bgpt[-_ ]?(6|5|4|oss)\b|\bo[134]-/.test(s)) return "gpt";
+  if (/\bclaude\b|\bfable\b|\bhaiku\b|\bsonnet\b|\bopus\b/.test(s) && !s.includes("gemini") && !s.includes("nvidia_nim")) return "claude";
+  if (/\bgpt[-_ ]?(6(?:\.[12])?|5(?:\.[2456])?|4(?:\.1|o)?|oss)\b|\bo[134](?:-|\b)/.test(s)) return "gpt";
   if (/\bdeepseek\b/.test(s)) return "deepseek";
   if (/\bkimi\b|\bmoonshot/.test(s)) return "kimi";
   if (/\bglm[-_ ]?\d|\bzai\b/.test(s)) return "glm";
