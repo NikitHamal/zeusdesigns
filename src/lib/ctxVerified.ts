@@ -293,12 +293,35 @@ export const CTX_VERIFIED: Record<string, Record<string, Verified>> = {
    "reasoning": true,
    "name": "Hy4 flash Free"
   },
-  "tidepool-alpha-free": {
-   "ctx": 1048576,
-   "out": 131072,
-   "vision": false,
-   "reasoning": true,
-   "name": "Tidepool Alpha Free"
+   "tidepool-alpha-free": {
+    "ctx": 1048576,
+    "out": 131072,
+    "vision": false,
+    "reasoning": true,
+    "name": "Tidepool Alpha Free"
+   }
+  },
+  "pouluogemini": {
+   "gemini-3.5-flash": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": false },
+   "gemini-3.5-flash-thinking": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-3.1-pro": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-3.5-flash-thinking-lite": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-flash-lite": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": false }
+  },
+  "peijungemini": {
+   "gemini-3.5-flash": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": false },
+   "gemini-3.5-flash-thinking": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-3.1-pro": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-3.5-flash-thinking-lite": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": true },
+   "gemini-flash-lite": { "ctx": 1000000, "out": 16384, "vision": false, "reasoning": false }
+  },
+  "zunkogemma4": {
+   "gemma4-e4b": { "ctx": 65536, "out": 8192, "vision": false, "reasoning": false }
+  },
+  "tomgemma4q5": {
+   "gemma-4-E2B-it-UD-Q5_K_XL.gguf": { "ctx": 65536, "out": 8192, "vision": false, "reasoning": true }
+  },
+  "amansonillama": {
+   "llama:latest": { "ctx": 65536, "out": 8192, "vision": false, "reasoning": false }
   }
- }
 };
