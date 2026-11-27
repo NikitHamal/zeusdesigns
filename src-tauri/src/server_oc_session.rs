@@ -642,12 +642,21 @@ fn handle_opencode_session_message(
         if cancel_flag.load(Ordering::Relaxed) {
             break;
         }
+        let is_final_oc_step = round == 31;
+        let step_system = if is_final_oc_step {
+            format!(
+                "{}\n\nCRITICAL - MAXIMUM STEPS REACHED\nThe maximum number of steps allowed for this task has been reached. Tools are disabled until next user input. Respond with text only summarizing work accomplished so far, remaining tasks, and next recommendations.",
+                system_prompt
+            )
+        } else {
+            system_prompt.clone()
+        };
         let chat_req = ChatRequest {
             request_id: format!("oc-{}-{}", session_id, round),
             provider: provider_id.clone(),
             model: upstream_model.clone(),
             effort: if round > 0 { "low".to_string() } else { req_effort.clone() },
-            system: system_prompt.clone(),
+            system: step_system,
             messages: history.clone(),
             workspace_root: if workdir.is_empty() { None } else { Some(workdir.clone()) },
             custom: None,
@@ -720,8 +729,12 @@ fn handle_opencode_session_message(
         }
 
         let clean_no_think = crate::agent::strip_thinking_blocks(&round_raw);
-        let mut invocations = crate::agent::parse_inline_invocations_segment(&clean_no_think, true, true);
-        if invocations.is_empty() && clean_no_think.trim().len() < 80 {
+        let mut invocations = if is_final_oc_step {
+            Vec::new()
+        } else {
+            crate::agent::parse_inline_invocations_segment(&clean_no_think, true, true)
+        };
+        if !is_final_oc_step && invocations.is_empty() && clean_no_think.trim().len() < 80 {
             invocations = crate::agent::parse_inline_invocations_segment(&round_raw, false, true);
         }
 
