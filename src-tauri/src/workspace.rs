@@ -1346,6 +1346,386 @@ pub fn workspace_search(root: String, query: String, limit: Option<usize>) -> Re
     Ok(search_workspace_code(&root, &query, limit.unwrap_or(25).min(100)))
 }
 
+/// Stormy `move_file` (`mv` / `rename_file`): move or rename a file or folder inside the workspace.
+#[tauri::command(async)]
+pub fn fs_move(root: String, source: String, destination: String, overwrite: Option<bool>) -> Result<String, String> {
+    let src = safe_join(&root, &source)?;
+    let dst = safe_join(&root, &destination)?;
+    if !src.exists() {
+        return Err(format!("Source file does not exist: {}", source));
+    }
+    if dst.exists() && !overwrite.unwrap_or(false) {
+        return Err(format!(
+            "Destination already exists: {}. Pass overwrite=true to replace it.",
+            destination
+        ));
+    }
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create destination parent dirs: {}", e))?;
+    }
+    if dst.exists() {
+        if dst.is_dir() {
+            let _ = fs::remove_dir_all(&dst);
+        } else {
+            let _ = fs::remove_file(&dst);
+        }
+    }
+    fs::rename(&src, &dst)
+        .map_err(|e| format!("Failed to move '{}' to '{}': {}", source, destination, e))?;
+    Ok(format!("Moved {} -> {}", source, destination))
+}
+
+/// Stormy `ProjectOutline`: produces a compact one-line symbol outline of a file
+/// (`list_files(symbols=true)`), extracting HTML ids/assets, CSS selectors/variables,
+/// JS/TS/Rust/Python functions & classes, JSON top-level keys, or Markdown headings.
+pub fn project_outline_of(path: &Path) -> Option<String> {
+    if !path.is_file() {
+        return None;
+    }
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    let meta = fs::metadata(path).ok()?;
+    if meta.len() > 400_000 {
+        return Some(format!("large file ({} KB)", meta.len() / 1024));
+    }
+    let text = fs::read_to_string(path).ok()?;
+    let lines = text.lines().count().max(1);
+    let mut parts: Vec<String> = Vec::new();
+
+    match ext.as_str() {
+        "html" | "htm" => {
+            let mut ids = Vec::new();
+            let mut loads = Vec::new();
+            for line in text.lines() {
+                if let Some(idx) = line.find("id=\"") {
+                    let rest = &line[idx + 4..];
+                    if let Some(end) = rest.find('"') {
+                        let id = rest[..end].trim();
+                        if !id.is_empty() && !ids.contains(&format!("#{}", id)) && ids.len() < 8 {
+                            ids.push(format!("#{}", id));
+                        }
+                    }
+                }
+                for attr in ["src=\"", "href=\""] {
+                    if let Some(idx) = line.find(attr) {
+                        let rest = &line[idx + attr.len()..];
+                        if let Some(end) = rest.find('"') {
+                            let val = rest[..end].trim();
+                            if !val.is_empty()
+                                && !val.starts_with("http")
+                                && !val.starts_with('#')
+                                && !val.starts_with("data:")
+                                && !loads.contains(&val.to_string())
+                                && loads.len() < 6
+                            {
+                                loads.push(val.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            if !ids.is_empty() {
+                parts.push(format!("ids: {}", ids.join(", ")));
+            }
+            if !loads.is_empty() {
+                parts.push(format!("loads: {}", loads.join(", ")));
+            }
+        }
+        "css" | "scss" => {
+            let mut vars = Vec::new();
+            let mut selectors = Vec::new();
+            for line in text.lines() {
+                let t = line.trim();
+                if let Some(v_idx) = t.find("--") {
+                    let rest = &t[v_idx..];
+                    if let Some(colon) = rest.find(':') {
+                        let var_name = rest[..colon].trim();
+                        if var_name.len() > 2
+                            && var_name.chars().skip(2).all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                            && !vars.contains(&var_name.to_string())
+                            && vars.len() < 6
+                        {
+                            vars.push(var_name.to_string());
+                        }
+                    }
+                } else if t.ends_with('{') && !t.starts_with('@') && !t.starts_with("/*") {
+                    let sel = t.trim_end_matches('{').trim();
+                    if !sel.is_empty() && sel.len() < 48 && !selectors.contains(&sel.to_string()) && selectors.len() < 6 {
+                        selectors.push(sel.to_string());
+                    }
+                }
+            }
+            if !selectors.is_empty() {
+                parts.push(format!("selectors: {}", selectors.join(", ")));
+            }
+            if !vars.is_empty() {
+                parts.push(format!("vars: {}", vars.join(", ")));
+            }
+        }
+        "js" | "mjs" | "cjs" | "jsx" | "ts" | "tsx" | "py" | "rs" => {
+            let mut fns = Vec::new();
+            let mut classes = Vec::new();
+            for line in text.lines() {
+                let t = line.trim();
+                let clean = t
+                    .strip_prefix("export ")
+                    .unwrap_or(t)
+                    .strip_prefix("default ")
+                    .unwrap_or(t)
+                    .strip_prefix("pub ")
+                    .unwrap_or(t)
+                    .strip_prefix("async ")
+                    .unwrap_or(t);
+                if let Some(rest) = clean
+                    .strip_prefix("function ")
+                    .or_else(|| clean.strip_prefix("fn "))
+                    .or_else(|| clean.strip_prefix("def "))
+                {
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() && !fns.contains(&name) && fns.len() < 8 {
+                        fns.push(name);
+                    }
+                } else if let Some(rest) = clean
+                    .strip_prefix("class ")
+                    .or_else(|| clean.strip_prefix("struct "))
+                    .or_else(|| clean.strip_prefix("interface "))
+                    .or_else(|| clean.strip_prefix("type "))
+                {
+                    let name: String = rest
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() && !classes.contains(&name) && classes.len() < 6 {
+                        classes.push(name);
+                    }
+                } else if (clean.starts_with("const ") || clean.starts_with("let "))
+                    && (clean.contains("=>") || clean.contains("= function"))
+                {
+                    let after_kw = clean
+                        .strip_prefix("const ")
+                        .or_else(|| clean.strip_prefix("let "))
+                        .unwrap_or("");
+                    let name: String = after_kw
+                        .chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() && !fns.contains(&name) && fns.len() < 8 {
+                        fns.push(name);
+                    }
+                }
+            }
+            if !fns.is_empty() {
+                parts.push(format!("functions: {}", fns.join(", ")));
+            }
+            if !classes.is_empty() {
+                parts.push(format!("types: {}", classes.join(", ")));
+            }
+        }
+        "json" => {
+            if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&text) {
+                let keys: Vec<String> = map.keys().take(8).cloned().collect();
+                if !keys.is_empty() {
+                    parts.push(format!("keys: {}", keys.join(", ")));
+                }
+            }
+        }
+        "md" | "mdx" => {
+            if let Some(h) = text.lines().find(|l| l.trim_start().starts_with('#')) {
+                let title = h.trim_start_matches('#').trim();
+                if !title.is_empty() {
+                    parts.push(format!("\"{}\"", title));
+                }
+            }
+        }
+        _ => {}
+    }
+
+    let summary = if parts.is_empty() {
+        format!("{} lines", lines)
+    } else {
+        format!("{} lines · {}", lines, parts.join(" · "))
+    };
+    Some(if summary.len() > 170 {
+        format!("{}...", &summary[..167])
+    } else {
+        summary
+    })
+}
+
+/// Stormy `glob` tool: match files by glob pattern (`**/*.ts`, `src/**/*.{js,tsx}`, `*.html`),
+/// returning paths sorted by most recently modified first.
+pub fn glob_workspace_files(root: &str, pattern: &str, subpath: Option<&str>) -> Vec<String> {
+    let base = Path::new(root);
+    if !base.exists() {
+        return Vec::new();
+    }
+    let start_dir = match subpath.filter(|s| !s.trim().is_empty() && *s != ".") {
+        Some(rel) => safe_join(root, rel).unwrap_or_else(|_| base.to_path_buf()),
+        None => base.to_path_buf(),
+    };
+    let nodes = walk_workspace_n(base, &start_dir, 8, 5000);
+    let mut matched: Vec<(String, u64)> = Vec::new();
+
+    fn match_glob_path(rel_path: &str, file_name: &str, raw_pat: &str) -> bool {
+        let pat = raw_pat.trim().replace('\\', "/");
+        if pat.is_empty() || pat == "*" || pat == "**/*" {
+            return true;
+        }
+        // Expand brace patterns like `*.{js,ts,tsx}`
+        if let (Some(b_open), Some(b_close)) = (pat.find('{'), pat.find('}')) {
+            if b_open < b_close {
+                let prefix = &pat[..b_open];
+                let suffix = &pat[b_close + 1..];
+                for alt in pat[b_open + 1..b_close].split(',') {
+                    let expanded = format!("{}{}{}", prefix, alt.trim(), suffix);
+                    if match_glob_path(rel_path, file_name, &expanded) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        if let Some(after_starstar) = pat.strip_prefix("**/") {
+            return glob_name_matches(file_name, after_starstar) || glob_name_matches(rel_path, after_starstar);
+        }
+        if pat.contains('/') {
+            let parts: Vec<&str> = pat.split("/**/").collect();
+            if parts.len() == 2 {
+                let dir_prefix = parts[0].trim_matches('/');
+                let tail = parts[1];
+                return rel_path.to_lowercase().starts_with(&dir_prefix.to_lowercase())
+                    && (glob_name_matches(file_name, tail) || glob_name_matches(rel_path, tail));
+            }
+            return glob_name_matches(rel_path, &pat);
+        }
+        glob_name_matches(file_name, &pat)
+    }
+
+    fn collect_glob(base: &Path, nodes: &[FileNode], pat: &str, out: &mut Vec<(String, u64)>) {
+        for n in nodes {
+            if n.dir {
+                if let Some(ch) = &n.children {
+                    collect_glob(base, ch, pat, out);
+                }
+            } else if match_glob_path(&n.path, &n.name, pat) {
+                let mtime = fs::metadata(base.join(&n.path))
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since( std::time::UNIX_EPOCH ).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                out.push((n.path.clone(), mtime));
+            }
+        }
+    }
+
+    collect_glob(base, &nodes, pattern, &mut matched);
+    matched.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    matched.into_iter().take(200).map(|(p, _)| p).collect()
+}
+
+/// Stormy `QualityAuditor` (`check_syntax` & `ProjectTools.withQuickCheck`):
+/// high-precision static syntax and structure auditor for HTML, CSS, JS/TS, and JSON files.
+pub fn audit_workspace_files(root: &str, target_paths: Option<&[String]>) -> Vec<String> {
+    let base = Path::new(root);
+    if !base.exists() {
+        return Vec::new();
+    }
+    let files: Vec<String> = if let Some(paths) = target_paths.filter(|p| !p.is_empty()) {
+        paths.to_vec()
+    } else {
+        glob_workspace_files(root, "**/*", None)
+    };
+    let mut findings = Vec::new();
+
+    for rel in files.into_iter().take(60) {
+        let Ok(full) = safe_join(root, &rel) else { continue };
+        if !full.is_file() {
+            continue;
+        }
+        let ext = full
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let Ok(text) = fs::read_to_string(&full) else { continue };
+        match ext.as_str() {
+            "json" => {
+                if let Err(e) = serde_json::from_str::<Value>(&text) {
+                    findings.push(format!("ERROR {}: Invalid JSON ({})", rel, e));
+                }
+            }
+            "html" | "htm" => {
+                let lower = text.to_lowercase();
+                if text.len() > 80 && !lower.contains("</html>") && (lower.contains("<html") || lower.contains("<!doctype")) {
+                    findings.push(format!("ERROR {}: HTML document appears truncated (missing </html>).", rel));
+                }
+                // Check referenced local <script src="..."> and <link href="...">
+                for attr in ["src=\"", "href=\""] {
+                    let mut from = 0usize;
+                    while let Some(pos) = text[from..].find(attr) {
+                        let start = from + pos + attr.len();
+                        let rest = &text[start..];
+                        let Some(end) = rest.find('"') else { break };
+                        let href = rest[..end].trim();
+                        from = start + end + 1;
+                        if href.is_empty()
+                            || href.starts_with("http://")
+                            || href.starts_with("https://")
+                            || href.starts_with("//")
+                            || href.starts_with('#')
+                            || href.starts_with("data:")
+                            || href.starts_with("mailto:")
+                            || href.starts_with("tel:")
+                            || href.starts_with("javascript:")
+                        {
+                            continue;
+                        }
+                        let clean_ref = href.split(['?', '#']).next().unwrap_or(href);
+                        if clean_ref.ends_with(".css") || clean_ref.ends_with(".js") {
+                            let resolved = full.parent().unwrap_or(base).join(clean_ref);
+                            let root_resolved = base.join(clean_ref.trim_start_matches('/'));
+                            if !resolved.exists() && !root_resolved.exists() {
+                                findings.push(format!(
+                                    "ERROR {}: Referenced asset '{}' does not exist in the project.",
+                                    rel, clean_ref
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            "css" => {
+                let opens = text.chars().filter(|&c| c == '{').count();
+                let closes = text.chars().filter(|&c| c == '}').count();
+                if opens != closes {
+                    findings.push(format!(
+                        "ERROR {}: Unbalanced braces in stylesheet ({} '{{' vs {} '}}').",
+                        rel, opens, closes
+                    ));
+                }
+            }
+            "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx" => {
+                let opens = text.chars().filter(|&c| c == '{').count();
+                let closes = text.chars().filter(|&c| c == '}').count();
+                if opens.abs_diff(closes) > 2 {
+                    findings.push(format!(
+                        "TIP {}: Brace count mismatch ({} '{{' vs {} '}}') — check for unclosed blocks or truncation.",
+                        rel, opens, closes
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    findings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
