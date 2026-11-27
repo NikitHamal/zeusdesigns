@@ -52,6 +52,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            workspace::set_term_app(app.handle().clone());
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.maximize();
                 let _ = win.set_focus();

@@ -5,7 +5,7 @@ use crate::providers::{
 use crate::workspace::{
     audit_workspace_files, bm25_search_project, checkpoint_capture_file, docs_lookup_reference,
     fs_delete, fs_move, fs_read, fs_write, glob_workspace_files, project_outline_of, python_run,
-    safe_join, scan_workspace_security, search_workspace_code, shell_run, walk_workspace, FileNode,
+    safe_join, scan_workspace_security, search_workspace_code, walk_workspace, FileNode,
 };
 use serde_json::{json, Value};
 use std::path::Path;
@@ -1921,7 +1921,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 }
                 _ => "git status -sb".to_string(),
             };
-            match shell_run(eff_root.clone(), git_cmd) {
+            match crate::workspace::shell_run_as(eff_root.to_string(), git_cmd, "agent") {
                 Ok(v) => format_exec_result(&v),
                 Err(e) => (false, e),
             }
@@ -2062,7 +2062,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                     }
                 }
             }
-            match shell_run(eff_root.clone(), cmd_str) {
+            match crate::workspace::shell_run_as(eff_root.to_string(), cmd_str, "agent") {
                 Ok(v) => format_exec_result(&v),
                 Err(e) => (false, e),
             }

@@ -1141,85 +1141,328 @@ pub fn clean_python_script(raw: &str) -> String {
     s
 }
 
+/* ------------------------------------------------------------------ */
+/* Shared terminal session: one cwd per project root, used by both the */
+/* Terminal panel (source "user") and the agent (source "agent").      */
+/* Agent runs are mirrored to the UI through the `zeus://term` event.  */
+/* ------------------------------------------------------------------ */
+static TERM_APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+static TERM_CWD: std::sync::OnceLock<Mutex<std::collections::HashMap<String, PathBuf>>> = std::sync::OnceLock::new();
+static TERM_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+pub fn set_term_app(app: tauri::AppHandle) {
+    let _ = TERM_APP.set(app);
+}
+
+fn term_cwd_map() -> &'static Mutex<std::collections::HashMap<String, PathBuf>> {
+    TERM_CWD.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+fn term_emit(payload: Value) {
+    if let Some(app) = TERM_APP.get() {
+        let _ = tauri::Emitter::emit(app, "zeus://term", payload);
+    }
+}
+
+/// Splits a leading `cd <dir>` off a command line. Returns (dir, remaining command).
+fn split_leading_cd(cmd: &str) -> Option<(String, String)> {
+    let t = cmd.trim();
+    let lower = t.to_ascii_lowercase();
+    if !(lower == "cd" || lower.starts_with("cd ") || lower.starts_with("cd\t") || lower.starts_with("chdir ")) {
+        return None;
+    }
+    let after = if lower.starts_with("chdir ") { &t[6..] } else { &t[2..] };
+    let mut end = after.len();
+    let mut rest_start = after.len();
+    for sep in ["&&", ";", "\n"] {
+        if let Some(i) = after.find(sep) {
+            if i < end {
+                end = i;
+                rest_start = i + sep.len();
+            }
+        }
+    }
+    let mut dir = after[..end].trim().to_string();
+    if dir.to_ascii_lowercase().starts_with("/d ") {
+        dir = dir[3..].trim().to_string();
+    }
+    let dir = dir.trim_matches('"').trim_matches('\'').to_string();
+    let rest = after[rest_start..].trim().to_string();
+    Some((dir, rest))
+}
+
+#[cfg(target_os = "windows")]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(0x08000000)
+        .output();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_tree(pid: u32) {
+    let _ = Command::new("kill").args(["-9", &pid.to_string()]).output();
+}
+
+/// Extra tool directories GUI-launched apps often miss (fresh installs of git, node, gh).
+fn augmented_path() -> Option<std::ffi::OsString> {
+    if !cfg!(target_os = "windows") {
+        return None;
+    }
+    let mut paths: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    let pf = std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+    let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let appdata = std::env::var("APPDATA").unwrap_or_default();
+    let mut extra: Vec<PathBuf> = vec![
+        PathBuf::from(&pf).join("Git").join("cmd"),
+        PathBuf::from(&pf).join("Git").join("mingw64").join("bin"),
+        PathBuf::from(&pf).join("Git").join("usr").join("bin"),
+        PathBuf::from(&pf).join("GitHub CLI"),
+        PathBuf::from(&pf).join("nodejs"),
+    ];
+    if !local.is_empty() {
+        extra.push(PathBuf::from(&local).join("Programs").join("Git").join("cmd"));
+        extra.push(PathBuf::from(&local).join("Programs").join("Python").join("Python312"));
+    }
+    if !appdata.is_empty() {
+        extra.push(PathBuf::from(&appdata).join("npm"));
+    }
+    for e in extra {
+        if e.is_dir() && !paths.iter().any(|p| p.as_os_str().eq_ignore_ascii_case(e.as_os_str())) {
+            paths.push(e);
+        }
+    }
+    std::env::join_paths(paths).ok()
+}
+
+/// Runs a prepared command with captured output and a hard timeout. Output readers are never
+/// joined blindly, so a background grandchild holding a pipe can't wedge the caller.
+fn run_captured(mut c: Command, timeout: std::time::Duration) -> Result<(i32, String, String), String> {
+    use std::io::Read;
+    use std::process::Stdio;
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    c.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = c.spawn().map_err(|e| format!("Failed to execute command: {}", e))?;
+    let out_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
+    let err_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
+
+    fn pump<R: Read + Send + 'static>(r: Option<R>, buf: Arc<Mutex<Vec<u8>>>) -> Option<std::thread::JoinHandle<()>> {
+        r.map(|mut r| {
+            std::thread::spawn(move || {
+                let mut chunk = [0u8; 8192];
+                loop {
+                    match r.read(&mut chunk) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            if let Ok(mut b) = buf.lock() {
+                                if b.len() < 4 * 1024 * 1024 {
+                                    b.extend_from_slice(&chunk[..n]);
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        })
+    }
+    let h1 = pump(child.stdout.take(), out_buf.clone());
+    let h2 = pump(child.stderr.take(), err_buf.clone());
+
+    let pid = child.id();
+    let start = Instant::now();
+    let mut timed_out = false;
+    let mut code = -1;
+    loop {
+        match child.try_wait() {
+            Ok(Some(s)) => {
+                code = s.code().unwrap_or(-1);
+                break;
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    kill_tree(pid);
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    timed_out = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => return Err(format!("Failed to wait for command: {}", e)),
+        }
+    }
+    // Give the readers a short window to drain the pipes.
+    let drain_start = Instant::now();
+    while drain_start.elapsed() < std::time::Duration::from_millis(400) {
+        let done1 = h1.as_ref().map(|h| h.is_finished()).unwrap_or(true);
+        let done2 = h2.as_ref().map(|h| h.is_finished()).unwrap_or(true);
+        if done1 && done2 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let stdout = String::from_utf8_lossy(&out_buf.lock().map(|b| b.clone()).unwrap_or_default()).to_string();
+    let mut stderr = String::from_utf8_lossy(&err_buf.lock().map(|b| b.clone()).unwrap_or_default()).to_string();
+    if timed_out {
+        if !stderr.is_empty() && !stderr.ends_with('\n') {
+            stderr.push('\n');
+        }
+        stderr.push_str(&format!(
+            "command timed out after {}s and was stopped (no interactive input is available)",
+            timeout.as_secs()
+        ));
+        code = 124;
+    }
+    Ok((code, stdout, stderr))
+}
+
 #[tauri::command(async)]
 pub fn shell_run(root: String, cmd: String) -> Result<Value, String> {
-    use std::process::Stdio;
-    let workdir = if root.trim().is_empty() {
+    shell_run_as(root, cmd, "user")
+}
+
+pub fn shell_run_as(root: String, cmd: String, source: &str) -> Result<Value, String> {
+    let base = if root.trim().is_empty() {
         std::env::current_dir().map_err(|e| e.to_string())?
     } else {
         PathBuf::from(&root)
     };
+    let mirror = source == "agent";
+    let id = format!("t{}-{}", std::process::id(), TERM_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
     let clean_cmd = sanitize_shell_command(&cmd);
+    if mirror {
+        term_emit(json!({ "id": id, "root": root, "cmd": clean_cmd, "source": source, "running": true }));
+    }
+    let res = shell_exec(&root, &base, clean_cmd.clone());
+    if mirror {
+        match &res {
+            Ok(v) => term_emit(json!({
+                "id": id, "root": root, "cmd": clean_cmd, "source": source, "running": false,
+                "code": v.get("code").cloned().unwrap_or(json!(0)),
+                "stdout": v.get("stdout").cloned().unwrap_or(json!("")),
+                "stderr": v.get("stderr").cloned().unwrap_or(json!("")),
+                "cwd": v.get("cwd").cloned().unwrap_or(json!("")),
+            })),
+            Err(e) => term_emit(json!({
+                "id": id, "root": root, "cmd": clean_cmd, "source": source, "running": false,
+                "code": 1, "stdout": "", "stderr": e,
+            })),
+        }
+    }
+    res
+}
+
+fn shell_exec(root: &str, base: &Path, mut clean_cmd: String) -> Result<Value, String> {
+    let key = root.to_string();
+    let mut workdir = term_cwd_map()
+        .lock()
+        .ok()
+        .and_then(|m| m.get(&key).cloned())
+        .filter(|p| p.is_dir())
+        .unwrap_or_else(|| base.to_path_buf());
+
     if clean_cmd.is_empty() || matches!(clean_cmd.to_ascii_lowercase().as_str(), "pause" | "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "bash") {
         return Ok(json!({
             "code": 0,
             "stdout": "(non-interactive shell ready — pass a specific command to run)",
-            "stderr": ""
+            "stderr": "",
+            "cwd": workdir.to_string_lossy()
         }));
     }
 
-    if let Some(builtin_res) = try_builtin_posix_shell(&workdir, &clean_cmd) {
+    // `cd` persists across calls, like a real terminal session.
+    if let Some((dir, rest)) = split_leading_cd(&clean_cmd) {
+        if dir.is_empty() || dir == "~" {
+            if rest.is_empty() {
+                return Ok(json!({ "code": 0, "stdout": workdir.to_string_lossy(), "stderr": "", "cwd": workdir.to_string_lossy() }));
+            }
+        } else {
+            let target = {
+                let p = PathBuf::from(&dir);
+                if p.is_absolute() { p } else { workdir.join(&dir) }
+            };
+            match target.canonicalize() {
+                Ok(t) if t.is_dir() => {
+                    #[allow(unused_mut)]
+                    let mut t = t;
+                    #[cfg(target_os = "windows")]
+                    {
+                        let s = t.to_string_lossy().to_string();
+                        if let Some(stripped) = s.strip_prefix("\\\\?\\") {
+                            t = PathBuf::from(stripped);
+                        }
+                    }
+                    workdir = t.clone();
+                    if let Ok(mut m) = term_cwd_map().lock() {
+                        m.insert(key.clone(), t);
+                    }
+                    if rest.is_empty() {
+                        return Ok(json!({ "code": 0, "stdout": "", "stderr": "", "cwd": workdir.to_string_lossy() }));
+                    }
+                    clean_cmd = rest;
+                }
+                _ => {
+                    return Ok(json!({
+                        "code": 1,
+                        "stdout": "",
+                        "stderr": format!("cd: no such directory: {}", dir),
+                        "cwd": workdir.to_string_lossy()
+                    }));
+                }
+            }
+        }
+    }
+
+    if let Some(mut builtin_res) = try_builtin_posix_shell(&workdir, &clean_cmd) {
+        if let Some(o) = builtin_res.as_object_mut() {
+            o.insert("cwd".to_string(), json!(workdir.to_string_lossy()));
+        }
         return Ok(builtin_res);
     }
 
     #[cfg(target_os = "windows")]
-    let output = {
+    let mut c = {
         use std::os::windows::process::CommandExt;
-        // 0x08000000 = CREATE_NO_WINDOW: guarantees zero external terminal/console window popup on the PC
-        Command::new("cmd")
-            .args(["/d", "/s", "/c", &clean_cmd])
-            .current_dir(&workdir)
-            .env("CI", "true")
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .env("GCM_INTERACTIVE", "never")
-            .env("NPM_CONFIG_YES", "true")
-            .env("PIP_NO_INPUT", "1")
-            .env("PYTHONIOENCODING", "utf-8")
-            .env("PYTHONUTF8", "1")
-            .env("NO_COLOR", "1")
-            .env("TERM", "dumb")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("Failed to execute command: {}", e))?
+        let mut c = Command::new("cmd");
+        // 0x08000000 = CREATE_NO_WINDOW: no external console window ever pops up.
+        c.args(["/d", "/s", "/c", &clean_cmd]).creation_flags(0x08000000);
+        c
     };
-
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new("bash")
-        .args(["-lc", &clean_cmd])
-        .current_dir(&workdir)
+    let mut c = {
+        let mut c = Command::new("bash");
+        c.args(["-lc", &clean_cmd]);
+        c
+    };
+    c.current_dir(&workdir)
         .env("CI", "true")
+        // Git must never block on a console prompt; credential helpers (Git Credential Manager,
+        // gh) stay fully enabled and may open their own sign-in window.
         .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GCM_INTERACTIVE", "never")
+        .env("GIT_PAGER", "cat")
+        .env("PAGER", "cat")
         .env("NPM_CONFIG_YES", "true")
         .env("PIP_NO_INPUT", "1")
         .env("PYTHONIOENCODING", "utf-8")
         .env("PYTHONUTF8", "1")
         .env("NO_COLOR", "1")
-        .env("TERM", "dumb")
-        .stdin(Stdio::null())
-        .output()
-        .or_else(|_| {
-            Command::new("sh")
-                .args(["-lc", &clean_cmd])
-                .current_dir(&workdir)
-                .env("CI", "true")
-                .env("GIT_TERMINAL_PROMPT", "0")
-                .stdin(Stdio::null())
-                .output()
-        })
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
+        .env("TERM", "dumb");
+    if let Some(p) = augmented_path() {
+        c.env("PATH", p);
+    }
+    c.env_remove("GCM_INTERACTIVE");
 
-    let code = output.status.code().unwrap_or(-1);
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
+    let (code, stdout, stderr) = run_captured(c, std::time::Duration::from_secs(300))?;
     Ok(json!({
         "code": code,
         "stdout": stdout,
-        "stderr": stderr
+        "stderr": stderr,
+        "cwd": workdir.to_string_lossy()
     }))
 }
 
