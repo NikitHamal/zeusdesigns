@@ -713,9 +713,40 @@ where
         if let Some(token) = bearer {
             rb = rb.header("Authorization", format!("Bearer {}", token));
         }
-        let resp = match rb.json(&payload).send()
-        {
+        let resp = match rb.json(&payload).send() {
             Ok(r) if r.status().is_success() => r,
+            Ok(r) if wants_agent_tools && supports_native_oai_tools && matches!(r.status().as_u16(), 400 | 404 | 422 | 500) => {
+                let mut fallback_msgs = oai_msgs.clone();
+                if let Some(first_m) = fallback_msgs.first_mut() {
+                    if first_m.get("role").and_then(|ro| ro.as_str()) == Some("system") {
+                        if let Some(orig_sys) = first_m.get("content").and_then(|c| c.as_str()).map(|s| s.to_string()) {
+                            if !orig_sys.contains("[XML DSL Output Mode") {
+                                first_m["content"] = json!(format!("{}\n\n{}", scraper_xml_dsl_banner(), orig_sys));
+                            }
+                        }
+                    }
+                }
+                let mut fb_payload = json!({
+                    "model": upstream_model,
+                    "stream": true,
+                    "max_tokens": max_tok,
+                    "messages": fallback_msgs
+                });
+                if endpoint.contains("ai.northcity.top") {
+                    fb_payload["enable_thinking"] = json!(true);
+                }
+                let mut rb_fb = client
+                    .post(endpoint)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "text/event-stream, application/json");
+                if let Some(token) = bearer {
+                    rb_fb = rb_fb.header("Authorization", format!("Bearer {}", token));
+                }
+                match rb_fb.json(&fb_payload).send() {
+                    Ok(r2) if r2.status().is_success() => r2,
+                    _ => continue,
+                }
+            }
             _ => continue,
         };
 

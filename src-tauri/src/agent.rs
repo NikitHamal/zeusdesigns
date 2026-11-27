@@ -863,13 +863,23 @@ fn execute_inline_workspace_tools(
                 continue;
             }
             let tool_id = format!("tool-{}-{}-{}", req_tag, executed_ids.len(), inv.offset);
+            let mut emit_args = json!({
+                "path": inv.path,
+                "body": inv.body.trim()
+            });
+            if let Some(st) = inv.start_line {
+                emit_args["start"] = json!(st);
+            }
+            if let Some(en) = inv.end_line {
+                emit_args["end"] = json!(en);
+            }
             let _ = app.emit(
                 event_topic,
                 json!({
                     "type": "tool_call",
                     "id": tool_id,
                     "name": name,
-                    "args": { "path": inv.path, "body": inv.body.trim() }
+                    "args": emit_args
                 }),
             );
             if name.starts_with("studio_") || name.contains("studio_") {

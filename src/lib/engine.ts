@@ -874,7 +874,44 @@ export async function sendMessage(opts: {
               b = t.args ?? "";
             }
             if (usesNativeProtocol) {
-              const argsPayload = parsedObj ?? { ...(p ? { path: p } : {}), ...(b ? { body: b } : {}) };
+              const canonName = ToolAliases.canonicalName(t.name);
+              let argsPayload: Record<string, unknown>;
+              if (b.startsWith("{") && b.endsWith("}")) {
+                try {
+                  const inner = JSON.parse(b) as Record<string, unknown>;
+                  argsPayload = { ...(p && !inner.path ? { path: p } : {}), ...inner };
+                } catch {
+                  argsPayload = parsedObj ?? { ...(p ? { path: p } : {}), ...(b ? { body: b } : {}) };
+                }
+              } else if (canonName === "run_command" || t.name === "shell" || t.name === "bash") {
+                argsPayload = { command: b || p };
+              } else if (canonName === "python") {
+                argsPayload = { code: b || p };
+              } else if (canonName === "write_file") {
+                argsPayload = { path: p, content: b };
+              } else if (canonName === "read_file") {
+                argsPayload = {
+                  path: p || b,
+                  ...(parsedObj?.start ? { start: parsedObj.start } : {}),
+                  ...(parsedObj?.end ? { end: parsedObj.end } : {}),
+                };
+              } else if (canonName === "grep") {
+                argsPayload = t.name === "search_code"
+                  ? { query: b || p, ...(b && p ? { path: p } : {}) }
+                  : { pattern: b || p, ...(b && p ? { path: p } : {}) };
+              } else if (canonName === "glob") {
+                argsPayload = { pattern: b || p, ...(b && p ? { path: p } : {}) };
+              } else if (canonName === "search_project" || canonName === "docs_lookup" || canonName === "memory_search") {
+                argsPayload = { query: b || p, ...(b && p ? { path: p } : {}) };
+              } else if (canonName === "memory_save" || canonName === "memory_edit") {
+                argsPayload = { ...(p ? { path: p } : {}), content: b };
+              } else if (canonName === "web_fetch") {
+                argsPayload = { url: p || b };
+              } else if (canonName === "use_skill") {
+                argsPayload = { name: p || b };
+              } else {
+                argsPayload = { ...(p ? { path: p } : {}), ...(b ? { content: b } : {}) };
+              }
               return `<tool_call>${JSON.stringify({ name: t.name, arguments: argsPayload })}</tool_call>`;
             }
             return `<zeus_tool name="${t.name}"${p ? ` path="${p}"` : ""}>${b}</zeus_tool>`;
