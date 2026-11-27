@@ -622,16 +622,8 @@ where
                 "https://bananamort-inkling-2-mini.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--unsloth--Inkling-2-Mini-GGUF/snapshots/45fd08764f2b0bf16b03a5483a80e5c7aaec8772/Inkling-2-Mini-UD-Q4_K_XL.gguf",
             ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
         ],
         "nanbeige4.3-33b" => &[
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
             (
                 "https://apathy-exe-nanbeige4-3-33b.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--bartowski--Nanbeige_Nanbeige4.3-33B-GGUF/snapshots/9beb68421fdf7be095093a6888325fa2c83ddd38/Nanbeige_Nanbeige4.3-33B-Q4_K_M.gguf",
@@ -642,19 +634,11 @@ where
                 "https://apathy-exe-muse-glimmer-30b.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--meta-models--Muse-Glimmer-30B-GGUF/snapshots/b44f1072cf75e918a1b82a3a17b45c4389b076e7/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
             ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
         ],
         "xing4.0-29b-a4b" => &[
             (
                 "https://apathy-exe-xing4-0-29b-a4b.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--XingChen-AGI--Xing4.0-29B-A4B-GGUF/snapshots/006904bc1d05ae2c37f938a4abdffee27e488544/xing4_0-29b-IQ4_NL.gguf",
-            ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
             ),
         ],
         "mellum2-12b-thinking" => &[
@@ -662,19 +646,11 @@ where
                 "https://usermma-mellum2-12b-a2-5b-thinking-abliterated.hf.space/v1/chat/completions",
                 "Mellum2-12B-A2.5B-Thinking-Abliterated-Q6_K.gguf",
             ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
         ],
         "nanbeige4.2-3b" => &[
             (
                 "https://apathy-exe-nanbeige4-2-3b.hf.space/v1/chat/completions",
                 "/app/nanbeige4.2-3b-Q4_K_M.gguf",
-            ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
             ),
         ],
         "minicpm5-1b" => &[
@@ -682,23 +658,11 @@ where
                 "https://usermma-minicpm5-abliterated-q3.hf.space/v1/chat/completions",
                 "Huihui-MiniCPM5-1B-abliterated.Q3_K_L.gguf",
             ),
-            (
-                "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
         ],
         _ => &[
             (
                 "https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions",
                 "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf",
-            ),
-            (
-                "https://bananamort-inkling-2-mini.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--unsloth--Inkling-2-Mini-GGUF/snapshots/45fd08764f2b0bf16b03a5483a80e5c7aaec8772/Inkling-2-Mini-UD-Q4_K_XL.gguf",
-            ),
-            (
-                "https://apathy-exe-nanbeige4-3-33b.hf.space/v1/chat/completions",
-                "/root/.cache/huggingface/hub/models--bartowski--Nanbeige_Nanbeige4.3-33B-GGUF/snapshots/9beb68421fdf7be095093a6888325fa2c83ddd38/Nanbeige_Nanbeige4.3-33B-Q4_K_M.gguf",
             ),
         ],
     };
