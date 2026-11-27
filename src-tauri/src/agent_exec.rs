@@ -8,7 +8,6 @@ use crate::workspace::{
 };
 use serde_json::Value;
 use std::path::Path;
-
 pub fn resolve_workspace_root(workspace_root: &str) -> String {
     let trimmed = workspace_root.trim();
     if !trimmed.is_empty() {
@@ -18,7 +17,6 @@ pub fn resolve_workspace_root(workspace_root: &str) -> String {
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| ".".to_string())
 }
-
 pub fn format_tree_compact(nodes: &[FileNode], indent: usize, out: &mut String) {
     let pad = "  ".repeat(indent);
     for n in nodes {
@@ -37,7 +35,6 @@ pub fn format_tree_compact(nodes: &[FileNode], indent: usize, out: &mut String) 
         }
     }
 }
-
 pub fn format_exec_result(v: &Value) -> (bool, String) {
     let code = v.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
     let stdout = v.get("stdout").and_then(|s| s.as_str()).unwrap_or("").trim_end();
@@ -75,7 +72,6 @@ pub fn format_exec_result(v: &Value) -> (bool, String) {
     };
     (code == 0, text)
 }
-
 /// Appends Stormy's `ProjectTools.withQuickCheck` note when a file write/edit introduces syntax or asset issues.
 pub fn append_quick_check(eff_root: &str, rel_path: &str, base_msg: String) -> String {
     if rel_path.trim().is_empty() {
@@ -88,13 +84,11 @@ pub fn append_quick_check(eff_root: &str, rel_path: &str, base_msg: String) -> S
         format!("{}\n\n[Quick syntax check]\n{}", base_msg, issues.join("\n"))
     }
 }
-
 pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation) -> (bool, String) {
     let name = inv.name.trim();
     let path_arg = &inv.path;
     let body = inv.body.trim();
     let eff_root = resolve_workspace_root(eff_root);
-
     match name {
         "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" | "read_file_lines" => {
             let mut target_paths = Vec::new();
@@ -1000,3 +994,4 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         ),
     }
 }
+

@@ -464,3 +464,132 @@ pub fn unpack_function_parameters(
     }
     body_out
 }
+
+pub fn parse_vendor_tool_calls(clean_text: &str, strict_placeholder_filter: bool, list: &mut Vec<crate::agent::InlineToolInvocation>) {
+    use crate::agent::{InlineToolInvocation, is_known_valid_tool, parse_inline_invocations_segment};
+    use serde_json::json;
+    // 5. Support K2-Horizon `<ifm|tool_call>`, Kimi `<|tool_call_begin|>`, DeepSeek `<｜tool▁call▁begin｜>`, and Mistral `[TOOL_CALLS]`
+    if clean_text.contains("<ifm|tool_call>") {
+        let open_pat = "<ifm|tool_call>";
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find(open_pat) {
+            let start = from + rel_s;
+            let after_open = start + open_pat.len();
+            let rest_after = &clean_text[after_open..];
+            let Some(rel_end) = rest_after.find("</ifm|tool_call>") else { break };
+            let inner = &rest_after[..rel_end];
+            from = after_open + rel_end + "</ifm|tool_call>".len();
+            let name_end = inner.find('<').unwrap_or(inner.len());
+            let name = inner[..name_end].trim().to_string();
+            if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
+                continue;
+            }
+            let mut path_arg = String::new();
+            let mut start_line = None;
+            let mut end_line = None;
+            let mut body_out = String::new();
+            let mut afrom = name_end;
+            while let Some(ks) = inner[afrom..].find("<ifm|arg_key>") {
+                let kstart = afrom + ks + "<ifm|arg_key>".len();
+                let Some(ke) = inner[kstart..].find("</ifm|arg_key>") else { break };
+                let key = inner[kstart..kstart + ke].trim();
+                let after_k = kstart + ke + "</ifm|arg_key>".len();
+                let Some(vs) = inner[after_k..].find("<ifm|arg_value>") else { break };
+                let vstart = after_k + vs + "<ifm|arg_value>".len();
+                let ve = inner[vstart..].find("</ifm|arg_value>").unwrap_or(inner.len() - vstart);
+                let val = inner[vstart..vstart + ve].trim();
+                afrom = (vstart + ve + "</ifm|arg_value>".len()).min(inner.len());
+                if matches!(key, "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
+                    path_arg = val.to_string();
+                } else if key == "start" {
+                    start_line = val.parse::<usize>().ok();
+                } else if key == "end" {
+                    end_line = val.parse::<usize>().ok();
+                } else {
+                    body_out = val.to_string();
+                }
+            }
+            list.push(InlineToolInvocation {
+                name,
+                path: path_arg,
+                start_line,
+                end_line,
+                body: body_out,
+                offset: start,
+            });
+        }
+    }
+
+    if clean_text.contains("<|tool_call_begin|>") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("<|tool_call_begin|>") {
+            let start = from + rel_s;
+            let after_open = start + "<|tool_call_begin|>".len();
+            let rest = &clean_text[after_open..];
+            let Some(arg_s) = rest.find("<|tool_call_argument_begin|>") else { break };
+            let raw_name = rest[..arg_s].trim();
+            let clean_name = raw_name.strip_prefix("functions.").unwrap_or(raw_name).split(':').next().unwrap_or("").trim();
+            let after_arg = arg_s + "<|tool_call_argument_begin|>".len();
+            let end_call = rest[after_arg..].find("<|tool_call_end|>").unwrap_or(rest.len() - after_arg);
+            let json_arg = rest[after_arg..after_arg + end_call].trim();
+            from = after_open + (after_arg + end_call + "<|tool_call_end|>".len()).min(rest.len());
+            if !clean_name.is_empty() {
+                let wrapped = format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({
+                        "name": clean_name,
+                        "arguments": serde_json::from_str::<Value>(json_arg).unwrap_or_else(|_| json!({ "body": json_arg }))
+                    })
+                );
+                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+            }
+        }
+    }
+
+    if clean_text.contains("<｜tool▁call▁begin｜>") {
+        let mut from = 0;
+        while let Some(rel_s) = clean_text[from..].find("<｜tool▁call▁begin｜>") {
+            let start = from + rel_s;
+            let after_open = start + "<｜tool▁call▁begin｜>".len();
+            let rest = &clean_text[after_open..];
+            let Some(sep_s) = rest.find("<｜tool▁sep｜>") else { break };
+            let after_sep = sep_s + "<｜tool▁sep｜>".len();
+            let end_call = rest[after_sep..].find("<｜tool▁call▁end｜>").unwrap_or(rest.len() - after_sep);
+            let inner = rest[after_sep..after_sep + end_call].trim();
+            from = after_open + (after_sep + end_call + "<｜tool▁call▁end｜>".len()).min(rest.len());
+            let name_end = inner.find(|c: char| c.is_whitespace() || c == '{' || c == '`').unwrap_or(inner.len());
+            let clean_name = inner[..name_end].trim();
+            let json_part = inner[name_end..]
+                .trim()
+                .trim_start_matches("```json")
+                .trim_start_matches("```")
+                .trim_end_matches("```")
+                .trim();
+            if !clean_name.is_empty() {
+                let wrapped = format!(
+                    "<tool_call>{}</tool_call>",
+                    json!({
+                        "name": clean_name,
+                        "arguments": serde_json::from_str::<Value>(json_part).unwrap_or_else(|_| json!({ "body": json_part }))
+                    })
+                );
+                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+            }
+        }
+    }
+
+    if clean_text.contains("[TOOL_CALLS]") {
+        if let Some(pos) = clean_text.find("[TOOL_CALLS]") {
+            let rest = clean_text[pos + "[TOOL_CALLS]".len()..].trim();
+            if rest.starts_with('[') {
+                if let Ok(Value::Array(arr)) = serde_json::from_str::<Value>(rest) {
+                    for item in arr {
+                        let wrapped = format!("<tool_call>{}</tool_call>", item);
+                        list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
+                    }
+                }
+            }
+        }
+    }
+
+}

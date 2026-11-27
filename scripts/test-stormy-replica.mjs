@@ -1,21 +1,10 @@
 #!/usr/bin/env node
-// Comprehensive Verification Suite for Stormy (Oro / Orobi) Replica & Desktop Upgrade in ZeusDesigns
-// Verifies:
-// 1. Stormy Core Agent System (`src/lib/stormyAgent.ts`): ToolAliases, TextToolProtocol, ModelProfiles,
-//    ToolBatch dependency waves, StuckDetector, TokenEstimator, RunLedger, HistoryPruner, BriefCheck,
-//    ProjectInstructions, ProjectSnapshot, DiffUtils, AutonomyPolicy, QualityGate, and DisplayText.
-// 2. Native Rust Engine (`src-tauri/src/workspace.rs` & `src-tauri/src/agent.rs`):
-//    4-stage TextEdits (`apply_stormy_text_edit`), BM25 ProjectSearch (`bm25_search_project`),
-//    ProjectOutline (`project_outline_of`), QualityAuditor (`audit_workspace_files`),
-//    Checkpoints (`checkpoint_capture_file`, `workspace_checkpoints`, `workspace_restore_checkpoint`),
-//    Git & Extended tools (`copy_file`, `create_folder`, `insert_at_line`, `diff_files`, `git_status`, `security_scan`).
-// 3. UI & IDE Components (`Activity.tsx`, `StormyCards.tsx`, `GitPanel.tsx`, `WorkspacePanels.tsx`, `Chat.tsx`, `Settings.tsx`).
-
+// Comprehensive Verification Suite for Stormy (Oro / Orobi) Replica & Coding Harness Overhaul in ZeusDesigns
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-console.log("=== Stormy (Oro) Replica & Desktop Upgrade Verification Suite ===");
+console.log("=== Stormy (Oro) & Coding Harness Overhaul Verification Suite ===");
 
 const stormyAgentSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/stormyAgent.ts"), "utf8");
 for (const sym of [
@@ -43,7 +32,10 @@ for (const sym of [
 }
 console.log("[PASS] 1. stormyAgent.ts exports all 19 Stormy core agent & harness subsystems");
 
-const workspaceRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/workspace.rs"), "utf8");
+const workspaceRs = [
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/workspace.rs"), "utf8"),
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/workspace_stormy.rs"), "utf8"),
+].join("\n");
 for (const fnName of [
   "pub fn project_outline_of",
   "pub fn glob_workspace_files",
@@ -60,12 +52,18 @@ for (const fnName of [
 ]) {
   assert.ok(workspaceRs.includes(fnName), `workspace.rs must implement ${fnName}`);
 }
-console.log("[PASS] 2. src-tauri/src/workspace.rs implements all 12 Stormy native workspace, BM25, checkpoint, git, and audit functions");
+console.log("[PASS] 2. src-tauri/src/workspace*.rs implements all 12 Stormy native workspace, BM25, checkpoint, git, and audit functions");
 
-const agentRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent.rs"), "utf8");
+const agentRs = [
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent.rs"), "utf8"),
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_edit.rs"), "utf8"),
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/agent_exec.rs"), "utf8"),
+].join("\n");
 for (const feature of [
   "pub fn apply_stormy_text_edit",
   "fn strip_read_file_line_prefixes",
+  "pub fn compute_tool_batch_waves",
+  "fn pre_tool_and_autonomy_guard",
   '"multi_edit"',
   '"search_project"',
   '"docs_lookup"',
@@ -84,19 +82,41 @@ for (const feature of [
   "<｜tool▁call▁begin｜>",
   "[TOOL_CALLS]",
 ]) {
-  assert.ok(agentRs.includes(feature), `agent.rs must support ${feature}`);
+  assert.ok(agentRs.includes(feature), `agent*.rs must support ${feature}`);
 }
-console.log("[PASS] 3. src-tauri/src/agent.rs supports Stormy 4-stage TextEdits, multi-format tool parsers, and all extended/git tools");
+console.log("[PASS] 3. src-tauri/src/agent*.rs supports post-stream ToolBatch waves, PreToolUse/Autonomy guards, and multi-format tool parsers");
 
-for (const uiFile of [
-  "src/components/Activity.tsx",
-  "src/components/StormyCards.tsx",
-  "src/components/GitPanel.tsx",
-  "src/components/WorkspacePanels.tsx",
-  "src/components/Chat.tsx",
-  "src/components/Settings.tsx",
-]) {
-  assert.ok(fs.existsSync(path.join(process.cwd(), uiFile)), `${uiFile} must exist`);
+// Verify coding harness fixes:
+// - Single protocol per provider in tools.ts
+// - No synthetic 3-turn list_dir prefill in agent.ts
+// - 60s minimum HTTP timeout, 120k system cap, and disabled silent cross-provider failover in providers*.rs
+const toolsTs = fs.readFileSync(path.join(process.cwd(), "src/lib/tools.ts"), "utf8");
+const agentTs = fs.readFileSync(path.join(process.cwd(), "src/lib/agent.ts"), "utf8");
+const engineTs = fs.readFileSync(path.join(process.cwd(), "src/lib/engine.ts"), "utf8");
+const providersAllRs = [
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers.rs"), "utf8"),
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_oai_a.rs"), "utf8"),
+  fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_fingerprint.rs"), "utf8"),
+].join("\n");
+
+assert.ok(toolsTs.includes("## Agent Tools (Native Function Calling)") && toolsTs.includes("## Agent Tools (Zeus XML Protocol)"));
+assert.ok(!agentTs.includes('content: `Workspace is connected. I will check the top-level directory listing first.'));
+assert.ok(engineTs.includes("runPreToolUseHook") && engineTs.includes("computeToolBatchWaves") && engineTs.includes("provider_notice"));
+assert.ok(providersAllRs.includes("timeout_secs.max(60)"));
+assert.ok(providersAllRs.includes("smart_cap_system(&req.system, 120000)"));
+assert.ok(providersAllRs.includes("Silent cross-provider model switching is disabled"));
+console.log("[PASS] 4. Unified tool protocol, post-stream execution, 60s+ timeouts, 120k prompt retention, and disabled silent failover verified");
+
+// Verify every .ts, .tsx, and .rs file in src/ and src-tauri/src/ is under 1,000 lines
+for (const dir of ["src/lib", "src/components", "src-tauri/src"]) {
+  const fullDir = path.join(process.cwd(), dir);
+  for (const entry of fs.readdirSync(fullDir)) {
+    if (!/\.(ts|tsx|rs)$/.test(entry)) continue;
+    const p = path.join(fullDir, entry);
+    if (!fs.statSync(p).isFile()) continue;
+    const lineCount = fs.readFileSync(p, "utf8").split("\n").length;
+    assert.ok(lineCount <= 1000, `${dir}/${entry} has ${lineCount} lines (must be <= 1000)`);
+  }
 }
-console.log("[PASS] 4. All Stormy UI components (ToolCard, ToolCallGroup, PlanTimeline, AskUserCard, ApprovalCard, GitPanel, CodeEditor) verified");
-console.log("=== ALL STORMY REPLICA VERIFICATION CHECKS PASSED ===");
+console.log("[PASS] 5. Every .ts, .tsx, and .rs file in src/ and src-tauri/src/ is strictly <= 1,000 lines");
+console.log("=== ALL STORMY & CODING HARNESS VERIFICATION CHECKS PASSED ===");

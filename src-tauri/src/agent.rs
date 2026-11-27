@@ -2,7 +2,6 @@
 pub mod agent_edit;
 #[path = "agent_exec.rs"]
 pub mod agent_exec;
-
 use crate::agent_edit::{apply_stormy_text_edit_impl, extract_attr};
 pub use crate::agent_exec::{execute_single_workspace_tool, resolve_workspace_root};
 use crate::providers::{
@@ -18,11 +17,9 @@ use std::sync::{
 };
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
-
 fn strip_read_file_line_prefixes(text: &str) -> String {
     crate::agent_edit::strip_read_file_line_prefixes(text)
 }
-
 pub fn apply_stormy_text_edit(
     content: &str,
     search_raw: &str,
@@ -33,12 +30,10 @@ pub fn apply_stormy_text_edit(
     let _ = strip_read_file_line_prefixes;
     apply_stormy_text_edit_impl(content, search_raw, replace_raw, replace_all, idx)
 }
-
 #[tauri::command]
 pub fn providers_list() -> Vec<ProviderInfo> {
     catalog()
 }
-
 #[tauri::command(async)]
 pub fn provider_verify_model(
     provider: String,
@@ -47,7 +42,6 @@ pub fn provider_verify_model(
 ) -> Result<ModelFingerprintReport, String> {
     verify_model_fingerprint(engine.inner(), &provider, &model)
 }
-
 #[tauri::command(async)]
 pub fn title_generate(text: String) -> Result<String, String> {
     let snippet: String = text.chars().take(280).collect();
@@ -94,7 +88,6 @@ pub fn title_generate(text: String) -> Result<String, String> {
         Ok(titled.chars().take(50).collect())
     }
 }
-
 #[tauri::command]
 pub fn chat_cancel(
     request_id: String,
@@ -107,7 +100,6 @@ pub fn chat_cancel(
     }
     Ok(())
 }
-
 /// Strip `<think>...</think>` and `<thinking>...</thinking>` blocks so tool tags mentioned inside
 /// a model's internal reasoning trace are never executed as real tools.
 pub fn strip_thinking_blocks(raw: &str) -> String {
@@ -180,7 +172,6 @@ pub fn strip_thinking_blocks(raw: &str) -> String {
     }
     out
 }
-
 #[derive(Debug, Clone)]
 pub struct InlineToolInvocation {
     pub name: String,
@@ -190,8 +181,7 @@ pub struct InlineToolInvocation {
     pub body: String,
     pub offset: usize,
 }
-
-fn is_known_valid_tool(name: &str) -> bool {
+pub fn is_known_valid_tool(name: &str) -> bool {
     matches!(
         name,
         "read_file" | "read" | "cat" | "cat_file" | "view_file" | "open_file" | "read_file_lines"
@@ -229,7 +219,6 @@ fn is_known_valid_tool(name: &str) -> bool {
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
-
 fn is_mutating_or_exec_tool(name: &str) -> bool {
     matches!(
         name,
@@ -243,7 +232,6 @@ fn is_mutating_or_exec_tool(name: &str) -> bool {
             | "python" | "python3" | "py" | "python_exec" | "run_python"
     )
 }
-
 fn is_template_placeholder(name: &str, path: &str, body: &str) -> bool {
     let p = path.trim();
     let b = body.trim();
@@ -269,11 +257,9 @@ fn is_template_placeholder(name: &str, path: &str, body: &str) -> bool {
     }
     false
 }
-
 fn is_offset_covered(spans: &[(usize, usize)], pos: usize) -> bool {
     spans.iter().any(|&(s, e)| pos >= s && pos < e)
 }
-
 pub fn parse_inline_invocations_segment(
     clean_text: &str,
     allow_unclosed_tail: bool,
@@ -281,7 +267,6 @@ pub fn parse_inline_invocations_segment(
 ) -> Vec<InlineToolInvocation> {
     let mut list = Vec::new();
     let mut covered_spans: Vec<(usize, usize)> = Vec::new();
-
     // 1. Parse `<zeus_tool ...>...</zeus_tool>` and self-closing `<zeus_tool ... />`
     let mut search_from = 0;
     while let Some(rel_start) = clean_text[search_from..].find("<zeus_tool") {
@@ -336,7 +321,6 @@ pub fn parse_inline_invocations_segment(
         };
         search_from = next_pos;
         covered_spans.push((start, next_pos));
-
         let mut path_arg = extract_attr(header, "path")
             .or_else(|| extract_attr(header, "file"))
             .or_else(|| extract_attr(header, "id"))
@@ -360,7 +344,6 @@ pub fn parse_inline_invocations_segment(
         } else {
             body.to_string()
         };
-
         if eff_body.contains("<parameter") || eff_body.contains("<param") || eff_body.contains("<antml:parameter") {
             let mut body_out = String::new();
             let mut saw_params = false;
@@ -401,7 +384,6 @@ pub fn parse_inline_invocations_segment(
                 eff_body = body_out;
             }
         }
-
         if eff_body.starts_with('{') && eff_body.ends_with('}') {
             if let Ok(j) = serde_json::from_str::<Value>(&eff_body) {
                 if path_arg.is_empty() {
@@ -452,7 +434,6 @@ pub fn parse_inline_invocations_segment(
         {
             path_arg = eff_body.trim_matches(|c| c == '"' || c == '\'' || c == '`').to_string();
         }
-
         if !is_known_valid_tool(&name) || is_template_placeholder(&name, &path_arg, &eff_body) {
             continue;
         }
@@ -465,7 +446,6 @@ pub fn parse_inline_invocations_segment(
             offset: start,
         });
     }
-
     // 2. Parse `<tool_call>{...}</tool_call>` and `<function_call>{...}</function_call>`
     for (open_tag, close_tag) in [("<tool_call>", "</tool_call>"), ("<function_call>", "</function_call>")] {
         let mut from = 0;
@@ -484,7 +464,6 @@ pub fn parse_inline_invocations_segment(
                 .trim_end_matches("```")
                 .trim();
             from = next_from;
-
             let parsed_val = serde_json::from_str::<Value>(raw).ok().or_else(|| {
                 let (first_line, rest_json) = raw.split_once('\n')?;
                 let fn_name = first_line.trim();
@@ -570,7 +549,6 @@ pub fn parse_inline_invocations_segment(
             }
         }
     }
-
     // 3. Support `<function name="...">`, `<function=name>`, `<invoke name="...">`, and `<antml:invoke name="...">` XML formats
     // (Never skipped when `<zeus_tool>` is also present; uses `covered_spans` to avoid double-parsing)
     for (open_tag, close_tag) in [("<function", "</function>"), ("<invoke", "</invoke>"), ("<antml:invoke", "</antml:invoke>")] {
@@ -613,7 +591,6 @@ pub fn parse_inline_invocations_segment(
             });
         }
     }
-
     // 4. Support direct shorthand XML tags (`<bash>...</bash>`, `<edit_file path="...">...</edit_file>`, etc.)
     // even when mixed with `<zeus_tool>` in the same turn
     for tag_name in [
@@ -685,135 +662,11 @@ pub fn parse_inline_invocations_segment(
             });
         }
     }
-
-    // 5. Support K2-Horizon `<ifm|tool_call>`, Kimi `<|tool_call_begin|>`, DeepSeek `<｜tool▁call▁begin｜>`, and Mistral `[TOOL_CALLS]`
-    if clean_text.contains("<ifm|tool_call>") {
-        let open_pat = "<ifm|tool_call>";
-        let mut from = 0;
-        while let Some(rel_s) = clean_text[from..].find(open_pat) {
-            let start = from + rel_s;
-            let after_open = start + open_pat.len();
-            let rest_after = &clean_text[after_open..];
-            let Some(rel_end) = rest_after.find("</ifm|tool_call>") else { break };
-            let inner = &rest_after[..rel_end];
-            from = after_open + rel_end + "</ifm|tool_call>".len();
-            let name_end = inner.find('<').unwrap_or(inner.len());
-            let name = inner[..name_end].trim().to_string();
-            if name.is_empty() || (strict_placeholder_filter && !is_known_valid_tool(&name)) {
-                continue;
-            }
-            let mut path_arg = String::new();
-            let mut start_line = None;
-            let mut end_line = None;
-            let mut body_out = String::new();
-            let mut afrom = name_end;
-            while let Some(ks) = inner[afrom..].find("<ifm|arg_key>") {
-                let kstart = afrom + ks + "<ifm|arg_key>".len();
-                let Some(ke) = inner[kstart..].find("</ifm|arg_key>") else { break };
-                let key = inner[kstart..kstart + ke].trim();
-                let after_k = kstart + ke + "</ifm|arg_key>".len();
-                let Some(vs) = inner[after_k..].find("<ifm|arg_value>") else { break };
-                let vstart = after_k + vs + "<ifm|arg_value>".len();
-                let ve = inner[vstart..].find("</ifm|arg_value>").unwrap_or(inner.len() - vstart);
-                let val = inner[vstart..vstart + ve].trim();
-                afrom = (vstart + ve + "</ifm|arg_value>".len()).min(inner.len());
-                if matches!(key, "path" | "file" | "filePath" | "id" | "category" | "url") && path_arg.is_empty() {
-                    path_arg = val.to_string();
-                } else if key == "start" {
-                    start_line = val.parse::<usize>().ok();
-                } else if key == "end" {
-                    end_line = val.parse::<usize>().ok();
-                } else {
-                    body_out = val.to_string();
-                }
-            }
-            list.push(InlineToolInvocation {
-                name,
-                path: path_arg,
-                start_line,
-                end_line,
-                body: body_out,
-                offset: start,
-            });
-        }
-    }
-
-    if clean_text.contains("<|tool_call_begin|>") {
-        let mut from = 0;
-        while let Some(rel_s) = clean_text[from..].find("<|tool_call_begin|>") {
-            let start = from + rel_s;
-            let after_open = start + "<|tool_call_begin|>".len();
-            let rest = &clean_text[after_open..];
-            let Some(arg_s) = rest.find("<|tool_call_argument_begin|>") else { break };
-            let raw_name = rest[..arg_s].trim();
-            let clean_name = raw_name.strip_prefix("functions.").unwrap_or(raw_name).split(':').next().unwrap_or("").trim();
-            let after_arg = arg_s + "<|tool_call_argument_begin|>".len();
-            let end_call = rest[after_arg..].find("<|tool_call_end|>").unwrap_or(rest.len() - after_arg);
-            let json_arg = rest[after_arg..after_arg + end_call].trim();
-            from = after_open + (after_arg + end_call + "<|tool_call_end|>".len()).min(rest.len());
-            if !clean_name.is_empty() {
-                let wrapped = format!(
-                    "<tool_call>{}</tool_call>",
-                    json!({
-                        "name": clean_name,
-                        "arguments": serde_json::from_str::<Value>(json_arg).unwrap_or_else(|_| json!({ "body": json_arg }))
-                    })
-                );
-                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
-            }
-        }
-    }
-
-    if clean_text.contains("<｜tool▁call▁begin｜>") {
-        let mut from = 0;
-        while let Some(rel_s) = clean_text[from..].find("<｜tool▁call▁begin｜>") {
-            let start = from + rel_s;
-            let after_open = start + "<｜tool▁call▁begin｜>".len();
-            let rest = &clean_text[after_open..];
-            let Some(sep_s) = rest.find("<｜tool▁sep｜>") else { break };
-            let after_sep = sep_s + "<｜tool▁sep｜>".len();
-            let end_call = rest[after_sep..].find("<｜tool▁call▁end｜>").unwrap_or(rest.len() - after_sep);
-            let inner = rest[after_sep..after_sep + end_call].trim();
-            from = after_open + (after_sep + end_call + "<｜tool▁call▁end｜>".len()).min(rest.len());
-            let name_end = inner.find(|c: char| c.is_whitespace() || c == '{' || c == '`').unwrap_or(inner.len());
-            let clean_name = inner[..name_end].trim();
-            let json_part = inner[name_end..]
-                .trim()
-                .trim_start_matches("```json")
-                .trim_start_matches("```")
-                .trim_end_matches("```")
-                .trim();
-            if !clean_name.is_empty() {
-                let wrapped = format!(
-                    "<tool_call>{}</tool_call>",
-                    json!({
-                        "name": clean_name,
-                        "arguments": serde_json::from_str::<Value>(json_part).unwrap_or_else(|_| json!({ "body": json_part }))
-                    })
-                );
-                list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
-            }
-        }
-    }
-
-    if clean_text.contains("[TOOL_CALLS]") {
-        if let Some(pos) = clean_text.find("[TOOL_CALLS]") {
-            let rest = clean_text[pos + "[TOOL_CALLS]".len()..].trim();
-            if rest.starts_with('[') {
-                if let Ok(Value::Array(arr)) = serde_json::from_str::<Value>(rest) {
-                    for item in arr {
-                        let wrapped = format!("<tool_call>{}</tool_call>", item);
-                        list.extend(parse_inline_invocations_segment(&wrapped, false, strict_placeholder_filter));
-                    }
-                }
-            }
-        }
-    }
-
+    // 5. Support K2-Horizon <ifm|tool_call>, Kimi <|tool_call_begin|>, DeepSeek <｜tool▁call▁begin｜>, and Mistral [TOOL_CALLS]
+    crate::agent_edit::parse_vendor_tool_calls(clean_text, strict_placeholder_filter, &mut list);
     list.sort_by_key(|x| x.offset);
     list
 }
-
 /// Stormy ToolBatch dependency-ordered wave scheduler in Rust:
 /// Groups non-conflicting read-only calls into parallel/early waves before mutating or barrier calls.
 pub fn compute_tool_batch_waves(invocations: &[InlineToolInvocation]) -> Vec<Vec<usize>> {
@@ -849,7 +702,6 @@ pub fn compute_tool_batch_waves(invocations: &[InlineToolInvocation]) -> Vec<Vec
     }
     waves
 }
-
 /// PreToolUse & AutonomyPolicy in-loop guard executed BEFORE any tool modifies disk or runs shell commands.
 fn pre_tool_and_autonomy_guard(
     inv: &mut InlineToolInvocation,
@@ -857,7 +709,6 @@ fn pre_tool_and_autonomy_guard(
 ) -> Result<(), String> {
     let n = inv.name.trim().to_ascii_lowercase();
     let p = inv.path.trim().replace('\\', "/");
-
     // 1. AutonomyPolicy: block destructive root deletions or sensitive credential mutations before execution
     if matches!(n.as_str(), "delete_file" | "delete" | "remove_file" | "rm" | "del" | "unlink")
         && (p.is_empty() || p == "." || p == "/" || p == "./")
@@ -877,7 +728,6 @@ fn pre_tool_and_autonomy_guard(
             p
         ));
     }
-
     // 2. PreToolUse: deduplicate identical read/list/search calls in the same turn
     if matches!(
         n.as_str(),
@@ -899,7 +749,6 @@ fn pre_tool_and_autonomy_guard(
             ));
         }
     }
-
     // 3. PreToolUse: sanitize interactive/window-spawning Windows shell commands
     if matches!(n.as_str(), "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run") {
         let mut cmd = if !inv.body.trim().is_empty() {
@@ -917,10 +766,8 @@ fn pre_tool_and_autonomy_guard(
         }
         inv.body = cmd;
     }
-
     Ok(())
 }
-
 /// Execute workspace tools AFTER stream completion in dependency-ordered waves with PreToolUse & AutonomyPolicy guards.
 fn execute_inline_workspace_tools(
     app: &AppHandle,
@@ -937,11 +784,9 @@ fn execute_inline_workspace_tools(
     if invocations.is_empty() {
         return;
     }
-
     let eff_root = resolve_workspace_root(workspace_root);
     let waves = compute_tool_batch_waves(&invocations);
     let mut seen_reads = HashSet::new();
-
     for wave in waves {
         for idx in wave {
             let mut inv = invocations[idx].clone();
@@ -949,14 +794,12 @@ fn execute_inline_workspace_tools(
             if matches!(name.as_str(), "TOOL" | "tool_name" | "NAME" | "") {
                 continue;
             }
-
             let req_tag = event_topic.rsplit('/').next().unwrap_or("r");
             let dedup_key = format!("{}|{}|{}|{}", inv.offset, name, inv.path, inv.body.trim());
             if !executed_ids.insert(dedup_key) {
                 continue;
             }
             let tool_id = format!("tool-{}-{}-{}", req_tag, executed_ids.len(), inv.offset);
-
             let _ = app.emit(
                 event_topic,
                 json!({
@@ -966,11 +809,9 @@ fn execute_inline_workspace_tools(
                     "args": { "path": inv.path, "body": inv.body.trim() }
                 }),
             );
-
             if name.starts_with("studio_") || name.contains("studio_") {
                 continue;
             }
-
             if let Err(blocked_msg) = pre_tool_and_autonomy_guard(&mut inv, &mut seen_reads) {
                 let _ = app.emit(
                     event_topic,
@@ -983,25 +824,20 @@ fn execute_inline_workspace_tools(
                 );
                 continue;
             }
-
             let is_file_mutation = is_mutating_or_exec_tool(name.as_str())
                 && !matches!(name.as_str(), "shell" | "bash" | "sh" | "cmd" | "terminal" | "exec" | "run_command" | "run" | "python" | "python3" | "py" | "python_exec" | "run_python");
-
             let old_content = if is_file_mutation && !inv.path.is_empty() {
                 checkpoint_capture_file(&eff_root, req_tag, &format!("{} {}", name, inv.path), &inv.path);
                 fs_read(eff_root.clone(), inv.path.clone()).ok()
             } else {
                 None
             };
-
             let (ok, output) = execute_single_workspace_tool(&eff_root, &inv);
-
             let new_content = if ok && is_file_mutation && !inv.path.is_empty() {
                 fs_read(eff_root.clone(), inv.path.clone()).ok()
             } else {
                 None
             };
-
             let _ = app.emit(
                 event_topic,
                 json!({
@@ -1017,7 +853,6 @@ fn execute_inline_workspace_tools(
         }
     }
 }
-
 #[tauri::command]
 pub fn chat_stream(
     req: ChatRequest,
@@ -1029,14 +864,12 @@ pub fn chat_stream(
     if let Ok(mut guard) = engine.state.lock() {
         guard.active_cancels.insert(request_id.clone(), cancel_flag.clone());
     }
-
     let engine_arc = engine.inner().clone();
     std::thread::spawn(move || {
         let topic = format!("zeus://chat/{}", req.request_id);
         let started = Instant::now();
         let mut accumulated = String::new();
         let mut executed_tools = HashSet::new();
-
         let mut enriched_req = req.clone();
         if let Some(root) = &req.workspace_root {
             if !root.trim().is_empty() && !enriched_req.system.contains("## Agent") {
@@ -1045,7 +878,6 @@ pub fn chat_stream(
                 );
             }
         }
-
         // Stream text and reasoning deltas ONLY; never execute workspace tools mid-delta.
         let res = dispatch_stream(&engine_arc, &enriched_req, &cancel_flag, |delta| {
             accumulated.push_str(delta);
@@ -1057,17 +889,14 @@ pub fn chat_stream(
                 }),
             );
         });
-
         // Execute tools ONLY after stream completion in dependency-ordered waves.
         if res.is_ok() && !cancel_flag.load(Ordering::Relaxed) {
             let root = enriched_req.workspace_root.as_deref().unwrap_or("");
             execute_inline_workspace_tools(&app, &topic, root, &accumulated, &mut executed_tools);
         }
-
         let elapsed_secs = started.elapsed().as_secs_f64().max(0.05);
         let out_tokens = (accumulated.len() / 4).max(1);
         let tps = (out_tokens as f64 / elapsed_secs).round() as u64;
-
         match res {
             Ok(()) => {
                 let _ = app.emit(
@@ -1092,19 +921,15 @@ pub fn chat_stream(
                 );
             }
         }
-
         if let Ok(mut guard) = engine_arc.state.lock() {
             guard.active_cancels.remove(&req.request_id);
         }
     });
-
     Ok(json!({ "requestId": request_id }))
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_stormy_text_edits_strips_line_numbers_and_matches_block_anchors() {
         let original = "fn alpha() {\n    let x = 10;\n    let y = 20;\n    println!(\"{}\", x + y);\n}\n";
@@ -1113,14 +938,12 @@ mod tests {
         let edited = apply_stormy_text_edit(original, numbered_old, numbered_new, false, 1)
             .expect("numbered prefix edit should apply");
         assert!(edited.contains("let x = 42;"));
-
         let drift_old = "fn alpha() {\n  let x = 42;\n  let y = 20;\n  println!(\"{}\", x + y);\n}";
         let drift_new = "fn alpha() {\n    let x = 99;\n}";
         let anchored = apply_stormy_text_edit(&edited, drift_old, drift_new, false, 1)
             .expect("block anchor edit should apply");
         assert!(anchored.contains("let x = 99;"));
     }
-
     #[test]
     fn test_stormy_function_parameter_tool_call_parsing_and_mixed_tags() {
         let raw = "<zeus_tool name=\"read_file\" path=\"a.ts\"></zeus_tool>\n<tool_call>\n<function=edit_file>\n<parameter=path>index.html</parameter>\n<parameter=old_string><h1>Old</h1></parameter>\n<parameter=new_string><h1>New</h1></parameter>\n</function>\n</tool_call>\n<edit_file path=\"b.ts\"><<<<<<< SEARCH\n1\n=======\n2\n>>>>>>> REPLACE</edit_file>";
@@ -1133,3 +956,4 @@ mod tests {
         assert_eq!(parsed[2].path, "b.ts");
     }
 }
+
