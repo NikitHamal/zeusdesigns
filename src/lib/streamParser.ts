@@ -466,12 +466,17 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
   const deleted: string[] = [];
   const commands: string[] = [];
   const read: string[] = [];
+  const searched: string[] = [];
+  const failed: string[] = [];
 
   const commandSnippets: string[] = [];
   let lastCommandOutput = "";
 
   for (const t of tools) {
-    if (t.status !== "ok") continue;
+    if (t.status !== "ok") {
+      if (t.status === "error") failed.push(t.name);
+      continue;
+    }
     const p = parsePath(t);
     if (/^(write_file|write|create_file|save_file)$/.test(t.name) && p) {
       if (!written.includes(p)) written.push(p);
@@ -497,6 +502,18 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
       }
     } else if (/^(read_file|read|cat)$/.test(t.name) && p) {
       if (!read.includes(p)) read.push(p);
+    } else if (/^(search_code|grep|rg|search_project|glob|list_dir|list_files)$/.test(t.name)) {
+      let q = p;
+      if (!q) {
+        try {
+          const j = JSON.parse(t.args ?? "{}");
+          q = String(j.query || j.pattern || j.body || "").trim().slice(0, 48);
+        } catch {
+          q = (t.args ?? "").trim().slice(0, 48);
+        }
+      }
+      const label = q || ".";
+      if (!searched.includes(label)) searched.push(label);
     }
   }
 
@@ -512,6 +529,14 @@ export function synthesizeToolCompletionSummary(tools: ToolCall[]): string {
   }
   if (!parts.length && read.length) {
     parts.push(`Inspected ${read.map((f) => `\`${f}\``).join(", ")}`);
+  }
+  if (!parts.length && searched.length) {
+    parts.push(`Searched ${searched.slice(-3).map((q) => `\`${q}\``).join(", ")}`);
+  }
+  if (!parts.length && failed.length) {
+    parts.push(
+      `${failed.length} tool call${failed.length > 1 ? "s" : ""} failed (${failed.slice(-3).map((f) => `\`${f}\``).join(", ")})`
+    );
   }
   if (!parts.length) return "";
   const headline = `${parts.join(" and ")}.`;

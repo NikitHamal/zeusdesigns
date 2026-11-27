@@ -583,10 +583,42 @@ fn url_encode(input: &str) -> String {
     out
 }
 
+/// Collapse Gemini's auto-linkified `[https://...](https://...)` markdown links back to the bare URL
+/// so shell commands, URLs, and mid-stream snapshot diffs never get corrupted.
+fn unlinkify_markdown_urls(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut rest = raw;
+    while let Some(lb) = rest.find('[') {
+        out.push_str(&rest[..lb]);
+        let after_lb = &rest[lb + 1..];
+        if let Some(mid) = after_lb.find("](") {
+            let label = &after_lb[..mid];
+            let after_mid = &after_lb[mid + 2..];
+            if (label.starts_with("http://") || label.starts_with("https://"))
+                && (after_mid.starts_with("http://") || after_mid.starts_with("https://"))
+                && !label.contains('\n')
+            {
+                if let Some(rb) = after_mid.find(')') {
+                    let href = &after_mid[..rb];
+                    if !href.contains('\n') && !href.contains(' ') {
+                        out.push_str(href);
+                        rest = &after_mid[rb + 1..];
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push('[');
+        rest = after_lb;
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Strip internal Gemini Web code execution blocks (` ```python?code_reference...``` ` and ` ```text?code_stdout...``` `),
 /// including unclosed trailing internal blocks during mid-stream snapshots so `prev_text` prefix matching never breaks.
 pub fn clean_gemini_code_blocks(raw: &str) -> String {
-    let mut out = raw.to_string();
+    let mut out = unlinkify_markdown_urls(raw);
     for marker in [
         "```python?code_reference",
         "```javascript?code_reference",
@@ -772,6 +804,7 @@ where
                                                                 let resume_from = if !tail_anchor.is_empty() {
                                                                     snap.rfind(&tail_anchor)
                                                                         .map(|pos| pos + tail_anchor.len())
+                                                                        .filter(|&p| p >= common_bytes)
                                                                         .unwrap_or(common_bytes)
                                                                 } else {
                                                                     common_bytes

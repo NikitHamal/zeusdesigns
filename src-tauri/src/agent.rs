@@ -752,6 +752,23 @@ fn pre_tool_and_autonomy_guard(
                 cmd = stripped.trim().to_string();
             }
         }
+        // Strip Markdown auto-links `[https://...](https://...)` injected by web scrapers (e.g. Gemini)
+        while let Some(lb) = cmd.find('[') {
+            let after_lb = &cmd[lb + 1..];
+            let Some(mid) = after_lb.find("](") else { break };
+            let label = &after_lb[..mid];
+            let after_mid = &after_lb[mid + 2..];
+            if (label.starts_with("http://") || label.starts_with("https://"))
+                && (after_mid.starts_with("http://") || after_mid.starts_with("https://"))
+            {
+                if let Some(rb) = after_mid.find(')') {
+                    let href = &after_mid[..rb];
+                    cmd = format!("{}{}{}", &cmd[..lb], href, &after_mid[rb + 1..]);
+                    continue;
+                }
+            }
+            break;
+        }
         if matches!(cmd.to_ascii_lowercase().as_str(), "pause" | "cmd" | "cmd.exe" | "powershell" | "powershell.exe" | "pwsh" | "bash") {
             return Err("[Harness² PreToolUse Hook] Interactive shell session without a command is blocked.".to_string());
         }

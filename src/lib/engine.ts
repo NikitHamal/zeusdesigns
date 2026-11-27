@@ -736,7 +736,7 @@ export async function sendMessage(opts: {
             ) || (lastToolFailed && !hasReadAnyFile && !hasFileOrMemMutation);
           const stoppedAfterReadOnly =
             asksForMutation && !hasFileOrMemMutation && tools.length > 0 && cleanVisibleRound.length < 180;
-          const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning));
+          const cutOffAfterThink = !cleanVisibleRound && (roundText.includes("<think") || Boolean(parsedRound.reasoning) || tools.length > 0);
           const dumpedCodeWithoutWrite =
             asksForMutation &&
             !hasFileOrMemMutation &&
