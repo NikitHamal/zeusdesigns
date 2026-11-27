@@ -1951,28 +1951,61 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 (true, format!("[Harness² Skill '{}']\n{}", skill_name, builtin))
             }
         }
-        "subagent" | "task" => {
-            let target_q = if !body.is_empty() { body } else { path_arg.as_str() };
-            let hits = search_workspace_code(&eff_root, target_q, 15);
-            if hits.is_empty() {
-                let tree = walk_workspace(Path::new(&eff_root), Path::new(&eff_root), 2);
-                let mut out = String::new();
-                format_tree_compact(&tree, 0, &mut out);
-                (true, format!("[Harness² Subagent Summary]\nWorkspace files:\n{}", out.trim_end()))
+        "add_ui_kit" | "install_ui_kit" => {
+            let css_rel = "oro-ui/oro.css";
+            let js_rel = "oro-ui/oro.js";
+            let kit_css = ":root {\n  --surface: #141318;\n  --surface-low: #1c1b20;\n  --surface-high: #2b2930;\n  --on-surface: #e6e1e9;\n  --on-surface-variant: #cac4d0;\n  --primary: #d0bcff;\n  --on-primary: #381e72;\n  --outline-variant: #49454f;\n  --radius-md: 16px;\n  --radius-lg: 24px;\n}\n[data-theme=\"light\"] {\n  --surface: #fdf8fd;\n  --surface-low: #f7f2fa;\n  --surface-high: #ece6f0;\n  --on-surface: #1d1b20;\n  --on-surface-variant: #49454f;\n  --primary: #6750a4;\n  --on-primary: #ffffff;\n  --outline-variant: #cac4d0;\n}\n* { box-sizing: border-box; }\nbody { margin: 0; background: var(--surface); color: var(--on-surface); font-family: system-ui, sans-serif; }\n.oro-card { background: var(--surface-low); border: 1px solid var(--outline-variant); border-radius: var(--radius-lg); padding: 1.25rem; }\n.oro-btn { display: inline-flex; align-items: center; gap: 0.5rem; height: 2.5rem; padding: 0 1.25rem; border-radius: 9999px; border: none; background: var(--primary); color: var(--on-primary); font-weight: 600; cursor: pointer; }\n";
+            let kit_js = "window.OroUI = {\n  toggleTheme() {\n    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';\n    document.documentElement.dataset.theme = next;\n    try { localStorage.setItem('oro-theme', next); } catch {}\n  }\n};\n";
+            let _ = fs_write(eff_root.clone(), css_rel.to_string(), kit_css.to_string());
+            let _ = fs_write(eff_root.clone(), js_rel.to_string(), kit_js.to_string());
+            (
+                true,
+                "Installed UI kit:\n- oro-ui/oro.css (tokens, .oro-card, .oro-btn, light/dark theme variables)\n- oro-ui/oro.js (OroUI.toggleTheme helper)".to_string(),
+            )
+        }
+        "subagent" | "spawn_subagent" | "task" => {
+            let mut agent_type = "explore".to_string();
+            let mut target_q = if !body.is_empty() { body.to_string() } else { path_arg.clone() };
+            if body.starts_with('{') && body.ends_with('}') {
+                if let Ok(j) = serde_json::from_str::<Value>(body) {
+                    if let Some(at) = j.get("agent_type").or_else(|| j.get("type")).and_then(|v| v.as_str()) {
+                        agent_type = at.to_string();
+                    }
+                    if let Some(pr) = j.get("prompt").or_else(|| j.get("task")).or_else(|| j.get("query")).and_then(|v| v.as_str()) {
+                        target_q = pr.to_string();
+                    }
+                }
+            }
+            if agent_type.eq_ignore_ascii_case("review") {
+                let issues = audit_workspace_files(&eff_root, None);
+                if issues.is_empty() {
+                    (true, "[Subagent (review) Summary]\nStatic audit passed with 0 errors or warnings.".to_string())
+                } else {
+                    (true, format!("[Subagent (review) Summary]\n{}", issues.join("\n")))
+                }
             } else {
-                let formatted = hits
-                    .iter()
-                    .filter_map(|r| {
-                        Some(format!(
-                            "{}:{}: {}",
-                            r.get("path")?.as_str()?,
-                            r.get("line")?.as_u64()?,
-                            r.get("snippet")?.as_str()?
-                        ))
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                (true, format!("[Harness² Subagent Summary for '{}']\n{}", target_q, formatted))
+                let bm25_hits = bm25_search_project(&eff_root, &target_q, 8);
+                if !bm25_hits.is_empty() {
+                    let formatted = bm25_hits
+                        .iter()
+                        .filter_map(|h| {
+                            Some(format!(
+                                "- {} (lines {}-{}): {}",
+                                h.get("path")?.as_str()?,
+                                h.get("startLine")?.as_u64()?,
+                                h.get("endLine")?.as_u64()?,
+                                h.get("snippet")?.as_str()?.replace('\n', " ")
+                            ))
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    (true, format!("[Subagent ({}) Summary for '{}']\n{}", agent_type, target_q, formatted))
+                } else {
+                    let tree = walk_workspace(Path::new(&eff_root), Path::new(&eff_root), 2);
+                    let mut out = String::new();
+                    format_tree_compact(&tree, 0, &mut out);
+                    (true, format!("[Subagent ({}) Summary]\nWorkspace files:\n{}", agent_type, out.trim_end()))
+                }
             }
         }
         "lmfingerprint" | "verify_model" | "model_fingerprint" => {
@@ -2551,4 +2584,37 @@ pub fn chat_stream(
     });
 
     Ok(json!({ "requestId": request_id }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stormy_text_edits_strips_line_numbers_and_matches_block_anchors() {
+        let original = "fn alpha() {\n    let x = 10;\n    let y = 20;\n    println!(\"{}\", x + y);\n}\n";
+        let numbered_old = "   1|fn alpha() {\n   2|    let x = 10;\n   3|    let y = 20;";
+        let numbered_new = "   1|fn alpha() {\n   2|    let x = 42;\n   3|    let y = 20;";
+        let edited = apply_stormy_text_edit(original, numbered_old, numbered_new, false, 1)
+            .expect("numbered prefix edit should apply");
+        assert!(edited.contains("let x = 42;"));
+
+        // Block-anchor match when middle whitespace/tokens drift slightly
+        let drift_old = "fn alpha() {\n  let x = 42;\n  let y = 20;\n  println!(\"{}\", x + y);\n}";
+        let drift_new = "fn alpha() {\n    let x = 99;\n}";
+        let anchored = apply_stormy_text_edit(&edited, drift_old, drift_new, false, 1)
+            .expect("block anchor edit should apply");
+        assert!(anchored.contains("let x = 99;"));
+    }
+
+    #[test]
+    fn test_stormy_function_parameter_tool_call_parsing() {
+        let raw = "<tool_call>\n<function=edit_file>\n<parameter=path>index.html</parameter>\n<parameter=old_string><h1>Old</h1></parameter>\n<parameter=new_string><h1>New</h1></parameter>\n</function>\n</tool_call>";
+        let parsed = parse_inline_invocations_segment(raw, false, true);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "edit_file");
+        assert_eq!(parsed[0].path, "index.html");
+        assert!(parsed[0].body.contains("<h1>Old</h1>"));
+        assert!(parsed[0].body.contains("<h1>New</h1>"));
+    }
 }

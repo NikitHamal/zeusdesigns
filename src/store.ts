@@ -39,6 +39,8 @@ export interface Settings {
   selfCheck: boolean;
   studioOn: boolean;
   learnOn: boolean;
+  askBeforeBuilding?: boolean;
+  autonomy?: "unleashed" | "leashed";
   agentRuntime?: "zeus" | "opencode";
 }
 export interface Viewport { x: number; y: number; z: number }

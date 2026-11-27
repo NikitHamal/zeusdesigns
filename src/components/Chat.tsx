@@ -380,14 +380,75 @@ export function Composer({ hero }: { hero?: boolean }) {
   const ws = useStore((s) => s.ui.workspace);
   const sel = useStore((s) => s.sel);
   const boards = useStore((s) => s.artboards);
+  const askBeforeBuilding = useStore((s) => Boolean(s.settings.askBeforeBuilding));
+  const autonomy = useStore((s) => s.settings.autonomy ?? "unleashed");
+  const patchSettings = useStore((s) => s.patchSettings);
   const [text, setText] = useState("");
   const [atts, setAtts] = useState<Attachment[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [drag, setDrag] = useState(false);
+  const [mentionIdx, setMentionIdx] = useState(0);
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const selected = boards.find((b) => sel.includes(b.id));
   const canAttach = supportsAttachments(providerId, modelId);
+
+  // Stormy FileMentionPopup (@file autocomplete from workspace tree)
+  const mentionMatch = /(?:^|\s)@([\w./\\-]*)$/.exec(text);
+  const mentionQuery = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+  const flatWorkspaceFiles = (() => {
+    if (!ws?.tree?.length || mentionQuery === null) return [];
+    const list: Array<{ name: string; path: string; dir: boolean }> = [];
+    const visit = (nodes: typeof ws.tree) => {
+      for (const n of nodes) {
+        if (list.length >= 200) return;
+        list.push({ name: n.name, path: n.path, dir: n.dir });
+        if (n.dir && n.children?.length) visit(n.children);
+      }
+    };
+    visit(ws.tree);
+    return list
+      .filter((item) =>
+        !mentionQuery
+          ? true
+          : item.name.toLowerCase().includes(mentionQuery) || item.path.toLowerCase().includes(mentionQuery)
+      )
+      .slice(0, 8);
+  })();
+
+  const selectMentionItem = async (item: { name: string; path: string; dir: boolean }) => {
+    const nextText = text.replace(/(?:^|\s)@([\w./\\-]*)$/, (m) => {
+      const lead = m.startsWith(" ") ? " " : "";
+      return `${lead}@${item.path} `;
+    });
+    setText(nextText);
+    setMentionIdx(0);
+    if (!item.dir && ws) {
+      try {
+        const { readWorkspaceFile } = await import("../lib/bridge");
+        const content = await readWorkspaceFile(ws, item.path);
+        if (content) {
+          setAtts((prev) =>
+            prev.some((a) => a.name === item.path)
+              ? prev
+              : [
+                  ...prev,
+                  {
+                    id: item.path,
+                    name: item.path,
+                    mime: "text/plain",
+                    size: content.length,
+                    text: content.slice(0, 40000),
+                  },
+                ]
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    ta.current?.focus();
+  };
 
   useEffect(() => {
     if (!canAttach && atts.length > 0) setAtts([]);
@@ -465,11 +526,65 @@ export function Composer({ hero }: { hero?: boolean }) {
             ))}
           </div>
         )}
+        {flatWorkspaceFiles.length > 0 && (
+          <div className="mx-2.5 mt-2.5 overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-high">
+            <div className="flex items-center justify-between bg-surface-highest px-3 py-1.5 text-[11px] font-medium text-on-surface-variant">
+              <span>Mention file or folder</span>
+              <span>{flatWorkspaceFiles.length} items</span>
+            </div>
+            <div className="max-h-48 overflow-y-auto p-1">
+              {flatWorkspaceFiles.map((item, i) => (
+                <button
+                  key={item.path}
+                  onClick={() => void selectMentionItem(item)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-xs transition-colors",
+                    i === mentionIdx ? "bg-primary-container text-on-primary-container" : "text-on-surface hover:bg-surface"
+                  )}
+                >
+                  <Icon name={item.dir ? "folder" : "description"} size={14} className="shrink-0 text-primary" />
+                  <span className="font-mono font-medium">{item.name}</span>
+                  {item.path !== item.name && (
+                    <span className="truncate font-mono text-[11px] opacity-70">{item.path}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <textarea
-          ref={ta} value={text} rows={1} onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          ref={ta}
+          value={text}
+          rows={1}
+          onChange={(e) => {
+            setText(e.target.value);
+            setMentionIdx(0);
+          }}
+          onKeyDown={(e) => {
+            if (flatWorkspaceFiles.length > 0) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setMentionIdx((idx) => (idx + 1) % flatWorkspaceFiles.length);
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setMentionIdx((idx) => (idx - 1 + flatWorkspaceFiles.length) % flatWorkspaceFiles.length);
+                return;
+              }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                void selectMentionItem(flatWorkspaceFiles[mentionIdx] ?? flatWorkspaceFiles[0]);
+                return;
+              }
+            }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
           onPaste={(e) => { const f = Array.from(e.clipboardData.files); if (f.length) { e.preventDefault(); addFiles(f); } }}
-          placeholder={hero ? "Ask Zeus Codes to build, debug, refactor, or run bash/python in your project…" : selected ? `Reply about “${selected.name}”` : "Ask Zeus Codes to edit files, run bash/python, debug, or build…"}
+          placeholder={hero ? "Ask Zeus Codes to build, debug, refactor, or type @ to mention a file…" : selected ? `Reply about “${selected.name}”` : "Ask Zeus Codes to edit files, run bash/python, or type @ to mention a file…"}
           className={hero ? "block max-h-[260px] min-h-[84px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-[16px] text-on-surface outline-none placeholder:text-on-surface-variant/60" : "block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60"}
         />
         <div className="flex min-w-0 items-center gap-0.5 px-2 pb-2">
@@ -487,14 +602,69 @@ export function Composer({ hero }: { hero?: boolean }) {
               </Dropdown>
             </>
           )}
-          <button
-            onClick={() => patchUI({ settingsOpen: true, settingsTab: "library" })}
-            title={`Zeus Harness² active (${providerId}/${modelId}) — Click to configure Harness² & Skills`}
-            className="state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium text-on-surface-variant hover:text-on-surface"
+          <Dropdown
+            up
+            width={280}
+            trigger={({ toggle, open }) => (
+              <button
+                onClick={toggle}
+                title="Stormy & Harness² Agent Settings"
+                className={cn(
+                  "state flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium text-on-surface-variant hover:text-on-surface",
+                  open && "bg-surface-high text-on-surface"
+                )}
+              >
+                <Icon name="bolt" size={15} className="text-primary" />
+                <span className="hidden max-w-[130px] truncate @[520px]:inline">Harness²</span>
+              </button>
+            )}
           >
-            <Icon name="bolt" size={15} className="text-primary" />
-            <span className="hidden max-w-[130px] truncate @[520px]:inline">Harness²</span>
-          </button>
+            {(close) => (
+              <div className="space-y-2.5 p-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-on-surface">Autonomy</span>
+                  <div className="flex rounded-full border border-outline-variant/60 bg-surface-low p-0.5 text-[11px]">
+                    {(["unleashed", "leashed"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => patchSettings({ autonomy: m })}
+                        className={cn(
+                          "rounded-full px-2.5 py-0.5 capitalize transition-colors",
+                          autonomy === m ? "bg-primary font-semibold text-on-primary" : "text-on-surface-variant"
+                        )}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => patchSettings({ askBeforeBuilding: !askBeforeBuilding })}
+                  className="state flex w-full items-center justify-between rounded-xl bg-surface-low px-3 py-2 text-left"
+                >
+                  <span className="font-medium text-on-surface">Ask before building</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
+                      askBeforeBuilding ? "bg-primary text-on-primary" : "bg-surface-high text-on-surface-variant"
+                    )}
+                  >
+                    {askBeforeBuilding ? "On" : "Off"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    close();
+                    patchUI({ settingsOpen: true, settingsTab: "library" });
+                  }}
+                  className="state flex h-8 w-full items-center justify-center gap-1.5 rounded-xl bg-surface-high font-medium text-on-surface"
+                >
+                  <Icon name="tune" size={14} />
+                  Configure Skills & Harness²
+                </button>
+              </div>
+            )}
+          </Dropdown>
           <span className="min-w-2 flex-1" />
           <ModelPicker />
           {busy ? (

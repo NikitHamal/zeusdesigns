@@ -2179,4 +2179,14 @@ mod tests {
         let find_out = find_res.get("stdout").and_then(|s| s.as_str()).unwrap_or("");
         assert!(find_out.contains("workspace.rs"));
     }
+
+    #[test]
+    fn test_stormy_project_outline_and_bm25_search() {
+        let outline = project_outline_of(Path::new("src/workspace.rs")).unwrap_or_default();
+        assert!(outline.contains("lines"));
+        let hits = bm25_search_project("src", "sanitize_shell_command", 5);
+        assert!(!hits.is_empty());
+        let globbed = glob_workspace_files(".", "**/*.rs", Some("src"));
+        assert!(globbed.iter().any(|p| p.contains("workspace.rs")));
+    }
 }
