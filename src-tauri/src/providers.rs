@@ -652,6 +652,7 @@ where
     F: FnMut(&str),
 {
     let wants_tools = is_agent_tool_request(system);
+    let norm_messages = normalize_multi_turn_messages(messages, 48, 24000, 120000);
     let mut prompt = String::new();
     if wants_tools {
         prompt.push_str(&format!("{}\n\n", scraper_xml_dsl_banner()));
@@ -660,27 +661,32 @@ where
     }
     if !system.trim().is_empty() {
         let sys_safe = smart_cap_system(system, 96000);
-        prompt.push_str(&format!("[System instruction]: {}\n\n", sys_safe));
+        prompt.push_str(&format!("<system_instruction>\n{}\n</system_instruction>\n\n", sys_safe));
     }
-    if messages.len() > 1 {
-        for m in &messages[..messages.len() - 1] {
-            let role_tag = if m.role == "assistant" { "[Assistant]" } else { "[User]" };
-            prompt.push_str(&format!("{}: {}\n\n", role_tag, m.content));
+    if norm_messages.len() > 1 {
+        prompt.push_str("<conversation_history>\n");
+        for m in &norm_messages[..norm_messages.len() - 1] {
+            let role_tag = if m.role == "assistant" { "assistant" } else { "user" };
+            prompt.push_str(&format!("<turn role=\"{}\">\n{}\n</turn>\n\n", role_tag, m.content));
         }
+        prompt.push_str("</conversation_history>\n\n");
     }
-    if let Some(last) = messages.last() {
+    if let Some(last) = norm_messages.last() {
         if wants_tools && !last.content.contains("<tool_result") && !last.content.contains("[XML DSL") {
             prompt.push_str(&format!(
-                "[User]: {}\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag.)",
+                "<current_user_turn>\n{}\n</current_user_turn>\n(If a workspace action is needed, output ONLY the <zeus_tool> XML tag. Never echo <turn>, [User]:, [Assistant]:, or <tool_result> tags.)",
                 last.content
             ));
         } else if wants_tools && last.content.contains("<tool_result") {
             prompt.push_str(&format!(
-                "[User]: {}\n\n[Execution Rule: Do NOT stop mid-task and NEVER ask 'tell me to proceed'. If the user's request is not yet 100% completed on disk, emit the next <zeus_tool name=\"read_file\"|\"edit_file\"|\"write_file\"|\"search_code\"|\"list_dir\"|\"shell\"|\"python\">...</zeus_tool> block outside <think> right now.]",
+                "<current_user_turn>\n{}\n</current_user_turn>\n\n[Execution Rule: Do NOT stop mid-task and NEVER ask 'tell me to proceed'. Respond directly as the assistant and NEVER echo <turn>, [User]:, [Assistant]:, or <tool_result> tags. If the user's request is not yet 100% completed on disk, emit the next <zeus_tool name=\"read_file\"|\"edit_file\"|\"write_file\"|\"search_code\"|\"list_dir\"|\"shell\"|\"python\">...</zeus_tool> block outside <think> right now.]",
                 last.content
             ));
         } else {
-            prompt.push_str(&format!("[User]: {}", last.content));
+            prompt.push_str(&format!(
+                "<current_user_turn>\n{}\n</current_user_turn>\n(Respond directly as the assistant. Never echo <turn>, [User]:, or [Assistant]: tags.)",
+                last.content
+            ));
         }
     }
 
