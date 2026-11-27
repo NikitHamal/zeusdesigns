@@ -370,10 +370,7 @@ where
         let token = match ensure_inception_token(engine, attempt > 0) {
             Ok(t) => t,
             Err(_) if attempt == 0 => continue,
-            Err(_) => {
-                return stream_kilo("kilo-auto/free", system, messages, cancel, on_delta)
-                    .or_else(|_| stream_unikey("gpt-6-luna", system, messages, cancel, on_delta));
-            }
+            Err(_) => return Err("Mercury 3 session token unavailable".to_string()),
         };
         let mut inc_msgs = Vec::new();
         if !system.trim().is_empty() {
@@ -841,20 +838,6 @@ where
     Err("Direct Gemini 4 StreamGenerate returned no text".to_string())
 }
 
-/// Stream from Gemini Web (`https://gemini.google.com/app` anonymous StreamGenerate, backed by Gemini 4 Hydrogen mode=1).
-pub fn stream_geminiweb<F>(
-    system: &str,
-    messages: &[ChatMessage],
-    cancel: &AtomicBool,
-    on_delta: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(&str),
-{
-    stream_gemini4_direct(1, 4, system, messages, cancel, on_delta)
-        .or_else(|_| stream_gemweb2api("gemini-4-hydrogen", system, messages, cancel, on_delta))
-}
-
 /// Stream from Kilo Gateway (`https://api.kilo.ai/api/gateway/chat/completions`, free frontier & multimodal models).
 
 fn is_agent_tool_request(system: &str) -> bool {
@@ -965,5 +948,4 @@ include!("providers_gateways_b.rs");
 include!("providers_oai_a.rs");
 include!("providers_oai_b.rs");
 include!("providers_direct.rs");
-include!("providers_flagships.rs");
 include!("providers_fingerprint.rs");

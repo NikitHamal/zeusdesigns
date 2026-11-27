@@ -4,13 +4,7 @@
 import type { ChatRequest } from "./bridge";
 
 export const BROWSER_FALLBACK_PROVIDER_IDS = new Set([
-  "claudefable",
-  "gpt6flagship",
-  "gemini4ultra",
-  "clinefrontier",
-  "deepseekv4ultra",
   "kilo",
-  "gemini4hydrogen",
   "antigravity",
   "gemini4",
   "agnescloud",
@@ -28,7 +22,6 @@ export const BROWSER_FALLBACK_PROVIDER_IDS = new Set([
   "aibridge",
   "hfrouter",
   "litellmhub",
-  "gemweb2api",
   "vireonix",
   "gemma4vl",
   "phi4cloud",
@@ -189,18 +182,12 @@ export function resolveBrowserGatewayConfig(
   modelId: string
 ): { baseUrl: string; apiKey: string; format: "openai" | "anthropic"; model: string } {
   const browserBase: Record<string, { baseUrl: string; apiKey: string; format?: "openai" | "anthropic" }> = {
-    claudefable: { baseUrl: "https://dherain24-claude-proxy.hf.space", apiKey: "free", format: "anthropic" },
-    gpt6flagship: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
-    gemini4ultra: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
-    clinefrontier: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
-    deepseekv4ultra: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "" },
     kilo: { baseUrl: "https://api.kilo.ai/api/gateway", apiKey: "" },
     nimcloud: { baseUrl: "https://garystu-openai-nim-proxy.hf.space/v1", apiKey: "free" },
     colibriqwen: { baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free" },
     freellmhub: { baseUrl: "https://bun008-freellmapi.hf.space/v1", apiKey: "" },
     aibridge: { baseUrl: "https://w902287-ai-bridge.hf.space/v1", apiKey: "" },
     opencodezen: { baseUrl: "https://opencode.ai/zen/v1", apiKey: "public" },
-    gemini4hydrogen: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
     antigravity: { baseUrl: "https://w902287-firebase-gemini-proxy.hf.space/ag/v1", apiKey: "sk-antigravity" },
     gemini4: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
     agnescloud: { baseUrl: "https://apihub.agnes-ai.com/v1", apiKey: ["sk", "VyPCzaG4d7f1NfozXHKfwQKjN0AXpOOfoBDPxcqONf3SRlVu"].join("-") },
@@ -233,7 +220,6 @@ export function resolveBrowserGatewayConfig(
     },
     hfrouter: { baseUrl: "https://cgjgj-ollamahftraemonitor.hf.space/v1", apiKey: "" },
     litellmhub: { baseUrl: "https://alchoholpad-litellm.hf.space/v1", apiKey: "" },
-    gemweb2api: { baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", apiKey: "" },
     vireonix: { baseUrl: "https://vireonix.ai/v1", apiKey: "" },
     gemma4vl: {
       baseUrl:

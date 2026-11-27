@@ -36,13 +36,7 @@ where
     let primary = req.provider.as_str();
     let res = match primary {
         "mercury3" => stream_mercury3(engine, &req.system, &req.messages, &req.effort, cancel, &mut on_delta),
-        "claudefable" => stream_claudefable(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "gpt6flagship" => stream_gpt6flagship(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "gemini4ultra" => stream_gemini4ultra(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "clinefrontier" => stream_clinefrontier(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "deepseekv4ultra" => stream_deepseekv4ultra(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "longcat" => stream_longcat(&req.system, &req.messages, cancel, &mut on_delta),
-        "geminiweb" => stream_geminiweb(&req.system, &req.messages, cancel, &mut on_delta),
         "kilo" => stream_kilo(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "nimcloud" => stream_nimcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "colibriqwen" => stream_colibriqwen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -52,7 +46,6 @@ where
         "hfrouter" => stream_hfrouter(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "litellmhub" => stream_litellmhub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "antigravity" => stream_antigravity(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "gemini4hydrogen" => stream_gemini4hydrogen(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemini4" => stream_gemini4(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "mychatcloud" => stream_mychatcloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "supavip" => stream_supavip(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -62,7 +55,6 @@ where
         "volcark" => stream_volcark(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "zhipudirect" => stream_zhipudirect(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "logfarehub" => stream_logfarehub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
-        "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -501,7 +493,7 @@ pub fn verify_model_fingerprint(
 ) -> Result<ModelFingerprintReport, String> {
     let t0 = std::time::Instant::now();
     let eff_provider = if provider.trim().is_empty() {
-        "gemini4hydrogen"
+        "gemini4"
     } else {
         provider.trim()
     };
@@ -619,10 +611,10 @@ pub fn verify_model_fingerprint(
                     protocol_sig = "Official Z.ai BigModel PaaS v4 Direct".to_string();
                 }
             }
-            "gemini4hydrogen" | "gemini4" | "gemweb2api" | "geminiweb" => {
-                upstream_endpoint = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate + chenian233-gemini-web2api.hf.space".to_string();
+            "gemini4" => {
+                upstream_endpoint = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate".to_string();
                 upstream_reported_model = eff_model.clone();
-                protocol_sig = "Google BardFrontendService wrb.fr StreamGenerate (mode=1..6) + Gemini 4 Web2API".to_string();
+                protocol_sig = "Google BardFrontendService wrb.fr StreamGenerate (mode=1..6)".to_string();
             }
             "freecc" => {
                 upstream_endpoint = "https://calkotter-free-claude-code.hf.space/v1/messages (origin: generativelanguage.googleapis.com/v1beta)".to_string();

@@ -173,16 +173,4 @@ for (const rel of moduleFiles) {
 }
 console.log("[PASS] 7. All refactored frontend & harness modules are modular and under 1,000 lines");
 
-// Verify Session 30: 5 New Multi-Turn Flagship Providers across TS & Rust
-const providersTs = fs.readFileSync(path.join(process.cwd(), "src/lib/providers.ts"), "utf8");
-const flagshipsRs = fs.readFileSync(path.join(process.cwd(), "src-tauri/src/providers_flagships.rs"), "utf8");
-for (const pid of ["claudefable", "gpt6flagship", "gemini4ultra", "clinefrontier", "deepseekv4ultra"]) {
-  assert.ok(providersTs.includes(`id: "${pid}"`), `src/lib/providers.ts must include provider ${pid}`);
-  assert.ok(flagshipsRs.includes(`pub fn stream_${pid}`), `providers_flagships.rs must define stream_${pid}`);
-}
-for (const mid of ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-sol", "gemini-4-argon", "gemini-4-carbon", "gemini-4-neon", "gemini-4-hydrogen"]) {
-  assert.ok(providersTs.includes(`id: "${mid}"`), `src/lib/providers.ts must include flagship model ${mid}`);
-}
-console.log("[PASS] 8. All 5 new multi-turn flagship providers and model families verified across TS & Rust");
-
-console.log("=== ALL 8 OVERHAUL VERIFICATION CHECKS PASSED ===");
+console.log("=== ALL 7 OVERHAUL VERIFICATION CHECKS PASSED ===");

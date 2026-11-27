@@ -8,7 +8,6 @@ const GATEWAYS = {
   freellmhub: "https://bun008-freellmapi.hf.space/v1",
   aibridge: "https://w902287-ai-bridge.hf.space/v1",
   litellmhub: "https://alchoholpad-litellm.hf.space/v1",
-  gemweb2api: "https://chenian233-gemini-web2api.hf.space/v1",
   hfrouter: "https://cgjgj-ollamahftraemonitor.hf.space/v1",
   vireonix: "https://vireonix.ai/v1",
   nimcloud: "https://garystu-openai-nim-proxy.hf.space/v1",

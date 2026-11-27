@@ -41,14 +41,8 @@ int main() {
 
     char cat_buf[196608]{};
     int count = zeus_providers_catalog_json(cat_buf, sizeof(cat_buf));
-    assert(count == 57);
+    assert(count == 49);
     std::string cat(cat_buf);
-    assert(cat.find("claudefable") != std::string::npos);
-    assert(cat.find("gpt6flagship") != std::string::npos);
-    assert(cat.find("gemini4ultra") != std::string::npos);
-    assert(cat.find("clinefrontier") != std::string::npos);
-    assert(cat.find("deepseekv4ultra") != std::string::npos);
-    assert(cat.find("gemini4hydrogen") != std::string::npos);
     assert(cat.find("antigravity") != std::string::npos);
     assert(cat.find("gemini4") != std::string::npos);
     assert(cat.find("agnescloud") != std::string::npos);
@@ -61,7 +55,6 @@ int main() {
     assert(cat.find("claude5proxy") != std::string::npos);
     assert(cat.find("mercury3") != std::string::npos);
     assert(cat.find("longcat") != std::string::npos);
-    assert(cat.find("geminiweb") != std::string::npos);
     assert(cat.find("kilo") != std::string::npos);
     assert(cat.find("nimcloud") != std::string::npos);
     assert(cat.find("colibriqwen") != std::string::npos);
@@ -69,7 +62,6 @@ int main() {
     assert(cat.find("aibridge") != std::string::npos);
     assert(cat.find("hfrouter") != std::string::npos);
     assert(cat.find("litellmhub") != std::string::npos);
-    assert(cat.find("gemweb2api") != std::string::npos);
     assert(cat.find("vireonix") != std::string::npos);
     assert(cat.find("opencodezen") != std::string::npos);
     assert(cat.find("gemma4vl") != std::string::npos);

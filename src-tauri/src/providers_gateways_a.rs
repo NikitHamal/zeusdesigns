@@ -43,13 +43,9 @@ where
         }
     }
 
-    let candidates = if eff_model == "moonshotai/kimi-k2.7-code" {
-        vec!["moonshotai/kimi-k3", "claude-opus-5-5", "gpt-6.1-sol"]
-    } else {
-        vec![eff_model, "gpt-6.1-sol", "claude-opus-5-5", "gpt-6-luna"]
-    };
+    let candidates = vec![eff_model];
 
-    let client = build_client(18)?;
+    let client = build_client(60)?;
     let mut active_resp = None;
     for cand in candidates {
         let cand_payload = json!({
@@ -77,18 +73,7 @@ where
         }
     }
     let Some(resp) = active_resp else {
-        return match eff_model {
-            "claude-opus-5-5" => stream_aibridge("claude-haiku-5-5", system, messages, cancel, on_delta)
-                .or_else(|_| stream_deepai("claude-haiku-5-5", system, messages, cancel, on_delta)),
-            "moonshotai/kimi-k3" | "moonshotai/kimi-k2.7-code" => {
-                stream_freellmhub("kimi-k2.7-code", system, messages, cancel, on_delta)
-            }
-            "x-ai/grok-4.3" => stream_aibridge("grok-4.20", system, messages, cancel, on_delta),
-            "deepseek-v4-flash" => stream_aibridge("deepseek-v4-flash", system, messages, cancel, on_delta)
-                .or_else(|_| stream_freellmhub("deepseek-v4.1-flash-1017", system, messages, cancel, on_delta)),
-            _ => stream_aibridge("gpt-6-luna", system, messages, cancel, on_delta)
-                .or_else(|_| stream_freellmhub("glm-5.3", system, messages, cancel, on_delta)),
-        };
+        return Err(format!("Unikey request failed for {}", eff_model));
     };
 
     let mut reader = BufReader::new(resp);

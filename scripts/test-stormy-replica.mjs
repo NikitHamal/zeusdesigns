@@ -159,7 +159,7 @@ assert.ok(
     providersOaiARs.includes('endpoint.contains("lolmaobruhhh-test")'),
   "supports_native_oai_tools in providers_oai_a.rs must match all native OpenAI tool providers"
 );
-for (const scraperOrGguf of ["gemini4hydrogen", "hfcluster", "gemma4pro", "frontierlab", "liquidai", "koboldcloud", "bonsaicloud", "unslothcloud"]) {
+for (const scraperOrGguf of ["hfcluster", "gemma4pro", "frontierlab", "liquidai", "koboldcloud", "bonsaicloud", "unslothcloud"]) {
   assert.ok(
     !codingHarnessTs.includes(`"${scraperOrGguf}"`),
     `${scraperOrGguf} should use scraper_xml_dsl rather than NATIVE_OPENAI_TOOLS_PROVIDERS`

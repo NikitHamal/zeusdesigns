@@ -26,7 +26,6 @@ export interface ProviderSpecialization {
 
 const SCRAPER_PROVIDERS = new Set([
   "mercury3",
-  "gemini4hydrogen",
   "antigravity",
   "gemini4",
   "agnescloud",
@@ -44,7 +43,6 @@ const SCRAPER_PROVIDERS = new Set([
   "aibridge",
   "hfrouter",
   "litellmhub",
-  "gemweb2api",
   "vireonix",
   "gemma4vl",
   "phi4cloud",
@@ -74,7 +72,6 @@ const SCRAPER_PROVIDERS = new Set([
   "motif",
   "deepai",
   "longcat",
-  "geminiweb",
   "chatjimmy",
 ]);
 
@@ -89,7 +86,7 @@ export function getProviderSpecialization(providerId: string, modelId: string): 
   // Scale effective budget with verified provider context window while keeping web-scraper endpoints snappy.
   const effectiveBudgetTokens =
     providerId === "chatjimmy" ? 14000 :
-    providerId === "longcat" || providerId === "geminiweb" ? 24000 :
+    providerId === "longcat" ? 24000 :
     providerId === "deepai" || providerId === "motif" ? 28000 :
     Math.max(48000, Math.min(Math.floor(contextWindow * 0.75), 128000));
 

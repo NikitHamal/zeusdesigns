@@ -15,96 +15,7 @@ where
     stream_oai_targets_bearer("Vireonix", &targets, system, messages, false, 60, None, cancel, on_delta)
 }
 
-/// Non-recursive Gemini 4 Direct + 5-node `gemini-web2api` cluster streamer.
-fn stream_gemini4_cluster<F>(
-    requested: &str,
-    system: &str,
-    messages: &[ChatMessage],
-    cancel: &AtomicBool,
-    on_delta: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(&str),
-{
-    let (mode_id, think_mode, legacy_alias) = match requested {
-        "gemini-4-hydrogen-thinking"
-        | "gemini-4-hydrogen-xhigh"
-        | "gemini-4-hydrogen-high"
-        | "gemini-4-hydrogen-tiered-xhigh"
-        | "gemini-4-hydrogen-tiered-high"
-        | "gemini-4-neon"
-        | "gemini-4-neon-xhigh"
-        | "gemini-4-neon-high"
-        | "gemini-4-neon-medium"
-        | "gemini-4-neon-thinking"
-        | "gemini-pro-orchestrator-neon"
-        | "gemini-3.5-flash-thinking"
-        | "gemini-2.5-flash-thinking" => (2, 0, "gemini-3.5-flash-thinking"),
-        "gemini-4-carbon"
-        | "gemini-4-carbon-high"
-        | "gemini-4-carbon-medium"
-        | "gemini-4-carbon-low"
-        | "gemini-4-argon"
-        | "gemini-4-argon-high"
-        | "gemini-4-argon-medium"
-        | "gemini-4-argon-low"
-        | "gemini-pro-orchestrator"
-        | "gemini-pro-orchestrator-argon"
-        | "gemini-3.1-pro" => (3, 4, "gemini-3.1-pro"),
-        "gemini-auto" => (4, 4, "gemini-auto"),
-        "gemini-3.5-flash-thinking-lite" | "gemini-3.8-flash-tiered" => {
-            (5, 0, "gemini-3.5-flash-thinking-lite")
-        }
-        "gemini-flash-lite" | "gemini-3.1-flash-lite" | "gemini-3.5-flash-lite" | "gemini-2.5-flash-lite" => {
-            (6, 4, "gemini-flash-lite")
-        }
-        _ => (1, 4, "gemini-3.5-flash"),
-    };
-
-    // Direct anonymous Google Gemini 4 StreamGenerate is fastest (~2.6s) and never hits HF Space account cooldowns
-    if stream_gemini4_direct(mode_id, think_mode, system, messages, cancel, on_delta).is_ok() {
-        return Ok(());
-    }
-
-    let chenian_model = match requested {
-        "gemini-4-hydrogen"
-        | "gemini-4-hydrogen-thinking"
-        | "gemini-4-neon"
-        | "gemini-4-neon-thinking"
-        | "gemini-4-carbon"
-        | "gemini-auto"
-        | "gemini-3.7-flash"
-        | "gemini-3.6-flash"
-        | "gemini-3.5-flash"
-        | "gemini-3.5-flash-thinking"
-        | "gemini-3.5-flash-thinking-lite"
-        | "gemini-flash-lite" => requested,
-        _ if mode_id == 2 => "gemini-4-hydrogen-thinking",
-        _ if mode_id == 3 => "gemini-4-carbon",
-        _ => "gemini-4-hydrogen",
-    };
-
-    let targets: [(&str, &str); 4] = [
-        ("https://chenian233-gemini-web2api.hf.space/v1/chat/completions", chenian_model),
-        ("https://pouluo-gemini-web2api.hf.space/v1/chat/completions", "gemini-3.5-flash"),
-        ("https://peijun1-gemini-web2api1.hf.space/v1/chat/completions", "gemini-3.5-flash"),
-        ("https://giabaopro1908-gemini2api.hf.space/v1/chat/completions", legacy_alias),
-    ];
-
-    stream_oai_targets_auth(
-        "Google Gemini 4 Cluster",
-        &targets,
-        system,
-        messages,
-        false,
-        11,
-        false,
-        cancel,
-        on_delta,
-    )
-}
-
-/// Stream from Google Antigravity & Cloud Code Hub (`w902287-firebase-gemini-proxy.hf.space/ag/v1` with `Bearer sk-antigravity` + Gemini 4 Direct / Claude 5.5 failover).
+/// Stream from Google Antigravity & Cloud Code Hub (`w902287-firebase-gemini-proxy.hf.space/ag/v1` with `Bearer sk-antigravity`).
 pub fn stream_antigravity<F>(
     model: &str,
     system: &str,
@@ -128,90 +39,14 @@ where
         system,
         messages,
         true,
-        8,
+        60,
         Some("sk-antigravity"),
         cancel,
         on_delta,
     )
-    .or_else(|_| {
-        if requested.starts_with("claude-") {
-            stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta)
-                .or_else(|_| stream_claude5proxy("claude-sonnet-5-5", system, messages, cancel, on_delta))
-        } else if requested.starts_with("gpt-oss") {
-            stream_litellmhub("groq/gpt-oss-120b", system, messages, cancel, on_delta)
-        } else {
-            stream_gemini4_cluster(requested, system, messages, cancel, on_delta).or_else(|_| {
-                stream_freecc(
-                    "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
-                    system,
-                    messages,
-                    cancel,
-                    on_delta,
-                )
-            })
-        }
-    })
 }
 
-/// Stream from Gemini 4 Hydrogen & Family Ultra Mesh (`gemini4hydrogen`):
-/// Load-balances across Direct `gemini.google.com` `StreamGenerate`, 5-node `gemini-web2api` cluster,
-/// Google Cloud Code Antigravity (`/ag/v1`), and FreeClaude Gemini 4 Hydrogen SSE so multi-turn sessions never exhaust.
-pub fn stream_gemini4hydrogen<F>(
-    model: &str,
-    system: &str,
-    messages: &[ChatMessage],
-    cancel: &AtomicBool,
-    on_delta: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(&str),
-{
-    let requested = if model.trim().is_empty() {
-        "gemini-4-hydrogen"
-    } else {
-        model
-    };
-    let has_images = messages.iter().any(|m| {
-        m.attachments
-            .iter()
-            .any(|a| a.mime.starts_with("image/") && !a.data_url.is_empty())
-    });
-    if has_images {
-        let ag_model = if requested == "gemini-4-hydrogen" || requested == "gemini-hydrogen" {
-            "gemini-4-hydrogen-medium"
-        } else {
-            requested
-        };
-        if stream_antigravity(ag_model, system, messages, cancel, on_delta).is_ok() {
-            return Ok(());
-        }
-    }
-
-    stream_gemini4_cluster(requested, system, messages, cancel, on_delta)
-        .or_else(|_| {
-            let ag_model = if requested == "gemini-4-hydrogen" || requested == "gemini-hydrogen" {
-                "gemini-4-hydrogen-medium"
-            } else if requested == "gemini-4-hydrogen-thinking" {
-                "gemini-4-hydrogen-high"
-            } else if requested == "gemini-4-neon-thinking" {
-                "gemini-4-neon-high"
-            } else {
-                requested
-            };
-            stream_antigravity(ag_model, system, messages, cancel, on_delta)
-        })
-        .or_else(|_| {
-            stream_freecc(
-                "claude-3-freecc-no-thinking/gemini/models/gemini-4-hydrogen",
-                system,
-                messages,
-                cancel,
-                on_delta,
-            )
-        })
-}
-
-/// Stream from Google Gemini 4 Direct & 5-Node Cluster (`chenian233`, `pouluo`, `giabaopro1908` + direct `gemini.google.com` `StreamGenerate`).
+/// Stream from Direct Google Gemini 4 (`gemini.google.com` `StreamGenerate`, modes 1..6).
 pub fn stream_gemini4<F>(
     model: &str,
     system: &str,
@@ -222,36 +57,15 @@ pub fn stream_gemini4<F>(
 where
     F: FnMut(&str),
 {
-    let requested = if model.trim().is_empty() {
-        "gemini-4-hydrogen"
-    } else {
-        model
+    let (mode_id, think_mode) = match model.trim() {
+        "gemini-4-hydrogen-thinking" => (2, 0),
+        "gemini-4-carbon" => (3, 4),
+        "gemini-auto" => (4, 4),
+        "gemini-3.5-flash-thinking-lite" => (5, 0),
+        "gemini-flash-lite" => (6, 4),
+        _ => (1, 4),
     };
-    stream_gemini4_cluster(requested, system, messages, cancel, on_delta)
-        .or_else(|_| {
-            let ag_model = match requested {
-                "gemini-4-argon" => "gemini-4-argon-medium",
-                "gemini-4-carbon" | "gemini-3.1-pro" => "gemini-4-carbon-medium",
-                "gemini-4-neon" | "gemini-neon" | "gemini-3.5-flash-thinking" => "gemini-4-neon-medium",
-                "gemini-4-neon-thinking" => "gemini-4-neon-high",
-                "gemini-4-hydrogen-thinking" => "gemini-4-hydrogen-high",
-                "gemini-flash-lite" => "gemini-4-hydrogen-low",
-                _ => "gemini-4-hydrogen-medium",
-            };
-            let ep = "https://w902287-firebase-gemini-proxy.hf.space/ag/v1/chat/completions";
-            let targets = [(ep, ag_model)];
-            stream_oai_targets_bearer(
-                "Google Antigravity & Cloud Code Hub",
-                &targets,
-                system,
-                messages,
-                true,
-                15,
-                Some("sk-antigravity"),
-                cancel,
-                on_delta,
-            )
-        })
+    stream_gemini4_direct(mode_id, think_mode, system, messages, cancel, on_delta)
 }
 
 /// Stream from MyChat Native Direct Cloud (`https://mychat-ai.cloud/api/openapi/turbo-stream` with rolling hourly MD5 `X-Encryption-Token`).
@@ -871,6 +685,5 @@ where
         }
     }
 
-    stream_antigravity("claude-sonnet-5-5-high", system, messages, cancel, on_delta)
-        .or_else(|_| stream_unikey("claude-opus-5-5", system, messages, cancel, on_delta))
+    Err(format!("Claude 5.5 Direct Hub stream ended without output for {}", model))
 }

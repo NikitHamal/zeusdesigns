@@ -515,10 +515,7 @@ where
         .send()
     {
         Ok(r) if r.status().is_success() => r,
-        _ => {
-            return stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta)
-                .or_else(|_| stream_kilo("reflection/beam-free", system, messages, cancel, on_delta));
-        }
+        _ => return Err("LongCat request failed".to_string()),
     };
 
     let mut reader = BufReader::new(resp);
@@ -571,8 +568,7 @@ where
     if saw_text {
         Ok(())
     } else {
-        stream_unikey("moonshotai/kimi-k3", system, messages, cancel, on_delta)
-            .or_else(|_| stream_kilo("reflection/beam-free", system, messages, cancel, on_delta))
+        Err("LongCat stream ended without output".to_string())
     }
 }
 

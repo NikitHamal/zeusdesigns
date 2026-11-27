@@ -733,8 +733,7 @@ mod tests {
     fn test_catalog_contains_all_thirty_one_keyless_providers() {
         let cat = catalog();
         let ids: Vec<&str> = cat.iter().map(|p| p.id.as_str()).collect();
-        assert_eq!(cat.len(), 51);
-        assert!(ids.contains(&"gemini4hydrogen"));
+        assert_eq!(cat.len(), 49);
         assert!(ids.contains(&"antigravity"));
         assert!(ids.contains(&"gemini4"));
         assert!(ids.contains(&"agnescloud"));
@@ -748,7 +747,6 @@ mod tests {
         assert!(ids.contains(&"opencodezen"));
         assert!(ids.contains(&"mercury3"));
         assert!(ids.contains(&"longcat"));
-        assert!(ids.contains(&"geminiweb"));
         assert!(ids.contains(&"kilo"));
         assert!(ids.contains(&"nimcloud"));
         assert!(ids.contains(&"colibriqwen"));
@@ -756,7 +754,6 @@ mod tests {
         assert!(ids.contains(&"aibridge"));
         assert!(ids.contains(&"hfrouter"));
         assert!(ids.contains(&"litellmhub"));
-        assert!(ids.contains(&"gemweb2api"));
         assert!(ids.contains(&"vireonix"));
         assert!(ids.contains(&"gemma4vl"));
         assert!(ids.contains(&"phi4cloud"));
@@ -853,7 +850,7 @@ mod tests {
     #[test]
     fn test_lmfingerprint_family_classification_and_reroute_detection() {
         assert_eq!(
-            classify_claimed_family("gemini4hydrogen", "gemini-4-hydrogen"),
+            classify_claimed_family("gemini4", "gemini-4-hydrogen"),
             "Google Gemini 4 Family"
         );
         assert_eq!(

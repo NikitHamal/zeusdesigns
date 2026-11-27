@@ -36,7 +36,6 @@ const TARGET_MODELS = [
   { providerId: "motif", modelId: "motif-102b", nativeTools: false, label: "Motif 3 102B (Motif Enterprise Scraper · Transcript + XML DSL)" },
   { providerId: "deepai", modelId: "claude-haiku-5-5", nativeTools: false, label: "Claude Haiku 5.5 (DeepAI IslandKey Scraper · chatHistory XML DSL)" },
   { providerId: "pollinations", modelId: "openai-fast", baseUrl: "https://text.pollinations.ai", nativeTools: false, label: "OpenAI Fast (Pollinations · Harmony to=zeus_tool + XML DSL)" },
-  { providerId: "gemweb2api", modelId: "gemini-3.5-flash", baseUrl: "https://chenian233-gemini-web2api.hf.space/v1", nativeTools: false, label: "Gemini 3.5 Flash (Gemini Web Scraper · User-Turn XML DSL)" },
   { providerId: "colibriqwen", modelId: "Qwen3.6-35B-A3B", baseUrl: "https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1", apiKey: "free", nativeTools: false, label: "Qwen 3.6 35B A3B (Colibri GGUF · XML DSL)" },
 ];
 

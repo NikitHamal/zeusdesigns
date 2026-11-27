@@ -704,7 +704,7 @@ where
                             Err(format!("{} stream ended without output", provider_label))
                         }
 
-/// Stream from FreeLLM Hub (`bun008-freellmapi.hf.space`) with in-provider model failover.
+/// Stream from FreeLLM Hub (`bun008-freellmapi.hf.space`) directly for the requested model.
 pub fn stream_freellmhub<F>(
     model: &str,
     system: &str,
@@ -716,20 +716,13 @@ where
     F: FnMut(&str),
 {
     let requested = if model.trim().is_empty() { "glm-5.3" } else { model };
-    let targets: [(&str, &str); 7] = [
+    let targets: [(&str, &str); 1] = [
         ("https://bun008-freellmapi.hf.space/v1/chat/completions", requested),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "glm-5.3"),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "kimi-k2.7-code"),
-        ("https://bun008-freellmapi.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "claude-haiku-5-5"),
-        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/gpt-oss-120b"),
     ];
     stream_oai_targets_auth("FreeLLM Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
 }
 
-/// Stream from OpenCode Zen (`opencode.ai/zen/v1`), the official keyless free tier OpenCode itself uses
-/// (`Authorization: Bearer public`). Free models only; an unknown id falls back through the chain.
+/// Stream from OpenCode Zen (`opencode.ai/zen/v1`), the official keyless free tier OpenCode itself uses.
 pub fn stream_opencodezen<F>(
     model: &str,
     system: &str,
@@ -742,16 +735,11 @@ where
 {
     const EP: &str = "https://opencode.ai/zen/v1/chat/completions";
     let requested = if model.trim().is_empty() { "big-pickle" } else { model };
-    let targets: [(&str, &str); 4] = [
-        (EP, requested),
-        (EP, "big-pickle"),
-        (EP, "deepseek-v4.1-flash-free"),
-        (EP, "mimo-v2.6-flash-free"),
-    ];
+    let targets: [(&str, &str); 1] = [(EP, requested)];
     stream_oai_targets_bearer("OpenCode Zen", &targets, system, messages, true, 120, Some("public"), cancel, on_delta)
 }
 
-/// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) with direct MyChat / Supabase / ShanNian failover.
+/// Stream from AI Bridge Gateway (`w902287-ai-bridge.hf.space`) directly for the requested model.
 pub fn stream_aibridge<F>(
     model: &str,
     system: &str,
@@ -762,30 +750,14 @@ pub fn stream_aibridge<F>(
 where
     F: FnMut(&str),
 {
-    let requested = match model {
-        "claude-haiku-5-5" => {
-            if stream_claude5proxy("claude-haiku-5-5", system, messages, cancel, on_delta).is_ok() {
-                return Ok(());
-            }
-            "gpt-6-luna"
-        }
-        "deepseek-v4-flash" => "supabase-deepseek-v4.1-flash",
-        "grok-4.20" => "gpt-6-luna",
-        m if m.trim().is_empty() => "gpt-6-luna",
-        m => m,
-    };
-    let targets: [(&str, &str); 5] = [
+    let requested = if model.trim().is_empty() { "gpt-6-luna" } else { model };
+    let targets: [(&str, &str); 1] = [
         ("https://w902287-ai-bridge.hf.space/v1/chat/completions", requested),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-6-luna"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "gpt-4.1"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "supabase-deepseek-v4.1-flash"),
-        ("https://w902287-ai-bridge.hf.space/v1/chat/completions", "qwen3.5-flash"),
     ];
     stream_oai_targets_auth("AI Bridge Gateway", &targets, system, messages, false, 30, false, cancel, on_delta)
-        .or_else(|_| stream_mychatcloud("gpt-6-luna", system, messages, cancel, on_delta))
 }
 
-/// Stream from HF Router Hub (`cgjgj-ollamahftraemonitor.hf.space`) with in-provider model failover.
+/// Stream from HF Router Hub (`cgjgj-ollamahftraemonitor.hf.space`) directly for the requested model.
 pub fn stream_hfrouter<F>(
     model: &str,
     system: &str,
@@ -797,11 +769,8 @@ where
     F: FnMut(&str),
 {
     let requested = if model.trim().is_empty() { "deepseek-v4-pro" } else { model };
-    let targets: [(&str, &str); 4] = [
+    let targets: [(&str, &str); 1] = [
         ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", requested),
-        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "deepseek-v4-flash"),
-        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "qwen3.8"),
-        ("https://cgjgj-ollamahftraemonitor.hf.space/v1/chat/completions", "glm-5.3"),
     ];
     stream_oai_targets_auth("HF Router Hub", &targets, system, messages, false, 90, false, cancel, on_delta)
 }
@@ -825,11 +794,7 @@ where
             _ => "openai/gpt-oss-120b",
         };
         let groq_key = ["gsk", "Xb9ZWf8oAqW1IW8BsMWaWGdyb3FYgttpysM49PRXF4ODD7VsOJbx"].join("_");
-        let groq_targets = [
-            ("https://api.groq.com/openai/v1/chat/completions", groq_model),
-            ("https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-120b"),
-            ("https://api.groq.com/openai/v1/chat/completions", "qwen/qwen3.8-27b"),
-        ];
+        let groq_targets = [("https://api.groq.com/openai/v1/chat/completions", groq_model)];
         if stream_oai_targets_bearer(
             "Groq LPU Direct",
             &groq_targets,
@@ -846,12 +811,8 @@ where
             return Ok(());
         }
     }
-    let targets: [(&str, &str); 4] = [
+    let targets: [(&str, &str); 1] = [
         ("https://alchoholpad-litellm.hf.space/v1/chat/completions", requested),
-        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/gpt-oss-120b"),
-        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "deepseek-v4.1-flash-1017"),
-        ("https://alchoholpad-litellm.hf.space/v1/chat/completions", "groq/qwen3.8-27b"),
     ];
     stream_oai_targets_auth("LiteLLM Frontier Hub", &targets, system, messages, false, 45, false, cancel, on_delta)
-        .or_else(|_| stream_nimcloud("nvidia/nemotron-3-ultra-550b-a55b", system, messages, cancel, on_delta))
 }

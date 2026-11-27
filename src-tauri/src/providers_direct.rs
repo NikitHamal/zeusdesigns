@@ -38,14 +38,6 @@ where
         cancel,
         on_delta,
     )
-    .or_else(|_| {
-        let ptero_model = if eff_model.contains("3.0") {
-            "agnes-3.0-flash:agnes"
-        } else {
-            "agnes-2.5-flash:agnes"
-        };
-        stream_ptero(ptero_model, system, messages, cancel, on_delta)
-    })
 }
 
 /// Stream from Volcengine Ark & SenseNova Direct Cloud (`https://ark.cn-beijing.volces.com/api/v3` + `https://token.sensenova.cn/v1`).
@@ -116,7 +108,6 @@ where
         cancel,
         on_delta,
     )
-    .or_else(|_| stream_shannian(engine, "doubao-seed-2-0-mini-260428", system, messages, cancel, on_delta))
 }
 
 /// Stream from Z.ai BigModel PaaS v4 & LongCat Official Cloud (`https://open.bigmodel.cn/api/paas/v4` + `https://api.longcat.chat/openai/v1`).
@@ -179,7 +170,6 @@ where
         cancel,
         on_delta,
     )
-    .or_else(|_| stream_freellmhub("glm-5.3", system, messages, cancel, on_delta))
 }
 
 /// Stream from Logfare, Mistral & Reka Frontier Hub (`https://bun008-freellmapi.hf.space/v1/chat/completions`).
@@ -216,26 +206,6 @@ where
         cancel,
         on_delta,
     )
-    .or_else(|_| stream_llm7("codestral-latest", system, messages, cancel, on_delta))
-}
-
-/// Stream from Gemini Web Gateway (`chenian233`, `pouluo`, `peijun1`, `peijun1-1`, `giabaopro1908` + direct `gemini.google.com`).
-pub fn stream_gemweb2api<F>(
-    model: &str,
-    system: &str,
-    messages: &[ChatMessage],
-    cancel: &AtomicBool,
-    on_delta: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(&str),
-{
-    let requested = if model.trim().is_empty() {
-        "gemini-4-hydrogen"
-    } else {
-        model
-    };
-    stream_gemini4(requested, system, messages, cancel, on_delta)
 }
 
 /// Stream from NVIDIA NIM OpenAI Cloud (7-key direct `integrate.api.nvidia.com/v1` rotation pool + `garystu-openai-nim-proxy.hf.space` + `mmoranguito-openai-nim-proxy.hf.space`).
@@ -310,15 +280,11 @@ where
     };
     let targets = [
         ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", gary_model),
-        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3.5-bolt-e4b"),
-        ("https://garystu-openai-nim-proxy.hf.space/v1/chat/completions", "nvidia/nemotron-3-ultra-550b-a55b"),
-        ("https://mmoranguito-openai-nim-proxy.hf.space/v1/chat/completions", "nemotron-bolt"),
     ];
-    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 14, cancel, on_delta)
-        .or_else(|_| stream_kilo("nvidia/nemotron-3.5-super-vl:free", system, messages, cancel, on_delta))
+    stream_oai_targets("NVIDIA NIM OpenAI Cloud", &targets, system, messages, true, 60, cancel, on_delta)
 }
 
-/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space` + `hispa-nico-qwen-3-6-35b-a3b.hf.space` + `averekke-qwen3-6pro.hf.space` + `ovhcloud` failover).
+/// Stream from Colibri Qwen 3.6 MoE Cloud (`kartik1302-qwen-3-6-35b-a3b.hf.space`).
 pub fn stream_colibriqwen<F>(
     _model: &str,
     system: &str,
@@ -331,12 +297,8 @@ where
 {
     let targets = [
         ("https://kartik1302-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "Qwen3.6-35B-A3B"),
-        ("https://hispa-nico-qwen-3-6-35b-a3b.hf.space/v1/chat/completions", "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q2_K_XL"),
-        ("https://averekke-qwen3-6pro.hf.space/v1/chat/completions", "/app/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf"),
-        ("https://apathy-exe-qwen3-8-flash-next.hf.space/v1/chat/completions", "/root/.cache/huggingface/hub/models--AtomicChat--Qwen3.8-Flash-Next-GGUF/snapshots/f5b0b790eebb89033c48091c26abf74c1b385940/Qwen3.8-Flash-Next-AD-4.27bpw-Q4_K_M-M64-00001-of-00003.gguf"),
     ];
-    stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 14, cancel, on_delta)
-        .or_else(|_| stream_ovhcloud("qwen3.6-35b-a3b", system, messages, cancel, on_delta))
+    stream_oai_targets("Colibri Qwen 3.6 MoE Cloud", &targets, system, messages, false, 60, cancel, on_delta)
 }
 
 /// Stream from Gemma 4 Vision & QAT Studio (`will-resolute-gemma4-vision-ui`, `titoo3-gemma-4-e4b`, `hispa-nico-gemma4-e2b-qat`, `elseodelasgalletas-gemma4-e2b-qat-mobile`, `gefdsv-gemma-4-e2b-it`).
@@ -556,8 +518,7 @@ where
         || collected.contains("aichatos")
         || collected.trim().is_empty()
     {
-        return stream_unikey("gpt-6-luna", system, messages, cancel, on_delta)
-            .or_else(|_| stream_pollinations("openai", system, messages, cancel, on_delta));
+        return Err("YQCloud stream returned blocked or empty response".to_string());
     }
     on_delta(&collected);
     Ok(())

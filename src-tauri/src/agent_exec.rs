@@ -966,7 +966,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
             } else if !target.is_empty() {
                 (target, "")
             } else {
-                ("gemini4hydrogen", "gemini-4-hydrogen")
+                ("gemini4", "gemini-4-hydrogen")
             };
             let temp_engine = ProviderEngine::default();
             match verify_model_fingerprint(&temp_engine, prov, mdl) {

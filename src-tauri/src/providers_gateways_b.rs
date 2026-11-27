@@ -446,20 +446,7 @@ where
         payload["tools"] = build_native_oai_agent_tools();
     }
 
-    let fallback = |em: &str, sys: &str, msgs: &[ChatMessage], c: &AtomicBool, od: &mut F| -> Result<(), String> {
-        match em {
-            "kimi-k3" => stream_freellmhub("kimi-k2.7-code", sys, msgs, c, od)
-                .or_else(|_| stream_unikey("moonshotai/kimi-k3", sys, msgs, c, od)),
-            "muse-glimmer-30b" => stream_frontierlab("muse-glimmer-30b", sys, msgs, c, od),
-            "gpt-oss-120b" => stream_litellmhub("groq/gpt-oss-120b", sys, msgs, c, od)
-                .or_else(|_| stream_ovhcloud("gpt-oss-20b", sys, msgs, c, od)),
-            _ => stream_freellmhub("glm-5.3", sys, msgs, c, od)
-                .or_else(|_| stream_deepai("glm-5.3-flash", sys, msgs, c, od))
-                .or_else(|_| stream_ptero("glm-5.3-flash", sys, msgs, c, od)),
-        }
-    };
-
-    let client = build_client(8)?;
+    let client = build_client(60)?;
     let resp = match client
         .post("https://lolmaobruhhh-test.hf.space/v1/chat/completions")
         .header("Content-Type", "application/json")
@@ -468,7 +455,8 @@ where
         .send()
     {
         Ok(r) if r.status().is_success() => r,
-        _ => return fallback(eff_model, system, messages, cancel, on_delta),
+        Ok(r) => return Err(format!("Together Frontier HTTP {}", r.status())),
+        Err(e) => return Err(format!("Together Frontier request failed: {}", e)),
     };
 
     let mut reader = BufReader::new(resp);
@@ -534,7 +522,7 @@ where
     if saw_text {
         Ok(())
     } else {
-        fallback(eff_model, system, messages, cancel, on_delta)
+        Err("Together Frontier stream ended without output".to_string())
     }
 }
 

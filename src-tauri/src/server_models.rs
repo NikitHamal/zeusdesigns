@@ -204,15 +204,6 @@ pub fn build_openai_models_list() -> Vec<OpenAiModelEntry> {
             16384,
         ),
         (
-            "gemini-3.1-pro",
-            "gemweb2api",
-            "Gemini 3.1 Pro (Zeus Gemini Web)",
-            true,
-            false,
-            262144,
-            16384,
-        ),
-        (
             "deepseek-v4-pro",
             "hfrouter",
             "DeepSeek V4 Pro (Zeus HF Router)",
@@ -458,20 +449,8 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             "antigravity".to_string(),
             trimmed.to_string(),
         ),
-        "claude-fable-5-2" | "claude-fable-5-1" | "claude-fable-5" | "claude-opus-5-5-thinking" | "claude-sonnet-5-5-thinking" | "claude-opus-5" | "claude-sonnet-5" => (
-            "claudefable".to_string(),
-            trimmed.to_string(),
-        ),
         "claude-sonnet-5-5" | "claude-haiku-5-5" | "claude-opus-5-5" => (
-            "claudefable".to_string(),
-            trimmed.to_string(),
-        ),
-        "gpt-6.2-sol" | "gpt-6.2-sol-pro" | "gpt-6.2-astra" | "gpt-6.2-astra-pro" | "gpt-6.1-terra" | "gpt-5.6-sol" | "gpt-5.6-terra" | "gpt-5.3-codex" => (
-            "gpt6flagship".to_string(),
-            trimmed.to_string(),
-        ),
-        "gemini-4-argon-xhigh" | "gemini-4-carbon-xhigh" | "gemini-3.8-flash" => (
-            "gemini4ultra".to_string(),
+            "claude5proxy".to_string(),
             trimmed.to_string(),
         ),
         "gpt-6-luna" | "gpt-5" | "gpt-5-mini" | "o3" | "o4-mini" => (
@@ -508,7 +487,6 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
             ("qwen".to_string(), trimmed.to_string())
         }
         "Qwen3.6-35B-A3B" => ("colibriqwen".to_string(), "Qwen3.6-35B-A3B".to_string()),
-        "gemini-3.1-pro" => ("gemweb2api".to_string(), "gemini-3.1-pro".to_string()),
         "deepseek-v4-pro" => ("hfrouter".to_string(), "deepseek-v4-pro".to_string()),
         "qwen3-235b" | "kimi-k2.6" => ("freellmhub".to_string(), trimmed.to_string()),
         "grok-4.20" => ("aibridge".to_string(), "grok-4.20".to_string()),
@@ -543,8 +521,8 @@ pub fn resolve_provider_and_model(raw_model: &str) -> (String, String) {
         "longcat-2.5" | "longcat" => {
             ("longcat".to_string(), "longcat-2.5".to_string())
         }
-        "gemini-flash-lite" | "geminiweb" => {
-            ("geminiweb".to_string(), "gemini-flash-lite".to_string())
+        "gemini-flash-lite" => {
+            ("gemini4".to_string(), "gemini-flash-lite".to_string())
         }
         _ => {
             let cat = catalog();
