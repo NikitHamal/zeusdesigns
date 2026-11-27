@@ -24,6 +24,54 @@ export const PROVIDERS: ProviderMeta[] = [
     models: [{ id: "mercury-3", label: "Mercury 3", note: "128k ctx · Diffusion UI architect", reasoning: true, vision: false, contextWindow: 128000, maxOutput: 16384 }],
   },
   {
+    id: "gemweb2api", name: "Gemini 4 Web2API Gateway", tagline: "", speed: "~170 tok/s", color: "#2f9e66", icon: "diamond",
+    contextWindow: 1000000,
+    models: [
+      { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen", note: "Google Gemini 4 Hydrogen workhorse coder", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-4-hydrogen-thinking", label: "Gemini 4 Hydrogen Thinking", note: "Google Gemini 4 Hydrogen reasoning coder", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-4-neon", label: "Gemini 4 Neon", note: "Google Gemini 4 Neon analytical coder", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-4-neon-thinking", label: "Gemini 4 Neon Thinking", note: "Google Gemini 4 Neon deep reasoning", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-4-carbon", label: "Gemini 4 Carbon", note: "Google Gemini 4 Carbon Pro flagship", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", note: "Google Gemini 3.7 Flash high-speed coder", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", note: "Google Gemini 3.6 Flash fast coder", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", note: "Google Gemini 3.5 Flash generalist", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking", label: "Gemini 3.5 Flash Thinking", note: "Google Gemini 3.5 Flash chain-of-thought", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", note: "Google Gemini 3.1 Pro software engineer", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-3.5-flash-thinking-lite", label: "Gemini 3.5 Flash Thinking Lite", note: "Google Gemini 3.5 Flash Thinking Lite", reasoning: true, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+      { id: "gemini-flash-lite", label: "Gemini Flash Lite", note: "Google Gemini Flash Lite low-latency", reasoning: false, vision: false, contextWindow: 1000000, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "clinebot", name: "Cline Direct Gateway", tagline: "", speed: "~160 tok/s", color: "#0ca678", icon: "terminal",
+    contextWindow: 262144,
+    models: [
+      { id: "baidu/ernie-5.5-flash-preview:free", label: "ERNIE 5.5 Flash Preview", note: "Official Cline API Baidu ERNIE 5.5 Flash reasoning & native tools", reasoning: true, vision: false, contextWindow: 262144, maxOutput: 16384 },
+    ],
+  },
+  {
+    id: "qwen3moe30b", name: "Qwen3 30B A3B MoE Cloud", tagline: "", speed: "~145 tok/s", color: "#d96b43", icon: "bolt",
+    contextWindow: 65536,
+    models: [
+      { id: "Qwen3-30B-A3B-Instruct-2507-UD-IQ1_S.gguf", label: "Qwen3 30B A3B Instruct 2507", note: "Alibaba Qwen3 30B A3B MoE Instruct 2507 coder", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "minicpmv46", name: "OpenBMB MiniCPM-V 4.6 & Bonsai Cloud", tagline: "", speed: "~155 tok/s", color: "#12b886", icon: "memory",
+    contextWindow: 65536,
+    models: [
+      { id: "MiniCPM-V-4.6-Q4_K_M", label: "MiniCPM-V 4.6 (Q4_K_M)", note: "OpenBMB MiniCPM-V 4.6 multimodal & coding", reasoning: true, vision: true, contextWindow: 65536, maxOutput: 8192 },
+      { id: "MiniCPM-V-4.6-Q8_0", label: "MiniCPM-V 4.6 (Q8_0)", note: "OpenBMB MiniCPM-V 4.6 8-bit high-precision", reasoning: true, vision: true, contextWindow: 65536, maxOutput: 8192 },
+      { id: "Bonsai-1.7B-Q1_0", label: "Ternary Bonsai 1.7B (Q1_0)", note: "Prism-ML Ternary Bonsai 1.7B ultra-fast coder", reasoning: false, vision: false, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
+    id: "titooqwen35", name: "Qwen 3.5 4B UD-Q5 Cloud", tagline: "", speed: "~165 tok/s", color: "#e67700", icon: "neurology",
+    contextWindow: 65536,
+    models: [
+      { id: "/app/Qwen3.5-4B-UD-Q5_K_XL.gguf", label: "Qwen 3.5 4B (UD-Q5_K_XL)", note: "Alibaba Qwen 3.5 4B Unsloth Dynamic Q5_K_XL multimodal coder", reasoning: true, vision: true, contextWindow: 65536, maxOutput: 8192 },
+    ],
+  },
+  {
     id: "kilo", name: "Kilo Gateway", tagline: "Free frontier & VL pool · no key", speed: "~140 tok/s", color: "#2f9e66", icon: "bolt",
     contextWindow: 262144,
     models: [

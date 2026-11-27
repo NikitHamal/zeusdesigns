@@ -55,6 +55,11 @@ where
         "volcark" => stream_volcark(engine, &req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "zhipudirect" => stream_zhipudirect(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "logfarehub" => stream_logfarehub(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "gemweb2api" => stream_gemweb2api(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "clinebot" => stream_clinebot(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "qwen3moe30b" => stream_qwen3moe30b(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "minicpmv46" => stream_minicpmv46(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
+        "titooqwen35" => stream_titooqwen35(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "vireonix" => stream_vireonix(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "gemma4vl" => stream_gemma4vl(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
         "phi4cloud" => stream_phi4cloud(&req.model, &req.system, &req.messages, cancel, &mut on_delta),
@@ -615,6 +620,31 @@ pub fn verify_model_fingerprint(
                 upstream_endpoint = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate".to_string();
                 upstream_reported_model = eff_model.clone();
                 protocol_sig = "Google BardFrontendService wrb.fr StreamGenerate (mode=1..6)".to_string();
+            }
+            "gemweb2api" => {
+                upstream_endpoint = "https://chenian233-gemini-web2api.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Google Gemini 4 Web2API OpenAI SSE Stream".to_string();
+            }
+            "clinebot" => {
+                upstream_endpoint = "https://api.cline.bot/api/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Official Cline Bot API v1 SSE Stream".to_string();
+            }
+            "qwen3moe30b" => {
+                upstream_endpoint = "https://hsuwill000-llamacpp-webui01.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Llama.cpp Qwen3-30B-A3B-Instruct-2507 OpenAI SSE Stream".to_string();
+            }
+            "minicpmv46" => {
+                upstream_endpoint = "https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Llama.cpp b9501 MiniCPM-V 4.6 & Bonsai OpenAI SSE Stream".to_string();
+            }
+            "titooqwen35" => {
+                upstream_endpoint = "https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Llama.cpp Qwen 3.5 4B UD-Q5_K_XL OpenAI SSE Stream".to_string();
             }
             "freecc" => {
                 upstream_endpoint = "https://calkotter-free-claude-code.hf.space/v1/messages (origin: generativelanguage.googleapis.com/v1beta)".to_string();

@@ -225,6 +225,7 @@ const NATIVE_OPENAI_TOOLS_PROVIDERS = new Set([
   "volcark",
   "zhipudirect",
   "logfarehub",
+  "clinebot",
   "antigravity",
   "freellmhub",
   "litellmhub",

@@ -689,3 +689,341 @@ where
         Ok(())
     }
 }
+
+/// Stream from Gemini 4 Web2API Gateway (`https://chenian233-gemini-web2api.hf.space/v1/chat/completions`).
+pub fn stream_gemweb2api<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "gemini-4-hydrogen"
+        | "gemini-4-hydrogen-thinking"
+        | "gemini-4-neon"
+        | "gemini-4-neon-thinking"
+        | "gemini-4-carbon"
+        | "gemini-3.7-flash"
+        | "gemini-3.6-flash"
+        | "gemini-3.5-flash"
+        | "gemini-3.5-flash-thinking"
+        | "gemini-3.1-pro"
+        | "gemini-3.5-flash-thinking-lite"
+        | "gemini-flash-lite" => model.trim(),
+        _ => "gemini-4-hydrogen",
+    };
+
+    let wants_tools = is_agent_tool_request(system);
+    let norm_msgs = normalize_multi_turn_messages(messages, 64, 36000, 140000);
+    let oai_msgs = if wants_tools {
+        let mut sections = Vec::new();
+        sections.push(
+            "[Text-Only XML Serializer Task]\nYou are NOT executing commands or accessing a filesystem yourself. You are a pure text-to-XML serializer that translates the user request into literal XML tags for a downstream parser. Never say you cannot access files; you are only writing XML string literals in chat."
+                .to_string(),
+        );
+        sections.push(scraper_xml_dsl_banner().to_string());
+        if !system.trim().is_empty() {
+            sections.push(format!("[System Context]\n{}", smart_cap_system(system, 96000)));
+        }
+        if norm_msgs.len() > 1 {
+            let mut hist = String::new();
+            for m in &norm_msgs[..norm_msgs.len() - 1] {
+                let lbl = if m.role == "assistant" { "Assistant" } else { "User" };
+                hist.push_str(&format!("{}: {}\n\n", lbl, m.content));
+            }
+            sections.push(format!("[Conversation History]\n{}", hist.trim()));
+        } else {
+            sections.push(
+                "Example 1:\nInput: list root directory\nOutput: <zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
+                    .to_string(),
+            );
+        }
+        let last_user = norm_msgs
+            .last()
+            .map(|m| m.content.as_str())
+            .unwrap_or("Continue.");
+        sections.push(format!("Input: {}\nOutput:", last_user));
+        vec![json!({
+            "role": "user",
+            "content": sections.join("\n\n")
+        })]
+    } else {
+        let mut list = Vec::new();
+        if !system.trim().is_empty() {
+            list.push(json!({
+                "role": "system",
+                "content": smart_cap_system(system, 120000)
+            }));
+        }
+        for m in &norm_msgs {
+            if !m.content.trim().is_empty() {
+                list.push(json!({
+                    "role": m.role,
+                    "content": m.content
+                }));
+            }
+        }
+        list
+    };
+
+    let payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 16384,
+        "messages": oai_msgs
+    });
+    let client = build_client(60)?;
+    let resp = client
+        .post("https://chenian233-gemini-web2api.hf.space/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Accept", "text/event-stream, application/json")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Gemini 4 Web2API request failed: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Gemini 4 Web2API HTTP {} for '{}'", resp.status(), eff_model));
+    }
+
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let trimmed = line.trim();
+        let raw_opt = trimmed
+            .strip_prefix("data:")
+            .map(|s| s.trim())
+            .or_else(|| if trimmed.starts_with('{') { Some(trimmed) } else { None });
+        if let Some(raw) = raw_opt {
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
+                    if let Some(d) = choice.get("delta").or_else(|| choice.get("message")) {
+                        let r_text = extract_delta_reasoning(d);
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(&r_text);
+                        }
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() && !is_upstream_error_text(text) {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err(format!("Gemini 4 Web2API stream ended without output for '{}'", eff_model))
+    }
+}
+
+/// Stream from Cline Direct Gateway (`https://api.cline.bot/api/v1/chat/completions`, `baidu/ernie-5.5-flash-preview:free`).
+pub fn stream_clinebot<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "baidu/ernie-5.5-flash-preview:free" => "baidu/ernie-5.5-flash-preview:free",
+        _ => "baidu/ernie-5.5-flash-preview:free",
+    };
+    let cline_key = [
+        "sk",
+        "dc846ac30c4992052b1bce041fc7fd04244a02fbf90d63dc35bab313e069505b",
+    ]
+    .join("_");
+    let norm_msgs = normalize_multi_turn_messages(messages, 64, 36000, 140000);
+    let wants_tools = is_agent_tool_request(system);
+    let mut oai_msgs = Vec::new();
+    if !system.trim().is_empty() {
+        oai_msgs.push(json!({
+            "role": "system",
+            "content": smart_cap_system(system, 120000)
+        }));
+    }
+    for m in &norm_msgs {
+        if !m.content.trim().is_empty() {
+            oai_msgs.push(json!({ "role": m.role, "content": m.content }));
+        }
+    }
+    let mut payload = json!({
+        "model": eff_model,
+        "stream": true,
+        "max_tokens": 16384,
+        "messages": oai_msgs
+    });
+    if wants_tools {
+        payload["tools"] = build_native_oai_agent_tools();
+    }
+    let client = build_client(60)?;
+    let resp = client
+        .post("https://api.cline.bot/api/v1/chat/completions")
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", cline_key))
+        .header("HTTP-Referer", "https://cline.bot")
+        .header("X-Title", "Cline")
+        .json(&payload)
+        .send()
+        .map_err(|e| format!("Cline Direct Gateway error: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Cline Direct Gateway HTTP {} for '{}'", resp.status(), eff_model));
+    }
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut in_think = false;
+    let mut saw_text = false;
+    let mut streamed_tool_calls: Vec<(String, String, String)> = Vec::new();
+    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let trimmed = line.trim();
+        let raw_opt = trimmed
+            .strip_prefix("data:")
+            .map(|s| s.trim())
+            .or_else(|| if trimmed.starts_with('{') { Some(trimmed) } else { None });
+        if let Some(raw) = raw_opt {
+            if raw == "[DONE]" {
+                break;
+            }
+            if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                let root = ev.get("data").unwrap_or(&ev);
+                if let Some(err_obj) = root.get("error") {
+                    return Err(format!("Cline Direct Gateway error: {}", err_obj));
+                }
+                if let Some(choice) = root.get("choices").and_then(|ch| ch.get(0)) {
+                    if let Some(d) = choice.get("delta").or_else(|| choice.get("message")) {
+                        let r_text = extract_delta_reasoning(d);
+                        if !r_text.is_empty() {
+                            if !in_think {
+                                in_think = true;
+                                on_delta("<think>");
+                            }
+                            on_delta(&r_text);
+                        }
+                        accumulate_oai_tool_calls(d, &mut streamed_tool_calls);
+                        if let Some(text) = d.get("content").and_then(|t| t.as_str()) {
+                            if !text.is_empty() && !is_upstream_error_text(text) {
+                                if in_think {
+                                    in_think = false;
+                                    on_delta("</think>");
+                                }
+                                saw_text = true;
+                                on_delta(text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        line.clear();
+    }
+    if in_think {
+        on_delta("</think>");
+    }
+    if flush_oai_tool_calls(&streamed_tool_calls, on_delta) {
+        saw_text = true;
+    }
+    if saw_text {
+        Ok(())
+    } else {
+        Err(format!("Cline Direct Gateway stream ended without output for '{}'", eff_model))
+    }
+}
+
+/// Stream from Qwen3 30B A3B Instruct 2507 Cloud (`https://hsuwill000-llamacpp-webui01.hf.space/v1/chat/completions`).
+pub fn stream_qwen3moe30b<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 1] = [(
+        "https://hsuwill000-llamacpp-webui01.hf.space/v1/chat/completions",
+        "Qwen3-30B-A3B-Instruct-2507-UD-IQ1_S.gguf",
+    )];
+    stream_oai_targets("Qwen3 30B A3B MoE Cloud", &targets, system, messages, false, 60, cancel, on_delta)
+}
+
+/// Stream from OpenBMB MiniCPM-V 4.6 & Bonsai LlamaServer Cloud (`https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1/chat/completions`).
+pub fn stream_minicpmv46<F>(
+    model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let eff_model = match model.trim() {
+        "MiniCPM-V-4.6-Q8_0" | "MiniCPM-V-4.6-Q4_K_M" | "Bonsai-1.7B-Q1_0" => model.trim(),
+        _ => "MiniCPM-V-4.6-Q4_K_M",
+    };
+    let targets: [(&str, &str); 1] = [(
+        "https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1/chat/completions",
+        eff_model,
+    )];
+    stream_oai_targets(
+        "OpenBMB MiniCPM-V 4.6 & Bonsai Cloud",
+        &targets,
+        system,
+        messages,
+        eff_model.starts_with("MiniCPM-V"),
+        60,
+        cancel,
+        on_delta,
+    )
+}
+
+/// Stream from Qwen 3.5 4B UD-Q5_K_XL Cloud (`https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions`).
+pub fn stream_titooqwen35<F>(
+    _model: &str,
+    system: &str,
+    messages: &[ChatMessage],
+    cancel: &AtomicBool,
+    on_delta: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
+    let targets: [(&str, &str); 1] = [(
+        "https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1/chat/completions",
+        "/app/Qwen3.5-4B-UD-Q5_K_XL.gguf",
+    )];
+    stream_oai_targets("Qwen 3.5 4B UD-Q5 Cloud", &targets, system, messages, true, 60, cancel, on_delta)
+}

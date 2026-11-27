@@ -129,6 +129,89 @@ KeylessProviderEngine::KeylessProviderEngine() {
             "1,000-2,000+ tok/s"
         },
         {
+            "gemweb2api",
+            "Gemini 4 Web2API Gateway",
+            ProviderFormat::SCRAPER_GEMWEB2API,
+            "https://chenian233-gemini-web2api.hf.space/v1",
+            "gemini-4-hydrogen",
+            {
+                {"gemini-4-hydrogen", "Gemini 4 Hydrogen", "Google Gemini 4 Hydrogen workhorse coder", false, false, false, 170},
+                {"gemini-4-hydrogen-thinking", "Gemini 4 Hydrogen Thinking", "Google Gemini 4 Hydrogen reasoning coder", true, false, false, 165},
+                {"gemini-4-neon", "Gemini 4 Neon", "Google Gemini 4 Neon analytical coder", false, false, false, 170},
+                {"gemini-4-neon-thinking", "Gemini 4 Neon Thinking", "Google Gemini 4 Neon deep reasoning", true, false, false, 165},
+                {"gemini-4-carbon", "Gemini 4 Carbon", "Google Gemini 4 Carbon Pro flagship", true, false, false, 160},
+                {"gemini-3.7-flash", "Gemini 3.7 Flash", "Google Gemini 3.7 Flash high-speed coder", true, false, false, 175},
+                {"gemini-3.6-flash", "Gemini 3.6 Flash", "Google Gemini 3.6 Flash fast coder", false, false, false, 175},
+                {"gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini 3.5 Flash generalist", false, false, false, 175},
+                {"gemini-3.5-flash-thinking", "Gemini 3.5 Flash Thinking", "Google Gemini 3.5 Flash chain-of-thought", true, false, false, 170},
+                {"gemini-3.1-pro", "Gemini 3.1 Pro", "Google Gemini 3.1 Pro software engineer", true, false, false, 160},
+                {"gemini-3.5-flash-thinking-lite", "Gemini 3.5 Flash Thinking Lite", "Google Gemini 3.5 Flash Thinking Lite", true, false, false, 180},
+                {"gemini-flash-lite", "Gemini Flash Lite", "Google Gemini Flash Lite low-latency", false, false, false, 190}
+            },
+            1000000,
+            16384,
+            false,
+            "~170 tok/s"
+        },
+        {
+            "clinebot",
+            "Cline Direct Gateway",
+            ProviderFormat::SCRAPER_CLINEBOT,
+            "https://api.cline.bot/api/v1",
+            "baidu/ernie-5.5-flash-preview:free",
+            {
+                {"baidu/ernie-5.5-flash-preview:free", "ERNIE 5.5 Flash Preview", "Official Cline API Baidu ERNIE 5.5 Flash reasoning & native tools", true, false, false, 160}
+            },
+            262144,
+            16384,
+            false,
+            "~160 tok/s"
+        },
+        {
+            "qwen3moe30b",
+            "Qwen3 30B A3B MoE Cloud",
+            ProviderFormat::SCRAPER_QWEN3MOE30B,
+            "https://hsuwill000-llamacpp-webui01.hf.space/v1",
+            "Qwen3-30B-A3B-Instruct-2507-UD-IQ1_S.gguf",
+            {
+                {"Qwen3-30B-A3B-Instruct-2507-UD-IQ1_S.gguf", "Qwen3 30B A3B Instruct 2507", "Alibaba Qwen3 30B A3B MoE Instruct 2507 coder", false, false, false, 145}
+            },
+            65536,
+            8192,
+            false,
+            "~145 tok/s"
+        },
+        {
+            "minicpmv46",
+            "OpenBMB MiniCPM-V 4.6 & Bonsai Cloud",
+            ProviderFormat::SCRAPER_MINICPMV46,
+            "https://misterai-llamacpp-llamaui-demo-b9501.hf.space/v1",
+            "MiniCPM-V-4.6-Q4_K_M",
+            {
+                {"MiniCPM-V-4.6-Q4_K_M", "MiniCPM-V 4.6 (Q4_K_M)", "OpenBMB MiniCPM-V 4.6 multimodal & coding", true, false, true, 155},
+                {"MiniCPM-V-4.6-Q8_0", "MiniCPM-V 4.6 (Q8_0)", "OpenBMB MiniCPM-V 4.6 8-bit high-precision", true, false, true, 145},
+                {"Bonsai-1.7B-Q1_0", "Ternary Bonsai 1.7B (Q1_0)", "Prism-ML Ternary Bonsai 1.7B ultra-fast coder", false, false, false, 180}
+            },
+            65536,
+            8192,
+            false,
+            "~155 tok/s"
+        },
+        {
+            "titooqwen35",
+            "Qwen 3.5 4B UD-Q5 Cloud",
+            ProviderFormat::SCRAPER_TITOOQWEN35,
+            "https://titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space/v1",
+            "/app/Qwen3.5-4B-UD-Q5_K_XL.gguf",
+            {
+                {"/app/Qwen3.5-4B-UD-Q5_K_XL.gguf", "Qwen 3.5 4B (UD-Q5_K_XL)", "Alibaba Qwen 3.5 4B Unsloth Dynamic Q5_K_XL multimodal coder", true, false, true, 165}
+            },
+            65536,
+            8192,
+            false,
+            "~165 tok/s"
+        },
+        {
             "qwen",
             "Qwen (Android App Gateway)",
             ProviderFormat::SCRAPER_QWEN,

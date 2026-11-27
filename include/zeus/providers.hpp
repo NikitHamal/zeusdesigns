@@ -39,8 +39,12 @@ enum class ProviderFormat {
     SCRAPER_MYCHATCLOUD,// MyChat Native Direct Cloud (mychat-ai.cloud/api/openapi/turbo-stream)
     SCRAPER_SUPAVIP,    // Supabase Tongyi VIP Cloud (vdspcxotxhxfjowqndix.supabase.co/functions/v1/translate-proxy)
     SCRAPER_SHANNIAN,   // ShanNian & Volcengine VIP Gateway (ai.northcity.top)
-    SCRAPER_CLAUDE5PROXY,// Claude 5.5 & Zhipu GLM Direct Hub (dherain24-claude-proxy.hf.space + sun14728-ai-proxy)
-    SCRAPER_GEMWEB2API, // Gemini Web Gateway (chenian233-gemini-web2api.hf.space)
+    SCRAPER_CLAUDE5PROXY,// Claude 5.5 & Zhipu GLM Direct Hub (dherain24-claude-proxy.hf.space + open.bigmodel.cn)
+    SCRAPER_GEMWEB2API, // Gemini 4 Web2API Gateway (chenian233-gemini-web2api.hf.space)
+    SCRAPER_CLINEBOT,   // Cline Direct Gateway (api.cline.bot/api/v1)
+    SCRAPER_QWEN3MOE30B,// Qwen3 30B A3B Instruct 2507 Cloud (hsuwill000-llamacpp-webui01.hf.space)
+    SCRAPER_MINICPMV46, // OpenBMB MiniCPM-V 4.6 & Bonsai Cloud (misterai-llamacpp-llamaui-demo-b9501.hf.space)
+    SCRAPER_TITOOQWEN35,// Qwen 3.5 4B UD-Q5 Cloud (titoo3-qwen3-5-4b-gguf-ud-q5-k-xl.hf.space)
     SCRAPER_VIREONIX,   // Vireonix (vireonix.ai/v1) anonymous request-aware router, 1M context
     SCRAPER_OPENCODEZEN,// OpenCode Zen (opencode.ai/zen/v1) free tier, Bearer public
     SCRAPER_GEMMA4VL,    // Gemma 4 Vision & QAT Studio (will-resolute / titoo3 / hispa-nico / elseodelasgalletas / gefdsv)
