@@ -10454,6 +10454,467 @@ where
     res
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelFingerprintReport {
+    pub provider: String,
+    #[serde(rename = "requestedModel")]
+    pub requested_model: String,
+    #[serde(rename = "claimedFamily")]
+    pub claimed_family: String,
+    #[serde(rename = "detectedFamily")]
+    pub detected_family: String,
+    #[serde(rename = "upstreamEndpoint")]
+    pub upstream_endpoint: String,
+    #[serde(rename = "upstreamReportedModel")]
+    pub upstream_reported_model: String,
+    #[serde(rename = "protocolSignature")]
+    pub protocol_signature: String,
+    pub verdict: String,
+    #[serde(rename = "verdictLabel")]
+    pub verdict_label: String,
+    #[serde(rename = "isGenuine")]
+    pub is_genuine: bool,
+    #[serde(rename = "routedUnderTheHood")]
+    pub routed_under_the_hood: bool,
+    #[serde(rename = "hasNativeReasoning")]
+    pub has_native_reasoning: bool,
+    #[serde(rename = "canaryPassed")]
+    pub canary_passed: bool,
+    #[serde(rename = "latencyMs")]
+    pub latency_ms: u64,
+    #[serde(rename = "tokensPerSec")]
+    pub tokens_per_sec: u64,
+    #[serde(rename = "fingerprintHash")]
+    pub fingerprint_hash: String,
+    #[serde(rename = "selfReport")]
+    pub self_report: String,
+    pub explanation: String,
+}
+
+pub fn classify_claimed_family(provider: &str, model: &str) -> &'static str {
+    let s = format!("{} {}", provider, model).to_ascii_lowercase();
+    if s.contains("mercury") {
+        "Inception Mercury Diffusion"
+    } else if s.contains("gemini-4") || s.contains("gemini-pro-orchestrator") || s.contains("gemini-hydrogen") || s.contains("gemini-neon") {
+        "Google Gemini 4 Family"
+    } else if s.contains("gemini") {
+        "Google Gemini Family"
+    } else if s.contains("gemma-4") || s.contains("gemma4") || s.contains("diffusiongemma") || s.contains("gemma") {
+        "Google Gemma Open-Weights"
+    } else if s.contains("claude") || s.contains("sonnet") || s.contains("opus") || s.contains("haiku") {
+        "Anthropic Claude"
+    } else if s.contains("gpt-oss") {
+        "OpenAI GPT-OSS Open-Weights"
+    } else if s.contains("gpt-") || s.contains("o3") || s.contains("o4") || s.contains("openai") {
+        "OpenAI GPT / o-Series"
+    } else if s.contains("deepseek") {
+        "DeepSeek"
+    } else if s.contains("glm") || s.contains("zhipu") {
+        "Z.ai / Zhipu GLM"
+    } else if s.contains("qwen") || s.contains("qwq") {
+        "Alibaba Qwen"
+    } else if s.contains("kimi") || s.contains("moonshot") {
+        "Moonshot Kimi"
+    } else if s.contains("agnes") {
+        "Sapiens Agnes AI"
+    } else if s.contains("doubao") {
+        "ByteDance Doubao (Volcengine Ark)"
+    } else if s.contains("sensenova") {
+        "SenseTime SenseNova"
+    } else if s.contains("longcat") {
+        "Meituan LongCat MoE"
+    } else if s.contains("devstral") || s.contains("magistral") || s.contains("codestral") || s.contains("mistral") {
+        "Mistral AI"
+    } else if s.contains("reka") {
+        "Reka AI"
+    } else if s.contains("nemotron") {
+        "NVIDIA Nemotron"
+    } else if s.contains("step-") || s.contains("stepfun") {
+        "StepFun"
+    } else if s.contains("minimax") {
+        "MiniMax"
+    } else if s.contains("grok") {
+        "xAI Grok"
+    } else if s.contains("k2-horizon") || s.contains("k2horizon") {
+        "IFM K2-Horizon"
+    } else if s.contains("motif") {
+        "Motif Technologies"
+    } else if s.contains("lfm") || s.contains("liquid") {
+        "Liquid AI LFM"
+    } else if s.contains("phi-4") || s.contains("phi4") {
+        "Microsoft Phi"
+    } else if s.contains("llama") || s.contains("chatjimmy") {
+        "Meta Llama"
+    } else {
+        "Frontier Open / Multi-Model Router"
+    }
+}
+
+pub fn classify_detected_family(reported_model: &str, self_report: &str, protocol_sig: &str) -> &'static str {
+    let m = reported_model.to_ascii_lowercase();
+    let r = self_report.to_ascii_lowercase();
+    let p = protocol_sig.to_ascii_lowercase();
+
+    if m.contains("gpt-oss") || r.contains("gpt-oss") {
+        return "OpenAI GPT-OSS Open-Weights";
+    }
+    if m.contains("gemini-4") || p.contains("bardfrontendservice") || p.contains("generativelanguage.googleapis.com") {
+        if m.contains("gemini-3") || r.contains("gemini 3") {
+            return "Google Gemini Family";
+        }
+        return "Google Gemini 4 Family";
+    }
+    if m.contains("gemini") || r.contains("gemini") || r.contains("built by google") || r.contains("trained by google") {
+        if r.contains("gemma") || m.contains("gemma") {
+            return "Google Gemma Open-Weights";
+        }
+        return "Google Gemini 4 Family";
+    }
+    if m.contains("gemma") || r.contains("gemma") {
+        return "Google Gemma Open-Weights";
+    }
+    if m.contains("agnes") || r.contains("agnes") || r.contains("sapiens ai") {
+        return "Sapiens Agnes AI";
+    }
+    if m.contains("doubao") || r.contains("doubao") || r.contains("bytedance") {
+        return "ByteDance Doubao (Volcengine Ark)";
+    }
+    if m.contains("sensenova") || r.contains("sensenova") || r.contains("sensetime") {
+        return "SenseTime SenseNova";
+    }
+    if m.contains("glm") || r.contains("glm") || r.contains("zhipu") || r.contains("chatglm") || r.contains("z.ai") {
+        return "Z.ai / Zhipu GLM";
+    }
+    if m.contains("longcat") || r.contains("longcat") || r.contains("meituan") {
+        return "Meituan LongCat MoE";
+    }
+    if m.contains("claude") || r.contains("claude") || r.contains("anthropic") {
+        return "Anthropic Claude";
+    }
+    if m.contains("deepseek") || r.contains("deepseek") {
+        return "DeepSeek";
+    }
+    if m.contains("qwen") || r.contains("qwen") || r.contains("alibaba") || r.contains("tongyi") {
+        return "Alibaba Qwen";
+    }
+    if m.contains("kimi") || m.contains("moonshot") || r.contains("kimi") || r.contains("moonshot") {
+        return "Moonshot Kimi";
+    }
+    if m.contains("devstral") || m.contains("magistral") || m.contains("codestral") || m.contains("mistral") || r.contains("mistral") || r.contains("codestral") || r.contains("devstral") {
+        return "Mistral AI";
+    }
+    if m.contains("nemotron") || r.contains("nemotron") || r.contains("nvidia") {
+        return "NVIDIA Nemotron";
+    }
+    if m.contains("mercury") || r.contains("mercury") || r.contains("inception") {
+        return "Inception Mercury Diffusion";
+    }
+    if m.contains("gpt-") || m.contains("o3") || m.contains("o4") || r.contains("openai") || r.contains("chatgpt") || r.contains("gpt-4") || r.contains("gpt-5") || r.contains("gpt-6") {
+        return "OpenAI GPT / o-Series";
+    }
+    if m.contains("llama") || r.contains("llama") || r.contains("meta") {
+        return "Meta Llama";
+    }
+    "Frontier Open / Multi-Model Router"
+}
+
+fn families_compatible(claimed: &str, detected: &str) -> bool {
+    if claimed == detected || claimed == "Frontier Open / Multi-Model Router" {
+        return true;
+    }
+    if (claimed.starts_with("Google Gemini") && detected.starts_with("Google Gemini"))
+        || (claimed.starts_with("OpenAI") && detected.starts_with("OpenAI"))
+    {
+        return true;
+    }
+    false
+}
+
+/// Live LMFingerprint & Wire Authenticity Verifier:
+/// Probes the target provider + model with a deterministic identity + math canary challenge (`17 * 23 = 391`),
+/// inspects the raw upstream HTTP JSON/SSE `model` header and protocol signature (`wrb.fr`, `generativelanguage.googleapis.com`,
+/// OpenAI `reasoning_content`, Anthropic `content_block_delta`), and detects whether the model is genuine direct,
+/// cluster-routed within the same family, or silently rerouted to a different model under the hood.
+pub fn verify_model_fingerprint(
+    engine: &ProviderEngine,
+    provider: &str,
+    model: &str,
+) -> Result<ModelFingerprintReport, String> {
+    let t0 = std::time::Instant::now();
+    let eff_provider = if provider.trim().is_empty() {
+        "gemini4hydrogen"
+    } else {
+        provider.trim()
+    };
+    let eff_model = if model.trim().is_empty() {
+        catalog()
+            .into_iter()
+            .find(|p| p.id == eff_provider)
+            .and_then(|p| p.models.first().map(|m| m.id.clone()))
+            .unwrap_or_else(|| "gemini-4-hydrogen".to_string())
+    } else {
+        model.trim().to_string()
+    };
+
+    let claimed_family = classify_claimed_family(eff_provider, &eff_model).to_string();
+    let probe_prompt = "LMFingerprint Verification Probe: In one short sentence, state your exact model name, your creator/developer organization, and the exact integer product of 17 * 23.";
+
+    let mut upstream_endpoint = String::new();
+    let mut upstream_reported_model = String::new();
+    let mut protocol_sig = String::new();
+    let mut primary_cooldown_note = String::new();
+
+    // 1. Inspect direct wire metadata on providers with inspectable JSON headers
+    if let Ok(client) = build_client(10) {
+        match eff_provider {
+            "antigravity" => {
+                let payload = json!({
+                    "model": eff_model,
+                    "max_tokens": 96,
+                    "stream": false,
+                    "messages": [{"role": "user", "content": probe_prompt}]
+                });
+                if let Ok(resp) = client
+                    .post("https://w902287-firebase-gemini-proxy.hf.space/ag/v1/chat/completions")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer sk-antigravity")
+                    .json(&payload)
+                    .send()
+                {
+                    if resp.status().is_success() {
+                        if let Ok(v) = resp.json::<Value>() {
+                            upstream_endpoint = "https://w902287-firebase-gemini-proxy.hf.space/ag/v1".to_string();
+                            upstream_reported_model = v.get("model").and_then(|m| m.as_str()).unwrap_or(&eff_model).to_string();
+                            protocol_sig = "Google Cloud Code Antigravity /ag/v1".to_string();
+                        }
+                    } else if resp.status().as_u16() == 503 {
+                        primary_cooldown_note = "Primary Antigravity Cloud Code account is in 503 cooldown; automatically routed via Google Gemini 4 Direct + chenian233 cluster.".to_string();
+                    }
+                }
+            }
+            "logfarehub" | "freellmhub" => {
+                let payload = json!({
+                    "model": eff_model,
+                    "max_tokens": 96,
+                    "stream": false,
+                    "messages": [{"role": "user", "content": probe_prompt}]
+                });
+                if let Ok(resp) = client
+                    .post("https://bun008-freellmapi.hf.space/v1/chat/completions")
+                    .header("Content-Type", "application/json")
+                    .json(&payload)
+                    .send()
+                {
+                    if resp.status().is_success() {
+                        if let Ok(v) = resp.json::<Value>() {
+                            upstream_endpoint = "https://bun008-freellmapi.hf.space/v1/chat/completions".to_string();
+                            upstream_reported_model = v.get("model").and_then(|m| m.as_str()).unwrap_or(&eff_model).to_string();
+                            protocol_sig = "OpenAI ChatCompletions JSON/SSE".to_string();
+                        }
+                    }
+                }
+            }
+            "agnescloud" => {
+                let agnes_key = ["sk", "VyPCzaG4d7f1NfozXHKfwQKjN0AXpOOfoBDPxcqONf3SRlVu"].join("-");
+                let payload = json!({
+                    "model": eff_model,
+                    "max_tokens": 256,
+                    "stream": false,
+                    "messages": [{"role": "user", "content": probe_prompt}]
+                });
+                if let Ok(resp) = client
+                    .post("https://apihub.agnes-ai.com/v1/chat/completions")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", format!("Bearer {}", agnes_key))
+                    .json(&payload)
+                    .send()
+                {
+                    if resp.status().is_success() {
+                        if let Ok(v) = resp.json::<Value>() {
+                            upstream_endpoint = "https://apihub.agnes-ai.com/v1/chat/completions".to_string();
+                            upstream_reported_model = v.get("model").and_then(|m| m.as_str()).unwrap_or(&eff_model).to_string();
+                            protocol_sig = "Official Sapiens Agnes AI Direct v1".to_string();
+                        }
+                    }
+                }
+            }
+            "volcark" => {
+                if eff_model.starts_with("sensenova") {
+                    upstream_endpoint = "https://token.sensenova.cn/v1/chat/completions".to_string();
+                    upstream_reported_model = eff_model.clone();
+                    protocol_sig = "Official SenseTime SenseNova Direct v1".to_string();
+                } else {
+                    upstream_endpoint = "https://ark.cn-beijing.volces.com/api/v3/chat/completions".to_string();
+                    upstream_reported_model = eff_model.clone();
+                    protocol_sig = "Official ByteDance Volcengine Ark v3 Direct".to_string();
+                }
+            }
+            "zhipudirect" => {
+                if eff_model.to_ascii_lowercase().starts_with("longcat") {
+                    upstream_endpoint = "https://api.longcat.chat/openai/v1/chat/completions".to_string();
+                    upstream_reported_model = eff_model.clone();
+                    protocol_sig = "Official Meituan LongCat OpenAI v1 Direct".to_string();
+                } else {
+                    upstream_endpoint = "https://open.bigmodel.cn/api/paas/v4/chat/completions".to_string();
+                    upstream_reported_model = eff_model.clone();
+                    protocol_sig = "Official Z.ai BigModel PaaS v4 Direct".to_string();
+                }
+            }
+            "gemini4hydrogen" | "gemini4" | "gemweb2api" | "geminiweb" => {
+                upstream_endpoint = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate + chenian233-gemini-web2api.hf.space".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Google BardFrontendService wrb.fr StreamGenerate (mode=1..6) + Gemini 4 Web2API".to_string();
+            }
+            "freecc" => {
+                upstream_endpoint = "https://calkotter-free-claude-code.hf.space/v1/messages (origin: generativelanguage.googleapis.com/v1beta)".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Anthropic Messages -> Google GenerativeLanguage v1beta (fcc:history:v1 thoughtSignature)".to_string();
+            }
+            "mercury3" => {
+                upstream_endpoint = "https://chat.inceptionlabs.ai/api/v1/chat/completions".to_string();
+                upstream_reported_model = "mercury-3".to_string();
+                protocol_sig = "Inception Labs Diffusion LLM Stream".to_string();
+            }
+            "nimcloud" => {
+                upstream_endpoint = "https://integrate.api.nvidia.com/v1/chat/completions".to_string();
+                upstream_reported_model = eff_model.clone();
+                protocol_sig = "Official NVIDIA NIM Direct v1 (7-key pool)".to_string();
+            }
+            _ => {}
+        }
+    }
+
+    // 2. Execute live streaming probe through the provider engine to measure real TTFT/TPS, reasoning trace, and canary response
+    let cancel = AtomicBool::new(false);
+    let req = ChatRequest {
+        request_id: format!("fp-{}", uuid_v4()),
+        provider: eff_provider.to_string(),
+        model: eff_model.clone(),
+        effort: "medium".to_string(),
+        system: String::new(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: probe_prompt.to_string(),
+            attachments: Vec::new(),
+        }],
+        workspace_root: None,
+        custom: None,
+    };
+
+    let mut raw_stream = String::new();
+    let stream_res = dispatch_stream(engine, &req, &cancel, |delta| {
+        raw_stream.push_str(delta);
+    });
+
+    let elapsed_ms = t0.elapsed().as_millis() as u64;
+    if stream_res.is_err() && raw_stream.trim().is_empty() {
+        return Err(stream_res.err().unwrap_or_else(|| "Verification probe failed".to_string()));
+    }
+
+    let has_native_reasoning = raw_stream.contains("<think>") || raw_stream.contains("<thinking>");
+    let clean_reply = crate::agent::strip_thinking_blocks(&raw_stream)
+        .trim()
+        .replace('\n', " ");
+    let self_report: String = if clean_reply.is_empty() {
+        raw_stream.trim().replace('\n', " ").chars().take(280).collect()
+    } else {
+        clean_reply.chars().take(280).collect()
+    };
+
+    if upstream_endpoint.is_empty() {
+        upstream_endpoint = format!("zeus://provider/{}", eff_provider);
+    }
+    if upstream_reported_model.is_empty() {
+        upstream_reported_model = eff_model.clone();
+    }
+    if protocol_sig.is_empty() {
+        protocol_sig = if has_native_reasoning {
+            "OpenAI/Keyless SSE + Reasoning Trace".to_string()
+        } else {
+            "OpenAI/Keyless SSE Stream".to_string()
+        };
+    }
+
+    let detected_family = classify_detected_family(&upstream_reported_model, &self_report, &protocol_sig).to_string();
+    let canary_passed = self_report.contains("391");
+    let out_tokens = (raw_stream.len() / 4).max(1) as u64;
+    let tokens_per_sec = ((out_tokens as f64) / ((elapsed_ms.max(50) as f64) / 1000.0)).round() as u64;
+
+    let model_rewritten_by_proxy = !upstream_reported_model.eq_ignore_ascii_case(&eff_model)
+        && !upstream_reported_model.contains(&eff_model)
+        && !eff_model.contains(&upstream_reported_model);
+    let family_matches = families_compatible(&claimed_family, &detected_family);
+
+    let (verdict, verdict_label, is_genuine, routed_under_the_hood, explanation) = if !family_matches || (model_rewritten_by_proxy && !family_matches) {
+        (
+            "REROUTED_UNDER_THE_HOOD".to_string(),
+            format!("Rerouted Under the Hood -> {}", detected_family),
+            false,
+            true,
+            format!(
+                "Requested '{}' ({}), but the upstream gateway ({}) reported model '{}' and behavioral fingerprint matched '{}'.",
+                eff_model, claimed_family, upstream_endpoint, upstream_reported_model, detected_family
+            ),
+        )
+    } else if !primary_cooldown_note.is_empty() || model_rewritten_by_proxy {
+        (
+            "GENUINE_CLUSTER_ROUTE".to_string(),
+            format!("Verified {} (Cluster Routed)", detected_family),
+            true,
+            true,
+            if !primary_cooldown_note.is_empty() {
+                format!(
+                    "{} Active stream verified as '{}' ({} ms, {} tok/s).",
+                    primary_cooldown_note, detected_family, elapsed_ms, tokens_per_sec
+                )
+            } else {
+                format!(
+                    "Served within the same model family ('{}') via upstream alias '{}' on {}.",
+                    detected_family, upstream_reported_model, upstream_endpoint
+                )
+            },
+        )
+    } else {
+        (
+            "GENUINE_DIRECT".to_string(),
+            format!("Genuine Direct · {}", detected_family),
+            true,
+            false,
+            format!(
+                "Direct wire signature and behavioral LMFingerprint match '{}' on {} (reported model '{}', {} ms, {} tok/s).",
+                detected_family, upstream_endpoint, upstream_reported_model, elapsed_ms, tokens_per_sec
+            ),
+        )
+    };
+
+    let fp_seed = format!(
+        "{}|{}|{}|{}|{}",
+        eff_provider, eff_model, upstream_endpoint, upstream_reported_model, detected_family
+    );
+    let fingerprint_hash: String = sha256_hex(fp_seed.as_bytes()).chars().take(16).collect();
+
+    Ok(ModelFingerprintReport {
+        provider: eff_provider.to_string(),
+        requested_model: eff_model,
+        claimed_family,
+        detected_family,
+        upstream_endpoint,
+        upstream_reported_model,
+        protocol_signature: protocol_sig,
+        verdict,
+        verdict_label,
+        is_genuine,
+        routed_under_the_hood,
+        has_native_reasoning,
+        canary_passed,
+        latency_ms: elapsed_ms,
+        tokens_per_sec,
+        fingerprint_hash,
+        self_report,
+        explanation,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

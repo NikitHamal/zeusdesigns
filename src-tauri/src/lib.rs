@@ -77,6 +77,7 @@ pub fn run() {
             updater::update_check,
             updater::update_install,
             agent::providers_list,
+            agent::provider_verify_model,
             agent::chat_stream,
             agent::chat_cancel,
             agent::title_generate,

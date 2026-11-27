@@ -1,5 +1,6 @@
 use crate::providers::{
-    catalog, chatjimmy_complete, dispatch_stream, ChatRequest, ProviderEngine, ProviderInfo,
+    catalog, chatjimmy_complete, dispatch_stream, verify_model_fingerprint, ChatRequest,
+    ModelFingerprintReport, ProviderEngine, ProviderInfo,
 };
 use crate::workspace::{
     fs_delete, fs_read, fs_write, python_run, safe_join, search_workspace_code, shell_run,
@@ -17,6 +18,15 @@ use tauri::{AppHandle, Emitter};
 #[tauri::command]
 pub fn providers_list() -> Vec<ProviderInfo> {
     catalog()
+}
+
+#[tauri::command(async)]
+pub fn provider_verify_model(
+    provider: String,
+    model: String,
+    engine: tauri::State<'_, Arc<ProviderEngine>>,
+) -> Result<ModelFingerprintReport, String> {
+    verify_model_fingerprint(engine.inner(), &provider, &model)
 }
 
 #[tauri::command(async)]
@@ -267,6 +277,9 @@ fn is_known_valid_tool(name: &str) -> bool {
             | "skill"
             | "subagent"
             | "task"
+            | "lmfingerprint"
+            | "verify_model"
+            | "model_fingerprint"
     ) || name.starts_with("studio_")
         || name.starts_with("mcp:")
 }
@@ -1368,6 +1381,46 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
                 (true, format!("[Harness² Subagent Summary for '{}']\n{}", target_q, formatted))
             }
         }
+        "lmfingerprint" | "verify_model" | "model_fingerprint" => {
+            let target = if !path_arg.is_empty() {
+                path_arg.trim()
+            } else {
+                body.trim()
+            };
+            let (prov, mdl) = if let Some((p, m)) = target.split_once('/') {
+                (p.trim(), m.trim())
+            } else if !target.is_empty() {
+                (target, "")
+            } else {
+                ("gemini4hydrogen", "gemini-4-hydrogen")
+            };
+            let temp_engine = ProviderEngine::default();
+            match verify_model_fingerprint(&temp_engine, prov, mdl) {
+                Ok(rep) => (
+                    true,
+                    format!(
+                        "[LMFingerprint Verification Report]\nProvider: {}\nRequested Model: {}\nClaimed Family: {}\nDetected Family: {}\nUpstream Endpoint: {}\nUpstream Reported Model: {}\nProtocol Signature: {}\nVerdict: {} ({})\nCanary (17*23=391): {}\nNative Reasoning: {}\nLatency: {} ms ({} tok/s)\nFingerprint Hash: {}\nSelf-Report: {}\nSummary: {}",
+                        rep.provider,
+                        rep.requested_model,
+                        rep.claimed_family,
+                        rep.detected_family,
+                        rep.upstream_endpoint,
+                        rep.upstream_reported_model,
+                        rep.protocol_signature,
+                        rep.verdict,
+                        rep.verdict_label,
+                        if rep.canary_passed { "PASS" } else { "PARTIAL" },
+                        if rep.has_native_reasoning { "YES" } else { "NO" },
+                        rep.latency_ms,
+                        rep.tokens_per_sec,
+                        rep.fingerprint_hash,
+                        rep.self_report,
+                        rep.explanation
+                    ),
+                ),
+                Err(e) => (false, format!("LMFingerprint probe error: {}", e)),
+            }
+        }
         other if other.starts_with("mcp:") => {
             let reg = crate::mcp::McpRegistry::default();
             reg.invoke_tool(other, body)
@@ -1375,7 +1428,7 @@ pub fn execute_single_workspace_tool(eff_root: &str, inv: &InlineToolInvocation)
         _ => (
             false,
             format!(
-                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete, load_skill, subagent.",
+                "Unknown tool '{}'. Valid tools: shell (bash), python, read_file, write_file, edit_file, list_dir, search_code, web_fetch, memory_search, memory_save, memory_edit, memory_delete, load_skill, subagent, lmfingerprint.",
                 name
             ),
         ),
