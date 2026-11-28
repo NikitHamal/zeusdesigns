@@ -156,6 +156,15 @@ export function buildPlainContext(opts: {
     ) {
       content +=
         "\n\n[Continuation directive: The files you already read are in the conversation above. Do NOT re-explore or repeat a plan. Immediately apply the code edits using edit_file / write_file / shell and verify them.]";
+    } else if (
+      m.role === "user" &&
+      idx === all.length - 1 &&
+      opts.mode === "code" &&
+      all.length > 2 &&
+      Boolean(useStore.getState().ui.workspace)
+    ) {
+      content +=
+        "\n\n[Workspace tools active: read_file, search_code, list_dir, edit_file, write_file, shell, python — invoke them directly; never claim you lack repo/file access.]";
     }
     return {
       role: m.role,
