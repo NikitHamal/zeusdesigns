@@ -707,31 +707,26 @@ where
     let oai_msgs = if wants_tools {
         let mut sections = Vec::new();
         sections.push(
-            "[Text-Only XML Serializer Task]\nYou are NOT executing commands or accessing a filesystem yourself. You are a pure text-to-XML serializer that translates the user request into literal XML tags for a downstream parser. Never say you cannot access files; you are only writing XML string literals in chat."
+            "You ARE connected to the user's local project workspace in Zeus Codes. You have full access to read files, search code, run shell/python, and edit files by emitting `<zeus_tool name=\"...\" path=\"...\">...</zeus_tool>` blocks in your final response (outside `<think>`). Never claim you lack access to the local repository or files."
                 .to_string(),
         );
         sections.push(scraper_xml_dsl_banner().to_string());
         if !system.trim().is_empty() {
-            sections.push(format!("[System Context]\n{}", smart_cap_system(system, 96000)));
+            sections.push(format!("<system_instructions>\n{}\n</system_instructions>", smart_cap_system(system, 96000)));
         }
         if norm_msgs.len() > 1 {
             let mut hist = String::new();
             for m in &norm_msgs[..norm_msgs.len() - 1] {
-                let lbl = if m.role == "assistant" { "Assistant" } else { "User" };
-                hist.push_str(&format!("{}: {}\n\n", lbl, m.content));
+                let role_attr = if m.role == "assistant" { "assistant" } else { "user" };
+                hist.push_str(&format!("<turn role=\"{}\">\n{}\n</turn>\n\n", role_attr, m.content));
             }
-            sections.push(format!("[Conversation History]\n{}", hist.trim()));
-        } else {
-            sections.push(
-                "Example 1:\nInput: list root directory\nOutput: <zeus_tool name=\"list_dir\" path=\"\"></zeus_tool>"
-                    .to_string(),
-            );
+            sections.push(format!("<conversation_history>\n{}\n</conversation_history>", hist.trim()));
         }
         let last_user = norm_msgs
             .last()
             .map(|m| m.content.as_str())
             .unwrap_or("Continue.");
-        sections.push(format!("Input: {}\nOutput:", last_user));
+        sections.push(format!("<current_user_turn>\n{}\n</current_user_turn>", last_user));
         vec![json!({
             "role": "user",
             "content": sections.join("\n\n")

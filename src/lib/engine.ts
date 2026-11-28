@@ -226,6 +226,9 @@ export async function sendMessage(opts: {
     const { blocks, reasoning, thinkOpen } = parsed;
     let { text } = parsed;
     if (final && !text.trim() && tools.length > 0) text = synthesizeToolCompletionSummary(tools);
+    if (final && !text.trim() && !reasoning.trim() && tools.length === 0 && blocks.length === 0 && full.trim()) {
+      text = full.trim();
+    }
 
     const S = useStore.getState();
     blocks.forEach((b, i) => {
