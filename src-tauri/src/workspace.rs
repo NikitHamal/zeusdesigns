@@ -46,8 +46,18 @@ fn ignored_dirs() -> HashSet<&'static str> {
         "__pycache__",
         ".venv",
         "venv",
+        "env",
         ".turbo",
         "coverage",
+        "staticfiles",
+        "media",
+        ".cache",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".parcel-cache",
+        ".vite",
+        ".svelte-kit",
         "appdata",
         "$recycle.bin",
         "system volume information",
@@ -507,6 +517,30 @@ pub fn shell_run_ex(root: String, cmd: String, source: &str, timeout_ms: Option<
     res
 }
 
+fn is_searchable_text_file(path: &Path) -> bool {
+    const MAX_SEARCH_FILE_BYTES: u64 = 512 * 1024;
+    if let Ok(meta) = fs::metadata(path) {
+        if !meta.is_file() || meta.len() > MAX_SEARCH_FILE_BYTES {
+            return false;
+        }
+    }
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_default();
+    !matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "bmp" | "svg"
+            | "mp4" | "webm" | "mov" | "avi" | "mp3" | "wav" | "ogg" | "flac"
+            | "woff" | "woff2" | "ttf" | "otf" | "eot"
+            | "pdf" | "zip" | "tar" | "gz" | "7z" | "rar" | "bz2" | "xz"
+            | "sqlite" | "sqlite3" | "db" | "pyc" | "pyo" | "pyd"
+            | "exe" | "dll" | "so" | "dylib" | "wasm" | "bin" | "class" | "jar"
+            | "map" | "lock"
+    )
+}
+
 pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec<Value> {
     let mut matches = Vec::new();
     let root_path = Path::new(root);
@@ -514,7 +548,9 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
         return matches;
     }
     let needle = query.to_lowercase();
-    let nodes = walk_workspace_n(root_path, root_path, 6, 6000);
+    let nodes = walk_workspace_n(root_path, root_path, 6, 4000);
+    let started = std::time::Instant::now();
+    let deadline = std::time::Duration::from_secs(5);
 
     fn visit(
         base: &Path,
@@ -522,17 +558,22 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
         needle: &str,
         out: &mut Vec<Value>,
         limit: usize,
+        started: std::time::Instant,
+        deadline: std::time::Duration,
     ) {
         for n in nodes {
-            if out.len() >= limit {
+            if out.len() >= limit || started.elapsed() >= deadline {
                 return;
             }
             if n.dir {
                 if let Some(children) = &n.children {
-                    visit(base, children, needle, out, limit);
+                    visit(base, children, needle, out, limit, started, deadline);
                 }
             } else {
                 let full = base.join(&n.path);
+                if !is_searchable_text_file(&full) {
+                    continue;
+                }
                 if let Ok(text) = fs::read_to_string(&full) {
                     let all_lines: Vec<&str> = text.lines().collect();
                     for (idx, line) in all_lines.iter().enumerate() {
@@ -562,7 +603,7 @@ pub fn search_workspace_code(root: &str, query: &str, max_results: usize) -> Vec
         }
     }
 
-    visit(root_path, &nodes, &needle, &mut matches, max_results);
+    visit(root_path, &nodes, &needle, &mut matches, max_results, started, deadline);
     matches
 }
 
