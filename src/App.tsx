@@ -7,6 +7,7 @@ import { listenTerminal, nativeAvailable, nativeMcp, nativeMemory, openWorkspace
 import { appVersion, checkForUpdate } from "./lib/updater";
 import { ChatPane } from "./components/Chat";
 import { ArtifactWorkbench } from "./components/ArtifactWorkbench";
+import { M3ePane } from "./components/M3ePane";
 import {
   OpenDesignBrandSystemsView,
   OpenDesignDeliverablesView,
@@ -24,6 +25,7 @@ export default function App() {
   const collapsed = useStore((s) => s.ui.chatCollapsed);
   const sidebarOpen = useStore((s) => s.ui.sidebarOpen);
   const showCanvas = useStore((s) => s.ui.showCanvas);
+  const m3e = useStore((s) => s.ui.m3e);
   const leftTab = useStore((s) => s.ui.leftTab);
   const odTab = useStore((s) => s.ui.odTab ?? "studio");
   const toast = useStore((s) => s.ui.toast);
@@ -158,7 +160,7 @@ export default function App() {
                 </div>
               </>
             )}
-            <div className="min-w-0 flex-1 p-2 pl-0"><ArtifactWorkbench /></div>
+            <div className="min-w-0 flex-1 p-2 pl-0">{m3e ? <M3ePane /> : <ArtifactWorkbench />}</div>
           </>
         ) : hasMessages || leftTab !== "chat" || Boolean(activeRoot) ? (
           <div className={`flex min-w-0 flex-1 justify-center `}><div className="h-full w-full"><ChatPane /></div></div>

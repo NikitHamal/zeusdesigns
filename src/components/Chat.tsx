@@ -182,7 +182,7 @@ function MessageView({ m, isLast }: { m: Message; isLast?: boolean }) {
           const part = splitM3e(text);
           return (
             <>
-              {part.text && <div className={cn(streaming && "caret")}><Markdown text={part.text} /></div>}
+              {part.text && <Markdown text={part.text} />}
               {part.docs.map((d, i) => <M3eCard key={i} doc={d} id={`${m.id}:${key}:${i}`} streaming={m.streaming} />)}
             </>
           );

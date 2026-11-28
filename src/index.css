@@ -139,11 +139,9 @@ button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-@keyframes blink { 50% { opacity: 0; } }
 .anim-pop { animation: pop-in .35s var(--ease-spring) both; }
 .anim-fade { animation: fade-in .25s var(--ease-emph) both; }
 .shimmer { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--m-primary) 14%, transparent), transparent); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
-.caret::after { content: ""; display: inline-block; width: 7px; height: 1em; vertical-align: -0.15em; border-radius: 2px; background: var(--m-primary); animation: blink 1s steps(2) infinite; margin-left: 2px; }
 
 /* chat markdown */
 .md p { margin: 0 0 .6em; line-height: 1.6; }
