@@ -772,6 +772,7 @@ where
     let mut line = String::new();
     let mut in_think = false;
     let mut saw_text = false;
+    let mut citations: Vec<String> = Vec::new();
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
@@ -786,6 +787,21 @@ where
                 break;
             }
             if let Ok(ev) = serde_json::from_str::<Value>(raw) {
+                if let Some(cits) = ev.get("citations").and_then(|c| c.as_array()) {
+                    for c in cits {
+                        if let Some(u) = c.as_str() {
+                            if !u.is_empty() && !citations.iter().any(|x| x == u) {
+                                citations.push(u.to_string());
+                            }
+                        } else if let Some(u) = c.get("url").and_then(|v| v.as_str()) {
+                            let t = c.get("title").and_then(|v| v.as_str()).unwrap_or(u);
+                            let entry = format!("[{}]({})", t, u);
+                            if !citations.iter().any(|x| x == &entry) {
+                                citations.push(entry);
+                            }
+                        }
+                    }
+                }
                 if let Some(choice) = ev.get("choices").and_then(|c| c.get(0)) {
                     if let Some(d) = choice.get("delta").or_else(|| choice.get("message")) {
                         let r_text = extract_delta_reasoning(d);
@@ -814,6 +830,13 @@ where
     }
     if in_think {
         on_delta("</think>");
+    }
+    if !citations.is_empty() && saw_text {
+        let mut src_block = String::from("\n\n**Sources**\n");
+        for c in &citations {
+            src_block.push_str(&format!("- {}\n", c));
+        }
+        on_delta(&src_block);
     }
     if saw_text {
         Ok(())

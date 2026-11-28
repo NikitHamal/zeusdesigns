@@ -402,11 +402,34 @@ export function stripToolMarkupFromText(input: string): string {
         return `\n${msg ? `**${msg}**\n` : ""}${items.join("\n")}\n`;
       }
     )
-    .replace(/<Image\b([^>]*)(?:\/>|>[\s\S]*?<\/Image>)/gi, (m, attrs: string) => {
-      if (/\bsrc\s*=\s*"https?:\/\//i.test(attrs)) return m;
-      return "";
+    .replace(/<Image\b([^>]*)(?:\/>|>[\s\S]*?<\/Image>)/gi, (_m, attrs: string) => {
+      const src = /\bsrc\s*=\s*"([^"]*)"/i.exec(attrs)?.[1]?.trim() ?? "";
+      const caption = /\bcaption\s*=\s*"([^"]*)"/i.exec(attrs)?.[1]?.trim() ?? "";
+      const alt = /\balt\s*=\s*"([^"]*)"/i.exec(attrs)?.[1]?.trim() ?? "";
+      const label = caption || alt;
+      if (/^(?:https?:\/\/|data:image\/)/i.test(src)) {
+        return `\n![${label.replace(/[\[\]]/g, "")}](${src})\n`;
+      }
+      if (!label) return "";
+      const desc = caption && alt && caption !== alt ? `**${caption}** — *${alt}*` : `**${label}**`;
+      return `\n> Visual: ${desc}\n`;
     })
-    .replace(/<\/?(?:Sequence|Step|ElicitationsGroup|Elicitation)\b[^>]*\/?>/gi, "")
+    .replace(
+      /<Sources\b[^>]*>([\s\S]*?)(<\/Sources>|$)/gi,
+      (_m, inner: string) => {
+        const items: string[] = [];
+        inner.replace(/<Source\b([^>]*)(?:\/>|>[\s\S]*?<\/Source>)/gi, (_sm, sa: string) => {
+          const title = /\btitle\s*=\s*"([^"]*)"/i.exec(sa)?.[1]?.trim() ?? "";
+          const url = /\burl\s*=\s*"([^"]*)"/i.exec(sa)?.[1]?.trim() ?? "";
+          if (url && title) items.push(`- [${title}](${url})`);
+          else if (url) items.push(`- ${url}`);
+          else if (title) items.push(`- ${title}`);
+          return "";
+        });
+        return items.length ? `\n**Sources**\n${items.join("\n")}\n` : "";
+      }
+    )
+    .replace(/<\/?(?:Sequence|Step|ElicitationsGroup|Elicitation|Sources|Source|Image)\b[^>]*\/?>/gi, "")
     .replace(/<\/?(?:think|thinking|thought|reasoning|zeus_tool|tool_call|function_call)\b[^>]*>/gi, notBackticked(() => ""));
 }
 

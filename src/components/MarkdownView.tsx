@@ -14,7 +14,7 @@ function openFilePill(raw: string) {
 function renderInline(s: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = [];
   const re =
-    /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\*[^*\s][^*]*\*|(?<![a-zA-Z0-9_])_[^_\s][^_]*_(?![a-zA-Z0-9_])|\[[^\]]+\]\([^)]+\))/g;
+    /(!\[[^\]]*\]\([^)]+\)|\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\*[^*\s][^*]*\*|(?<![a-zA-Z0-9_])_[^_\s][^_]*_(?![a-zA-Z0-9_])|\[[^\]]+\]\([^)]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
@@ -59,6 +59,25 @@ function renderInline(s: string, keyPrefix: string): ReactNode[] {
           {codeText}
         </code>
       );
+    } else if (tok.startsWith("![")) {
+      const im = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(tok);
+      if (im) {
+        out.push(
+          <figure key={k} className="my-2 overflow-hidden rounded-xl border border-outline-variant/60 bg-surface-lowest p-2">
+            <img
+              src={im[2]}
+              alt={im[1]}
+              loading="lazy"
+              className="max-h-96 w-auto max-w-full rounded-lg object-contain"
+            />
+            {im[1] && (
+              <figcaption className="mt-1.5 text-[12px] text-on-surface-variant">{im[1]}</figcaption>
+            )}
+          </figure>
+        );
+      } else {
+        out.push(tok);
+      }
     } else if (tok.startsWith("[")) {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(tok);
       if (mm) {
