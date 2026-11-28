@@ -370,6 +370,43 @@ export function stripToolMarkupFromText(input: string): string {
         return "";
       }
     )
+    .replace(
+      /<Sequence\b[^>]*>([\s\S]*?)(<\/Sequence>|$)/gi,
+      (_m, inner: string) => {
+        let stepNum = 0;
+        const formatted = inner.replace(
+          /<Step\b([^>]*)>([\s\S]*?)(<\/Step>|$)/gi,
+          (_sm, attrs: string, body: string) => {
+            stepNum++;
+            const title = /\btitle\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? "";
+            const subtitle = /\bsubtitle\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? "";
+            const head = [title ? `**${title}**` : "", subtitle ? `*${subtitle}*` : ""].filter(Boolean).join(" — ");
+            const cleanBody = body.trim();
+            return `\n${stepNum}. ${head}${cleanBody ? `\n   - ${cleanBody}` : ""}\n`;
+          }
+        );
+        return formatted.trim() + "\n";
+      }
+    )
+    .replace(
+      /<ElicitationsGroup\b([^>]*)>([\s\S]*?)(<\/ElicitationsGroup>|$)/gi,
+      (_m, attrs: string, inner: string) => {
+        const msg = /\bmessage\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? "";
+        const items: string[] = [];
+        inner.replace(/<Elicitation\b([^>]*)(?:\/>|>[\s\S]*?<\/Elicitation>)/gi, (_em, ea: string) => {
+          const label = /\blabel\s*=\s*"([^"]*)"/i.exec(ea)?.[1] ?? "";
+          if (label) items.push(`- ${label}`);
+          return "";
+        });
+        if (!msg && !items.length) return "";
+        return `\n${msg ? `**${msg}**\n` : ""}${items.join("\n")}\n`;
+      }
+    )
+    .replace(/<Image\b([^>]*)(?:\/>|>[\s\S]*?<\/Image>)/gi, (m, attrs: string) => {
+      if (/\bsrc\s*=\s*"https?:\/\//i.test(attrs)) return m;
+      return "";
+    })
+    .replace(/<\/?(?:Sequence|Step|ElicitationsGroup|Elicitation)\b[^>]*\/?>/gi, "")
     .replace(/<\/?(?:think|thinking|thought|reasoning|zeus_tool|tool_call|function_call)\b[^>]*>/gi, notBackticked(() => ""));
 }
 

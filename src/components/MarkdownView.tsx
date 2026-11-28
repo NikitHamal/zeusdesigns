@@ -14,7 +14,7 @@ function openFilePill(raw: string) {
 function renderInline(s: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = [];
   const re =
-    /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_|\[[^\]]+\]\([^)]+\))/g;
+    /(\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\*[^*\s][^*]*\*|(?<![a-zA-Z0-9_])_[^_\s][^_]*_(?![a-zA-Z0-9_])|\[[^\]]+\]\([^)]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
