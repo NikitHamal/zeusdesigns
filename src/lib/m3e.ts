@@ -29,11 +29,63 @@ function b64url(bytes: Uint8Array): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Validates the document and returns the share link that opens it in M3E Canvas. */
+const VALID_KINDS = new Set([
+  "topAppBar", "bottomNav", "navRail", "tabs", "searchBar", "button", "iconButton",
+  "fab", "extendedFab", "splitButton", "fabMenu", "toolbar", "chip", "card", "listItem",
+  "box", "dialog", "snackbar", "textField", "select", "switch", "checkbox", "radio",
+  "slider", "text", "image", "divider", "badge", "loadingIndicator", "linearProgress",
+  "circularProgress",
+]);
+
+/** Normalizes common model omissions, validates the M3E Canvas schema, and returns the #docz= share link. */
 export async function m3eLink(json: string): Promise<string> {
-  const doc = JSON.parse(json) as { frames?: unknown[]; groups?: unknown[] };
-  if (!Array.isArray(doc.frames) || !Array.isArray(doc.groups)) throw new Error("The sketch is missing frames or groups.");
-  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  const doc = JSON.parse(json) as Record<string, unknown>;
+  if (!Array.isArray(doc.frames) || !Array.isArray(doc.groups) || doc.frames.length === 0) {
+    throw new Error("The sketch is missing frames or groups.");
+  }
+  const seenIds = new Set<string>();
+  const uniq = (raw: unknown, prefix: string, idx: number) => {
+    let id = typeof raw === "string" && raw.trim() ? raw.trim() : `${prefix}-${idx}`;
+    while (seenIds.has(id)) id = `${id}-${idx}`;
+    seenIds.add(id);
+    return id;
+  };
+  doc.frame = typeof doc.frame === "string" ? doc.frame : "phone";
+  doc.platform = typeof doc.platform === "string" ? doc.platform : "android";
+  doc.frames = (doc.frames as Record<string, unknown>[]).map((f, i) => ({
+    ...f,
+    id: uniq(f.id, "frame", i),
+    name: typeof f.name === "string" && f.name ? f.name : `Screen ${i + 1}`,
+    x: typeof f.x === "number" ? f.x : i * 492,
+    y: typeof f.y === "number" ? f.y : 0,
+  }));
+  doc.groups = (doc.groups as Record<string, unknown>[]).map((g, gi) => {
+    const rawItems = Array.isArray(g.items) ? (g.items as Record<string, unknown>[]) : [];
+    const items = rawItems
+      .filter((it) => typeof it.kind === "string" && VALID_KINDS.has(it.kind))
+      .map((it, ii) => ({
+        ...it,
+        id: uniq(it.id, "item", gi * 100 + ii),
+        label: typeof it.label === "string" ? it.label : "",
+        icon: it.icon === undefined ? null : it.icon,
+        variant: typeof it.variant === "string" && it.variant ? it.variant : "filled",
+      }));
+    const axis = g.axis === "y" || g.axis === "x"
+      ? g.axis
+      : items.length > 1 && items[0]?.kind === "listItem"
+      ? "y"
+      : "x";
+    return {
+      ...g,
+      id: uniq(g.id, "grp", gi),
+      x: typeof g.x === "number" ? g.x : 0,
+      y: typeof g.y === "number" ? g.y : 0,
+      axis,
+      items,
+    };
+  });
+  const normalized = JSON.stringify(doc);
+  const stream = new Blob([normalized]).stream().pipeThrough(new CompressionStream("deflate-raw"));
   const buf = new Uint8Array(await new Response(stream).arrayBuffer());
   return `${M3E_BASE}#docz=${b64url(buf)}`;
 }
