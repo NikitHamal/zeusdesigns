@@ -8,6 +8,7 @@ import { DEVICE_SIZE } from "./types";
 import { DESIGN_SYSTEMS, getDS } from "./lib/designSystems";
 import { rethemeHtml } from "./lib/harness";
 import { SKILLS } from "./lib/skills";
+import { mergeOpenCodeCustomProviders, OPENCODE_CUSTOM_PROVIDERS } from "./lib/customPresets";
 import { blankFrame } from "./lib/templates";
 import { applyTheme } from "./lib/theme";
 import type { Workspace } from "./lib/bridge";
@@ -189,7 +190,7 @@ export const useStore = create<State>()(
       settings: {
         theme: "dark", hue: 17, providerId: "mercury3", modelId: "mercury-3", effort: "medium",
         designSystemId: "m3e", skills: SKILLS.filter((s) => s.default).map((s) => s.id),
-        customProviders: [], mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true, studioOn: true, learnOn: true,
+        customProviders: OPENCODE_CUSTOM_PROVIDERS, mcp: [], memory: [], autoTitle: true, webSearch: false, memoryOn: true, selfCheck: true, studioOn: true, learnOn: true,
       },
       ui: {
         settingsOpen: false, settingsTab: "providers", leftTab: "chat", compare: null, interactId: null, editId: null, openPinId: null,
@@ -679,6 +680,7 @@ export const useStore = create<State>()(
             settings.modelId = "mercury-3";
           }
         }
+        settings.customProviders = mergeOpenCodeCustomProviders(settings.customProviders);
         try { applyTheme(settings.theme, settings.hue); } catch { /* ignore */ }
         const cleanSavedHtml = (h: string) =>
           h

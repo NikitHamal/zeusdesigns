@@ -963,4 +963,5 @@ include!("providers_gateways_b.rs");
 include!("providers_oai_a.rs");
 include!("providers_oai_b.rs");
 include!("providers_direct.rs");
+include!("providers_responses.rs");
 include!("providers_fingerprint.rs");

@@ -105,12 +105,22 @@ export function ModelPicker() {
                 </div>
                 <div className="min-w-0 flex-1 overflow-y-auto p-1.5">
                   {active === "custom"
-                    ? settings.customProviders.map((c) => (
-                      <button key={c.id} onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: c.model }); close(); }} className={cn("state flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left", settings.providerId === `custom:${c.id}` ? "bg-primary-container text-on-primary-container" : "text-on-surface")}>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{c.model}</span>
-                        <span className="truncate text-[11px] text-on-surface-variant">{c.name}</span>
-                      </button>
-                    ))
+                    ? settings.customProviders.flatMap((c) => {
+                        const list = c.models && c.models.length > 0 ? c.models : [c.model];
+                        return list.map((mid) => {
+                          const on = settings.providerId === `custom:${c.id}` && settings.modelId === mid;
+                          return (
+                            <button
+                              key={`${c.id}:${mid}`}
+                              onClick={() => { patch({ providerId: `custom:${c.id}`, modelId: mid }); close(); }}
+                              className={cn("state flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left", on ? "bg-primary-container text-on-primary-container" : "text-on-surface")}
+                            >
+                              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{mid}</span>
+                              <span className="truncate text-[11px] text-on-surface-variant">{c.name}</span>
+                            </button>
+                          );
+                        });
+                      })
                     : findProvider(active).models.map((m) => (
                       <ModelRow key={m.id} m={m} active={settings.providerId === active && settings.modelId === m.id} onPick={() => pick(active, m, close)} />
                     ))}

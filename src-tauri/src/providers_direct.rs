@@ -586,6 +586,8 @@ where
         }
         flush_oai_tool_calls(&streamed_tool_calls, on_delta);
         Ok(())
+    } else if custom.format == "openai-responses" || model.to_ascii_lowercase().contains("gpt-6.2-sol") {
+        stream_openai_responses_endpoint(custom, model, system, messages, effort, cancel, on_delta)
     } else {
         let wants_tools = is_agent_tool_request(system);
         let mut oai_msgs = Vec::new();
@@ -637,7 +639,13 @@ where
             .map_err(|e| format!("OpenAI request failed: {}", e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("OpenAI HTTP {}", resp.status()));
+            let status = resp.status();
+            let err_body: String = resp.text().unwrap_or_default();
+            if err_body.contains("/v1/responses") || err_body.contains("does not support /v1/chat/completions") {
+                return stream_openai_responses_endpoint(custom, model, system, messages, effort, cancel, on_delta);
+            }
+            let snippet: String = err_body.chars().take(240).collect();
+            return Err(format!("OpenAI HTTP {}: {}", status, snippet));
         }
         let mut reader = BufReader::new(resp);
         let mut line = String::new();

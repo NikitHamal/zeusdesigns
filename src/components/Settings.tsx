@@ -64,7 +64,7 @@ const field = "h-11 w-full rounded-2xl bg-surface-high px-4 text-sm text-on-surf
 function ProvidersTab() {
   const { settings } = useStore();
   const patch = useStore((s) => s.patchSettings);
-  const [form, setForm] = useState({ name: "", format: "openai" as "openai" | "anthropic", baseUrl: "", apiKey: "", model: "" });
+  const [form, setForm] = useState({ name: "", format: "openai" as "openai" | "openai-responses" | "anthropic", baseUrl: "", apiKey: "", model: "" });
   const [fpBusy, setFpBusy] = useState(false);
   const [fpRep, setFpRep] = useState<ModelFingerprintReport | null>(null);
   const [fpError, setFpError] = useState<string | null>(null);
@@ -200,16 +200,26 @@ function ProvidersTab() {
           {PRESETS.map((p) => <button key={p.name} onClick={() => setForm({ ...form, ...p, apiKey: form.apiKey })} className="state rounded-full bg-surface-high px-3 py-1.5 text-xs font-semibold text-on-surface">{p.name}</button>)}
         </div>
         {settings.customProviders.map((c) => (
-          <div key={c.id} className="mb-2 flex items-center gap-3 rounded-[22px] bg-surface-container px-4 py-3">
-            <Icon name="key" size={18} className="text-primary" />
-            <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold">{c.name}</div><div className="truncate text-xs text-on-surface-variant">{c.format} · {c.baseUrl} · {c.model}</div></div>
+          <div key={c.id} className="mb-2 flex flex-wrap items-center gap-2.5 rounded-[22px] bg-surface-container px-4 py-3">
+            <Icon name="key" size={18} className={c.apiKey ? "text-primary" : "text-on-surface-variant"} />
+            <div className="min-w-[160px] flex-1">
+              <div className="truncate text-sm font-semibold">{c.name}</div>
+              <div className="truncate text-xs text-on-surface-variant">{c.format} · {c.baseUrl} · {c.models?.length ? `${c.models.length} models` : c.model}</div>
+            </div>
+            <input
+              type="password"
+              value={c.apiKey}
+              placeholder="Paste API key…"
+              onChange={(e) => patch({ customProviders: settings.customProviders.map((x) => x.id === c.id ? { ...x, apiKey: e.target.value } : x) })}
+              className="h-8 w-44 rounded-xl bg-surface-high px-2.5 text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-on-surface-variant/50"
+            />
             <IconBtn label="Use" size={34} active={settings.providerId === `custom:${c.id}`} onClick={() => patch({ providerId: `custom:${c.id}`, modelId: c.model })}><Icon name="check" size={16} /></IconBtn>
             <IconBtn label="Remove" size={34} onClick={() => patch({ customProviders: settings.customProviders.filter((x) => x.id !== c.id) })}><Icon name="delete" size={16} /></IconBtn>
           </div>
         ))}
         <div className="grid gap-2.5 rounded-[26px] bg-surface-container p-4 sm:grid-cols-2">
           <input className={field} placeholder="Name (optional)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Segmented value={form.format} onChange={(v) => setForm({ ...form, format: v })} options={[{ id: "openai", label: "OpenAI-compatible" }, { id: "anthropic", label: "Anthropic" }]} />
+          <Segmented value={form.format} onChange={(v) => setForm({ ...form, format: v })} options={[{ id: "openai", label: "OpenAI" }, { id: "openai-responses", label: "Responses" }, { id: "anthropic", label: "Anthropic" }]} />
           <input className={cn(field, "sm:col-span-2")} placeholder="Base URL  e.g. https://api.openai.com/v1" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
           <input className={field} type="password" placeholder="API key" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
           <input className={field} placeholder="Model id" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />

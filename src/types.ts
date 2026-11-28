@@ -165,7 +165,7 @@ export interface Conversation {
   compactedCount?: number;
 }
 
-export interface CustomProvider { id: string; name: string; format: "openai" | "anthropic"; baseUrl: string; apiKey: string; model: string }
+export interface CustomProvider { id: string; name: string; format: "openai" | "openai-responses" | "anthropic"; baseUrl: string; apiKey: string; model: string; models?: string[] }
 export interface McpServer { id: string; name: string; transport: "stdio" | "http" | "builtin"; command: string; args?: string[]; enabled: boolean; catalogId?: string }
 export type MemoryCategory = "preferences" | "profile" | "topics" | "areas";
 export interface MemoryItem { id: string; text: string; at: number; pinned?: boolean; category?: MemoryCategory }

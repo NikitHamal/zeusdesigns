@@ -40,7 +40,7 @@ export interface ChatRequest {
   subagentDepth?: number;
   maxSubagentDepth?: number;
   toolsPrompt?: string;
-  custom?: { baseUrl: string; apiKey: string; format: "openai" | "anthropic" };
+  custom?: { baseUrl: string; apiKey: string; format: "openai" | "openai-responses" | "anthropic" };
 }
 
 export async function nativeChat(req: ChatRequest, onEvent: (e: ChatEvent) => void): Promise<() => void> {

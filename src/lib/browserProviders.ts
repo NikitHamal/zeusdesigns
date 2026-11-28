@@ -137,6 +137,28 @@ export async function streamCustom(
     await sse(res, (j) =>
       j.type === "content_block_delta" ? { text: j.delta?.text ?? "", think: j.delta?.thinking ?? "" } : {}
     );
+  } else if (c.format === "openai-responses" || req.model.toLowerCase().includes("gpt-6.2-sol")) {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (c.apiKey) headers.authorization = `Bearer ${c.apiKey}`;
+    const respUrl = base.endsWith("/v1") ? `${base}/responses` : `${base}/v1/responses`;
+    const res = await fetch(respUrl, {
+      method: "POST",
+      signal,
+      headers,
+      body: JSON.stringify({
+        model: req.model,
+        stream: true,
+        ...(req.system ? { instructions: req.system } : {}),
+        input: msgs,
+      }),
+    });
+    await sse(res, (j) => {
+      if (j.type === "response.output_text.delta") return { text: j.delta ?? "" };
+      if (j.type === "response.reasoning_summary_text.delta" || j.type === "response.reasoning_text.delta") {
+        return { think: j.delta ?? "" };
+      }
+      return {};
+    });
   } else {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (c.apiKey) headers.authorization = `Bearer ${c.apiKey}`;

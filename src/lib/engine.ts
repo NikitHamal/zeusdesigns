@@ -130,8 +130,11 @@ export async function sendMessage(opts: {
   const custom = settings.providerId.startsWith("custom:")
     ? settings.customProviders.find((c) => `custom:${c.id}` === settings.providerId)
     : undefined;
+  const customModel = custom
+    ? (custom.models?.includes(settings.modelId) ? settings.modelId : custom.model)
+    : settings.modelId;
   const modelLabel = custom
-    ? custom.model
+    ? customModel
     : prov?.models.find((m) => m.id === settings.modelId)?.label ?? settings.modelId;
   freshSt.addMessage(convId, userMsg);
   freshSt.addMessage(convId, {
@@ -362,7 +365,7 @@ export async function sendMessage(opts: {
   const req: ChatRequest = {
     requestId: uid(),
     provider: custom ? "custom" : settings.providerId,
-    model: custom ? custom.model : settings.modelId,
+    model: custom ? customModel : settings.modelId,
     effort: settings.effort,
     system,
     messages: history,
